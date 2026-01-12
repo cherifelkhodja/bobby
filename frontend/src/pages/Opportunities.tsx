@@ -35,7 +35,7 @@ export function Opportunities() {
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Opportunit\u00e9s</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Opportunités</h1>
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
@@ -68,7 +68,7 @@ export function Opportunities() {
                   {opportunity.budget && (
                     <span className="flex items-center">
                       <Euro className="h-4 w-4 mr-1" />
-                      {opportunity.budget}\u20ac/jour
+                      {opportunity.budget}€/jour
                     </span>
                   )}
                   {opportunity.start_date && (
@@ -119,7 +119,7 @@ export function Opportunities() {
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
           >
-            Pr\u00e9c\u00e9dent
+            Précédent
           </Button>
           <span className="px-4 py-2 text-sm text-gray-600">
             Page {page} / {Math.ceil(data.total / data.page_size)}

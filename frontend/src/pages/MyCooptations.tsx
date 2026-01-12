@@ -36,7 +36,7 @@ export function MyCooptations() {
         <Card className="text-center py-12">
           <p className="text-gray-500">Vous n'avez pas encore de cooptation.</p>
           <p className="text-sm text-gray-400 mt-2">
-            Rendez-vous sur la page Opportunit\u00e9s pour proposer des candidats.
+            Rendez-vous sur la page Opportunités pour proposer des candidats.
           </p>
         </Card>
       ) : (
@@ -58,7 +58,7 @@ export function MyCooptations() {
                     <p className="text-sm text-gray-500">
                       {cooptation.candidate_email}
                       {cooptation.candidate_phone &&
-                        ` \u2022 ${cooptation.candidate_phone}`}
+                        ` • ${cooptation.candidate_phone}`}
                     </p>
                     {cooptation.rejection_reason && (
                       <p className="text-sm text-error mt-2">
@@ -70,7 +70,7 @@ export function MyCooptations() {
                     <p>Soumis le {formatDate(cooptation.submitted_at)}</p>
                     {cooptation.candidate_daily_rate && (
                       <p className="font-medium text-gray-700">
-                        {cooptation.candidate_daily_rate}\u20ac/jour
+                        {cooptation.candidate_daily_rate}€/jour
                       </p>
                     )}
                   </div>
@@ -87,7 +87,7 @@ export function MyCooptations() {
                 disabled={page === 1}
                 onClick={() => setPage((p) => p - 1)}
               >
-                Pr\u00e9c\u00e9dent
+                Précédent
               </Button>
               <span className="px-4 py-2 text-sm text-gray-600">
                 Page {page} / {Math.ceil(data.total / data.page_size)}

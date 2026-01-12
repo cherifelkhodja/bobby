@@ -10,7 +10,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 
 const profileSchema = z.object({
-  first_name: z.string().min(1, 'Pr\u00e9nom requis'),
+  first_name: z.string().min(1, 'Prénom requis'),
   last_name: z.string().min(1, 'Nom requis'),
   boond_resource_id: z.string().optional(),
 });
@@ -18,7 +18,7 @@ const profileSchema = z.object({
 const passwordSchema = z
   .object({
     current_password: z.string().min(1, 'Mot de passe actuel requis'),
-    new_password: z.string().min(8, '8 caract\u00e8res minimum'),
+    new_password: z.string().min(8, '8 caractères minimum'),
     confirm_password: z.string(),
   })
   .refine((data) => data.new_password === data.confirm_password, {
@@ -57,9 +57,9 @@ export function Profile() {
         full_name: `${data.first_name} ${data.last_name}`,
         boond_resource_id: data.boond_resource_id || null,
       });
-      toast.success('Profil mis \u00e0 jour');
+      toast.success('Profil mis à jour');
     } catch {
-      toast.error('Erreur lors de la mise \u00e0 jour');
+      toast.error('Erreur lors de la mise à jour');
     } finally {
       setIsUpdating(false);
     }
@@ -69,7 +69,7 @@ export function Profile() {
     setIsChangingPassword(true);
     try {
       // API call would go here
-      toast.success('Mot de passe modifi\u00e9');
+      toast.success('Mot de passe modifié');
       passwordForm.reset();
     } catch {
       toast.error('Erreur lors du changement de mot de passe');
@@ -86,7 +86,7 @@ export function Profile() {
         <Card>
           <CardHeader
             title="Informations personnelles"
-            subtitle="Mettez \u00e0 jour vos informations"
+            subtitle="Mettez à jour vos informations"
           />
           <form
             onSubmit={profileForm.handleSubmit(onUpdateProfile)}
@@ -94,7 +94,7 @@ export function Profile() {
           >
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="Pr\u00e9nom"
+                label="Prénom"
                 error={profileForm.formState.errors.first_name?.message}
                 {...profileForm.register('first_name')}
               />
@@ -124,7 +124,7 @@ export function Profile() {
 
         <Card>
           <CardHeader
-            title="S\u00e9curit\u00e9"
+            title="Sécurité"
             subtitle="Changez votre mot de passe"
           />
           <form
@@ -141,7 +141,7 @@ export function Profile() {
             <Input
               label="Nouveau mot de passe"
               type="password"
-              helperText="8 caract\u00e8res minimum"
+              helperText="8 caractères minimum"
               error={passwordForm.formState.errors.new_password?.message}
               {...passwordForm.register('new_password')}
             />

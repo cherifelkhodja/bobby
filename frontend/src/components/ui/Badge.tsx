@@ -23,11 +23,11 @@ const statusConfig: Record<
   },
   accepted: {
     className: 'bg-success-light text-success-dark',
-    label: 'Accept\u00e9',
+    label: 'Accepté',
   },
   rejected: {
     className: 'bg-error-light text-error-dark',
-    label: 'Refus\u00e9',
+    label: 'Refusé',
   },
 };
 

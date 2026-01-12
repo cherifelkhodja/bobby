@@ -47,14 +47,14 @@ export function ForgotPassword() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md text-center">
           <h2 className="text-xl font-bold text-gray-900 mb-4">
-            Email envoy\u00e9 !
+            Email envoyé !
           </h2>
           <p className="text-gray-600 mb-6">
-            Si cette adresse email existe dans notre syst\u00e8me, vous recevrez un
-            lien pour r\u00e9initialiser votre mot de passe.
+            Si cette adresse email existe dans notre système, vous recevrez un
+            lien pour réinitialiser votre mot de passe.
           </p>
           <Link to="/login">
-            <Button variant="secondary">Retour \u00e0 la connexion</Button>
+            <Button variant="secondary">Retour à la connexion</Button>
           </Link>
         </Card>
       </div>
@@ -69,15 +69,15 @@ export function ForgotPassword() {
           className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Retour \u00e0 la connexion
+          Retour à la connexion
         </Link>
 
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-900">
-            Mot de passe oubli\u00e9
+            Mot de passe oublié
           </h1>
           <p className="text-gray-600 mt-2">
-            Entrez votre email pour recevoir un lien de r\u00e9initialisation
+            Entrez votre email pour recevoir un lien de réinitialisation
           </p>
         </div>
 

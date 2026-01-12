@@ -32,7 +32,7 @@ export function Header() {
             onClick={handleLogout}
             leftIcon={<LogOut className="h-4 w-4" />}
           >
-            D\u00e9connexion
+            Déconnexion
           </Button>
         </div>
       </div>

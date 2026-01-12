@@ -41,7 +41,7 @@ export function Login() {
         refresh_token: response.refresh_token,
         token_type: response.token_type,
       });
-      toast.success('Connexion r\u00e9ussie');
+      toast.success('Connexion réussie');
       navigate('/dashboard');
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -55,7 +55,7 @@ export function Login() {
       <Card className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-900">Gemini Cooptation</h1>
-          <p className="text-gray-600 mt-2">Connectez-vous \u00e0 votre compte</p>
+          <p className="text-gray-600 mt-2">Connectez-vous à votre compte</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -80,7 +80,7 @@ export function Login() {
               to="/forgot-password"
               className="text-sm text-primary-600 hover:text-primary-700"
             >
-              Mot de passe oubli\u00e9 ?
+              Mot de passe oublié ?
             </Link>
           </div>
 

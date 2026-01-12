@@ -12,7 +12,7 @@ import { Input } from '../ui/Input';
 import type { Opportunity } from '../../types';
 
 const cooptationSchema = z.object({
-  candidate_first_name: z.string().min(1, 'Pr\u00e9nom requis'),
+  candidate_first_name: z.string().min(1, 'Prénom requis'),
   candidate_last_name: z.string().min(1, 'Nom requis'),
   candidate_email: z.string().email('Email invalide'),
   candidate_civility: z.enum(['M', 'Mme']),
@@ -52,7 +52,7 @@ export function CreateCooptationForm({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-cooptations'] });
       queryClient.invalidateQueries({ queryKey: ['my-stats'] });
-      toast.success('Cooptation soumise avec succ\u00e8s');
+      toast.success('Cooptation soumise avec succès');
       onSuccess();
     },
     onError: (error) => {
@@ -70,21 +70,21 @@ export function CreateCooptationForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <p className="text-sm text-gray-600">Opportunit\u00e9 :</p>
+        <p className="text-sm text-gray-600">Opportunité :</p>
         <p className="font-medium text-gray-900">{opportunity.title}</p>
         <p className="text-sm text-gray-500">{opportunity.reference}</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
         <div>
-          <label className="label">Civilit\u00e9</label>
+          <label className="label">Civilité</label>
           <select className="input" {...register('candidate_civility')}>
             <option value="M">M.</option>
             <option value="Mme">Mme</option>
           </select>
         </div>
         <Input
-          label="Pr\u00e9nom"
+          label="Prénom"
           error={errors.candidate_first_name?.message}
           {...register('candidate_first_name')}
         />
@@ -103,7 +103,7 @@ export function CreateCooptationForm({
           {...register('candidate_email')}
         />
         <Input
-          label="T\u00e9l\u00e9phone"
+          label="Téléphone"
           placeholder="0612345678"
           error={errors.candidate_phone?.message}
           {...register('candidate_phone')}
@@ -111,7 +111,7 @@ export function CreateCooptationForm({
       </div>
 
       <Input
-        label="TJM souhait\u00e9 (\u20ac/jour)"
+        label="TJM souhaité (€/jour)"
         type="number"
         placeholder="500"
         error={errors.candidate_daily_rate?.message}
@@ -122,7 +122,7 @@ export function CreateCooptationForm({
         <label className="label">Note / Commentaire</label>
         <textarea
           className="input min-h-[100px]"
-          placeholder="Informations compl\u00e9mentaires sur le candidat..."
+          placeholder="Informations complémentaires sur le candidat..."
           {...register('candidate_note')}
         />
         {errors.candidate_note && (

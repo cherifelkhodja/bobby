@@ -31,14 +31,14 @@ export function Dashboard() {
       bgColor: 'bg-warning-light',
     },
     {
-      title: 'Accept\u00e9es',
+      title: 'Acceptées',
       value: stats?.accepted || 0,
       icon: CheckCircle,
       color: 'text-success',
       bgColor: 'bg-success-light',
     },
     {
-      title: 'Refus\u00e9es',
+      title: 'Refusées',
       value: stats?.rejected || 0,
       icon: XCircle,
       color: 'text-error',
@@ -69,14 +69,14 @@ export function Dashboard() {
       <Card>
         <CardHeader
           title="Taux de conversion"
-          subtitle="Pourcentage de cooptations accept\u00e9es"
+          subtitle="Pourcentage de cooptations acceptées"
         />
         <div className="flex items-center">
           <div className="text-4xl font-bold text-primary-600">
             {stats?.conversion_rate.toFixed(1)}%
           </div>
           <div className="ml-4 text-sm text-gray-500">
-            {stats?.accepted} accept\u00e9es sur {stats?.total} soumises
+            {stats?.accepted} acceptées sur {stats?.total} soumises
           </div>
         </div>
       </Card>

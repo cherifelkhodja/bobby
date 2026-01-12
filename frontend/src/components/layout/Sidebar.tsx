@@ -3,7 +3,7 @@ import { LayoutDashboard, Briefcase, Users, Settings } from 'lucide-react';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
-  { to: '/opportunities', icon: Briefcase, label: 'Opportunit\u00e9s' },
+  { to: '/opportunities', icon: Briefcase, label: 'Opportunités' },
   { to: '/my-cooptations', icon: Users, label: 'Mes cooptations' },
   { to: '/profile', icon: Settings, label: 'Mon profil' },
 ];
