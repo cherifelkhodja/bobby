@@ -39,6 +39,14 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class RefreshResponse(BaseModel):
+    """Token refresh response (tokens only, no user)."""
+
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
 class ForgotPasswordRequest(BaseModel):
     """Forgot password request."""
 

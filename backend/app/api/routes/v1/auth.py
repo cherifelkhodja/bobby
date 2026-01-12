@@ -8,6 +8,7 @@ from app.api.schemas.auth import (
     LoginRequest,
     LoginResponse,
     RefreshRequest,
+    RefreshResponse,
     RegisterRequest,
     ResetPasswordRequest,
     VerifyEmailRequest,
@@ -75,7 +76,7 @@ async def login(
     )
 
 
-@router.post("/refresh", response_model=LoginResponse)
+@router.post("/refresh", response_model=RefreshResponse)
 async def refresh_token(
     request: RefreshRequest,
     db: DbSession,
@@ -86,13 +87,11 @@ async def refresh_token(
     use_case = RefreshTokenUseCase(user_repo)
     tokens = await use_case.execute(request.refresh_token)
 
-    # We need to return user info too, but RefreshTokenUseCase doesn't return it
-    # For simplicity, we'll return minimal response
-    return {
-        "access_token": tokens.access_token,
-        "refresh_token": tokens.refresh_token,
-        "token_type": tokens.token_type,
-    }
+    return RefreshResponse(
+        access_token=tokens.access_token,
+        refresh_token=tokens.refresh_token,
+        token_type=tokens.token_type,
+    )
 
 
 @router.post("/verify-email", response_model=UserResponse)
