@@ -27,7 +27,10 @@ async def seed_admin_user() -> None:
         existing = result.scalar_one_or_none()
 
         if existing:
-            logger.info(f"Admin user already exists: {settings.ADMIN_EMAIL}")
+            # Update password hash in case hashing method changed
+            existing.password_hash = hash_password(settings.ADMIN_PASSWORD)
+            await session.commit()
+            logger.info(f"Admin user password updated: {settings.ADMIN_EMAIL}")
             return
 
         # Create admin user
