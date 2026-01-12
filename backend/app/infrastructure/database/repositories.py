@@ -375,6 +375,13 @@ class OpportunityRepository:
         result = await self.session.execute(query)
         return result.scalar() or 0
 
+    async def get_last_sync_time(self) -> Optional[datetime]:
+        """Get the most recent sync time."""
+        result = await self.session.execute(
+            select(func.max(OpportunityModel.synced_at))
+        )
+        return result.scalar()
+
     def _to_entity(self, model: OpportunityModel) -> Opportunity:
         """Convert model to entity."""
         return Opportunity(

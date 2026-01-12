@@ -9,16 +9,22 @@ import { Dashboard } from './pages/Dashboard';
 import { Opportunities } from './pages/Opportunities';
 import { MyCooptations } from './pages/MyCooptations';
 import { Profile } from './pages/Profile';
+import { Admin } from './pages/Admin';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  requireAdmin?: boolean;
 }
 
-function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated } = useAuthStore();
+function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
+  const { isAuthenticated, user } = useAuthStore();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (requireAdmin && user?.role !== 'admin') {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -46,6 +52,14 @@ function App() {
         <Route path="opportunities" element={<Opportunities />} />
         <Route path="my-cooptations" element={<MyCooptations />} />
         <Route path="profile" element={<Profile />} />
+        <Route
+          path="admin"
+          element={
+            <ProtectedRoute requireAdmin>
+              <Admin />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
       {/* Fallback */}
