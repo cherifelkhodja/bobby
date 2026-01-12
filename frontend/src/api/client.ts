@@ -3,6 +3,9 @@ import { useAuthStore } from '../stores/authStore';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
+// Flag to prevent multiple refresh attempts
+let isRefreshing = false;
+
 export const apiClient = axios.create({
   baseURL: `${API_URL}/api/v1`,
   headers: {
@@ -26,28 +29,35 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config;
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // If 401 and not a login request, try to refresh token
+    // If 401 and not a login/refresh request, try to refresh token once
     if (
       error.response?.status === 401 &&
       originalRequest &&
+      !originalRequest._retry &&
       !originalRequest.url?.includes('/auth/login') &&
       !originalRequest.url?.includes('/auth/refresh')
     ) {
-      const { tokens, logout } = useAuthStore.getState();
+      // Prevent multiple simultaneous refresh attempts
+      if (isRefreshing) {
+        useAuthStore.getState().logout();
+        return Promise.reject(error);
+      }
 
-      if (tokens?.refresh_token) {
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      const { tokens, user, logout } = useAuthStore.getState();
+
+      if (tokens?.refresh_token && user) {
         try {
           const response = await axios.post(`${API_URL}/api/v1/auth/refresh`, {
             refresh_token: tokens.refresh_token,
           });
 
           const newTokens = response.data;
-          useAuthStore.getState().setAuth(
-            useAuthStore.getState().user!,
-            newTokens
-          );
+          useAuthStore.getState().setAuth(user, newTokens);
 
           // Retry original request
           originalRequest.headers.Authorization = `Bearer ${newTokens.access_token}`;
@@ -55,8 +65,11 @@ apiClient.interceptors.response.use(
         } catch {
           // Refresh failed, logout
           logout();
+        } finally {
+          isRefreshing = false;
         }
       } else {
+        isRefreshing = false;
         logout();
       }
     }

@@ -11,7 +11,16 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes
-      retry: 1,
+      retry: (failureCount, error) => {
+        // Don't retry on 401 (auth errors) or 403 (forbidden)
+        if (error && typeof error === 'object' && 'response' in error) {
+          const status = (error as { response?: { status?: number } }).response?.status;
+          if (status === 401 || status === 403) {
+            return false;
+          }
+        }
+        return failureCount < 1;
+      },
     },
   },
 });
