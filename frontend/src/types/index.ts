@@ -37,6 +37,17 @@ export interface LoginResponse extends AuthTokens {
   user: User;
 }
 
+export interface UpdateProfileRequest {
+  first_name?: string;
+  last_name?: string;
+  boond_resource_id?: string;
+}
+
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
 // Opportunity types
 export interface Opportunity {
   id: string;

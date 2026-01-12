@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 
 import { useAuthStore } from '../stores/authStore';
+import { usersApi } from '../api/users';
+import { getErrorMessage } from '../api/client';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -50,16 +52,15 @@ export function Profile() {
   const onUpdateProfile = async (data: ProfileFormData) => {
     setIsUpdating(true);
     try {
-      // API call would go here
-      updateUser({
+      const updatedUser = await usersApi.updateMe({
         first_name: data.first_name,
         last_name: data.last_name,
-        full_name: `${data.first_name} ${data.last_name}`,
-        boond_resource_id: data.boond_resource_id || null,
+        boond_resource_id: data.boond_resource_id || undefined,
       });
+      updateUser(updatedUser);
       toast.success('Profil mis à jour');
-    } catch {
-      toast.error('Erreur lors de la mise à jour');
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setIsUpdating(false);
     }
@@ -68,11 +69,14 @@ export function Profile() {
   const onChangePassword = async (data: PasswordFormData) => {
     setIsChangingPassword(true);
     try {
-      // API call would go here
+      await usersApi.changePassword({
+        current_password: data.current_password,
+        new_password: data.new_password,
+      });
       toast.success('Mot de passe modifié');
       passwordForm.reset();
-    } catch {
-      toast.error('Erreur lors du changement de mot de passe');
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setIsChangingPassword(false);
     }

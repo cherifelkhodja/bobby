@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.user import (
@@ -47,7 +47,7 @@ def get_current_user_id(authorization: str = "") -> UUID:
 @router.get("/me", response_model=UserResponse)
 async def get_me(
     db: DbSession,
-    authorization: str = "",
+    authorization: str = Header(default=""),
 ):
     """Get current user profile."""
     if not authorization:
@@ -79,7 +79,7 @@ async def get_me(
 async def update_me(
     request: UpdateUserRequest,
     db: DbSession,
-    authorization: str = "",
+    authorization: str = Header(default=""),
 ):
     """Update current user profile."""
     if not authorization:
@@ -120,7 +120,7 @@ async def update_me(
 async def change_password(
     request: ChangePasswordRequest,
     db: DbSession,
-    authorization: str = "",
+    authorization: str = Header(default=""),
 ):
     """Change current user password."""
     if not authorization:
