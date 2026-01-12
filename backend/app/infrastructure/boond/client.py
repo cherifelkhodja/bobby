@@ -145,9 +145,10 @@ class BoondClient:
     async def health_check(self) -> bool:
         """Check BoondManager API availability."""
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(3.0)) as client:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
+                # Try to get current user info to validate credentials
                 response = await client.get(
-                    f"{self.base_url}/application/version",
+                    f"{self.base_url}/current-user",
                     auth=self._auth,
                 )
                 return response.status_code == 200
