@@ -138,20 +138,61 @@ class BoondClient:
             logger.info(f"Created positioning with ID {positioning_id}")
             return positioning_id
 
-    @retry(
-        stop=stop_after_attempt(2),
-        wait=wait_exponential(multiplier=1, min=1, max=2),
-    )
     async def health_check(self) -> bool:
-        """Check BoondManager API availability."""
+        """Check BoondManager API availability using GET /candidates."""
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
-                # Try to get current user info to validate credentials
+            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
                 response = await client.get(
-                    f"{self.base_url}/current-user",
+                    f"{self.base_url}/candidates",
                     auth=self._auth,
+                    params={"page": 1, "pageSize": 1},
                 )
+                logger.info(f"BoondManager health check: status={response.status_code}")
                 return response.status_code == 200
         except Exception as e:
             logger.warning(f"BoondManager health check failed: {e}")
             return False
+
+    async def test_connection(self) -> dict:
+        """Test connection and return detailed info."""
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+                response = await client.get(
+                    f"{self.base_url}/candidates",
+                    auth=self._auth,
+                    params={"page": 1, "pageSize": 1},
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    total = data.get("numberOfResources", 0)
+                    return {
+                        "success": True,
+                        "status_code": response.status_code,
+                        "message": f"Connexion reussie. {total} candidats dans BoondManager.",
+                        "candidates_count": total,
+                    }
+                elif response.status_code == 401:
+                    return {
+                        "success": False,
+                        "status_code": response.status_code,
+                        "message": "Authentification echouee. Verifiez vos identifiants.",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "status_code": response.status_code,
+                        "message": f"Erreur HTTP {response.status_code}: {response.text[:200]}",
+                    }
+        except httpx.ConnectError as e:
+            return {
+                "success": False,
+                "status_code": 0,
+                "message": f"Impossible de se connecter a l'API: {str(e)}",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "status_code": 0,
+                "message": f"Erreur: {str(e)}",
+            }

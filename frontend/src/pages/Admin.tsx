@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, CheckCircle, XCircle, AlertCircle, Settings } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, AlertCircle, Settings, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { adminApi } from '../api/admin';
@@ -11,11 +11,33 @@ import { PageSpinner } from '../components/ui/Spinner';
 export function Admin() {
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
 
   const { data: boondStatus, isLoading } = useQuery({
     queryKey: ['boond-status'],
     queryFn: adminApi.getBoondStatus,
     refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  const testMutation = useMutation({
+    mutationFn: adminApi.testConnection,
+    onMutate: () => {
+      setIsTesting(true);
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success(data.message);
+      } else {
+        toast.error(data.message);
+      }
+      queryClient.invalidateQueries({ queryKey: ['boond-status'] });
+    },
+    onError: () => {
+      toast.error('Erreur lors du test de connexion');
+    },
+    onSettled: () => {
+      setIsTesting(false);
+    },
   });
 
   const syncMutation = useMutation({
@@ -126,8 +148,17 @@ export function Admin() {
               </div>
             </div>
 
-            {/* Sync Button */}
-            <div className="pt-4">
+            {/* Action Buttons */}
+            <div className="pt-4 flex space-x-3">
+              <Button
+                onClick={() => testMutation.mutate()}
+                disabled={!boondStatus?.configured || isTesting}
+                isLoading={isTesting}
+                variant="outline"
+                leftIcon={<Zap className="h-4 w-4" />}
+              >
+                {isTesting ? 'Test en cours...' : 'Tester la connexion'}
+              </Button>
               <Button
                 onClick={() => syncMutation.mutate()}
                 disabled={!boondStatus?.configured || !boondStatus?.connected || isSyncing}
@@ -136,13 +167,13 @@ export function Admin() {
               >
                 {isSyncing ? 'Synchronisation...' : 'Lancer la synchronisation'}
               </Button>
-              {!boondStatus?.configured && (
-                <p className="mt-2 text-sm text-gray-500">
-                  Configurez les identifiants BoondManager dans les variables d'environnement
-                  (BOOND_USERNAME, BOOND_PASSWORD)
-                </p>
-              )}
             </div>
+            {!boondStatus?.configured && (
+              <p className="mt-2 text-sm text-gray-500">
+                Configurez les identifiants BoondManager dans les variables d'environnement
+                (BOOND_USERNAME, BOOND_PASSWORD)
+              </p>
+            )}
           </div>
         </Card>
 

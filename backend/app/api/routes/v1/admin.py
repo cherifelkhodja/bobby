@@ -37,6 +37,15 @@ class SyncResponse(BaseModel):
     message: str
 
 
+class TestConnectionResponse(BaseModel):
+    """Test connection response."""
+
+    success: bool
+    status_code: int
+    message: str
+    candidates_count: Optional[int] = None
+
+
 async def require_admin(db: DbSession, authorization: str) -> UUID:
     """Verify user is admin."""
     if not authorization or not authorization.startswith("Bearer "):
@@ -137,3 +146,29 @@ async def trigger_boond_sync(
             synced_count=0,
             message=f"Erreur lors de la synchronisation: {str(e)}",
         )
+
+
+@router.post("/boond/test", response_model=TestConnectionResponse)
+async def test_boond_connection(
+    db: DbSession,
+    authorization: str = Header(default=""),
+):
+    """Test BoondManager connection using GET /candidates."""
+    await require_admin(db, authorization)
+
+    if not settings.BOOND_USERNAME or not settings.BOOND_PASSWORD:
+        return TestConnectionResponse(
+            success=False,
+            status_code=0,
+            message="Identifiants BoondManager non configures (BOOND_USERNAME, BOOND_PASSWORD)",
+        )
+
+    boond_client = BoondClient(settings)
+    result = await boond_client.test_connection()
+
+    return TestConnectionResponse(
+        success=result.get("success", False),
+        status_code=result.get("status_code", 0),
+        message=result.get("message", "Erreur inconnue"),
+        candidates_count=result.get("candidates_count"),
+    )

@@ -15,6 +15,13 @@ export interface SyncResponse {
   message: string;
 }
 
+export interface TestConnectionResponse {
+  success: boolean;
+  status_code: number;
+  message: string;
+  candidates_count: number | null;
+}
+
 export const adminApi = {
   getBoondStatus: async (): Promise<BoondStatus> => {
     const response = await apiClient.get<BoondStatus>('/admin/boond/status');
@@ -23,6 +30,11 @@ export const adminApi = {
 
   triggerSync: async (): Promise<SyncResponse> => {
     const response = await apiClient.post<SyncResponse>('/admin/boond/sync');
+    return response.data;
+  },
+
+  testConnection: async (): Promise<TestConnectionResponse> => {
+    const response = await apiClient.post<TestConnectionResponse>('/admin/boond/test');
     return response.data;
   },
 };
