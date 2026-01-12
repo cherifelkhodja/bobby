@@ -1,0 +1,46 @@
+# Test environment configuration
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - ENV=test
+      - DATABASE_URL=postgresql+asyncpg://test:test@postgres-test:5432/test
+      - REDIS_URL=redis://redis-test:6379/0
+      - JWT_SECRET=test-secret-key
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    networks:
+      - cooptation-test-network
+
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d test"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - cooptation-test-network
+
+  redis-test:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - cooptation-test-network
+
+networks:
+  cooptation-test-network:
+    driver: bridge

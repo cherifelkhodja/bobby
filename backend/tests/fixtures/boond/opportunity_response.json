@@ -1,0 +1,19 @@
+{
+  "data": {
+    "id": 12345,
+    "title": "Développeur Python Senior",
+    "reference": "REF-2024-001",
+    "startDate": "2024-03-01",
+    "endDate": "2024-12-31",
+    "responseDeadline": "2024-02-15",
+    "averageDailyRate": 600.0,
+    "managerFirstName": "Jean",
+    "managerLastName": "Martin",
+    "managerEmail": "jean.martin@geminiconsulting.fr",
+    "clientName": "Client Entreprise",
+    "description": "Mission de développement Python/FastAPI",
+    "skills": ["Python", "FastAPI", "PostgreSQL", "Docker"],
+    "location": "Paris",
+    "state": 1
+  }
+}

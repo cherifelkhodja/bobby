@@ -1,0 +1,138 @@
+// User types
+export interface User {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  role: 'member' | 'admin';
+  is_verified: boolean;
+  is_active: boolean;
+  boond_resource_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Auth types
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  boond_resource_id?: string;
+}
+
+export interface AuthTokens {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
+
+export interface LoginResponse extends AuthTokens {
+  user: User;
+}
+
+// Opportunity types
+export interface Opportunity {
+  id: string;
+  external_id: string;
+  title: string;
+  reference: string;
+  budget: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  response_deadline: string | null;
+  manager_name: string | null;
+  client_name: string | null;
+  description: string | null;
+  skills: string[];
+  location: string | null;
+  is_open: boolean;
+  days_until_deadline: number | null;
+  synced_at: string;
+  created_at: string;
+}
+
+export interface OpportunityListResponse {
+  items: Opportunity[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+// Cooptation types
+export type CooptationStatus =
+  | 'pending'
+  | 'in_review'
+  | 'interview'
+  | 'accepted'
+  | 'rejected';
+
+export interface StatusChange {
+  from_status: string;
+  to_status: string;
+  changed_at: string;
+  changed_by: string | null;
+  comment: string | null;
+}
+
+export interface Cooptation {
+  id: string;
+  candidate_id: string;
+  candidate_name: string;
+  candidate_email: string;
+  candidate_phone: string | null;
+  candidate_daily_rate: number | null;
+  opportunity_id: string;
+  opportunity_title: string;
+  opportunity_reference: string;
+  status: CooptationStatus;
+  status_display: string;
+  submitter_id: string;
+  submitter_name: string | null;
+  external_positioning_id: string | null;
+  rejection_reason: string | null;
+  status_history: StatusChange[];
+  submitted_at: string;
+  updated_at: string;
+}
+
+export interface CooptationListResponse {
+  items: Cooptation[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface CreateCooptationRequest {
+  opportunity_id: string;
+  candidate_first_name: string;
+  candidate_last_name: string;
+  candidate_email: string;
+  candidate_civility: 'M' | 'Mme';
+  candidate_phone?: string;
+  candidate_daily_rate?: number;
+  candidate_note?: string;
+}
+
+export interface CooptationStats {
+  total: number;
+  pending: number;
+  in_review: number;
+  interview: number;
+  accepted: number;
+  rejected: number;
+  conversion_rate: number;
+}
+
+// Pagination
+export interface PaginationParams {
+  page?: number;
+  page_size?: number;
+  search?: string;
+}

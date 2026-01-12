@@ -1,0 +1,11 @@
+{
+  "data": {
+    "id": 67890,
+    "firstName": "Pierre",
+    "lastName": "Durand",
+    "email": "pierre.durand@example.com",
+    "civility": "M",
+    "phone1": "0612345678",
+    "state": 1
+  }
+}

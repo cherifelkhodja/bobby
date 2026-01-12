@@ -1,0 +1,71 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cooptation-backend
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cooptation-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cooptation-frontend
+    env_file:
+      - .env
+    depends_on:
+      - backend
+    networks:
+      - cooptation-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: cooptation-postgres
+    environment:
+      POSTGRES_USER: cooptation
+      POSTGRES_PASSWORD: cooptation
+      POSTGRES_DB: cooptation
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cooptation -d cooptation"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cooptation-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: cooptation-redis
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cooptation-network
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: cooptation-mailhog
+    networks:
+      - cooptation-network
+
+networks:
+  cooptation-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
