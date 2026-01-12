@@ -47,8 +47,23 @@ export function Opportunities() {
         </div>
       </div>
 
-      <div className="grid gap-4">
-        {data?.items.map((opportunity) => (
+      {data?.items.length === 0 ? (
+        <Card className="text-center py-12">
+          <div className="text-gray-400 mb-4">
+            <Search className="h-12 w-12 mx-auto" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Aucune opportunité disponible
+          </h3>
+          <p className="text-gray-500">
+            {search
+              ? 'Aucun résultat pour votre recherche. Essayez avec d\'autres termes.'
+              : 'Les opportunités seront synchronisées depuis BoondManager.'}
+          </p>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {data?.items.map((opportunity) => (
           <Card key={opportunity.id} className="hover:shadow-md transition-shadow">
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -107,9 +122,10 @@ export function Opportunities() {
                 Proposer
               </Button>
             </div>
-          </Card>
-        ))}
-      </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {data && data.total > data.page_size && (
         <div className="flex justify-center mt-8 space-x-2">
