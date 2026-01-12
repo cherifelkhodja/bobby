@@ -44,9 +44,9 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = "noreply@geminiconsulting.fr"
 
-    # Admin seed (dev only)
-    ADMIN_EMAIL: str = "cherif.elkhodja@geminiconsulting.fr"
-    ADMIN_PASSWORD: str = "Admin@2024!"
+    # Admin seed (dev only - set via environment variables if needed)
+    ADMIN_EMAIL: str = ""
+    ADMIN_PASSWORD: str = ""
 
     # Feature flags
     FEATURE_MAGIC_LINK: bool = True

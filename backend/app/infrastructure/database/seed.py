@@ -19,6 +19,10 @@ async def seed_admin_user() -> None:
         logger.warning("Skipping admin seed in production")
         return
 
+    if not settings.ADMIN_EMAIL or not settings.ADMIN_PASSWORD:
+        logger.info("Admin seed skipped: ADMIN_EMAIL or ADMIN_PASSWORD not configured")
+        return
+
     async with async_session_factory() as session:
         # Check if admin already exists
         result = await session.execute(
@@ -27,10 +31,7 @@ async def seed_admin_user() -> None:
         existing = result.scalar_one_or_none()
 
         if existing:
-            # Update password hash in case hashing method changed
-            existing.password_hash = hash_password(settings.ADMIN_PASSWORD)
-            await session.commit()
-            logger.info(f"Admin user password updated: {settings.ADMIN_EMAIL}")
+            logger.info(f"Admin user already exists: {settings.ADMIN_EMAIL}")
             return
 
         # Create admin user
