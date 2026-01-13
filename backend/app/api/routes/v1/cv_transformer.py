@@ -343,3 +343,58 @@ async def get_transformation_stats(
 
     stats = await use_case.execute()
     return TransformationStatsResponse(**stats)
+
+
+class GeminiTestResponse(BaseModel):
+    """Gemini API test response."""
+
+    success: bool
+    message: str
+    api_key_configured: bool
+
+
+@router.get("/test-gemini", response_model=GeminiTestResponse)
+async def test_gemini_api(
+    db: DbSession,
+    app_settings: AppSettings,
+    authorization: str = Header(default=""),
+):
+    """Test Gemini API connectivity (admin only)."""
+    await require_admin(db, authorization)
+
+    # Check if API key is configured
+    if not app_settings.GEMINI_API_KEY:
+        return GeminiTestResponse(
+            success=False,
+            message="GEMINI_API_KEY non configurée",
+            api_key_configured=False,
+        )
+
+    try:
+        import google.generativeai as genai
+
+        genai.configure(api_key=app_settings.GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+
+        # Simple test prompt
+        response = model.generate_content("Réponds uniquement 'OK' si tu fonctionnes.")
+
+        if response.text:
+            return GeminiTestResponse(
+                success=True,
+                message=f"Gemini fonctionne. Réponse: {response.text.strip()[:100]}",
+                api_key_configured=True,
+            )
+        else:
+            return GeminiTestResponse(
+                success=False,
+                message="Réponse vide de Gemini",
+                api_key_configured=True,
+            )
+
+    except Exception as e:
+        return GeminiTestResponse(
+            success=False,
+            message=f"Erreur Gemini: {str(e)}",
+            api_key_configured=True,
+        )
