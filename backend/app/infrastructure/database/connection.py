@@ -1,5 +1,6 @@
 """Database connection management."""
 
+import logging
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
@@ -10,18 +11,15 @@ from sqlalchemy.ext.asyncio import (
 
 from app.config import settings
 
+logger = logging.getLogger(__name__)
 
-def get_async_database_url() -> str:
-    """Convert DATABASE_URL to async format if needed."""
-    url = settings.DATABASE_URL
-    # Railway provides postgresql:// but asyncpg needs postgresql+asyncpg://
-    if url.startswith("postgresql://"):
-        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    return url
-
+# Log the database URL being used (masked for security)
+db_url = settings.async_database_url
+masked_url = db_url.split("@")[0].rsplit(":", 1)[0] + ":***@" + db_url.split("@")[-1] if "@" in db_url else db_url
+logger.info(f"Creating async engine with URL: {masked_url}")
 
 engine = create_async_engine(
-    get_async_database_url(),
+    db_url,
     echo=settings.is_development,
     pool_pre_ping=True,
     pool_size=5,

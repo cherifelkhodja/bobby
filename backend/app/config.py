@@ -75,6 +75,15 @@ class Settings(BaseSettings):
         return self.ENV == "test"
 
     @property
+    def async_database_url(self) -> str:
+        """Get DATABASE_URL converted to asyncpg format."""
+        url = self.DATABASE_URL
+        # Railway provides postgresql:// but asyncpg needs postgresql+asyncpg://
+        if url.startswith("postgresql://") and "+asyncpg" not in url:
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
+
+    @property
     def cors_origins(self) -> list[str]:
         """Get list of allowed CORS origins."""
         origins = [self.FRONTEND_URL]
