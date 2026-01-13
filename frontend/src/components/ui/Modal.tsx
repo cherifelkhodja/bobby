@@ -51,16 +51,16 @@ export function Modal({
               leaveTo="opacity-0 scale-95"
             >
               <Dialog.Panel
-                className={`w-full ${sizeClasses[size]} transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all`}
+                className={`w-full ${sizeClasses[size]} transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl transition-all`}
               >
                 {title && (
                   <div className="flex items-center justify-between mb-4">
-                    <Dialog.Title className="text-lg font-semibold text-gray-900">
+                    <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                       {title}
                     </Dialog.Title>
                     <button
                       onClick={onClose}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                     >
                       <X className="h-5 w-5" />
                     </button>

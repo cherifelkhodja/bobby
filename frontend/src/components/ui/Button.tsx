@@ -25,16 +25,16 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseClasses =
-      'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
+      'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-50';
 
     const variantClasses = {
       primary: 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500',
       secondary:
-        'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-primary-500',
+        'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-primary-500',
       outline:
-        'bg-transparent text-primary-600 border border-primary-600 hover:bg-primary-50 focus:ring-primary-500',
+        'bg-transparent text-primary-600 dark:text-primary-400 border border-primary-600 dark:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 focus:ring-primary-500',
       danger: 'bg-error text-white hover:bg-error-dark focus:ring-error',
-      ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
+      ghost: 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:ring-gray-500',
     };
 
     const sizeClasses = {

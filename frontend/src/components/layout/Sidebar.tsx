@@ -19,7 +19,7 @@ export function Sidebar() {
   const isAdmin = user?.role === 'admin';
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-73px)]">
+    <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 min-h-[calc(100vh-73px)]">
       <nav className="p-4 space-y-1">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
@@ -28,8 +28,8 @@ export function Sidebar() {
             className={({ isActive }) =>
               `flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
               }`
             }
           >
@@ -40,7 +40,7 @@ export function Sidebar() {
 
         {isAdmin && (
           <>
-            <div className="pt-4 mt-4 border-t border-gray-200">
+            <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
               <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                 Admin
               </p>
@@ -52,8 +52,8 @@ export function Sidebar() {
                 className={({ isActive }) =>
                   `flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                     isActive
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
                   }`
                 }
               >

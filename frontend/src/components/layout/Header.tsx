@@ -13,16 +13,16 @@ export function Header() {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
       <div className="px-8 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <h1 className="text-xl font-bold text-primary-600">
+          <h1 className="text-xl font-bold text-primary-600 dark:text-primary-400">
             Gemini Cooptation
           </h1>
         </div>
 
         <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
+          <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
             <User className="h-4 w-4" />
             <span>{user?.full_name}</span>
           </div>

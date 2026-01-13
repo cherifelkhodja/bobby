@@ -13,33 +13,33 @@ const statusConfig: Record<
   { className: string; label: string }
 > = {
   pending: {
-    className: 'bg-warning-light text-warning-dark',
+    className: 'bg-warning-light text-warning-dark dark:bg-warning-dark/20 dark:text-warning',
     label: 'En attente',
   },
   in_review: {
-    className: 'bg-primary-100 text-primary-700',
+    className: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400',
     label: "En cours d'examen",
   },
   interview: {
-    className: 'bg-primary-100 text-primary-700',
+    className: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400',
     label: 'En entretien',
   },
   accepted: {
-    className: 'bg-success-light text-success-dark',
+    className: 'bg-success-light text-success-dark dark:bg-success-dark/20 dark:text-success',
     label: 'Accepté',
   },
   rejected: {
-    className: 'bg-error-light text-error-dark',
+    className: 'bg-error-light text-error-dark dark:bg-error-dark/20 dark:text-error',
     label: 'Refusé',
   },
 };
 
 const variantClasses: Record<BadgeVariant, string> = {
-  default: 'bg-gray-100 text-gray-700',
-  primary: 'bg-primary-100 text-primary-700',
-  success: 'bg-success-light text-success-dark',
-  warning: 'bg-warning-light text-warning-dark',
-  error: 'bg-error-light text-error-dark',
+  default: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+  primary: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400',
+  success: 'bg-success-light text-success-dark dark:bg-success-dark/20 dark:text-success',
+  warning: 'bg-warning-light text-warning-dark dark:bg-warning-dark/20 dark:text-warning',
+  error: 'bg-error-light text-error-dark dark:bg-error-dark/20 dark:text-error',
 };
 
 export function Badge({ status, variant, children }: BadgeProps) {

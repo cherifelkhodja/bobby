@@ -9,6 +9,7 @@
 
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
+    @apply dark:bg-gray-900 dark:text-gray-100;
   }
 }
 
@@ -17,6 +18,7 @@
     @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium
            transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
            disabled:cursor-not-allowed disabled:opacity-50;
+    @apply dark:focus:ring-offset-gray-900;
   }
 
   .btn-primary {
@@ -25,6 +27,7 @@
 
   .btn-secondary {
     @apply btn bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-primary-500;
+    @apply dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700;
   }
 
   .btn-danger {
@@ -36,6 +39,8 @@
            placeholder-gray-400 shadow-sm transition-colors
            focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500
            disabled:cursor-not-allowed disabled:bg-gray-100;
+    @apply dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder-gray-500
+           dark:disabled:bg-gray-700;
   }
 
   .input-error {
@@ -44,10 +49,12 @@
 
   .label {
     @apply block text-sm font-medium text-gray-700 mb-1;
+    @apply dark:text-gray-300;
   }
 
   .card {
     @apply bg-white rounded-xl shadow-soft p-6;
+    @apply dark:bg-gray-800 dark:shadow-none dark:border dark:border-gray-700;
   }
 
   .badge {
@@ -56,21 +63,47 @@
 
   .badge-pending {
     @apply badge bg-warning-light text-warning-dark;
+    @apply dark:bg-warning-dark/20 dark:text-warning;
   }
 
   .badge-in-review {
     @apply badge bg-primary-100 text-primary-700;
+    @apply dark:bg-primary-900/30 dark:text-primary-400;
   }
 
   .badge-interview {
     @apply badge bg-primary-100 text-primary-700;
+    @apply dark:bg-primary-900/30 dark:text-primary-400;
   }
 
   .badge-accepted {
     @apply badge bg-success-light text-success-dark;
+    @apply dark:bg-success-dark/20 dark:text-success;
   }
 
   .badge-rejected {
     @apply badge bg-error-light text-error-dark;
+    @apply dark:bg-error-dark/20 dark:text-error;
+  }
+
+  /* Dark mode for common elements */
+  .dark-card {
+    @apply bg-white dark:bg-gray-800;
+  }
+
+  .dark-border {
+    @apply border-gray-200 dark:border-gray-700;
+  }
+
+  .dark-text {
+    @apply text-gray-900 dark:text-gray-100;
+  }
+
+  .dark-text-secondary {
+    @apply text-gray-500 dark:text-gray-400;
+  }
+
+  .dark-bg-hover {
+    @apply hover:bg-gray-50 dark:hover:bg-gray-700;
   }
 }
