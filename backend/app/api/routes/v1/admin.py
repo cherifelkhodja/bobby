@@ -175,6 +175,62 @@ async def test_boond_connection(
     )
 
 
+class BoondResourceResponse(BaseModel):
+    """BoondManager resource (employee)."""
+
+    id: str
+    first_name: str
+    last_name: str
+    email: str
+    manager_id: Optional[str] = None
+
+
+class BoondResourcesListResponse(BaseModel):
+    """List of resources response."""
+
+    resources: list[BoondResourceResponse]
+    total: int
+
+
+@router.get("/boond/resources", response_model=BoondResourcesListResponse)
+async def get_boond_resources(
+    db: DbSession,
+    authorization: str = Header(default=""),
+):
+    """Fetch resources (employees) from BoondManager."""
+    await require_admin(db, authorization)
+
+    if not settings.BOOND_USERNAME or not settings.BOOND_PASSWORD:
+        raise HTTPException(
+            status_code=400,
+            detail="BoondManager credentials not configured",
+        )
+
+    boond_client = BoondClient(settings)
+
+    try:
+        resources = await boond_client.get_resources()
+        return BoondResourcesListResponse(
+            resources=[
+                BoondResourceResponse(
+                    id=r["id"],
+                    first_name=r["first_name"],
+                    last_name=r["last_name"],
+                    email=r["email"],
+                    manager_id=r.get("manager_id"),
+                )
+                for r in resources
+                if r.get("email")  # Only include resources with emails
+            ],
+            total=len(resources),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch resources: {str(e)}",
+        )
+
+
 # ============================================================================
 # User Management Endpoints
 # ============================================================================

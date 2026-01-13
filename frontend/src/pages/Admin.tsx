@@ -16,7 +16,7 @@ import {
 import { toast } from 'sonner';
 
 import { adminApi } from '../api/admin';
-import type { User, UserRole, CreateInvitationRequest } from '../types';
+import type { User, UserRole, CreateInvitationRequest, BoondResource } from '../types';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -280,6 +280,8 @@ function UsersTab() {
 function InvitationsTab() {
   const queryClient = useQueryClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [inviteMode, setInviteMode] = useState<'manual' | 'boond'>('manual');
+  const [selectedResource, setSelectedResource] = useState<BoondResource | null>(null);
   const [newInvitation, setNewInvitation] = useState<CreateInvitationRequest>({
     email: '',
     role: 'user',
@@ -290,6 +292,12 @@ function InvitationsTab() {
     queryFn: () => adminApi.getInvitations(0, 100),
   });
 
+  const { data: boondResourcesData, isLoading: isLoadingResources } = useQuery({
+    queryKey: ['boond-resources'],
+    queryFn: adminApi.getBoondResources,
+    enabled: isCreateModalOpen,
+  });
+
   const createMutation = useMutation({
     mutationFn: adminApi.createInvitation,
     onSuccess: () => {
@@ -297,11 +305,23 @@ function InvitationsTab() {
       queryClient.invalidateQueries({ queryKey: ['admin-invitations'] });
       setIsCreateModalOpen(false);
       setNewInvitation({ email: '', role: 'user' });
+      setSelectedResource(null);
+      setInviteMode('manual');
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.detail || 'Erreur lors de l\'envoi');
     },
   });
+
+  const handleResourceSelect = (resource: BoondResource) => {
+    setSelectedResource(resource);
+    setNewInvitation({
+      ...newInvitation,
+      email: resource.email,
+      boond_resource_id: resource.id,
+      manager_boond_id: resource.manager_id || undefined,
+    });
+  };
 
   const resendMutation = useMutation({
     mutationFn: adminApi.resendInvitation,
@@ -421,7 +441,12 @@ function InvitationsTab() {
       {/* Create Invitation Modal */}
       <Modal
         isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setSelectedResource(null);
+          setInviteMode('manual');
+          setNewInvitation({ email: '', role: 'user' });
+        }}
         title="Inviter un membre"
       >
         <form
@@ -431,15 +456,100 @@ function InvitationsTab() {
           }}
           className="space-y-4"
         >
-          <Input
-            label="Email"
-            type="email"
-            value={newInvitation.email}
-            onChange={(e) =>
-              setNewInvitation({ ...newInvitation, email: e.target.value })
-            }
-            required
-          />
+          {/* Mode Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Source
+            </label>
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setInviteMode('manual');
+                  setSelectedResource(null);
+                  setNewInvitation({ ...newInvitation, email: '', boond_resource_id: undefined, manager_boond_id: undefined });
+                }}
+                className={`flex-1 p-3 rounded-lg border text-center ${
+                  inviteMode === 'manual'
+                    ? 'border-primary bg-primary-light'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <Mail className="h-5 w-5 mx-auto mb-1" />
+                <div className="text-sm font-medium">Saisie manuelle</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setInviteMode('boond')}
+                className={`flex-1 p-3 rounded-lg border text-center ${
+                  inviteMode === 'boond'
+                    ? 'border-primary bg-primary-light'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <Users className="h-5 w-5 mx-auto mb-1" />
+                <div className="text-sm font-medium">BoondManager</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Manual Email Input */}
+          {inviteMode === 'manual' && (
+            <Input
+              label="Email"
+              type="email"
+              value={newInvitation.email}
+              onChange={(e) =>
+                setNewInvitation({ ...newInvitation, email: e.target.value })
+              }
+              required
+            />
+          )}
+
+          {/* BoondManager Resource Selection */}
+          {inviteMode === 'boond' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ressource BoondManager
+              </label>
+              {isLoadingResources ? (
+                <div className="p-4 text-center text-gray-500">
+                  Chargement des ressources...
+                </div>
+              ) : boondResourcesData?.resources.length === 0 ? (
+                <div className="p-4 text-center text-gray-500">
+                  Aucune ressource disponible
+                </div>
+              ) : (
+                <div className="max-h-48 overflow-y-auto border rounded-lg divide-y">
+                  {boondResourcesData?.resources.map((resource) => (
+                    <button
+                      type="button"
+                      key={resource.id}
+                      onClick={() => handleResourceSelect(resource)}
+                      className={`w-full p-3 text-left hover:bg-gray-50 ${
+                        selectedResource?.id === resource.id
+                          ? 'bg-primary-light border-l-4 border-l-primary'
+                          : ''
+                      }`}
+                    >
+                      <div className="font-medium">
+                        {resource.first_name} {resource.last_name}
+                      </div>
+                      <div className="text-sm text-gray-500">{resource.email}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {selectedResource && (
+                <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
+                  <strong>Selection:</strong> {selectedResource.first_name} {selectedResource.last_name} ({selectedResource.email})
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Role Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Role
@@ -479,15 +589,25 @@ function InvitationsTab() {
               ))}
             </div>
           </div>
+
           <div className="flex justify-end space-x-3 pt-4">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setIsCreateModalOpen(false)}
+              onClick={() => {
+                setIsCreateModalOpen(false);
+                setSelectedResource(null);
+                setInviteMode('manual');
+                setNewInvitation({ email: '', role: 'user' });
+              }}
             >
               Annuler
             </Button>
-            <Button type="submit" isLoading={createMutation.isPending}>
+            <Button
+              type="submit"
+              isLoading={createMutation.isPending}
+              disabled={!newInvitation.email}
+            >
               Envoyer l'invitation
             </Button>
           </div>
@@ -650,31 +770,6 @@ function BoondTab() {
               (BOOND_USERNAME, BOOND_PASSWORD)
             </p>
           )}
-        </div>
-      </Card>
-
-      {/* Configuration Help */}
-      <Card>
-        <CardHeader
-          title="Configuration"
-          subtitle="Variables d'environnement requises"
-        />
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded font-mono text-sm">
-            <Settings className="h-4 w-4 text-gray-400" />
-            <span>BOOND_USERNAME</span>
-            <span className="text-gray-400">- Nom d'utilisateur BoondManager</span>
-          </div>
-          <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded font-mono text-sm">
-            <Settings className="h-4 w-4 text-gray-400" />
-            <span>BOOND_PASSWORD</span>
-            <span className="text-gray-400">- Mot de passe BoondManager</span>
-          </div>
-          <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded font-mono text-sm">
-            <Settings className="h-4 w-4 text-gray-400" />
-            <span>BOOND_API_URL</span>
-            <span className="text-gray-400">- URL de l'API (defaut: https://ui.boondmanager.com/api)</span>
-          </div>
         </div>
       </Card>
     </div>

@@ -18,6 +18,8 @@ class Invitation:
     token: str
     expires_at: datetime
     accepted_at: Optional[datetime] = None
+    boond_resource_id: Optional[str] = None  # BoondManager resource ID
+    manager_boond_id: Optional[str] = None  # BoondManager manager ID
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -60,6 +62,8 @@ class Invitation:
         invited_by: UUID,
         token: str,
         validity_hours: int = 48,
+        boond_resource_id: Optional[str] = None,
+        manager_boond_id: Optional[str] = None,
     ) -> "Invitation":
         """Create a new invitation with default 48h validity."""
         return cls(
@@ -68,4 +72,6 @@ class Invitation:
             invited_by=invited_by,
             token=token,
             expires_at=datetime.utcnow() + timedelta(hours=validity_hours),
+            boond_resource_id=boond_resource_id,
+            manager_boond_id=manager_boond_id,
         )

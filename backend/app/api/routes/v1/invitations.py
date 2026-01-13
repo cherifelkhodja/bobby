@@ -36,6 +36,8 @@ class CreateInvitationRequest(BaseModel):
 
     email: EmailStr
     role: str  # user, commercial, admin
+    boond_resource_id: Optional[str] = None
+    manager_boond_id: Optional[str] = None
 
 
 class InvitationResponse(BaseModel):
@@ -120,6 +122,8 @@ async def create_invitation(
                 email=request.email,
                 role=request.role,
                 invited_by=admin_id,
+                boond_resource_id=request.boond_resource_id,
+                manager_boond_id=request.manager_boond_id,
             )
         )
 

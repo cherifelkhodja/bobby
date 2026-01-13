@@ -97,6 +97,16 @@ export interface InvitationValidation {
 export interface CreateInvitationRequest {
   email: string;
   role: UserRole;
+  boond_resource_id?: string;
+  manager_boond_id?: string;
+}
+
+export interface BoondResource {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  manager_id: string | null;
 }
 
 export interface AcceptInvitationRequest {

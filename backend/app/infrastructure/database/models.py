@@ -183,6 +183,8 @@ class InvitationModel(Base):
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    boond_resource_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    manager_boond_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships

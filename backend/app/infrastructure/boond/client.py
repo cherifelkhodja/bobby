@@ -153,6 +153,46 @@ class BoondClient:
             logger.warning(f"BoondManager health check failed: {e}")
             return False
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+    )
+    async def get_resources(self) -> list[dict]:
+        """Fetch resources (employees) from BoondManager."""
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            logger.info("Fetching resources from BoondManager")
+            response = await client.get(
+                f"{self.base_url}/resources",
+                auth=self._auth,
+                params={"page": 1, "pageSize": 500},
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            resources = []
+
+            for item in data.get("data", []):
+                try:
+                    attrs = item.get("attributes", {})
+                    relationships = item.get("relationships", {})
+
+                    # Get manager ID from relationships
+                    manager_data = relationships.get("manager", {}).get("data")
+                    manager_id = str(manager_data.get("id")) if manager_data else None
+
+                    resources.append({
+                        "id": str(item.get("id")),
+                        "first_name": attrs.get("firstName", ""),
+                        "last_name": attrs.get("lastName", ""),
+                        "email": attrs.get("email1", "") or attrs.get("email2", ""),
+                        "manager_id": manager_id,
+                    })
+                except Exception as e:
+                    logger.warning(f"Failed to parse resource {item.get('id')}: {e}")
+
+            logger.info(f"Fetched {len(resources)} resources")
+            return resources
+
     async def test_connection(self) -> dict:
         """Test connection and return detailed info."""
         try:

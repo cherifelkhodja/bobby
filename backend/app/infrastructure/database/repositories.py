@@ -822,6 +822,8 @@ class InvitationRepository:
             model.invited_by = invitation.invited_by
             model.expires_at = invitation.expires_at
             model.accepted_at = invitation.accepted_at
+            model.boond_resource_id = invitation.boond_resource_id
+            model.manager_boond_id = invitation.manager_boond_id
         else:
             model = InvitationModel(
                 id=invitation.id,
@@ -831,6 +833,8 @@ class InvitationRepository:
                 invited_by=invitation.invited_by,
                 expires_at=invitation.expires_at,
                 accepted_at=invitation.accepted_at,
+                boond_resource_id=invitation.boond_resource_id,
+                manager_boond_id=invitation.manager_boond_id,
                 created_at=invitation.created_at,
             )
             self.session.add(model)
@@ -901,6 +905,8 @@ class InvitationRepository:
             invited_by=model.invited_by,
             expires_at=model.expires_at,
             accepted_at=model.accepted_at,
+            boond_resource_id=model.boond_resource_id,
+            manager_boond_id=model.manager_boond_id,
             created_at=model.created_at,
         )
 

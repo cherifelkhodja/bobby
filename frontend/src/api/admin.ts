@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { User, UserRole, Invitation, CreateInvitationRequest, AcceptInvitationRequest, InvitationValidation } from '../types';
+import type { User, UserRole, Invitation, CreateInvitationRequest, AcceptInvitationRequest, InvitationValidation, BoondResource } from '../types';
 
 export interface BoondStatus {
   connected: boolean;
@@ -21,6 +21,11 @@ export interface TestConnectionResponse {
   status_code: number;
   message: string;
   candidates_count: number | null;
+}
+
+export interface BoondResourcesListResponse {
+  resources: BoondResource[];
+  total: number;
 }
 
 export interface UsersListResponse {
@@ -54,6 +59,11 @@ export const adminApi = {
 
   testConnection: async (): Promise<TestConnectionResponse> => {
     const response = await apiClient.post<TestConnectionResponse>('/admin/boond/test');
+    return response.data;
+  },
+
+  getBoondResources: async (): Promise<BoondResourcesListResponse> => {
+    const response = await apiClient.get<BoondResourcesListResponse>('/admin/boond/resources');
     return response.data;
   },
 

@@ -53,6 +53,8 @@ class CreateInvitationCommand:
     email: str
     role: str
     invited_by: UUID
+    boond_resource_id: str | None = None
+    manager_boond_id: str | None = None
 
 
 class CreateInvitationUseCase:
@@ -90,6 +92,8 @@ class CreateInvitationUseCase:
             invited_by=command.invited_by,
             token=token,
             validity_hours=48,
+            boond_resource_id=command.boond_resource_id,
+            manager_boond_id=command.manager_boond_id,
         )
 
         # Save invitation
@@ -178,6 +182,8 @@ class AcceptInvitationUseCase:
             role=invitation.role,
             is_verified=True,  # Auto-verify since they came via invitation
             is_active=True,
+            boond_resource_id=invitation.boond_resource_id,
+            manager_boond_id=invitation.manager_boond_id,
         )
 
         saved_user = await self.user_repository.save(user)
@@ -237,6 +243,8 @@ class ResendInvitationUseCase:
             invited_by=invitation.invited_by,
             token=new_token,
             validity_hours=48,
+            boond_resource_id=invitation.boond_resource_id,
+            manager_boond_id=invitation.manager_boond_id,
         )
         new_invitation.id = invitation.id  # Keep same ID
 
