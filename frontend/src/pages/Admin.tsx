@@ -280,6 +280,7 @@ function InvitationsTab() {
   const [sendingResourceId, setSendingResourceId] = useState<string | null>(null);
   const [agencyFilter, setAgencyFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [selectedRoles, setSelectedRoles] = useState<Record<string, UserRole>>({});
 
   const { data: invitationsData, isLoading: isLoadingInvitations } = useQuery({
     queryKey: ['admin-invitations'],
@@ -342,11 +343,21 @@ function InvitationsTab() {
     },
   });
 
+  // Get the role for a resource (selected or suggested)
+  const getRoleForResource = (resource: BoondResource): UserRole => {
+    return selectedRoles[resource.id] || resource.suggested_role;
+  };
+
+  const handleRoleChange = (resourceId: string, role: UserRole) => {
+    setSelectedRoles(prev => ({ ...prev, [resourceId]: role }));
+  };
+
   const handleSendInvitation = (resource: BoondResource) => {
     setSendingResourceId(resource.id);
+    const role = getRoleForResource(resource);
     createMutation.mutate({
       email: resource.email,
-      role: resource.suggested_role,
+      role: role,
       boond_resource_id: resource.id,
       manager_boond_id: resource.manager_id || undefined,
     });
@@ -523,7 +534,7 @@ function InvitationsTab() {
                     Type
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Role suggere
+                    Rôle
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Action
@@ -534,6 +545,7 @@ function InvitationsTab() {
                 {filteredResources.map((resource) => {
                   const { hasAccount, hasPendingInvitation } = getResourceStatus(resource);
                   const isDisabled = hasAccount || hasPendingInvitation;
+                  const currentRole = getRoleForResource(resource);
 
                   return (
                     <tr key={resource.id} className={isDisabled ? 'bg-gray-50' : ''}>
@@ -556,15 +568,27 @@ function InvitationsTab() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant={ROLE_COLORS[resource.suggested_role]}>
-                          {ROLE_LABELS[resource.suggested_role]}
-                        </Badge>
+                        {isDisabled ? (
+                          <Badge variant={ROLE_COLORS[currentRole]}>
+                            {ROLE_LABELS[currentRole]}
+                          </Badge>
+                        ) : (
+                          <select
+                            value={currentRole}
+                            onChange={(e) => handleRoleChange(resource.id, e.target.value as UserRole)}
+                            className="rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary text-sm"
+                          >
+                            <option value="user">{ROLE_LABELS.user}</option>
+                            <option value="commercial">{ROLE_LABELS.commercial}</option>
+                            <option value="admin">{ROLE_LABELS.admin}</option>
+                          </select>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         {hasAccount ? (
                           <Badge variant="success">Inscrit</Badge>
                         ) : hasPendingInvitation ? (
-                          <Badge variant="warning">Invite</Badge>
+                          <Badge variant="warning">Invité</Badge>
                         ) : (
                           <Button
                             size="sm"
