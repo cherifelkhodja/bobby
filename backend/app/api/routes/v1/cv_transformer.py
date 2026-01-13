@@ -238,12 +238,14 @@ async def transform_cv(
     )
 
     try:
+        print(f"[CV Transform] Starting transformation: template={template_name}, file={file.filename}, size={len(content)}")
         output_content = await use_case.execute(
             user_id=user_id,
             template_name=template_name,
             file_content=content,
             filename=file.filename,
         )
+        print(f"[CV Transform] Success: generated {len(output_content)} bytes")
 
         # Generate output filename
         original_name = file.filename.rsplit(".", 1)[0]
@@ -259,8 +261,10 @@ async def transform_cv(
         )
 
     except ValueError as e:
+        print(f"[CV Transform] ValueError: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        print(f"[CV Transform] Exception: {type(e).__name__}: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erreur lors de la transformation: {str(e)}",
