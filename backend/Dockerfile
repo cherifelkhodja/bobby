@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml ./
 
 # Install dependencies directly (simpler and more reliable)
+# v2: Added CV transformer deps (google-generativeai, docxtpl, pypdf, python-docx)
 RUN pip install --no-cache-dir \
     "fastapi>=0.109.0" \
     "uvicorn[standard]>=0.27.0" \
