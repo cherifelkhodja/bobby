@@ -26,10 +26,32 @@ frontend/
 ├── src/
 │   ├── api/                # API client functions
 │   ├── components/         # React components
+│   │   ├── layout/         # Header, Footer, Layout
+│   │   ├── ui/             # Reusable UI components
+│   │   └── ThemeProvider.tsx
 │   ├── contexts/           # Auth context
+│   ├── hooks/              # Custom hooks (useTheme)
 │   ├── pages/              # Page components
 │   └── types/              # TypeScript interfaces
 └── Dockerfile
+```
+
+## User Roles
+
+| Role | Description | Permissions |
+|------|-------------|-------------|
+| `user` | Consultant | Submit cooptations |
+| `commercial` | Commercial | Manage opportunities, view associated cooptations |
+| `rh` | RH | Manage users, view all cooptations, change cooptation status |
+| `admin` | Administrator | Full access to all features |
+
+**Backend enum**: `backend/app/domain/value_objects/status.py`
+```python
+class UserRole(str, Enum):
+    USER = "user"
+    COMMERCIAL = "commercial"
+    RH = "rh"
+    ADMIN = "admin"
 ```
 
 ## Key Features Implemented
@@ -47,12 +69,16 @@ frontend/
 - Admin can invite users from BoondManager resources list
 - Stores `boond_resource_id` and `manager_boond_id` with invitations
 - Email sent via Resend API with registration link
+- **Role selector**: Admin can change the suggested role before sending invitation
+- **Filters**: Filter resources by Agency and Type
 - **Migration**: `003_add_inv_boond_ids.py`
 
 ### 3. Admin Panel (`frontend/src/pages/Admin.tsx`)
 - **BoondTab**: Connection status, sync button, test connection
 - **InvitationsTab**: Table of BoondManager resources with:
   - Consultant name, agency, type, suggested role
+  - Role selector dropdown to change role before invitation
+  - Agency and Type filters
   - "Inviter" button (disabled if already registered or pending invitation)
 - **UsersTab**: User management (activate/deactivate, change role)
 
@@ -60,6 +86,18 @@ frontend/
 - JWT with access (15min) and refresh (7d) tokens
 - Password reset via email
 - Email verification
+
+### 5. Dark Mode Support
+- **Tailwind config**: `darkMode: 'class'` for manual control
+- **Theme hook**: `frontend/src/hooks/useTheme.ts`
+  - Manages theme state: `system` | `light` | `dark`
+  - Persists preference in localStorage
+  - Cycles through modes: Auto → Clair → Sombre
+- **ThemeProvider**: `frontend/src/components/ThemeProvider.tsx`
+  - Initializes theme on app load
+  - Listens for system preference changes
+- **Toggle button**: In Header component (Sun/Moon/Monitor icons)
+- All UI components styled with `dark:` variants
 
 ## API Endpoints
 
@@ -213,3 +251,10 @@ npm run lint                  # Lint
 - Optimized BoondManager API calls (removed unnecessary requests)
 - Added pagination support to fetch all resources (maxResults=500)
 - Added agency and type filters to InvitationsTab
+- Added role selector dropdown before sending invitation
+- Created new `rh` role for HR users (types 5, 6)
+- Added system-based dark mode support (`darkMode: 'media'` → `darkMode: 'class'`)
+- Created `useTheme` hook for theme management
+- Created `ThemeProvider` component for theme initialization
+- Added manual theme toggle button in Header (Auto/Clair/Sombre)
+- Fixed dark mode styling across all Admin page components
