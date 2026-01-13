@@ -984,7 +984,7 @@ function GeminiTestCard() {
         </div>
         <div className="flex items-center space-x-3">
           {testResult && (
-            <Badge variant={testResult.success ? 'success' : 'danger'}>
+            <Badge variant={testResult.success ? 'success' : 'error'}>
               {testResult.success ? 'OK' : 'Erreur'}
             </Badge>
           )}
