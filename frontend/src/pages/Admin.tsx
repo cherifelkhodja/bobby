@@ -8,6 +8,7 @@ import {
   Settings,
   Zap,
   Users,
+  Mail,
   Trash2,
   Send,
 } from 'lucide-react';
