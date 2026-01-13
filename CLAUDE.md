@@ -211,3 +211,5 @@ npm run lint                  # Lint
 - Fixed Mail icon import in Admin.tsx
 - Added automatic migration execution in Dockerfile
 - Optimized BoondManager API calls (removed unnecessary requests)
+- Added pagination support to fetch all resources (maxResults=500)
+- Added agency and type filters to InvitationsTab
