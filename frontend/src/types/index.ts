@@ -222,3 +222,25 @@ export interface PaginationParams {
   page_size?: number;
   search?: string;
 }
+
+// CV Transformer types
+export interface CvTemplate {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string | null;
+  is_active: boolean;
+  updated_at: string;
+}
+
+export interface CvTransformationStats {
+  total: number;
+  by_user: CvTransformationUserStats[];
+}
+
+export interface CvTransformationUserStats {
+  user_id: string;
+  user_email: string;
+  user_name: string;
+  count: number;
+}

@@ -11,13 +11,16 @@ import { Opportunities } from './pages/Opportunities';
 import { MyCooptations } from './pages/MyCooptations';
 import { Profile } from './pages/Profile';
 import { Admin } from './pages/Admin';
+import { CvTransformer } from './pages/CvTransformer';
+import type { UserRole } from './types';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
+  allowedRoles?: UserRole[];
 }
 
-function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
+function ProtectedRoute({ children, requireAdmin = false, allowedRoles }: ProtectedRouteProps) {
   const { isAuthenticated, user } = useAuthStore();
 
   if (!isAuthenticated) {
@@ -25,6 +28,10 @@ function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps)
   }
 
   if (requireAdmin && user?.role !== 'admin') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (allowedRoles && user?.role && !allowedRoles.includes(user.role)) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -54,6 +61,14 @@ function App() {
         <Route path="opportunities" element={<Opportunities />} />
         <Route path="my-cooptations" element={<MyCooptations />} />
         <Route path="profile" element={<Profile />} />
+        <Route
+          path="cv-transformer"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'commercial', 'rh']}>
+              <CvTransformer />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="admin"
           element={

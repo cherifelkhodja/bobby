@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   RefreshCw,
@@ -11,18 +11,22 @@ import {
   Mail,
   Trash2,
   Send,
+  FileText,
+  BarChart3,
+  Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { adminApi } from '../api/admin';
-import type { User, UserRole, BoondResource } from '../types';
+import { cvTransformerApi } from '../api/cvTransformer';
+import type { User, UserRole, BoondResource, CvTemplate } from '../types';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
 
-type TabType = 'users' | 'invitations' | 'boond';
+type TabType = 'users' | 'invitations' | 'boond' | 'templates' | 'stats';
 
 const ROLE_LABELS: Record<UserRole, string> = {
   user: 'Utilisateur',
@@ -83,6 +87,28 @@ export function Admin() {
             <Settings className="h-4 w-4 inline-block mr-2" />
             BoondManager
           </button>
+          <button
+            onClick={() => setActiveTab('templates')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'templates'
+                ? 'border-primary text-primary dark:text-primary-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+            }`}
+          >
+            <FileText className="h-4 w-4 inline-block mr-2" />
+            Templates CV
+          </button>
+          <button
+            onClick={() => setActiveTab('stats')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'stats'
+                ? 'border-primary text-primary dark:text-primary-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+            }`}
+          >
+            <BarChart3 className="h-4 w-4 inline-block mr-2" />
+            Statistiques CV
+          </button>
         </nav>
       </div>
 
@@ -90,6 +116,8 @@ export function Admin() {
       {activeTab === 'users' && <UsersTab />}
       {activeTab === 'invitations' && <InvitationsTab />}
       {activeTab === 'boond' && <BoondTab />}
+      {activeTab === 'templates' && <TemplatesTab />}
+      {activeTab === 'stats' && <StatsTab />}
     </div>
   );
 }
@@ -771,6 +799,218 @@ function BoondTab() {
             </p>
           )}
         </div>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================================================
+// Templates Tab
+// ============================================================================
+
+const PREDEFINED_TEMPLATES = [
+  { name: 'gemini', displayName: 'Template Gemini', description: 'Format standard Gemini Consulting' },
+  { name: 'craftmania', displayName: 'Template Craftmania', description: 'Format standard Craftmania' },
+];
+
+function TemplatesTab() {
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingTemplate, setUploadingTemplate] = useState<string | null>(null);
+
+  const { data: templatesData, isLoading } = useQuery({
+    queryKey: ['cv-templates'],
+    queryFn: cvTransformerApi.getTemplates,
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: async ({ name, file, displayName, description }: {
+      name: string;
+      file: File;
+      displayName: string;
+      description?: string;
+    }) => {
+      return cvTransformerApi.uploadTemplate(name, file, displayName, description);
+    },
+    onSuccess: () => {
+      toast.success('Template mis à jour');
+      queryClient.invalidateQueries({ queryKey: ['cv-templates'] });
+      setUploadingTemplate(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Erreur lors de l\'upload');
+      setUploadingTemplate(null);
+    },
+  });
+
+  const handleFileSelect = (templateName: string, displayName: string, description: string) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.docx';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        setUploadingTemplate(templateName);
+        uploadMutation.mutate({ name: templateName, file, displayName, description });
+      }
+    };
+    input.click();
+  };
+
+  // Get existing template data by name
+  const getTemplateData = (name: string): CvTemplate | undefined => {
+    return templatesData?.templates.find(t => t.name === name);
+  };
+
+  if (isLoading) {
+    return <PageSpinner />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader
+          title="Gestion des templates CV"
+          subtitle="Uploadez ou mettez à jour les templates Word pour la transformation de CV"
+        />
+
+        <div className="space-y-4">
+          {PREDEFINED_TEMPLATES.map((template) => {
+            const existingTemplate = getTemplateData(template.name);
+            const isUploading = uploadingTemplate === template.name;
+
+            return (
+              <div
+                key={template.name}
+                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg"
+              >
+                <div className="flex items-center space-x-4">
+                  <div className={`p-3 rounded-lg ${existingTemplate ? 'bg-primary-100 dark:bg-primary-900/30' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                    <FileText className={`h-6 w-6 ${existingTemplate ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400'}`} />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-gray-100">{template.displayName}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{template.description}</p>
+                    {existingTemplate && (
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        Mis à jour le {new Date(existingTemplate.updated_at).toLocaleDateString('fr-FR')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  {existingTemplate ? (
+                    <Badge variant="success">Configuré</Badge>
+                  ) : (
+                    <Badge variant="warning">Non configuré</Badge>
+                  )}
+                  <Button
+                    variant={existingTemplate ? 'outline' : 'primary'}
+                    size="sm"
+                    onClick={() => handleFileSelect(template.name, template.displayName, template.description)}
+                    isLoading={isUploading}
+                    leftIcon={<Upload className="h-4 w-4" />}
+                  >
+                    {existingTemplate ? 'Remplacer' : 'Uploader'}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+          <p className="text-sm text-blue-700 dark:text-blue-400">
+            <strong>Format requis :</strong> Les templates doivent être au format .docx et utiliser
+            les variables Jinja2 (ex: {'{{ profil.titre_cible }}'}, {'{% for exp in experiences %}'}).
+          </p>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================================================
+// Stats Tab
+// ============================================================================
+
+function StatsTab() {
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ['cv-transformation-stats'],
+    queryFn: cvTransformerApi.getStats,
+  });
+
+  if (isLoading) {
+    return <PageSpinner />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader
+          title="Statistiques de transformation CV"
+          subtitle="Nombre de CVs transformés par utilisateur"
+        />
+
+        {/* Total */}
+        <div className="mb-6 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
+          <div className="flex items-center">
+            <BarChart3 className="h-8 w-8 text-primary-600 dark:text-primary-400 mr-4" />
+            <div>
+              <p className="text-sm text-primary-600 dark:text-primary-400">Total des transformations</p>
+              <p className="text-3xl font-bold text-primary-700 dark:text-primary-300">{stats?.total || 0}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Per user stats */}
+        {stats?.by_user && stats.by_user.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Utilisateur
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    CVs transformés
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {stats.by_user.map((userStat) => (
+                  <tr key={userStat.user_id}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {userStat.user_name}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {userStat.user_email}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        {userStat.count}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <BarChart3 className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+              Aucune transformation
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Les statistiques apparaîtront ici après les premières transformations.
+            </p>
+          </div>
+        )}
       </Card>
     </div>
   );

@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = ""
     ADMIN_PASSWORD: str = ""
 
+    # Google Gemini API
+    GEMINI_API_KEY: str = ""
+
     # Feature flags
     FEATURE_MAGIC_LINK: bool = True
     FEATURE_EMAIL_NOTIFICATIONS: bool = True

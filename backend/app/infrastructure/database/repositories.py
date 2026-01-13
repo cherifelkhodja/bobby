@@ -12,6 +12,8 @@ from app.domain.entities import (
     BusinessLead,
     Candidate,
     Cooptation,
+    CvTemplate,
+    CvTransformationLog,
     Invitation,
     Opportunity,
     User,
@@ -22,6 +24,8 @@ from app.infrastructure.database.models import (
     BusinessLeadModel,
     CandidateModel,
     CooptationModel,
+    CvTemplateModel,
+    CvTransformationLogModel,
     InvitationModel,
     OpportunityModel,
     UserModel,
@@ -1087,4 +1091,188 @@ class BusinessLeadRepository:
             notes=model.notes,
             created_at=model.created_at,
             updated_at=model.updated_at,
+        )
+
+
+class CvTemplateRepository:
+    """CV Template repository implementation."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_by_id(self, template_id: UUID) -> Optional[CvTemplate]:
+        """Get template by ID."""
+        result = await self.session.execute(
+            select(CvTemplateModel).where(CvTemplateModel.id == template_id)
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def get_by_name(self, name: str) -> Optional[CvTemplate]:
+        """Get template by unique name."""
+        result = await self.session.execute(
+            select(CvTemplateModel).where(CvTemplateModel.name == name)
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def save(self, template: CvTemplate) -> CvTemplate:
+        """Save template (create or update)."""
+        result = await self.session.execute(
+            select(CvTemplateModel).where(CvTemplateModel.id == template.id)
+        )
+        model = result.scalar_one_or_none()
+
+        if model:
+            model.name = template.name
+            model.display_name = template.display_name
+            model.description = template.description
+            model.file_content = template.file_content
+            model.file_name = template.file_name
+            model.is_active = template.is_active
+            model.updated_at = datetime.utcnow()
+        else:
+            model = CvTemplateModel(
+                id=template.id,
+                name=template.name,
+                display_name=template.display_name,
+                description=template.description,
+                file_content=template.file_content,
+                file_name=template.file_name,
+                is_active=template.is_active,
+                created_at=template.created_at,
+                updated_at=template.updated_at,
+            )
+            self.session.add(model)
+
+        await self.session.flush()
+        return self._to_entity(model)
+
+    async def delete(self, template_id: UUID) -> bool:
+        """Delete template by ID."""
+        result = await self.session.execute(
+            select(CvTemplateModel).where(CvTemplateModel.id == template_id)
+        )
+        model = result.scalar_one_or_none()
+        if model:
+            await self.session.delete(model)
+            return True
+        return False
+
+    async def list_active(self) -> list[CvTemplate]:
+        """List all active templates."""
+        result = await self.session.execute(
+            select(CvTemplateModel)
+            .where(CvTemplateModel.is_active == True)
+            .order_by(CvTemplateModel.name)
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def list_all(self) -> list[CvTemplate]:
+        """List all templates (including inactive)."""
+        result = await self.session.execute(
+            select(CvTemplateModel).order_by(CvTemplateModel.name)
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    def _to_entity(self, model: CvTemplateModel) -> CvTemplate:
+        """Convert model to entity."""
+        return CvTemplate(
+            id=model.id,
+            name=model.name,
+            display_name=model.display_name,
+            description=model.description,
+            file_content=model.file_content,
+            file_name=model.file_name,
+            is_active=model.is_active,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
+
+
+class CvTransformationLogRepository:
+    """CV Transformation Log repository implementation."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def save(self, log: CvTransformationLog) -> CvTransformationLog:
+        """Save transformation log."""
+        model = CvTransformationLogModel(
+            id=log.id,
+            user_id=log.user_id,
+            template_id=log.template_id,
+            template_name=log.template_name,
+            original_filename=log.original_filename,
+            success=log.success,
+            error_message=log.error_message,
+            created_at=log.created_at,
+        )
+        self.session.add(model)
+        await self.session.flush()
+        return self._to_entity(model)
+
+    async def count_by_user(self, user_id: UUID, success_only: bool = True) -> int:
+        """Count transformations by user."""
+        query = select(func.count(CvTransformationLogModel.id)).where(
+            CvTransformationLogModel.user_id == user_id
+        )
+        if success_only:
+            query = query.where(CvTransformationLogModel.success == True)
+        result = await self.session.execute(query)
+        return result.scalar() or 0
+
+    async def get_stats_by_user(self) -> list[dict]:
+        """Get transformation stats grouped by user.
+
+        Returns a list of dicts with user_id, user_email, user_name, and count.
+        """
+        result = await self.session.execute(
+            select(
+                CvTransformationLogModel.user_id,
+                UserModel.email,
+                UserModel.first_name,
+                UserModel.last_name,
+                func.count(CvTransformationLogModel.id).label("count"),
+            )
+            .join(UserModel, CvTransformationLogModel.user_id == UserModel.id)
+            .where(CvTransformationLogModel.success == True)
+            .group_by(
+                CvTransformationLogModel.user_id,
+                UserModel.email,
+                UserModel.first_name,
+                UserModel.last_name,
+            )
+            .order_by(func.count(CvTransformationLogModel.id).desc())
+        )
+
+        return [
+            {
+                "user_id": str(row.user_id),
+                "user_email": row.email,
+                "user_name": f"{row.first_name} {row.last_name}",
+                "count": row.count,
+            }
+            for row in result.all()
+        ]
+
+    async def get_total_count(self, success_only: bool = True) -> int:
+        """Get total transformation count."""
+        query = select(func.count(CvTransformationLogModel.id))
+        if success_only:
+            query = query.where(CvTransformationLogModel.success == True)
+        result = await self.session.execute(query)
+        return result.scalar() or 0
+
+    def _to_entity(self, model: CvTransformationLogModel) -> CvTransformationLog:
+        """Convert model to entity."""
+        return CvTransformationLog(
+            id=model.id,
+            user_id=model.user_id,
+            template_id=model.template_id,
+            template_name=model.template_name,
+            original_filename=model.original_filename,
+            success=model.success,
+            error_message=model.error_message,
+            created_at=model.created_at,
         )

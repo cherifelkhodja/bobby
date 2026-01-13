@@ -10,6 +10,7 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    LargeBinary,
     String,
     Text,
     Date,
@@ -224,3 +225,52 @@ class BusinessLeadModel(Base):
 
     # Relationships
     submitter: Mapped["UserModel"] = relationship("UserModel", foreign_keys=[submitter_id])
+
+
+class CvTemplateModel(Base):
+    """CV Template database model."""
+
+    __tablename__ = "cv_templates"
+
+    id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    display_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    file_content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class CvTransformationLogModel(Base):
+    """CV Transformation Log database model."""
+
+    __tablename__ = "cv_transformation_logs"
+
+    id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    template_id: Mapped[Optional[UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cv_templates.id"), nullable=True
+    )
+    template_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    success: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, index=True
+    )
+
+    # Relationships
+    user: Mapped["UserModel"] = relationship("UserModel", foreign_keys=[user_id])
+    template: Mapped[Optional["CvTemplateModel"]] = relationship(
+        "CvTemplateModel", foreign_keys=[template_id]
+    )

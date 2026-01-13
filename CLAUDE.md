@@ -99,6 +99,38 @@ class UserRole(str, Enum):
 - **Toggle button**: In Header component (Sun/Moon/Monitor icons)
 - All UI components styled with `dark:` variants
 
+### 6. CV Transformer
+Transform CVs (PDF/DOCX) into standardized Word documents using Google Gemini AI.
+
+**Access**: admin, commercial, rh roles only
+
+**Features**:
+- Upload CV (PDF or DOCX, max 16 Mo)
+- Select template (Gemini, Craftmania)
+- Extract text from document
+- Parse CV data using Gemini AI
+- Generate formatted Word document using docxtpl
+- Direct download of result
+- Stats tracking per user (admin only)
+- Template management in Admin panel
+
+**Dependencies**:
+- `google-generativeai` - Gemini API client
+- `docxtpl` - Word template engine (Jinja2)
+- `pypdf` - PDF text extraction
+- `python-docx` - DOCX text extraction
+
+**Database tables** (migration `004_add_cv_transformer_tables.py`):
+- `cv_templates` - Word templates stored as BYTEA
+- `cv_transformation_logs` - Usage tracking
+
+**Files**:
+- Backend: `backend/app/infrastructure/cv_transformer/`
+- Use cases: `backend/app/application/use_cases/cv_transformer.py`
+- API: `backend/app/api/routes/v1/cv_transformer.py`
+- Frontend: `frontend/src/pages/CvTransformer.tsx`
+- API client: `frontend/src/api/cvTransformer.ts`
+
 ## API Endpoints
 
 ### Admin (`/api/v1/admin`)
@@ -116,6 +148,12 @@ class UserRole(str, Enum):
 - `POST /` - Create invitation (accepts `boond_resource_id`, `manager_boond_id`)
 - `GET /` - List invitations
 - `DELETE /{id}` - Cancel invitation
+
+### CV Transformer (`/api/v1/cv-transformer`)
+- `GET /templates` - List available templates (admin/commercial/rh)
+- `POST /transform` - Transform CV file (multipart form: file + template_name)
+- `POST /templates/{name}` - Upload/update template (admin only)
+- `GET /stats` - Get transformation stats (admin only)
 
 ## Database Models
 
@@ -149,6 +187,31 @@ created_at: datetime
 updated_at: datetime
 ```
 
+### CvTemplate
+```python
+id: UUID
+name: str  # unique identifier (gemini, craftmania)
+display_name: str
+description: str | None
+file_content: bytes  # BYTEA
+file_name: str
+is_active: bool
+created_at: datetime
+updated_at: datetime
+```
+
+### CvTransformationLog
+```python
+id: UUID
+user_id: UUID  # FK to users
+template_id: UUID | None  # FK to cv_templates
+template_name: str
+original_filename: str
+success: bool
+error_message: str | None
+created_at: datetime
+```
+
 ## Environment Variables
 
 ### Backend
@@ -161,6 +224,7 @@ BOOND_USERNAME=...
 BOOND_PASSWORD=...
 RESEND_API_KEY=...
 FRONTEND_URL=https://...
+GEMINI_API_KEY=...  # Google Gemini API key for CV transformation
 ```
 
 ### Frontend
@@ -239,6 +303,17 @@ npm run lint                  # Lint
 ```
 
 ## Recent Changes Log
+
+### 2026-01-13
+- Added CV Transformer feature for transforming CVs to standardized Word documents
+- Created migration `004_add_cv_transformer_tables.py` for templates and logs
+- Added Gemini AI integration for CV data extraction
+- Created infrastructure services for PDF/DOCX text extraction
+- Added CvTransformer page with drag & drop upload, template selection, progress
+- Added Templates management tab in Admin panel
+- Added Stats tab in Admin panel for transformation statistics
+- Added `/cv-transformer` route accessible to admin, commercial, rh roles
+- Added "Outils" section in sidebar navigation
 
 ### 2025-01-13
 - Added BoondManager resources endpoint for invitations
