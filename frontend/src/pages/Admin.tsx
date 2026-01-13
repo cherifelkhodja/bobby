@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   RefreshCw,
@@ -815,7 +815,6 @@ const PREDEFINED_TEMPLATES = [
 
 function TemplatesTab() {
   const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingTemplate, setUploadingTemplate] = useState<string | null>(null);
 
   const { data: templatesData, isLoading } = useQuery({
