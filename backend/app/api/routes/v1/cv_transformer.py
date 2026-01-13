@@ -187,7 +187,11 @@ async def transform_cv(
 
     Upload a PDF or DOCX file and receive a formatted Word document back.
     """
+    import sys
+    print(f"[CV Transform] Request received: template={template_name}, filename={file.filename}", flush=True)
+
     user_id = await require_transformer_access(db, authorization)
+    print(f"[CV Transform] User authenticated: {user_id}", flush=True)
 
     # Validate file type
     if not file.filename:
@@ -238,14 +242,14 @@ async def transform_cv(
     )
 
     try:
-        print(f"[CV Transform] Starting transformation: template={template_name}, file={file.filename}, size={len(content)}")
+        print(f"[CV Transform] Starting transformation: template={template_name}, file={file.filename}, size={len(content)}", flush=True)
         output_content = await use_case.execute(
             user_id=user_id,
             template_name=template_name,
             file_content=content,
             filename=file.filename,
         )
-        print(f"[CV Transform] Success: generated {len(output_content)} bytes")
+        print(f"[CV Transform] Success: generated {len(output_content)} bytes", flush=True)
 
         # Generate output filename
         original_name = file.filename.rsplit(".", 1)[0]
@@ -261,10 +265,10 @@ async def transform_cv(
         )
 
     except ValueError as e:
-        print(f"[CV Transform] ValueError: {str(e)}")
+        print(f"[CV Transform] ValueError: {str(e)}", flush=True)
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        print(f"[CV Transform] Exception: {type(e).__name__}: {str(e)}")
+        print(f"[CV Transform] Exception: {type(e).__name__}: {str(e)}", flush=True)
         raise HTTPException(
             status_code=500,
             detail=f"Erreur lors de la transformation: {str(e)}",
