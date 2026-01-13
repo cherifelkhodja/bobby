@@ -1,7 +1,10 @@
 import type { CooptationStatus } from '../../types';
 
+type BadgeVariant = 'default' | 'primary' | 'success' | 'warning' | 'error';
+
 interface BadgeProps {
-  status: CooptationStatus;
+  status?: CooptationStatus;
+  variant?: BadgeVariant;
   children?: React.ReactNode;
 }
 
@@ -31,14 +34,31 @@ const statusConfig: Record<
   },
 };
 
-export function Badge({ status, children }: BadgeProps) {
-  const config = statusConfig[status];
+const variantClasses: Record<BadgeVariant, string> = {
+  default: 'bg-gray-100 text-gray-700',
+  primary: 'bg-primary-100 text-primary-700',
+  success: 'bg-success-light text-success-dark',
+  warning: 'bg-warning-light text-warning-dark',
+  error: 'bg-error-light text-error-dark',
+};
+
+export function Badge({ status, variant, children }: BadgeProps) {
+  let className: string;
+  let label: string | undefined;
+
+  if (status) {
+    const config = statusConfig[status];
+    className = config.className;
+    label = config.label;
+  } else {
+    className = variantClasses[variant || 'default'];
+  }
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config.className}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${className}`}
     >
-      {children || config.label}
+      {children || label}
     </span>
   );
 }

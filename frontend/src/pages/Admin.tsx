@@ -10,14 +10,13 @@ import {
   Users,
   Mail,
   UserPlus,
-  MoreVertical,
   Trash2,
   Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { adminApi } from '../api/admin';
-import type { User, UserRole, Invitation, CreateInvitationRequest } from '../types';
+import type { User, UserRole, CreateInvitationRequest } from '../types';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
