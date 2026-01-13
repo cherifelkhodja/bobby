@@ -206,8 +206,9 @@ class BoondClient:
 
         Only returns resources with state 1 or 2 (active).
         Uses included data for agencies to avoid extra API calls.
+        Handles pagination to fetch all resources.
         """
-        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
             logger.info("Fetching resources from BoondManager")
 
             # Fetch resources with state filter (1=active, 2=mission)
@@ -215,21 +216,31 @@ class BoondClient:
             agencies_map = {}
 
             for state in [1, 2]:
-                response = await client.get(
-                    f"{self.base_url}/resources",
-                    auth=self._auth,
-                    params={"page": 1, "pageSize": 500, "resourceStates": state},
-                )
-                response.raise_for_status()
-                data = response.json()
-                all_resources.extend(data.get("data", []))
+                page = 1
+                while True:
+                    response = await client.get(
+                        f"{self.base_url}/resources",
+                        auth=self._auth,
+                        params={"page": page, "maxResults": 500, "resourceStates": state},
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    resources_batch = data.get("data", [])
+                    all_resources.extend(resources_batch)
 
-                # Extract agencies from included data if available
-                for included in data.get("included", []):
-                    if included.get("type") == "agency":
-                        agency_id = str(included.get("id"))
-                        agency_name = included.get("attributes", {}).get("name", "")
-                        agencies_map[agency_id] = agency_name
+                    # Extract agencies from included data if available
+                    for included in data.get("included", []):
+                        if included.get("type") == "agency":
+                            agency_id = str(included.get("id"))
+                            agency_name = included.get("attributes", {}).get("name", "")
+                            agencies_map[agency_id] = agency_name
+
+                    # Check for more pages
+                    meta = data.get("meta", {})
+                    total_pages = meta.get("totalPages", 1)
+                    if page >= total_pages:
+                        break
+                    page += 1
 
             resources = []
             for item in all_resources:

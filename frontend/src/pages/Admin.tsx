@@ -278,6 +278,8 @@ function UsersTab() {
 function InvitationsTab() {
   const queryClient = useQueryClient();
   const [sendingResourceId, setSendingResourceId] = useState<string | null>(null);
+  const [agencyFilter, setAgencyFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
 
   const { data: invitationsData, isLoading: isLoadingInvitations } = useQuery({
     queryKey: ['admin-invitations'],
@@ -293,6 +295,17 @@ function InvitationsTab() {
     queryKey: ['admin-users'],
     queryFn: () => adminApi.getUsers(0, 500),
   });
+
+  // Extract unique agencies and types for filter options
+  const agencies = [...new Set(boondResourcesData?.resources.map(r => r.agency_name).filter(Boolean) || [])].sort();
+  const types = [...new Set(boondResourcesData?.resources.map(r => r.resource_type_name).filter(Boolean) || [])].sort();
+
+  // Filter resources based on selected filters
+  const filteredResources = boondResourcesData?.resources.filter(resource => {
+    const matchesAgency = agencyFilter === 'all' || resource.agency_name === agencyFilter;
+    const matchesType = typeFilter === 'all' || resource.resource_type_name === typeFilter;
+    return matchesAgency && matchesType;
+  }) || [];
 
   const createMutation = useMutation({
     mutationFn: adminApi.createInvitation,
@@ -429,10 +442,63 @@ function InvitationsTab() {
       <Card>
         <CardHeader
           title="Ressources BoondManager"
-          subtitle={`${boondResourcesData?.resources.length || 0} consultants actifs`}
+          subtitle={`${filteredResources.length} sur ${boondResourcesData?.resources.length || 0} ressources`}
         />
 
-        {boondResourcesData?.resources.length === 0 ? (
+        {/* Filters */}
+        <div className="px-6 pb-4 flex flex-wrap gap-4">
+          <div className="flex items-center gap-2">
+            <label htmlFor="agency-filter" className="text-sm font-medium text-gray-700">
+              Agence:
+            </label>
+            <select
+              id="agency-filter"
+              value={agencyFilter}
+              onChange={(e) => setAgencyFilter(e.target.value)}
+              className="rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary text-sm"
+            >
+              <option value="all">Toutes</option>
+              {agencies.map((agency) => (
+                <option key={agency} value={agency}>
+                  {agency}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="type-filter" className="text-sm font-medium text-gray-700">
+              Type:
+            </label>
+            <select
+              id="type-filter"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary text-sm"
+            >
+              <option value="all">Tous</option>
+              {types.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {(agencyFilter !== 'all' || typeFilter !== 'all') && (
+            <button
+              onClick={() => {
+                setAgencyFilter('all');
+                setTypeFilter('all');
+              }}
+              className="text-sm text-primary hover:text-primary-dark underline"
+            >
+              Réinitialiser les filtres
+            </button>
+          )}
+        </div>
+
+        {filteredResources.length === 0 ? (
           <div className="text-center py-12">
             <Users className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">
@@ -465,7 +531,7 @@ function InvitationsTab() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {boondResourcesData?.resources.map((resource) => {
+                {filteredResources.map((resource) => {
                   const { hasAccount, hasPendingInvitation } = getResourceStatus(resource);
                   const isDisabled = hasAccount || hasPendingInvitation;
 
