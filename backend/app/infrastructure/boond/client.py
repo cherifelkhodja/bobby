@@ -181,6 +181,16 @@ class BoondClient:
             logger.info(f"Fetched {len(types_dict)} resource types")
             return types_dict
 
+    # Hardcoded resource type names to avoid extra API call
+    RESOURCE_TYPE_NAMES = {
+        0: "Consultant",
+        1: "Manager",
+        2: "Commercial",
+        5: "RH",
+        6: "Direction RH",
+        10: "Consultant Senior",
+    }
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=4),
@@ -189,15 +199,15 @@ class BoondClient:
         """Fetch resources (employees) from BoondManager.
 
         Only returns resources with state 1 or 2 (active).
+        Uses included data for agencies to avoid extra API calls.
         """
         async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
             logger.info("Fetching resources from BoondManager")
 
-            # Fetch resource types dictionary first
-            resource_types = await self.get_resource_types()
-
             # Fetch resources with state filter (1=active, 2=mission)
             all_resources = []
+            agencies_map = {}
+
             for state in [1, 2]:
                 response = await client.get(
                     f"{self.base_url}/resources",
@@ -207,6 +217,13 @@ class BoondClient:
                 response.raise_for_status()
                 data = response.json()
                 all_resources.extend(data.get("data", []))
+
+                # Extract agencies from included data if available
+                for included in data.get("included", []):
+                    if included.get("type") == "agency":
+                        agency_id = str(included.get("id"))
+                        agency_name = included.get("attributes", {}).get("name", "")
+                        agencies_map[agency_id] = agency_name
 
             resources = []
             for item in all_resources:
@@ -221,10 +238,11 @@ class BoondClient:
                     # Get agency from relationships
                     agency_data = relationships.get("mainAgency", {}).get("data")
                     agency_id = str(agency_data.get("id")) if agency_data else None
+                    agency_name = agencies_map.get(agency_id, "") if agency_id else ""
 
-                    # Get resource type
+                    # Get resource type - use hardcoded names
                     resource_type = attrs.get("typeOf", None)
-                    resource_type_name = resource_types.get(resource_type, "") if resource_type is not None else ""
+                    resource_type_name = self.RESOURCE_TYPE_NAMES.get(resource_type, "") if resource_type is not None else ""
 
                     # Determine role based on type
                     # 0, 1, 10 -> user
@@ -246,6 +264,7 @@ class BoondClient:
                         "email": attrs.get("email1", "") or attrs.get("email2", ""),
                         "manager_id": manager_id,
                         "agency_id": agency_id,
+                        "agency_name": agency_name,
                         "resource_type": resource_type,
                         "resource_type_name": resource_type_name,
                         "suggested_role": suggested_role,

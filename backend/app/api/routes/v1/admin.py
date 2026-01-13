@@ -217,9 +217,8 @@ async def get_boond_resources(
     boond_client = BoondClient(settings)
 
     try:
-        # Fetch resources and agencies in parallel
+        # Fetch resources (includes agency names directly)
         resources = await boond_client.get_resources()
-        agencies = await boond_client.get_agencies()
 
         return BoondResourcesListResponse(
             resources=[
@@ -230,7 +229,7 @@ async def get_boond_resources(
                     email=r["email"],
                     manager_id=r.get("manager_id"),
                     agency_id=r.get("agency_id"),
-                    agency_name=agencies.get(r.get("agency_id", ""), ""),
+                    agency_name=r.get("agency_name", ""),
                     resource_type=r.get("resource_type"),
                     resource_type_name=r.get("resource_type_name"),
                     suggested_role=r.get("suggested_role", "user"),
