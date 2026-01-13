@@ -107,6 +107,11 @@ export interface BoondResource {
   last_name: string;
   email: string;
   manager_id: string | null;
+  agency_id: string | null;
+  agency_name: string | null;
+  resource_type: number | null;
+  resource_type_name: string | null;
+  suggested_role: UserRole;
 }
 
 export interface AcceptInvitationRequest {

@@ -8,18 +8,15 @@ import {
   Settings,
   Zap,
   Users,
-  Mail,
-  UserPlus,
   Trash2,
   Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { adminApi } from '../api/admin';
-import type { User, UserRole, CreateInvitationRequest, BoondResource } from '../types';
+import type { User, UserRole, BoondResource } from '../types';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
@@ -279,15 +276,9 @@ function UsersTab() {
 
 function InvitationsTab() {
   const queryClient = useQueryClient();
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [inviteMode, setInviteMode] = useState<'manual' | 'boond'>('manual');
-  const [selectedResource, setSelectedResource] = useState<BoondResource | null>(null);
-  const [newInvitation, setNewInvitation] = useState<CreateInvitationRequest>({
-    email: '',
-    role: 'user',
-  });
+  const [sendingResourceId, setSendingResourceId] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data: invitationsData, isLoading: isLoadingInvitations } = useQuery({
     queryKey: ['admin-invitations'],
     queryFn: () => adminApi.getInvitations(0, 100),
   });
@@ -295,7 +286,11 @@ function InvitationsTab() {
   const { data: boondResourcesData, isLoading: isLoadingResources } = useQuery({
     queryKey: ['boond-resources'],
     queryFn: adminApi.getBoondResources,
-    enabled: isCreateModalOpen,
+  });
+
+  const { data: usersData } = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: () => adminApi.getUsers(0, 500),
   });
 
   const createMutation = useMutation({
@@ -303,25 +298,13 @@ function InvitationsTab() {
     onSuccess: () => {
       toast.success('Invitation envoyee');
       queryClient.invalidateQueries({ queryKey: ['admin-invitations'] });
-      setIsCreateModalOpen(false);
-      setNewInvitation({ email: '', role: 'user' });
-      setSelectedResource(null);
-      setInviteMode('manual');
+      setSendingResourceId(null);
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.detail || 'Erreur lors de l\'envoi');
+      setSendingResourceId(null);
     },
   });
-
-  const handleResourceSelect = (resource: BoondResource) => {
-    setSelectedResource(resource);
-    setNewInvitation({
-      ...newInvitation,
-      email: resource.email,
-      boond_resource_id: resource.id,
-      manager_boond_id: resource.manager_id || undefined,
-    });
-  };
 
   const resendMutation = useMutation({
     mutationFn: adminApi.resendInvitation,
@@ -345,37 +328,40 @@ function InvitationsTab() {
     },
   });
 
-  if (isLoading) {
+  const handleSendInvitation = (resource: BoondResource) => {
+    setSendingResourceId(resource.id);
+    createMutation.mutate({
+      email: resource.email,
+      role: resource.suggested_role,
+      boond_resource_id: resource.id,
+      manager_boond_id: resource.manager_id || undefined,
+    });
+  };
+
+  // Check if resource already has an account or pending invitation
+  const getResourceStatus = (resource: BoondResource) => {
+    const hasAccount = usersData?.users.some(
+      (u) => u.email.toLowerCase() === resource.email.toLowerCase()
+    );
+    const hasPendingInvitation = invitationsData?.invitations.some(
+      (i) => i.email.toLowerCase() === resource.email.toLowerCase()
+    );
+    return { hasAccount, hasPendingInvitation };
+  };
+
+  if (isLoadingInvitations || isLoadingResources) {
     return <PageSpinner />;
   }
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader
-          title="Invitations en attente"
-          subtitle={`${data?.total || 0} invitations`}
-          action={
-            <Button
-              onClick={() => setIsCreateModalOpen(true)}
-              leftIcon={<UserPlus className="h-4 w-4" />}
-            >
-              Inviter un membre
-            </Button>
-          }
-        />
-
-        {data?.invitations.length === 0 ? (
-          <div className="text-center py-12">
-            <Mail className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">
-              Aucune invitation en attente
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Invitez des membres a rejoindre la plateforme.
-            </p>
-          </div>
-        ) : (
+      {/* Pending Invitations */}
+      {invitationsData && invitationsData.invitations.length > 0 && (
+        <Card>
+          <CardHeader
+            title="Invitations en attente"
+            subtitle={`${invitationsData.total} invitations`}
+          />
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -395,7 +381,7 @@ function InvitationsTab() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {data?.invitations.map((invitation) => (
+                {invitationsData.invitations.map((invitation) => (
                   <tr key={invitation.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
@@ -435,184 +421,103 @@ function InvitationsTab() {
               </tbody>
             </table>
           </div>
+        </Card>
+      )}
+
+      {/* BoondManager Resources */}
+      <Card>
+        <CardHeader
+          title="Ressources BoondManager"
+          subtitle={`${boondResourcesData?.resources.length || 0} consultants actifs`}
+        />
+
+        {boondResourcesData?.resources.length === 0 ? (
+          <div className="text-center py-12">
+            <Users className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">
+              Aucune ressource disponible
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Verifiez la configuration BoondManager.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Consultant
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Agence
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Role suggere
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {boondResourcesData?.resources.map((resource) => {
+                  const { hasAccount, hasPendingInvitation } = getResourceStatus(resource);
+                  const isDisabled = hasAccount || hasPendingInvitation;
+
+                  return (
+                    <tr key={resource.id} className={isDisabled ? 'bg-gray-50' : ''}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {resource.first_name} {resource.last_name}
+                          </div>
+                          <div className="text-sm text-gray-500">{resource.email}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {resource.agency_name || '-'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {resource.resource_type_name || '-'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge variant={ROLE_COLORS[resource.suggested_role]}>
+                          {ROLE_LABELS[resource.suggested_role]}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        {hasAccount ? (
+                          <Badge variant="success">Inscrit</Badge>
+                        ) : hasPendingInvitation ? (
+                          <Badge variant="warning">Invite</Badge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={() => handleSendInvitation(resource)}
+                            isLoading={sendingResourceId === resource.id}
+                            disabled={createMutation.isPending}
+                            leftIcon={<Send className="h-4 w-4" />}
+                          >
+                            Inviter
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
-
-      {/* Create Invitation Modal */}
-      <Modal
-        isOpen={isCreateModalOpen}
-        onClose={() => {
-          setIsCreateModalOpen(false);
-          setSelectedResource(null);
-          setInviteMode('manual');
-          setNewInvitation({ email: '', role: 'user' });
-        }}
-        title="Inviter un membre"
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            createMutation.mutate(newInvitation);
-          }}
-          className="space-y-4"
-        >
-          {/* Mode Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Source
-            </label>
-            <div className="flex space-x-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setInviteMode('manual');
-                  setSelectedResource(null);
-                  setNewInvitation({ ...newInvitation, email: '', boond_resource_id: undefined, manager_boond_id: undefined });
-                }}
-                className={`flex-1 p-3 rounded-lg border text-center ${
-                  inviteMode === 'manual'
-                    ? 'border-primary bg-primary-light'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <Mail className="h-5 w-5 mx-auto mb-1" />
-                <div className="text-sm font-medium">Saisie manuelle</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setInviteMode('boond')}
-                className={`flex-1 p-3 rounded-lg border text-center ${
-                  inviteMode === 'boond'
-                    ? 'border-primary bg-primary-light'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <Users className="h-5 w-5 mx-auto mb-1" />
-                <div className="text-sm font-medium">BoondManager</div>
-              </button>
-            </div>
-          </div>
-
-          {/* Manual Email Input */}
-          {inviteMode === 'manual' && (
-            <Input
-              label="Email"
-              type="email"
-              value={newInvitation.email}
-              onChange={(e) =>
-                setNewInvitation({ ...newInvitation, email: e.target.value })
-              }
-              required
-            />
-          )}
-
-          {/* BoondManager Resource Selection */}
-          {inviteMode === 'boond' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ressource BoondManager
-              </label>
-              {isLoadingResources ? (
-                <div className="p-4 text-center text-gray-500">
-                  Chargement des ressources...
-                </div>
-              ) : boondResourcesData?.resources.length === 0 ? (
-                <div className="p-4 text-center text-gray-500">
-                  Aucune ressource disponible
-                </div>
-              ) : (
-                <div className="max-h-48 overflow-y-auto border rounded-lg divide-y">
-                  {boondResourcesData?.resources.map((resource) => (
-                    <button
-                      type="button"
-                      key={resource.id}
-                      onClick={() => handleResourceSelect(resource)}
-                      className={`w-full p-3 text-left hover:bg-gray-50 ${
-                        selectedResource?.id === resource.id
-                          ? 'bg-primary-light border-l-4 border-l-primary'
-                          : ''
-                      }`}
-                    >
-                      <div className="font-medium">
-                        {resource.first_name} {resource.last_name}
-                      </div>
-                      <div className="text-sm text-gray-500">{resource.email}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {selectedResource && (
-                <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
-                  <strong>Selection:</strong> {selectedResource.first_name} {selectedResource.last_name} ({selectedResource.email})
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Role Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Role
-            </label>
-            <div className="space-y-2">
-              {(['user', 'commercial', 'admin'] as UserRole[]).map((role) => (
-                <label
-                  key={role}
-                  className={`flex items-center p-3 rounded-lg border cursor-pointer ${
-                    newInvitation.role === role
-                      ? 'border-primary bg-primary-light'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="role"
-                    value={role}
-                    checked={newInvitation.role === role}
-                    onChange={(e) =>
-                      setNewInvitation({
-                        ...newInvitation,
-                        role: e.target.value as UserRole,
-                      })
-                    }
-                    className="sr-only"
-                  />
-                  <div>
-                    <div className="font-medium">{ROLE_LABELS[role]}</div>
-                    <div className="text-sm text-gray-500">
-                      {role === 'user' && 'Peut soumettre des cooptations'}
-                      {role === 'commercial' && 'Peut gerer ses opportunites'}
-                      {role === 'admin' && 'Acces complet'}
-                    </div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-end space-x-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setIsCreateModalOpen(false);
-                setSelectedResource(null);
-                setInviteMode('manual');
-                setNewInvitation({ email: '', role: 'user' });
-              }}
-            >
-              Annuler
-            </Button>
-            <Button
-              type="submit"
-              isLoading={createMutation.isPending}
-              disabled={!newInvitation.email}
-            >
-              Envoyer l'invitation
-            </Button>
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 }

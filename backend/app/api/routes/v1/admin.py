@@ -183,6 +183,11 @@ class BoondResourceResponse(BaseModel):
     last_name: str
     email: str
     manager_id: Optional[str] = None
+    agency_id: Optional[str] = None
+    agency_name: Optional[str] = None
+    resource_type: Optional[int] = None
+    resource_type_name: Optional[str] = None
+    suggested_role: str = "user"
 
 
 class BoondResourcesListResponse(BaseModel):
@@ -197,7 +202,10 @@ async def get_boond_resources(
     db: DbSession,
     authorization: str = Header(default=""),
 ):
-    """Fetch resources (employees) from BoondManager."""
+    """Fetch resources (employees) from BoondManager.
+
+    Only returns resources with state 1 or 2 (active employees).
+    """
     await require_admin(db, authorization)
 
     if not settings.BOOND_USERNAME or not settings.BOOND_PASSWORD:
@@ -209,7 +217,10 @@ async def get_boond_resources(
     boond_client = BoondClient(settings)
 
     try:
+        # Fetch resources and agencies in parallel
         resources = await boond_client.get_resources()
+        agencies = await boond_client.get_agencies()
+
         return BoondResourcesListResponse(
             resources=[
                 BoondResourceResponse(
@@ -218,6 +229,11 @@ async def get_boond_resources(
                     last_name=r["last_name"],
                     email=r["email"],
                     manager_id=r.get("manager_id"),
+                    agency_id=r.get("agency_id"),
+                    agency_name=agencies.get(r.get("agency_id", ""), ""),
+                    resource_type=r.get("resource_type"),
+                    resource_type_name=r.get("resource_type_name"),
+                    suggested_role=r.get("suggested_role", "user"),
                 )
                 for r in resources
                 if r.get("email")  # Only include resources with emails

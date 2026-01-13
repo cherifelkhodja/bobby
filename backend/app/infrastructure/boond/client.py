@@ -157,21 +157,59 @@ class BoondClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=4),
     )
-    async def get_resources(self) -> list[dict]:
-        """Fetch resources (employees) from BoondManager."""
+    async def get_resource_types(self) -> dict[int, str]:
+        """Fetch resource types dictionary from BoondManager."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            logger.info("Fetching resources from BoondManager")
+            logger.info("Fetching resource types dictionary from BoondManager")
             response = await client.get(
-                f"{self.base_url}/resources",
+                f"{self.base_url}/application/dictionary/setting.typeOf.resource",
                 auth=self._auth,
-                params={"page": 1, "pageSize": 500},
             )
             response.raise_for_status()
 
             data = response.json()
-            resources = []
+            types_dict = {}
 
             for item in data.get("data", []):
+                try:
+                    type_id = int(item.get("id"))
+                    type_name = item.get("attributes", {}).get("value", "")
+                    types_dict[type_id] = type_name
+                except Exception as e:
+                    logger.warning(f"Failed to parse resource type {item.get('id')}: {e}")
+
+            logger.info(f"Fetched {len(types_dict)} resource types")
+            return types_dict
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+    )
+    async def get_resources(self) -> list[dict]:
+        """Fetch resources (employees) from BoondManager.
+
+        Only returns resources with state 1 or 2 (active).
+        """
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+            logger.info("Fetching resources from BoondManager")
+
+            # Fetch resource types dictionary first
+            resource_types = await self.get_resource_types()
+
+            # Fetch resources with state filter (1=active, 2=mission)
+            all_resources = []
+            for state in [1, 2]:
+                response = await client.get(
+                    f"{self.base_url}/resources",
+                    auth=self._auth,
+                    params={"page": 1, "pageSize": 500, "resourceStates": state},
+                )
+                response.raise_for_status()
+                data = response.json()
+                all_resources.extend(data.get("data", []))
+
+            resources = []
+            for item in all_resources:
                 try:
                     attrs = item.get("attributes", {})
                     relationships = item.get("relationships", {})
@@ -180,18 +218,72 @@ class BoondClient:
                     manager_data = relationships.get("manager", {}).get("data")
                     manager_id = str(manager_data.get("id")) if manager_data else None
 
+                    # Get agency from relationships
+                    agency_data = relationships.get("mainAgency", {}).get("data")
+                    agency_id = str(agency_data.get("id")) if agency_data else None
+
+                    # Get resource type
+                    resource_type = attrs.get("typeOf", None)
+                    resource_type_name = resource_types.get(resource_type, "") if resource_type is not None else ""
+
+                    # Determine role based on type
+                    # 0, 1, 10 -> user
+                    # 2 -> commercial
+                    # 5, 6 -> admin (RH)
+                    if resource_type in [0, 1, 10]:
+                        suggested_role = "user"
+                    elif resource_type == 2:
+                        suggested_role = "commercial"
+                    elif resource_type in [5, 6]:
+                        suggested_role = "admin"
+                    else:
+                        suggested_role = "user"
+
                     resources.append({
                         "id": str(item.get("id")),
                         "first_name": attrs.get("firstName", ""),
                         "last_name": attrs.get("lastName", ""),
                         "email": attrs.get("email1", "") or attrs.get("email2", ""),
                         "manager_id": manager_id,
+                        "agency_id": agency_id,
+                        "resource_type": resource_type,
+                        "resource_type_name": resource_type_name,
+                        "suggested_role": suggested_role,
                     })
                 except Exception as e:
                     logger.warning(f"Failed to parse resource {item.get('id')}: {e}")
 
             logger.info(f"Fetched {len(resources)} resources")
             return resources
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+    )
+    async def get_agencies(self) -> dict[str, str]:
+        """Fetch agencies dictionary from BoondManager."""
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            logger.info("Fetching agencies from BoondManager")
+            response = await client.get(
+                f"{self.base_url}/agencies",
+                auth=self._auth,
+                params={"page": 1, "pageSize": 100},
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            agencies = {}
+
+            for item in data.get("data", []):
+                try:
+                    agency_id = str(item.get("id"))
+                    agency_name = item.get("attributes", {}).get("name", "")
+                    agencies[agency_id] = agency_name
+                except Exception as e:
+                    logger.warning(f"Failed to parse agency {item.get('id')}: {e}")
+
+            logger.info(f"Fetched {len(agencies)} agencies")
+            return agencies
 
     async def test_connection(self) -> dict:
         """Test connection and return detailed info."""
