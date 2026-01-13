@@ -8,6 +8,7 @@ class UserRole(str, Enum):
 
     USER = "user"
     COMMERCIAL = "commercial"
+    RH = "rh"
     ADMIN = "admin"
 
     def __str__(self) -> str:
@@ -19,6 +20,7 @@ class UserRole(str, Enum):
         names = {
             UserRole.USER: "Utilisateur",
             UserRole.COMMERCIAL: "Commercial",
+            UserRole.RH: "RH",
             UserRole.ADMIN: "Administrateur",
         }
         return names[self]
@@ -26,7 +28,7 @@ class UserRole(str, Enum):
     @property
     def can_manage_users(self) -> bool:
         """Check if role can manage users."""
-        return self == UserRole.ADMIN
+        return self in (UserRole.ADMIN, UserRole.RH)
 
     @property
     def can_manage_opportunities(self) -> bool:
@@ -36,12 +38,12 @@ class UserRole(str, Enum):
     @property
     def can_view_all_cooptations(self) -> bool:
         """Check if role can view all cooptations."""
-        return self == UserRole.ADMIN
+        return self in (UserRole.ADMIN, UserRole.RH)
 
     @property
     def can_change_cooptation_status(self) -> bool:
         """Check if role can change cooptation status."""
-        return self in (UserRole.ADMIN, UserRole.COMMERCIAL)
+        return self in (UserRole.ADMIN, UserRole.RH, UserRole.COMMERCIAL)
 
 
 class CooptationStatus(str, Enum):

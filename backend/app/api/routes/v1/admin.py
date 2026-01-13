@@ -277,7 +277,7 @@ class UsersListResponse(BaseModel):
 class ChangeRoleRequest(BaseModel):
     """Request to change user role."""
 
-    role: str  # user, commercial, admin
+    role: str  # user, commercial, rh, admin
 
 
 class UpdateUserRequest(BaseModel):
@@ -385,7 +385,7 @@ async def update_user(
             user.deactivate()
 
     if request.role:
-        if request.role not in ("user", "commercial", "admin"):
+        if request.role not in ("user", "commercial", "rh", "admin"):
             raise HTTPException(status_code=400, detail="Rôle invalide")
         user.change_role(UserRole(request.role))
 
@@ -422,7 +422,7 @@ async def change_user_role(
     """Change user role (admin only)."""
     admin_id = await require_admin(db, authorization)
 
-    if request.role not in ("user", "commercial", "admin"):
+    if request.role not in ("user", "commercial", "rh", "admin"):
         raise HTTPException(status_code=400, detail="Rôle invalide")
 
     user_repo = UserRepository(db)

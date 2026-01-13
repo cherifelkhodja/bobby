@@ -35,7 +35,7 @@ class CreateInvitationRequest(BaseModel):
     """Request to create an invitation."""
 
     email: EmailStr
-    role: str  # user, commercial, admin
+    role: str  # user, commercial, rh, admin
     boond_resource_id: Optional[str] = None
     manager_boond_id: Optional[str] = None
 
@@ -107,7 +107,7 @@ async def create_invitation(
     admin_id = await require_admin(db, authorization)
 
     # Validate role
-    if request.role not in ("user", "commercial", "admin"):
+    if request.role not in ("user", "commercial", "rh", "admin"):
         raise HTTPException(status_code=400, detail="Rôle invalide")
 
     invitation_repo = InvitationRepository(db)

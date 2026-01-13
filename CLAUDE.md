@@ -41,7 +41,7 @@ frontend/
 - Resource type to role mapping:
   - Types 0, 1, 10 → `user` (Consultant)
   - Type 2 → `commercial`
-  - Types 5, 6 → `admin` (RH)
+  - Types 5, 6 → `rh` (RH, Direction RH)
 
 ### 2. Invitation System
 - Admin can invite users from BoondManager resources list
@@ -102,7 +102,7 @@ email: str
 first_name: str
 last_name: str
 hashed_password: str
-role: str  # user, commercial, admin
+role: str  # user, commercial, rh, admin
 is_verified: bool
 is_active: bool
 boond_resource_id: str | None

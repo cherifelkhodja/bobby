@@ -264,15 +264,15 @@ class BoondClient:
                     resource_type_name = self.RESOURCE_TYPE_NAMES.get(resource_type, "") if resource_type is not None else ""
 
                     # Determine role based on type
-                    # 0, 1, 10 -> user
+                    # 0, 1, 10 -> user (Consultant)
                     # 2 -> commercial
-                    # 5, 6 -> admin (RH)
+                    # 5, 6 -> rh (RH, Direction RH)
                     if resource_type in [0, 1, 10]:
                         suggested_role = "user"
                     elif resource_type == 2:
                         suggested_role = "commercial"
                     elif resource_type in [5, 6]:
-                        suggested_role = "admin"
+                        suggested_role = "rh"
                     else:
                         suggested_role = "user"
 

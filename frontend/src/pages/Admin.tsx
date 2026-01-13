@@ -27,12 +27,14 @@ type TabType = 'users' | 'invitations' | 'boond';
 const ROLE_LABELS: Record<UserRole, string> = {
   user: 'Utilisateur',
   commercial: 'Commercial',
+  rh: 'RH',
   admin: 'Administrateur',
 };
 
 const ROLE_COLORS: Record<UserRole, 'default' | 'primary' | 'success' | 'warning' | 'error'> = {
   user: 'default',
   commercial: 'primary',
+  rh: 'success',
   admin: 'warning',
 };
 
@@ -242,7 +244,7 @@ function UsersTab() {
               </strong>
             </p>
             <div className="space-y-2">
-              {(['user', 'commercial', 'admin'] as UserRole[]).map((role) => (
+              {(['user', 'commercial', 'rh', 'admin'] as UserRole[]).map((role) => (
                 <button
                   key={role}
                   onClick={() =>
@@ -259,6 +261,7 @@ function UsersTab() {
                   <div className="text-sm text-gray-500">
                     {role === 'user' && 'Peut soumettre des cooptations'}
                     {role === 'commercial' && 'Peut gerer ses opportunites et voir les cooptations associees'}
+                    {role === 'rh' && 'Peut gerer les utilisateurs et voir toutes les cooptations'}
                     {role === 'admin' && 'Acces complet a toutes les fonctionnalites'}
                   </div>
                 </button>
@@ -580,6 +583,7 @@ function InvitationsTab() {
                           >
                             <option value="user">{ROLE_LABELS.user}</option>
                             <option value="commercial">{ROLE_LABELS.commercial}</option>
+                            <option value="rh">{ROLE_LABELS.rh}</option>
                             <option value="admin">{ROLE_LABELS.admin}</option>
                           </select>
                         )}
