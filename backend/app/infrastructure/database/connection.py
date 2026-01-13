@@ -10,8 +10,18 @@ from sqlalchemy.ext.asyncio import (
 
 from app.config import settings
 
+
+def get_async_database_url() -> str:
+    """Convert DATABASE_URL to async format if needed."""
+    url = settings.DATABASE_URL
+    # Railway provides postgresql:// but asyncpg needs postgresql+asyncpg://
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    get_async_database_url(),
     echo=settings.is_development,
     pool_pre_ping=True,
     pool_size=5,
