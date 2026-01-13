@@ -260,3 +260,56 @@ class EmailService:
         """
 
         return await self._send_email(to, subject, html_body)
+
+    async def send_invitation_email(
+        self,
+        to_email: str,
+        token: str,
+        role: str,
+    ) -> bool:
+        """Send invitation email to join the platform."""
+        role_labels = {
+            "user": "Utilisateur",
+            "commercial": "Commercial",
+            "admin": "Administrateur",
+        }
+        role_label = role_labels.get(role, role)
+
+        subject = "Invitation à rejoindre Gemini Cooptation"
+        invitation_url = f"http://localhost:3012/accept-invitation?token={token}"
+
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #0ea5e9;">Vous êtes invité(e) !</h1>
+                <p>Bonjour,</p>
+                <p>Vous avez été invité(e) à rejoindre la plateforme <strong>Gemini Cooptation</strong>
+                   en tant que <strong style="color: #0ea5e9;">{role_label}</strong>.</p>
+                <p>Cette plateforme vous permettra de proposer des candidats pour les opportunités
+                   de notre entreprise et de suivre vos cooptations.</p>
+                <p style="text-align: center; margin: 30px 0;">
+                    <a href="{invitation_url}"
+                       style="background-color: #0ea5e9; color: white; padding: 12px 30px;
+                              text-decoration: none; border-radius: 5px; display: inline-block;">
+                        Accepter l'invitation
+                    </a>
+                </p>
+                <p>Ou copiez ce lien dans votre navigateur :</p>
+                <p style="word-break: break-all; color: #0ea5e9;">{invitation_url}</p>
+                <p><strong>Ce lien expire dans 48 heures.</strong></p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #666; font-size: 12px;">
+                    Cet email a été envoyé par Gemini Cooptation.
+                    Si vous n'attendiez pas cette invitation, ignorez cet email.
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+
+        return await self._send_email(to_email, subject, html_body)

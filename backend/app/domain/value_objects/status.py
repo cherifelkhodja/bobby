@@ -6,11 +6,42 @@ from enum import Enum
 class UserRole(str, Enum):
     """User roles in the system."""
 
-    MEMBER = "member"
+    USER = "user"
+    COMMERCIAL = "commercial"
     ADMIN = "admin"
 
     def __str__(self) -> str:
         return self.value
+
+    @property
+    def display_name(self) -> str:
+        """Human-readable role name."""
+        names = {
+            UserRole.USER: "Utilisateur",
+            UserRole.COMMERCIAL: "Commercial",
+            UserRole.ADMIN: "Administrateur",
+        }
+        return names[self]
+
+    @property
+    def can_manage_users(self) -> bool:
+        """Check if role can manage users."""
+        return self == UserRole.ADMIN
+
+    @property
+    def can_manage_opportunities(self) -> bool:
+        """Check if role can select opportunities to share."""
+        return self in (UserRole.ADMIN, UserRole.COMMERCIAL)
+
+    @property
+    def can_view_all_cooptations(self) -> bool:
+        """Check if role can view all cooptations."""
+        return self == UserRole.ADMIN
+
+    @property
+    def can_change_cooptation_status(self) -> bool:
+        """Check if role can change cooptation status."""
+        return self in (UserRole.ADMIN, UserRole.COMMERCIAL)
 
 
 class CooptationStatus(str, Enum):

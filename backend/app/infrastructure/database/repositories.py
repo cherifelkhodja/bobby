@@ -8,11 +8,21 @@ from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.domain.entities import Candidate, Cooptation, Opportunity, User
+from app.domain.entities import (
+    BusinessLead,
+    Candidate,
+    Cooptation,
+    Invitation,
+    Opportunity,
+    User,
+)
+from app.domain.entities.business_lead import BusinessLeadStatus
 from app.domain.value_objects import CooptationStatus, Email, Phone, UserRole
 from app.infrastructure.database.models import (
+    BusinessLeadModel,
     CandidateModel,
     CooptationModel,
+    InvitationModel,
     OpportunityModel,
     UserModel,
 )
@@ -73,6 +83,7 @@ class UserRepository:
             model.is_verified = user.is_verified
             model.is_active = user.is_active
             model.boond_resource_id = user.boond_resource_id
+            model.manager_boond_id = user.manager_boond_id
             model.verification_token = user.verification_token
             model.reset_token = user.reset_token
             model.reset_token_expires = user.reset_token_expires
@@ -89,6 +100,7 @@ class UserRepository:
                 is_verified=user.is_verified,
                 is_active=user.is_active,
                 boond_resource_id=user.boond_resource_id,
+                manager_boond_id=user.manager_boond_id,
                 verification_token=user.verification_token,
                 reset_token=user.reset_token,
                 reset_token_expires=user.reset_token_expires,
@@ -135,6 +147,7 @@ class UserRepository:
             is_verified=model.is_verified,
             is_active=model.is_active,
             boond_resource_id=model.boond_resource_id,
+            manager_boond_id=model.manager_boond_id,
             verification_token=model.verification_token,
             reset_token=model.reset_token,
             reset_token_expires=model.reset_token_expires,
@@ -282,11 +295,14 @@ class OpportunityRepository:
             model.budget = opportunity.budget
             model.manager_name = opportunity.manager_name
             model.manager_email = opportunity.manager_email
+            model.manager_boond_id = opportunity.manager_boond_id
             model.client_name = opportunity.client_name
             model.description = opportunity.description
             model.skills = opportunity.skills
             model.location = opportunity.location
             model.is_active = opportunity.is_active
+            model.is_shared = opportunity.is_shared
+            model.owner_id = opportunity.owner_id
             model.synced_at = opportunity.synced_at
             model.updated_at = datetime.utcnow()
         else:
@@ -301,11 +317,14 @@ class OpportunityRepository:
                 budget=opportunity.budget,
                 manager_name=opportunity.manager_name,
                 manager_email=opportunity.manager_email,
+                manager_boond_id=opportunity.manager_boond_id,
                 client_name=opportunity.client_name,
                 description=opportunity.description,
                 skills=opportunity.skills,
                 location=opportunity.location,
                 is_active=opportunity.is_active,
+                is_shared=opportunity.is_shared,
+                owner_id=opportunity.owner_id,
                 synced_at=opportunity.synced_at,
                 created_at=opportunity.created_at,
                 updated_at=opportunity.updated_at,
@@ -382,6 +401,86 @@ class OpportunityRepository:
         )
         return result.scalar()
 
+    async def list_shared(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+    ) -> list[Opportunity]:
+        """List shared opportunities available for cooptation."""
+        query = select(OpportunityModel).where(
+            OpportunityModel.is_active == True,
+            OpportunityModel.is_shared == True,
+        )
+
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    OpportunityModel.title.ilike(search_pattern),
+                    OpportunityModel.reference.ilike(search_pattern),
+                    OpportunityModel.client_name.ilike(search_pattern),
+                )
+            )
+
+        query = query.offset(skip).limit(limit).order_by(OpportunityModel.created_at.desc())
+        result = await self.session.execute(query)
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def count_shared(self, search: Optional[str] = None) -> int:
+        """Count shared opportunities."""
+        query = select(func.count(OpportunityModel.id)).where(
+            OpportunityModel.is_active == True,
+            OpportunityModel.is_shared == True,
+        )
+
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    OpportunityModel.title.ilike(search_pattern),
+                    OpportunityModel.reference.ilike(search_pattern),
+                    OpportunityModel.client_name.ilike(search_pattern),
+                )
+            )
+
+        result = await self.session.execute(query)
+        return result.scalar() or 0
+
+    async def list_by_owner(
+        self,
+        owner_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[Opportunity]:
+        """List opportunities owned by a specific user (commercial)."""
+        query = (
+            select(OpportunityModel)
+            .where(OpportunityModel.owner_id == owner_id)
+            .offset(skip)
+            .limit(limit)
+            .order_by(OpportunityModel.created_at.desc())
+        )
+        result = await self.session.execute(query)
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def list_by_manager_boond_id(
+        self,
+        manager_boond_id: str,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[Opportunity]:
+        """List opportunities managed by a specific manager (via BoondManager ID)."""
+        query = (
+            select(OpportunityModel)
+            .where(OpportunityModel.manager_boond_id == manager_boond_id)
+            .offset(skip)
+            .limit(limit)
+            .order_by(OpportunityModel.created_at.desc())
+        )
+        result = await self.session.execute(query)
+        return [self._to_entity(m) for m in result.scalars().all()]
+
     def _to_entity(self, model: OpportunityModel) -> Opportunity:
         """Convert model to entity."""
         return Opportunity(
@@ -395,11 +494,14 @@ class OpportunityRepository:
             budget=model.budget,
             manager_name=model.manager_name,
             manager_email=model.manager_email,
+            manager_boond_id=model.manager_boond_id,
             client_name=model.client_name,
             description=model.description,
             skills=model.skills or [],
             location=model.location,
             is_active=model.is_active,
+            is_shared=model.is_shared,
+            owner_id=model.owner_id,
             synced_at=model.synced_at,
             created_at=model.created_at,
             updated_at=model.updated_at,
@@ -632,11 +734,14 @@ class CooptationRepository:
             budget=model.opportunity.budget,
             manager_name=model.opportunity.manager_name,
             manager_email=model.opportunity.manager_email,
+            manager_boond_id=model.opportunity.manager_boond_id,
             client_name=model.opportunity.client_name,
             description=model.opportunity.description,
             skills=model.opportunity.skills or [],
             location=model.opportunity.location,
             is_active=model.opportunity.is_active,
+            is_shared=model.opportunity.is_shared,
+            owner_id=model.opportunity.owner_id,
             synced_at=model.opportunity.synced_at,
             created_at=model.opportunity.created_at,
             updated_at=model.opportunity.updated_at,
@@ -665,5 +770,315 @@ class CooptationRepository:
             status_history=status_history,
             rejection_reason=model.rejection_reason,
             submitted_at=model.submitted_at,
+            updated_at=model.updated_at,
+        )
+
+
+class InvitationRepository:
+    """Invitation repository implementation."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_by_id(self, invitation_id: UUID) -> Optional[Invitation]:
+        """Get invitation by ID."""
+        result = await self.session.execute(
+            select(InvitationModel).where(InvitationModel.id == invitation_id)
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def get_by_token(self, token: str) -> Optional[Invitation]:
+        """Get invitation by token."""
+        result = await self.session.execute(
+            select(InvitationModel).where(InvitationModel.token == token)
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def get_by_email(self, email: str) -> Optional[Invitation]:
+        """Get pending invitation by email."""
+        result = await self.session.execute(
+            select(InvitationModel).where(
+                InvitationModel.email == email.lower(),
+                InvitationModel.accepted_at.is_(None),
+                InvitationModel.expires_at > datetime.utcnow(),
+            )
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def save(self, invitation: Invitation) -> Invitation:
+        """Save invitation (create or update)."""
+        result = await self.session.execute(
+            select(InvitationModel).where(InvitationModel.id == invitation.id)
+        )
+        model = result.scalar_one_or_none()
+
+        if model:
+            model.email = str(invitation.email).lower()
+            model.role = str(invitation.role)
+            model.token = invitation.token
+            model.invited_by = invitation.invited_by
+            model.expires_at = invitation.expires_at
+            model.accepted_at = invitation.accepted_at
+        else:
+            model = InvitationModel(
+                id=invitation.id,
+                email=str(invitation.email).lower(),
+                role=str(invitation.role),
+                token=invitation.token,
+                invited_by=invitation.invited_by,
+                expires_at=invitation.expires_at,
+                accepted_at=invitation.accepted_at,
+                created_at=invitation.created_at,
+            )
+            self.session.add(model)
+
+        await self.session.flush()
+        return self._to_entity(model)
+
+    async def delete(self, invitation_id: UUID) -> bool:
+        """Delete invitation by ID."""
+        result = await self.session.execute(
+            select(InvitationModel).where(InvitationModel.id == invitation_id)
+        )
+        model = result.scalar_one_or_none()
+        if model:
+            await self.session.delete(model)
+            return True
+        return False
+
+    async def list_pending(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[Invitation]:
+        """List pending (not accepted, not expired) invitations."""
+        result = await self.session.execute(
+            select(InvitationModel)
+            .where(
+                InvitationModel.accepted_at.is_(None),
+                InvitationModel.expires_at > datetime.utcnow(),
+            )
+            .offset(skip)
+            .limit(limit)
+            .order_by(InvitationModel.created_at.desc())
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def list_all(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[Invitation]:
+        """List all invitations."""
+        result = await self.session.execute(
+            select(InvitationModel)
+            .offset(skip)
+            .limit(limit)
+            .order_by(InvitationModel.created_at.desc())
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def count_pending(self) -> int:
+        """Count pending invitations."""
+        result = await self.session.execute(
+            select(func.count(InvitationModel.id)).where(
+                InvitationModel.accepted_at.is_(None),
+                InvitationModel.expires_at > datetime.utcnow(),
+            )
+        )
+        return result.scalar() or 0
+
+    def _to_entity(self, model: InvitationModel) -> Invitation:
+        """Convert model to entity."""
+        return Invitation(
+            id=model.id,
+            email=Email(model.email),
+            role=UserRole(model.role),
+            token=model.token,
+            invited_by=model.invited_by,
+            expires_at=model.expires_at,
+            accepted_at=model.accepted_at,
+            created_at=model.created_at,
+        )
+
+
+class BusinessLeadRepository:
+    """Business Lead repository implementation."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_by_id(self, lead_id: UUID) -> Optional[BusinessLead]:
+        """Get business lead by ID."""
+        result = await self.session.execute(
+            select(BusinessLeadModel).where(BusinessLeadModel.id == lead_id)
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def save(self, lead: BusinessLead) -> BusinessLead:
+        """Save business lead (create or update)."""
+        result = await self.session.execute(
+            select(BusinessLeadModel).where(BusinessLeadModel.id == lead.id)
+        )
+        model = result.scalar_one_or_none()
+
+        if model:
+            model.title = lead.title
+            model.description = lead.description
+            model.submitter_id = lead.submitter_id
+            model.client_name = lead.client_name
+            model.contact_name = lead.contact_name
+            model.contact_email = lead.contact_email
+            model.contact_phone = lead.contact_phone
+            model.estimated_budget = lead.estimated_budget
+            model.expected_start_date = lead.expected_start_date
+            model.skills_needed = lead.skills_needed
+            model.location = lead.location
+            model.status = str(lead.status)
+            model.rejection_reason = lead.rejection_reason
+            model.notes = lead.notes
+            model.updated_at = datetime.utcnow()
+        else:
+            model = BusinessLeadModel(
+                id=lead.id,
+                title=lead.title,
+                description=lead.description,
+                submitter_id=lead.submitter_id,
+                client_name=lead.client_name,
+                contact_name=lead.contact_name,
+                contact_email=lead.contact_email,
+                contact_phone=lead.contact_phone,
+                estimated_budget=lead.estimated_budget,
+                expected_start_date=lead.expected_start_date,
+                skills_needed=lead.skills_needed,
+                location=lead.location,
+                status=str(lead.status),
+                rejection_reason=lead.rejection_reason,
+                notes=lead.notes,
+                created_at=lead.created_at,
+                updated_at=lead.updated_at,
+            )
+            self.session.add(model)
+
+        await self.session.flush()
+        return self._to_entity(model)
+
+    async def delete(self, lead_id: UUID) -> bool:
+        """Delete business lead by ID."""
+        result = await self.session.execute(
+            select(BusinessLeadModel).where(BusinessLeadModel.id == lead_id)
+        )
+        model = result.scalar_one_or_none()
+        if model:
+            await self.session.delete(model)
+            return True
+        return False
+
+    async def list_by_submitter(
+        self,
+        submitter_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[BusinessLead]:
+        """List business leads by submitter."""
+        result = await self.session.execute(
+            select(BusinessLeadModel)
+            .where(BusinessLeadModel.submitter_id == submitter_id)
+            .offset(skip)
+            .limit(limit)
+            .order_by(BusinessLeadModel.created_at.desc())
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def list_by_manager(
+        self,
+        manager_boond_id: str,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[BusinessLead]:
+        """List business leads visible to a manager (via submitter's manager_boond_id)."""
+        result = await self.session.execute(
+            select(BusinessLeadModel)
+            .join(UserModel, BusinessLeadModel.submitter_id == UserModel.id)
+            .where(UserModel.manager_boond_id == manager_boond_id)
+            .offset(skip)
+            .limit(limit)
+            .order_by(BusinessLeadModel.created_at.desc())
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def list_by_status(
+        self,
+        status: BusinessLeadStatus,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[BusinessLead]:
+        """List business leads by status."""
+        result = await self.session.execute(
+            select(BusinessLeadModel)
+            .where(BusinessLeadModel.status == str(status))
+            .offset(skip)
+            .limit(limit)
+            .order_by(BusinessLeadModel.created_at.desc())
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def list_all(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        status: Optional[BusinessLeadStatus] = None,
+    ) -> list[BusinessLead]:
+        """List all business leads with optional status filter."""
+        query = select(BusinessLeadModel)
+
+        if status:
+            query = query.where(BusinessLeadModel.status == str(status))
+
+        query = query.offset(skip).limit(limit).order_by(BusinessLeadModel.created_at.desc())
+        result = await self.session.execute(query)
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def count_by_submitter(self, submitter_id: UUID) -> int:
+        """Count business leads by submitter."""
+        result = await self.session.execute(
+            select(func.count(BusinessLeadModel.id)).where(
+                BusinessLeadModel.submitter_id == submitter_id
+            )
+        )
+        return result.scalar() or 0
+
+    async def count_by_status(self, status: BusinessLeadStatus) -> int:
+        """Count business leads by status."""
+        result = await self.session.execute(
+            select(func.count(BusinessLeadModel.id)).where(
+                BusinessLeadModel.status == str(status)
+            )
+        )
+        return result.scalar() or 0
+
+    def _to_entity(self, model: BusinessLeadModel) -> BusinessLead:
+        """Convert model to entity."""
+        return BusinessLead(
+            id=model.id,
+            title=model.title,
+            description=model.description,
+            submitter_id=model.submitter_id,
+            client_name=model.client_name,
+            contact_name=model.contact_name,
+            contact_email=model.contact_email,
+            contact_phone=model.contact_phone,
+            estimated_budget=model.estimated_budget,
+            expected_start_date=model.expected_start_date,
+            skills_needed=model.skills_needed or [],
+            location=model.location,
+            status=BusinessLeadStatus(model.status),
+            rejection_reason=model.rejection_reason,
+            notes=model.notes,
+            created_at=model.created_at,
             updated_at=model.updated_at,
         )

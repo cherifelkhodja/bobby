@@ -20,6 +20,7 @@ class UserReadModel(BaseModel):
     is_verified: bool
     is_active: bool
     boond_resource_id: Optional[str] = None
+    manager_boond_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

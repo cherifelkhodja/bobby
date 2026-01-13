@@ -69,6 +69,15 @@ class EmailServicePort(Protocol):
         """Send cooptation status update notification."""
         ...
 
+    async def send_invitation_email(
+        self,
+        to_email: str,
+        token: str,
+        role: str,
+    ) -> bool:
+        """Send invitation email to join the platform."""
+        ...
+
 
 class CacheServicePort(Protocol):
     """Port for caching operations."""

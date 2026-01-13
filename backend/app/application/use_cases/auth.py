@@ -109,6 +109,7 @@ class RegisterUserUseCase:
             is_verified=user.is_verified,
             is_active=user.is_active,
             boond_resource_id=user.boond_resource_id,
+            manager_boond_id=user.manager_boond_id,
             created_at=user.created_at,
             updated_at=user.updated_at,
         )
@@ -155,6 +156,7 @@ class LoginUseCase:
             is_verified=user.is_verified,
             is_active=user.is_active,
             boond_resource_id=user.boond_resource_id,
+            manager_boond_id=user.manager_boond_id,
             created_at=user.created_at,
             updated_at=user.updated_at,
         )
@@ -187,6 +189,7 @@ class VerifyEmailUseCase:
             is_verified=saved_user.is_verified,
             is_active=saved_user.is_active,
             boond_resource_id=saved_user.boond_resource_id,
+            manager_boond_id=saved_user.manager_boond_id,
             created_at=saved_user.created_at,
             updated_at=saved_user.updated_at,
         )

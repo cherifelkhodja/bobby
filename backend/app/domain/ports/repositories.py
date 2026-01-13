@@ -3,8 +3,16 @@
 from typing import Optional, Protocol
 from uuid import UUID
 
-from app.domain.entities import Candidate, Cooptation, Opportunity, User
-from app.domain.value_objects import CooptationStatus
+from app.domain.entities import (
+    BusinessLead,
+    Candidate,
+    Cooptation,
+    Invitation,
+    Opportunity,
+    User,
+)
+from app.domain.entities.business_lead import BusinessLeadStatus
+from app.domain.value_objects import CooptationStatus, UserRole
 
 
 class UserRepositoryPort(Protocol):
@@ -164,4 +172,91 @@ class CandidateRepositoryPort(Protocol):
 
     async def delete(self, candidate_id: UUID) -> bool:
         """Delete candidate by ID."""
+        ...
+
+
+class InvitationRepositoryPort(Protocol):
+    """Port for invitation persistence operations."""
+
+    async def get_by_id(self, invitation_id: UUID) -> Optional[Invitation]:
+        """Get invitation by ID."""
+        ...
+
+    async def get_by_token(self, token: str) -> Optional[Invitation]:
+        """Get invitation by token."""
+        ...
+
+    async def get_by_email(self, email: str) -> Optional[Invitation]:
+        """Get pending invitation by email."""
+        ...
+
+    async def save(self, invitation: Invitation) -> Invitation:
+        """Save invitation (create or update)."""
+        ...
+
+    async def delete(self, invitation_id: UUID) -> bool:
+        """Delete invitation by ID."""
+        ...
+
+    async def list_pending(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[Invitation]:
+        """List pending (not accepted, not expired) invitations."""
+        ...
+
+    async def count_pending(self) -> int:
+        """Count pending invitations."""
+        ...
+
+
+class BusinessLeadRepositoryPort(Protocol):
+    """Port for business lead persistence operations."""
+
+    async def get_by_id(self, lead_id: UUID) -> Optional[BusinessLead]:
+        """Get business lead by ID."""
+        ...
+
+    async def save(self, lead: BusinessLead) -> BusinessLead:
+        """Save business lead (create or update)."""
+        ...
+
+    async def delete(self, lead_id: UUID) -> bool:
+        """Delete business lead by ID."""
+        ...
+
+    async def list_by_submitter(
+        self,
+        submitter_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[BusinessLead]:
+        """List business leads by submitter."""
+        ...
+
+    async def list_by_manager(
+        self,
+        manager_boond_id: str,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[BusinessLead]:
+        """List business leads visible to a manager (via submitter's manager_boond_id)."""
+        ...
+
+    async def list_by_status(
+        self,
+        status: BusinessLeadStatus,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[BusinessLead]:
+        """List business leads by status."""
+        ...
+
+    async def count_by_submitter(self, submitter_id: UUID) -> int:
+        """Count business leads by submitter."""
+        ...
+
+    async def count_by_status(self, status: BusinessLeadStatus) -> int:
+        """Count business leads by status."""
         ...

@@ -16,10 +16,11 @@ class User:
     first_name: str
     last_name: str
     password_hash: str = ""
-    role: UserRole = UserRole.MEMBER
+    role: UserRole = UserRole.USER
     is_verified: bool = False
     is_active: bool = True
     boond_resource_id: Optional[str] = None
+    manager_boond_id: Optional[str] = None  # Manager's BoondManager ID
     verification_token: Optional[str] = None
     reset_token: Optional[str] = None
     reset_token_expires: Optional[datetime] = None
@@ -36,6 +37,21 @@ class User:
     def is_admin(self) -> bool:
         """Check if user is admin."""
         return self.role == UserRole.ADMIN
+
+    @property
+    def is_commercial(self) -> bool:
+        """Check if user is commercial."""
+        return self.role == UserRole.COMMERCIAL
+
+    @property
+    def is_user(self) -> bool:
+        """Check if user is basic user."""
+        return self.role == UserRole.USER
+
+    def change_role(self, new_role: UserRole) -> None:
+        """Change user role."""
+        self.role = new_role
+        self.updated_at = datetime.utcnow()
 
     def verify_email(self) -> None:
         """Mark email as verified."""

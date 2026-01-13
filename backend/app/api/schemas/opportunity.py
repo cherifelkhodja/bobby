@@ -20,11 +20,14 @@ class OpportunityResponse(BaseModel):
     end_date: Optional[date] = None
     response_deadline: Optional[date] = None
     manager_name: Optional[str] = None
+    manager_boond_id: Optional[str] = None
     client_name: Optional[str] = None
     description: Optional[str] = None
     skills: list[str] = []
     location: Optional[str] = None
     is_open: bool = True
+    is_shared: bool = False
+    owner_id: Optional[str] = None
     days_until_deadline: Optional[int] = None
     synced_at: datetime
     created_at: datetime

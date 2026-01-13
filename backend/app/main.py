@@ -13,6 +13,7 @@ from app.api.routes.v1 import (
     auth_router,
     cooptations_router,
     health_router,
+    invitations_router,
     opportunities_router,
     users_router,
 )
@@ -65,4 +66,5 @@ app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users_router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(opportunities_router, prefix="/api/v1/opportunities", tags=["Opportunities"])
 app.include_router(cooptations_router, prefix="/api/v1/cooptations", tags=["Cooptations"])
+app.include_router(invitations_router, prefix="/api/v1/invitations", tags=["Invitations"])
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])

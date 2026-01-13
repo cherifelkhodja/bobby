@@ -4,11 +4,12 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from app.config import settings
 from app.dependencies import AppSettings, DbSession
+from app.domain.value_objects import UserRole
 from app.infrastructure.boond.client import BoondClient
 from app.infrastructure.cache.redis import CacheService
 from app.infrastructure.database.repositories import OpportunityRepository, UserRepository
@@ -172,3 +173,261 @@ async def test_boond_connection(
         message=result.get("message", "Erreur inconnue"),
         candidates_count=result.get("candidates_count"),
     )
+
+
+# ============================================================================
+# User Management Endpoints
+# ============================================================================
+
+
+class UserAdminResponse(BaseModel):
+    """User response for admin."""
+
+    id: str
+    email: str
+    first_name: str
+    last_name: str
+    role: str
+    is_verified: bool
+    is_active: bool
+    boond_resource_id: Optional[str] = None
+    manager_boond_id: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class UsersListResponse(BaseModel):
+    """List of users response."""
+
+    users: list[UserAdminResponse]
+    total: int
+
+
+class ChangeRoleRequest(BaseModel):
+    """Request to change user role."""
+
+    role: str  # user, commercial, admin
+
+
+class UpdateUserRequest(BaseModel):
+    """Request to update user."""
+
+    is_active: Optional[bool] = None
+    role: Optional[str] = None
+    boond_resource_id: Optional[str] = None
+    manager_boond_id: Optional[str] = None
+
+
+@router.get("/users", response_model=UsersListResponse)
+async def list_users(
+    db: DbSession,
+    authorization: str = Header(default=""),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+):
+    """List all users (admin only)."""
+    await require_admin(db, authorization)
+
+    user_repo = UserRepository(db)
+    users = await user_repo.list_all(skip=skip, limit=limit)
+    total = await user_repo.count()
+
+    return UsersListResponse(
+        users=[
+            UserAdminResponse(
+                id=str(user.id),
+                email=str(user.email),
+                first_name=user.first_name,
+                last_name=user.last_name,
+                role=str(user.role),
+                is_verified=user.is_verified,
+                is_active=user.is_active,
+                boond_resource_id=user.boond_resource_id,
+                manager_boond_id=user.manager_boond_id,
+                created_at=user.created_at.isoformat(),
+                updated_at=user.updated_at.isoformat(),
+            )
+            for user in users
+        ],
+        total=total,
+    )
+
+
+@router.get("/users/{user_id}", response_model=UserAdminResponse)
+async def get_user(
+    user_id: UUID,
+    db: DbSession,
+    authorization: str = Header(default=""),
+):
+    """Get user details (admin only)."""
+    await require_admin(db, authorization)
+
+    user_repo = UserRepository(db)
+    user = await user_repo.get_by_id(user_id)
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+    return UserAdminResponse(
+        id=str(user.id),
+        email=str(user.email),
+        first_name=user.first_name,
+        last_name=user.last_name,
+        role=str(user.role),
+        is_verified=user.is_verified,
+        is_active=user.is_active,
+        boond_resource_id=user.boond_resource_id,
+        manager_boond_id=user.manager_boond_id,
+        created_at=user.created_at.isoformat(),
+        updated_at=user.updated_at.isoformat(),
+    )
+
+
+@router.patch("/users/{user_id}", response_model=UserAdminResponse)
+async def update_user(
+    user_id: UUID,
+    request: UpdateUserRequest,
+    db: DbSession,
+    authorization: str = Header(default=""),
+):
+    """Update user (admin only)."""
+    admin_id = await require_admin(db, authorization)
+
+    user_repo = UserRepository(db)
+    user = await user_repo.get_by_id(user_id)
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+    # Prevent admin from changing their own role
+    if user_id == admin_id and request.role and request.role != str(user.role):
+        raise HTTPException(
+            status_code=400,
+            detail="Vous ne pouvez pas modifier votre propre rôle"
+        )
+
+    # Update fields
+    if request.is_active is not None:
+        if request.is_active:
+            user.activate()
+        else:
+            user.deactivate()
+
+    if request.role:
+        if request.role not in ("user", "commercial", "admin"):
+            raise HTTPException(status_code=400, detail="Rôle invalide")
+        user.change_role(UserRole(request.role))
+
+    if request.boond_resource_id is not None:
+        user.boond_resource_id = request.boond_resource_id or None
+
+    if request.manager_boond_id is not None:
+        user.manager_boond_id = request.manager_boond_id or None
+
+    updated_user = await user_repo.save(user)
+
+    return UserAdminResponse(
+        id=str(updated_user.id),
+        email=str(updated_user.email),
+        first_name=updated_user.first_name,
+        last_name=updated_user.last_name,
+        role=str(updated_user.role),
+        is_verified=updated_user.is_verified,
+        is_active=updated_user.is_active,
+        boond_resource_id=updated_user.boond_resource_id,
+        manager_boond_id=updated_user.manager_boond_id,
+        created_at=updated_user.created_at.isoformat(),
+        updated_at=updated_user.updated_at.isoformat(),
+    )
+
+
+@router.post("/users/{user_id}/role", response_model=UserAdminResponse)
+async def change_user_role(
+    user_id: UUID,
+    request: ChangeRoleRequest,
+    db: DbSession,
+    authorization: str = Header(default=""),
+):
+    """Change user role (admin only)."""
+    admin_id = await require_admin(db, authorization)
+
+    if request.role not in ("user", "commercial", "admin"):
+        raise HTTPException(status_code=400, detail="Rôle invalide")
+
+    user_repo = UserRepository(db)
+    user = await user_repo.get_by_id(user_id)
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+    # Prevent admin from changing their own role
+    if user_id == admin_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Vous ne pouvez pas modifier votre propre rôle"
+        )
+
+    user.change_role(UserRole(request.role))
+    updated_user = await user_repo.save(user)
+
+    return UserAdminResponse(
+        id=str(updated_user.id),
+        email=str(updated_user.email),
+        first_name=updated_user.first_name,
+        last_name=updated_user.last_name,
+        role=str(updated_user.role),
+        is_verified=updated_user.is_verified,
+        is_active=updated_user.is_active,
+        boond_resource_id=updated_user.boond_resource_id,
+        manager_boond_id=updated_user.manager_boond_id,
+        created_at=updated_user.created_at.isoformat(),
+        updated_at=updated_user.updated_at.isoformat(),
+    )
+
+
+@router.post("/users/{user_id}/activate")
+async def activate_user(
+    user_id: UUID,
+    db: DbSession,
+    authorization: str = Header(default=""),
+):
+    """Activate a user account (admin only)."""
+    await require_admin(db, authorization)
+
+    user_repo = UserRepository(db)
+    user = await user_repo.get_by_id(user_id)
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+    user.activate()
+    await user_repo.save(user)
+
+    return {"message": "Utilisateur activé", "is_active": True}
+
+
+@router.post("/users/{user_id}/deactivate")
+async def deactivate_user(
+    user_id: UUID,
+    db: DbSession,
+    authorization: str = Header(default=""),
+):
+    """Deactivate a user account (admin only)."""
+    admin_id = await require_admin(db, authorization)
+
+    if user_id == admin_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Vous ne pouvez pas désactiver votre propre compte"
+        )
+
+    user_repo = UserRepository(db)
+    user = await user_repo.get_by_id(user_id)
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+    user.deactivate()
+    await user_repo.save(user)
+
+    return {"message": "Utilisateur désactivé", "is_active": False}
