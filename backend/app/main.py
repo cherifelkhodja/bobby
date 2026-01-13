@@ -49,16 +49,17 @@ app = FastAPI(
     openapi_url="/api/openapi.json" if not settings.is_production else None,
 )
 
-# Middleware
+# Middleware (order matters - CORS must be outermost to handle OPTIONS preflight)
+app.middleware("http")(error_handler_middleware)
+app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
-app.add_middleware(CorrelationIdMiddleware)
-app.middleware("http")(error_handler_middleware)
 
 # API v1 routes
 app.include_router(health_router, prefix="/api/v1/health", tags=["Health"])
