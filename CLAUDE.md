@@ -146,15 +146,15 @@ VITE_API_URL=https://.../api/v1
 ### BoondManager API Calls (2025-01-13)
 - Removed separate `get_resource_types()` call - uses hardcoded mapping
 - Removed separate `get_agencies()` call - extracts from `included` section
-- **Resource type names hardcoded**:
+- **Resource type names hardcoded** (types 0, 1, 10 are all Consultant):
   ```python
   RESOURCE_TYPE_NAMES = {
       0: "Consultant",
-      1: "Manager",
+      1: "Consultant",
       2: "Commercial",
       5: "RH",
       6: "Direction RH",
-      10: "Consultant Senior",
+      10: "Consultant",
   }
   ```
 - **Agency IDs**:

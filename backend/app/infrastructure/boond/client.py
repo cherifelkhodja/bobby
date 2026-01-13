@@ -182,13 +182,14 @@ class BoondClient:
             return types_dict
 
     # Hardcoded resource type names to avoid extra API call
+    # Types 0, 1, 10 are all Consultant
     RESOURCE_TYPE_NAMES = {
         0: "Consultant",
-        1: "Manager",
+        1: "Consultant",
         2: "Commercial",
         5: "RH",
         6: "Direction RH",
-        10: "Consultant Senior",
+        10: "Consultant",
     }
 
     # Hardcoded agency names as fallback
