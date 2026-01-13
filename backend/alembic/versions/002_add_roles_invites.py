@@ -1,6 +1,6 @@
 """Add new roles, invitations and business leads tables
 
-Revision ID: 002_roles_invitations_business_leads
+Revision ID: 002_add_roles_invites
 Revises: 001_initial_schema
 Create Date: 2026-01-13
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '002_roles_invitations_business_leads'
+revision: str = '002_add_roles_invites'
 down_revision: Union[str, None] = '001_initial_schema'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
