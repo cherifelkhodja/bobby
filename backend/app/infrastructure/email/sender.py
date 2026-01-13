@@ -3,8 +3,15 @@
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Optional
 
 import aiosmtplib
+
+try:
+    import resend
+    RESEND_AVAILABLE = True
+except ImportError:
+    RESEND_AVAILABLE = False
 
 from app.config import Settings
 
@@ -12,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """Email sending service using SMTP."""
+    """Email sending service using Resend or SMTP."""
 
     def __init__(self, settings: Settings) -> None:
         self.host = settings.SMTP_HOST
@@ -22,13 +29,46 @@ class EmailService:
         self.from_email = settings.SMTP_FROM
         self.enabled = settings.FEATURE_EMAIL_NOTIFICATIONS
         self.frontend_url = settings.FRONTEND_URL.rstrip("/")
+        self.resend_api_key = settings.RESEND_API_KEY
+
+        # Configure Resend if API key is available
+        if self.resend_api_key and RESEND_AVAILABLE:
+            resend.api_key = self.resend_api_key
+            self.use_resend = True
+            logger.info("Email service configured with Resend")
+        else:
+            self.use_resend = False
+            logger.info("Email service configured with SMTP")
 
     async def _send_email(self, to: str, subject: str, html_body: str) -> bool:
-        """Send email via SMTP."""
+        """Send email via Resend or SMTP."""
         if not self.enabled:
             logger.info(f"Email notifications disabled. Would send to {to}: {subject}")
             return True
 
+        if self.use_resend:
+            return await self._send_via_resend(to, subject, html_body)
+        else:
+            return await self._send_via_smtp(to, subject, html_body)
+
+    async def _send_via_resend(self, to: str, subject: str, html_body: str) -> bool:
+        """Send email via Resend API."""
+        try:
+            params = {
+                "from": self.from_email,
+                "to": [to],
+                "subject": subject,
+                "html": html_body,
+            }
+            response = resend.Emails.send(params)
+            logger.info(f"Email sent via Resend to {to}: {subject} (id: {response.get('id', 'unknown')})")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send email via Resend to {to}: {e}")
+            return False
+
+    async def _send_via_smtp(self, to: str, subject: str, html_body: str) -> bool:
+        """Send email via SMTP."""
         try:
             message = MIMEMultipart("alternative")
             message["Subject"] = subject
@@ -52,10 +92,10 @@ class EmailService:
                 start_tls=start_tls,
             )
 
-            logger.info(f"Email sent to {to}: {subject}")
+            logger.info(f"Email sent via SMTP to {to}: {subject}")
             return True
         except Exception as e:
-            logger.error(f"Failed to send email to {to}: {e}")
+            logger.error(f"Failed to send email via SMTP to {to}: {e}")
             return False
 
     async def send_verification_email(self, to: str, token: str, name: str) -> bool:

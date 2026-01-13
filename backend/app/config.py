@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = "noreply@geminiconsulting.fr"
+    RESEND_API_KEY: str = ""  # If set, uses Resend instead of SMTP
 
     # Frontend URL (for email links and CORS)
     FRONTEND_URL: str = "http://localhost:3012"
