@@ -68,4 +68,18 @@ export const cvTransformerApi = {
     const response = await apiClient.get<CvTransformationStats>('/cv-transformer/stats');
     return response.data;
   },
+
+  /**
+   * Test Gemini API connectivity (admin only)
+   */
+  testGemini: async (): Promise<GeminiTestResponse> => {
+    const response = await apiClient.get<GeminiTestResponse>('/cv-transformer/test-gemini');
+    return response.data;
+  },
 };
+
+export interface GeminiTestResponse {
+  success: boolean;
+  message: string;
+  api_key_configured: boolean;
+}
