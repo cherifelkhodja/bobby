@@ -4,6 +4,7 @@ import asyncio
 import logging
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.infrastructure.database.connection import async_session_factory
@@ -24,9 +25,9 @@ async def seed_admin_user() -> None:
         return
 
     async with async_session_factory() as session:
-        # Check if admin already exists
+        # Check if admin already exists (case-insensitive)
         result = await session.execute(
-            select(UserModel).where(UserModel.email == settings.ADMIN_EMAIL.lower())
+            select(UserModel).where(UserModel.email.ilike(settings.ADMIN_EMAIL))
         )
         existing = result.scalar_one_or_none()
 
@@ -45,9 +46,13 @@ async def seed_admin_user() -> None:
             is_active=True,
         )
 
-        session.add(admin)
-        await session.commit()
-        logger.info(f"Admin user created: {settings.ADMIN_EMAIL}")
+        try:
+            session.add(admin)
+            await session.commit()
+            logger.info(f"Admin user created: {settings.ADMIN_EMAIL}")
+        except IntegrityError:
+            await session.rollback()
+            logger.info(f"Admin user already exists (race condition): {settings.ADMIN_EMAIL}")
 
 
 async def main() -> None:
