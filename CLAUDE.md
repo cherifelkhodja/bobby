@@ -157,6 +157,13 @@ VITE_API_URL=https://.../api/v1
       10: "Consultant Senior",
   }
   ```
+- **Agency IDs**:
+  ```python
+  AGENCY_NAMES = {
+      1: "Gemini",
+      5: "Craftmania",
+  }
+  ```
 - Reduced API calls from 4 to 2 for fetching resources
 
 ## TypeScript Interfaces

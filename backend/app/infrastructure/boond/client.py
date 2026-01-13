@@ -191,6 +191,12 @@ class BoondClient:
         10: "Consultant Senior",
     }
 
+    # Hardcoded agency names as fallback
+    AGENCY_NAMES = {
+        "1": "Gemini",
+        "5": "Craftmania",
+    }
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=4),
@@ -238,7 +244,8 @@ class BoondClient:
                     # Get agency from relationships
                     agency_data = relationships.get("mainAgency", {}).get("data")
                     agency_id = str(agency_data.get("id")) if agency_data else None
-                    agency_name = agencies_map.get(agency_id, "") if agency_id else ""
+                    # Use included data first, fallback to hardcoded names
+                    agency_name = agencies_map.get(agency_id) or self.AGENCY_NAMES.get(agency_id, "") if agency_id else ""
 
                     # Get resource type - use hardcoded names
                     resource_type = attrs.get("typeOf", None)
