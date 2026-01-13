@@ -301,8 +301,8 @@ function InvitationsTab() {
   });
 
   // Extract unique agencies and types for filter options
-  const agencies = [...new Set(boondResourcesData?.resources.map(r => r.agency_name).filter(Boolean) || [])].sort();
-  const types = [...new Set(boondResourcesData?.resources.map(r => r.resource_type_name).filter(Boolean) || [])].sort();
+  const agencies = [...new Set(boondResourcesData?.resources.map(r => r.agency_name).filter((v): v is string => Boolean(v)) || [])].sort();
+  const types = [...new Set(boondResourcesData?.resources.map(r => r.resource_type_name).filter((v): v is string => Boolean(v)) || [])].sort();
 
   // Filter resources based on selected filters
   const filteredResources = boondResourcesData?.resources.filter(resource => {
