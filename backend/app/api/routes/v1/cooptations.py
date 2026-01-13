@@ -3,7 +3,7 @@
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 
 from app.api.schemas.cooptation import (
     CooptationListResponse,
@@ -50,7 +50,7 @@ async def create_cooptation(
     db: DbSession,
     boond: Boond,
     settings: AppSettings,
-    authorization: str = "",
+    authorization: str = Header(default=""),
 ):
     """Create a new cooptation (propose a candidate for an opportunity)."""
     user_id = get_user_id_from_auth(authorization)
@@ -92,7 +92,7 @@ async def list_cooptations(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),
-    authorization: str = "",
+    authorization: str = Header(default=""),
 ):
     """List all cooptations (admin view)."""
     # In production, would check for admin role
@@ -121,7 +121,7 @@ async def list_my_cooptations(
     db: DbSession,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    authorization: str = "",
+    authorization: str = Header(default=""),
 ):
     """List current user's cooptations."""
     user_id = get_user_id_from_auth(authorization)
@@ -147,7 +147,7 @@ async def list_my_cooptations(
 @router.get("/me/stats", response_model=CooptationStatsResponse)
 async def get_my_stats(
     db: DbSession,
-    authorization: str = "",
+    authorization: str = Header(default=""),
 ):
     """Get current user's cooptation statistics."""
     user_id = get_user_id_from_auth(authorization)
@@ -163,7 +163,7 @@ async def get_my_stats(
 @router.get("/stats", response_model=CooptationStatsResponse)
 async def get_all_stats(
     db: DbSession,
-    authorization: str = "",
+    authorization: str = Header(default=""),
 ):
     """Get overall cooptation statistics (admin view)."""
     # In production, would check for admin role
@@ -179,7 +179,7 @@ async def get_all_stats(
 async def get_cooptation(
     cooptation_id: UUID,
     db: DbSession,
-    authorization: str = "",
+    authorization: str = Header(default=""),
 ):
     """Get cooptation details."""
     cooptation_repo = CooptationRepository(db)
@@ -196,7 +196,7 @@ async def update_cooptation_status(
     request: UpdateCooptationStatusRequest,
     db: DbSession,
     settings: AppSettings,
-    authorization: str = "",
+    authorization: str = Header(default=""),
 ):
     """Update cooptation status (admin only)."""
     user_id = get_user_id_from_auth(authorization)
