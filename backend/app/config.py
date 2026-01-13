@@ -44,8 +44,11 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = "noreply@geminiconsulting.fr"
 
-    # Frontend URL (for email links)
+    # Frontend URL (for email links and CORS)
     FRONTEND_URL: str = "http://localhost:3012"
+
+    # Additional CORS origins (comma-separated, optional)
+    CORS_ORIGINS: str = ""
 
     # Admin seed (dev only - set via environment variables if needed)
     ADMIN_EMAIL: str = ""
@@ -70,6 +73,30 @@ class Settings(BaseSettings):
     def is_testing(self) -> bool:
         """Check if running in test mode."""
         return self.ENV == "test"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Get list of allowed CORS origins."""
+        origins = [self.FRONTEND_URL]
+
+        # Add localhost for development
+        if not self.is_production:
+            origins.extend([
+                "http://localhost:3012",
+                "http://127.0.0.1:3012",
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+            ])
+
+        # Add additional origins from CORS_ORIGINS
+        if self.CORS_ORIGINS:
+            origins.extend([
+                origin.strip()
+                for origin in self.CORS_ORIGINS.split(",")
+                if origin.strip()
+            ])
+
+        return list(set(origins))  # Remove duplicates
 
 
 @lru_cache

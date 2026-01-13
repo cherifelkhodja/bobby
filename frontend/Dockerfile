@@ -1,21 +1,35 @@
-FROM node:20-alpine
+# Build stage
+FROM node:20-alpine as builder
 
 WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
-# Copy application code
+# Copy source and build
 COPY . .
 
-# Create non-root user
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -S appuser -u 1001 -G appgroup && \
-    chown -R appuser:appgroup /app
+# Build with environment variable for API URL
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+RUN npm run build
 
-USER appuser
+# Production stage with nginx
+FROM nginx:alpine
 
-EXPOSE 5173
+# Copy custom nginx config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-CMD ["npm", "run", "dev", "--", "--host"]
+# Copy built assets
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Railway uses PORT env variable - nginx needs to listen on it
+# We'll use envsubst to replace the port in nginx config
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+EXPOSE 80
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;"]
