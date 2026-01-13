@@ -1,33 +1,34 @@
-FROM python:3.12-slim as builder
-
-WORKDIR /app
-
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir build && \
-    pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -e .
-
-# Production image
+# Production Dockerfile for Railway
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install runtime dependencies only
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy wheels and install
-COPY --from=builder /app/wheels /wheels
+# Copy requirements and install Python dependencies
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir /wheels/* && \
-    pip install --no-cache-dir -e . && \
-    rm -rf /wheels
+
+# Install dependencies directly (simpler and more reliable)
+RUN pip install --no-cache-dir \
+    "fastapi>=0.109.0" \
+    "uvicorn[standard]>=0.27.0" \
+    "sqlalchemy[asyncio]>=2.0.25" \
+    "asyncpg>=0.29.0" \
+    "alembic>=1.13.1" \
+    "pydantic>=2.5.3" \
+    "pydantic-settings>=2.1.0" \
+    "python-jose[cryptography]>=3.3.0" \
+    "bcrypt>=4.0.0" \
+    "httpx>=0.26.0" \
+    "tenacity>=8.2.3" \
+    "redis>=5.0.1" \
+    "aiosmtplib>=3.0.1" \
+    "structlog>=24.1.0" \
+    "python-multipart>=0.0.6" \
+    "email-validator>=2.1.0"
 
 # Copy application code
 COPY . .
@@ -40,5 +41,5 @@ USER appuser
 ENV PORT=8000
 EXPOSE $PORT
 
-# Production command with proper workers
+# Production command
 CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2
