@@ -1,10 +1,29 @@
-"""Text extractors for PDF and DOCX files."""
+"""Text extractors for PDF and DOCX files.
+
+Implements CvTextExtractorPort for dependency inversion.
+"""
 
 import io
 from typing import BinaryIO
 
 from pypdf import PdfReader
 from docx import Document
+
+
+class PdfTextExtractor:
+    """PDF text extractor implementing CvTextExtractorPort."""
+
+    def extract(self, content: bytes) -> str:
+        """Extract text from PDF content."""
+        return extract_text_from_pdf(content)
+
+
+class DocxTextExtractor:
+    """DOCX text extractor implementing CvTextExtractorPort."""
+
+    def extract(self, content: bytes) -> str:
+        """Extract text from DOCX content."""
+        return extract_text_from_docx(content)
 
 
 def extract_text_from_pdf(file_content: bytes | BinaryIO) -> str:

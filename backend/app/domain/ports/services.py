@@ -1,6 +1,6 @@
 """Service port interfaces for external services."""
 
-from typing import Optional, Protocol
+from typing import Any, Optional, Protocol
 
 from app.domain.entities import Candidate, Opportunity
 
@@ -100,4 +100,59 @@ class CacheServicePort(Protocol):
 
     async def clear_pattern(self, pattern: str) -> int:
         """Clear all keys matching pattern. Returns count of deleted keys."""
+        ...
+
+
+class CvTextExtractorPort(Protocol):
+    """Port for extracting text from CV documents."""
+
+    def extract(self, content: bytes) -> str:
+        """Extract text from document content.
+
+        Args:
+            content: Binary content of the document.
+
+        Returns:
+            Extracted text.
+
+        Raises:
+            ValueError: If extraction fails.
+        """
+        ...
+
+
+class CvDataExtractorPort(Protocol):
+    """Port for extracting structured data from CV text using AI."""
+
+    async def extract_cv_data(self, cv_text: str) -> dict[str, Any]:
+        """Extract structured CV data from text.
+
+        Args:
+            cv_text: Raw text extracted from CV.
+
+        Returns:
+            Structured CV data dictionary.
+
+        Raises:
+            ValueError: If extraction fails.
+        """
+        ...
+
+
+class CvDocumentGeneratorPort(Protocol):
+    """Port for generating CV documents from templates."""
+
+    def generate(self, template_content: bytes, cv_data: dict[str, Any]) -> bytes:
+        """Generate document from template and data.
+
+        Args:
+            template_content: Binary content of the template.
+            cv_data: Structured CV data.
+
+        Returns:
+            Generated document as bytes.
+
+        Raises:
+            ValueError: If generation fails.
+        """
         ...

@@ -1,7 +1,10 @@
-"""Google Gemini API client for CV data extraction."""
+"""Google Gemini API client for CV data extraction.
 
+Implements CvDataExtractorPort for dependency inversion.
+"""
+
+import asyncio
 import json
-import re
 from typing import Any
 
 import google.generativeai as genai
@@ -110,7 +113,8 @@ class GeminiClient:
 
             prompt = CV_EXTRACTION_PROMPT + cv_text + "\n\nRéponds UNIQUEMENT avec le JSON valide, sans commentaires ni explications."
 
-            response = model.generate_content(prompt)
+            # Use asyncio.to_thread to avoid blocking the event loop
+            response = await asyncio.to_thread(model.generate_content, prompt)
 
             if not response.text:
                 raise ValueError("La réponse de Gemini est vide")

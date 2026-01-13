@@ -7,6 +7,8 @@ from app.domain.entities import (
     BusinessLead,
     Candidate,
     Cooptation,
+    CvTemplate,
+    CvTransformationLog,
     Invitation,
     Opportunity,
     User,
@@ -259,4 +261,52 @@ class BusinessLeadRepositoryPort(Protocol):
 
     async def count_by_status(self, status: BusinessLeadStatus) -> int:
         """Count business leads by status."""
+        ...
+
+
+class CvTemplateRepositoryPort(Protocol):
+    """Port for CV template persistence operations."""
+
+    async def get_by_id(self, template_id: UUID) -> Optional[CvTemplate]:
+        """Get template by ID."""
+        ...
+
+    async def get_by_name(self, name: str) -> Optional[CvTemplate]:
+        """Get template by unique name."""
+        ...
+
+    async def save(self, template: CvTemplate) -> CvTemplate:
+        """Save template (create or update)."""
+        ...
+
+    async def delete(self, template_id: UUID) -> bool:
+        """Delete template by ID."""
+        ...
+
+    async def list_active(self) -> list[CvTemplate]:
+        """List all active templates."""
+        ...
+
+    async def list_all(self) -> list[CvTemplate]:
+        """List all templates (including inactive)."""
+        ...
+
+
+class CvTransformationLogRepositoryPort(Protocol):
+    """Port for CV transformation log persistence operations."""
+
+    async def save(self, log: CvTransformationLog) -> CvTransformationLog:
+        """Save transformation log."""
+        ...
+
+    async def count_by_user(self, user_id: UUID, success_only: bool = True) -> int:
+        """Count transformations by user."""
+        ...
+
+    async def get_stats_by_user(self) -> list[dict]:
+        """Get transformation stats grouped by user."""
+        ...
+
+    async def get_total_count(self, success_only: bool = True) -> int:
+        """Get total transformation count."""
         ...

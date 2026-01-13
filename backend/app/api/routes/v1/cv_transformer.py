@@ -17,7 +17,12 @@ from app.application.use_cases.cv_transformer import (
 from app.config import settings
 from app.dependencies import AppSettings, DbSession
 from app.domain.value_objects import UserRole
-from app.infrastructure.cv_transformer import DocxGenerator, GeminiClient
+from app.infrastructure.cv_transformer import (
+    DocxGenerator,
+    DocxTextExtractor,
+    GeminiClient,
+    PdfTextExtractor,
+)
 from app.infrastructure.database.repositories import (
     CvTemplateRepository,
     CvTransformationLogRepository,
@@ -215,17 +220,21 @@ async def transform_cv(
             detail="Service d'IA non configuré. Contactez l'administrateur.",
         )
 
-    # Create services and use case
+    # Create services and use case (Dependency Injection with ports)
     template_repo = CvTemplateRepository(db)
     log_repo = CvTransformationLogRepository(db)
     gemini_client = GeminiClient(app_settings)
     docx_generator = DocxGenerator()
+    pdf_extractor = PdfTextExtractor()
+    docx_extractor = DocxTextExtractor()
 
     use_case = TransformCvUseCase(
         template_repository=template_repo,
         log_repository=log_repo,
-        gemini_client=gemini_client,
-        docx_generator=docx_generator,
+        data_extractor=gemini_client,
+        document_generator=docx_generator,
+        pdf_text_extractor=pdf_extractor,
+        docx_text_extractor=docx_extractor,
     )
 
     try:

@@ -3,34 +3,38 @@
 from typing import Optional
 from uuid import UUID
 
-from app.config import Settings
 from app.domain.entities import CvTemplate, CvTransformationLog
-from app.infrastructure.cv_transformer import (
-    DocxGenerator,
-    GeminiClient,
-    extract_text_from_docx,
-    extract_text_from_pdf,
-)
-from app.infrastructure.database.repositories import (
-    CvTemplateRepository,
-    CvTransformationLogRepository,
+from app.domain.ports import (
+    CvDataExtractorPort,
+    CvDocumentGeneratorPort,
+    CvTemplateRepositoryPort,
+    CvTextExtractorPort,
+    CvTransformationLogRepositoryPort,
 )
 
 
 class TransformCvUseCase:
-    """Use case for transforming a CV into a standardized Word document."""
+    """Use case for transforming a CV into a standardized Word document.
+
+    Follows Dependency Inversion Principle - depends on abstractions (ports),
+    not concrete implementations.
+    """
 
     def __init__(
         self,
-        template_repository: CvTemplateRepository,
-        log_repository: CvTransformationLogRepository,
-        gemini_client: GeminiClient,
-        docx_generator: DocxGenerator,
+        template_repository: CvTemplateRepositoryPort,
+        log_repository: CvTransformationLogRepositoryPort,
+        data_extractor: CvDataExtractorPort,
+        document_generator: CvDocumentGeneratorPort,
+        pdf_text_extractor: CvTextExtractorPort,
+        docx_text_extractor: CvTextExtractorPort,
     ) -> None:
-        self.template_repository = template_repository
-        self.log_repository = log_repository
-        self.gemini_client = gemini_client
-        self.docx_generator = docx_generator
+        self._template_repository = template_repository
+        self._log_repository = log_repository
+        self._data_extractor = data_extractor
+        self._document_generator = document_generator
+        self._pdf_extractor = pdf_text_extractor
+        self._docx_extractor = docx_text_extractor
 
     async def execute(
         self,
@@ -57,29 +61,21 @@ class TransformCvUseCase:
 
         try:
             # Get the template
-            template = await self.template_repository.get_by_name(template_name)
+            template = await self._template_repository.get_by_name(template_name)
             if not template:
                 raise ValueError(f"Template '{template_name}' non trouvé")
 
             if not template.is_active:
                 raise ValueError(f"Template '{template_name}' n'est pas actif")
 
-            # Extract text based on file type
-            file_lower = filename.lower()
-            if file_lower.endswith(".pdf"):
-                cv_text = extract_text_from_pdf(file_content)
-            elif file_lower.endswith(".docx"):
-                cv_text = extract_text_from_docx(file_content)
-            elif file_lower.endswith(".doc"):
-                raise ValueError("Les fichiers .doc ne sont pas supportés. Veuillez convertir en .docx ou .pdf")
-            else:
-                raise ValueError("Format de fichier non supporté. Utilisez PDF ou DOCX")
+            # Extract text based on file type (Single Responsibility - delegate to extractors)
+            cv_text = self._extract_text(file_content, filename)
 
-            # Extract structured data using Gemini
-            cv_data = await self.gemini_client.extract_cv_data(cv_text)
+            # Extract structured data using AI
+            cv_data = await self._data_extractor.extract_cv_data(cv_text)
 
             # Generate the output document
-            output_content = self.docx_generator.generate(
+            output_content = self._document_generator.generate(
                 template_content=template.file_content,
                 cv_data=cv_data,
             )
@@ -91,7 +87,7 @@ class TransformCvUseCase:
                 template_name=template_name,
                 original_filename=filename,
             )
-            await self.log_repository.save(log)
+            await self._log_repository.save(log)
 
             return output_content
 
@@ -104,15 +100,38 @@ class TransformCvUseCase:
                 error_message=str(e),
                 template_id=template.id if template else None,
             )
-            await self.log_repository.save(log)
+            await self._log_repository.save(log)
             raise
+
+    def _extract_text(self, file_content: bytes, filename: str) -> str:
+        """Extract text from file based on extension.
+
+        Args:
+            file_content: Binary content of the file.
+            filename: Original filename.
+
+        Returns:
+            Extracted text.
+
+        Raises:
+            ValueError: If file type is not supported.
+        """
+        file_lower = filename.lower()
+        if file_lower.endswith(".pdf"):
+            return self._pdf_extractor.extract(file_content)
+        elif file_lower.endswith(".docx"):
+            return self._docx_extractor.extract(file_content)
+        elif file_lower.endswith(".doc"):
+            raise ValueError("Les fichiers .doc ne sont pas supportés. Veuillez convertir en .docx ou .pdf")
+        else:
+            raise ValueError("Format de fichier non supporté. Utilisez PDF ou DOCX")
 
 
 class GetTemplatesUseCase:
     """Use case for getting available CV templates."""
 
-    def __init__(self, template_repository: CvTemplateRepository) -> None:
-        self.template_repository = template_repository
+    def __init__(self, template_repository: CvTemplateRepositoryPort) -> None:
+        self._template_repository = template_repository
 
     async def execute(self, include_inactive: bool = False) -> list[dict]:
         """Get list of available templates.
@@ -124,9 +143,9 @@ class GetTemplatesUseCase:
             List of template info dicts (without file content).
         """
         if include_inactive:
-            templates = await self.template_repository.list_all()
+            templates = await self._template_repository.list_all()
         else:
-            templates = await self.template_repository.list_active()
+            templates = await self._template_repository.list_active()
 
         return [
             {
@@ -144,8 +163,8 @@ class GetTemplatesUseCase:
 class UploadTemplateUseCase:
     """Use case for uploading or updating a CV template."""
 
-    def __init__(self, template_repository: CvTemplateRepository) -> None:
-        self.template_repository = template_repository
+    def __init__(self, template_repository: CvTemplateRepositoryPort) -> None:
+        self._template_repository = template_repository
 
     async def execute(
         self,
@@ -168,14 +187,14 @@ class UploadTemplateUseCase:
             Template info dict.
         """
         # Check if template exists
-        existing = await self.template_repository.get_by_name(name)
+        existing = await self._template_repository.get_by_name(name)
 
         if existing:
             # Update existing template
             existing.update_content(file_content, file_name)
             existing.display_name = display_name
             existing.description = description
-            template = await self.template_repository.save(existing)
+            template = await self._template_repository.save(existing)
         else:
             # Create new template
             template = CvTemplate(
@@ -185,7 +204,7 @@ class UploadTemplateUseCase:
                 file_content=file_content,
                 file_name=file_name,
             )
-            template = await self.template_repository.save(template)
+            template = await self._template_repository.save(template)
 
         return {
             "id": str(template.id),
@@ -200,8 +219,8 @@ class UploadTemplateUseCase:
 class GetTransformationStatsUseCase:
     """Use case for getting CV transformation statistics."""
 
-    def __init__(self, log_repository: CvTransformationLogRepository) -> None:
-        self.log_repository = log_repository
+    def __init__(self, log_repository: CvTransformationLogRepositoryPort) -> None:
+        self._log_repository = log_repository
 
     async def execute(self) -> dict:
         """Get transformation statistics.
@@ -209,8 +228,8 @@ class GetTransformationStatsUseCase:
         Returns:
             Dict with total count and per-user stats.
         """
-        total = await self.log_repository.get_total_count(success_only=True)
-        by_user = await self.log_repository.get_stats_by_user()
+        total = await self._log_repository.get_total_count(success_only=True)
+        by_user = await self._log_repository.get_stats_by_user()
 
         return {
             "total": total,
