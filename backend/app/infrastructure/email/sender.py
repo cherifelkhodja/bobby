@@ -21,6 +21,7 @@ class EmailService:
         self.password = settings.SMTP_PASSWORD
         self.from_email = settings.SMTP_FROM
         self.enabled = settings.FEATURE_EMAIL_NOTIFICATIONS
+        self.frontend_url = settings.FRONTEND_URL.rstrip("/")
 
     async def _send_email(self, to: str, subject: str, html_body: str) -> bool:
         """Send email via SMTP."""
@@ -37,12 +38,18 @@ class EmailService:
             html_part = MIMEText(html_body, "html")
             message.attach(html_part)
 
+            # Use STARTTLS for port 587 (OVH, Gmail, etc.)
+            use_tls = self.port == 465
+            start_tls = self.port == 587
+
             await aiosmtplib.send(
                 message,
                 hostname=self.host,
                 port=self.port,
                 username=self.user if self.user else None,
                 password=self.password if self.password else None,
+                use_tls=use_tls,
+                start_tls=start_tls,
             )
 
             logger.info(f"Email sent to {to}: {subject}")
@@ -54,8 +61,7 @@ class EmailService:
     async def send_verification_email(self, to: str, token: str, name: str) -> bool:
         """Send email verification link."""
         subject = "Vérifiez votre adresse email - Gemini Cooptation"
-        # In production, this would be FRONTEND_URL
-        verification_url = f"http://localhost:3012/verify-email?token={token}"
+        verification_url = f"{self.frontend_url}/verify-email?token={token}"
 
         html_body = f"""
         <!DOCTYPE html>
@@ -93,7 +99,7 @@ class EmailService:
     async def send_password_reset_email(self, to: str, token: str, name: str) -> bool:
         """Send password reset link."""
         subject = "Réinitialisation de votre mot de passe - Gemini Cooptation"
-        reset_url = f"http://localhost:3012/reset-password?token={token}"
+        reset_url = f"{self.frontend_url}/reset-password?token={token}"
 
         html_body = f"""
         <!DOCTYPE html>
@@ -133,7 +139,7 @@ class EmailService:
     async def send_magic_link_email(self, to: str, token: str, name: str) -> bool:
         """Send magic link for passwordless login."""
         subject = "Votre lien de connexion - Gemini Cooptation"
-        magic_url = f"http://localhost:3012/auth/magic-link?token={token}"
+        magic_url = f"{self.frontend_url}/auth/magic-link?token={token}"
 
         html_body = f"""
         <!DOCTYPE html>
@@ -276,7 +282,7 @@ class EmailService:
         role_label = role_labels.get(role, role)
 
         subject = "Invitation à rejoindre Gemini Cooptation"
-        invitation_url = f"http://localhost:3012/accept-invitation?token={token}"
+        invitation_url = f"{self.frontend_url}/accept-invitation?token={token}"
 
         html_body = f"""
         <!DOCTYPE html>

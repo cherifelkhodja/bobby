@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = "noreply@geminiconsulting.fr"
 
+    # Frontend URL (for email links)
+    FRONTEND_URL: str = "http://localhost:3012"
+
     # Admin seed (dev only - set via environment variables if needed)
     ADMIN_EMAIL: str = ""
     ADMIN_PASSWORD: str = ""
