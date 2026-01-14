@@ -67,20 +67,26 @@ class UserRole(str, Enum):
 
 ### 2. Invitation System
 - Admin can invite users from BoondManager resources list
-- Stores `boond_resource_id` and `manager_boond_id` with invitations
+- Stores `boond_resource_id`, `manager_boond_id`, `phone`, `first_name`, `last_name` with invitations
 - Email sent via Resend API with registration link
 - **Role selector**: Admin can change the suggested role before sending invitation
-- **Filters**: Filter resources by Agency and Type
-- **Migration**: `003_add_inv_boond_ids.py`
+- **Filters**: Filter resources by Agency, Type, and State (default: "En cours")
+- **Pre-fill**: Registration form pre-filled with BoondManager data (name, phone)
+- **Migrations**: `003_add_inv_boond_ids.py`, `006_add_names_to_invitations.py`
 
 ### 3. Admin Panel (`frontend/src/pages/Admin.tsx`)
 - **BoondTab**: Connection status, sync button, test connection
 - **InvitationsTab**: Table of BoondManager resources with:
-  - Consultant name, agency, type, suggested role
+  - Consultant name, agency, type, state, suggested role
   - Role selector dropdown to change role before invitation
-  - Agency and Type filters
+  - Agency, Type and State filters (default state: "En cours")
+  - Resource details modal (click on name)
   - "Inviter" button (disabled if already registered or pending invitation)
-- **UsersTab**: User management (activate/deactivate, change role)
+- **UsersTab**: User management with:
+  - Role and Status filters
+  - User details modal (click on name to edit)
+  - Activate/deactivate, change role, delete user
+  - Centered action buttons
 
 ### 4. Authentication
 - JWT with access (15min) and refresh (7d) tokens
@@ -137,12 +143,13 @@ Transform CVs (PDF/DOCX) into standardized Word documents using Google Gemini AI
 - `GET /boond/status` - BoondManager connection status
 - `POST /boond/sync` - Sync opportunities
 - `POST /boond/test` - Test connection
-- `GET /boond/resources` - List BoondManager employees (states 1,2 only)
+- `GET /boond/resources` - List BoondManager employees (with phone, manager_name, state)
 - `GET /users` - List all users
 - `PATCH /users/{id}` - Update user
 - `POST /users/{id}/role` - Change role
 - `POST /users/{id}/activate` - Activate user
 - `POST /users/{id}/deactivate` - Deactivate user
+- `DELETE /users/{id}` - Delete user permanently (admin only)
 
 ### Invitations (`/api/v1/invitations`)
 - `POST /` - Create invitation (accepts `boond_resource_id`, `manager_boond_id`)
@@ -161,12 +168,13 @@ Transform CVs (PDF/DOCX) into standardized Word documents using Google Gemini AI
 ```python
 id: UUID
 email: str
-first_name: str
-last_name: str
 role: str
 token: str
 boond_resource_id: str | None  # Added in migration 003
 manager_boond_id: str | None   # Added in migration 003
+phone: str | None              # Added in migration 005
+first_name: str | None         # Added in migration 006 (pre-fill from Boond)
+last_name: str | None          # Added in migration 006 (pre-fill from Boond)
 expires_at: datetime
 created_at: datetime
 ```
@@ -266,6 +274,16 @@ VITE_API_URL=https://.../api/v1
       5: "Craftmania",
   }
   ```
+- **Resource state names**:
+  ```python
+  RESOURCE_STATE_NAMES = {
+      0: "Sortie",
+      1: "En cours",
+      2: "Intercontrat",
+      3: "Arrivée prochaine",
+      7: "Sortie prochaine",
+  }
+  ```
 - Reduced API calls from 4 to 2 for fetching resources
 
 ## TypeScript Interfaces
@@ -277,12 +295,29 @@ interface BoondResource {
   first_name: string;
   last_name: string;
   email: string;
+  phone?: string | null;
   manager_id: string | null;
+  manager_name: string | null;  // Resolved from included data
   agency_id: string | null;
   agency_name: string | null;
   resource_type: number | null;
   resource_type_name: string | null;
+  state: number | null;
+  state_name: string | null;
   suggested_role: UserRole;
+}
+```
+
+### InvitationValidation
+```typescript
+interface InvitationValidation {
+  email: string;
+  role: string;
+  phone?: string | null;
+  first_name?: string | null;  // Pre-fill from Boond
+  last_name?: string | null;   // Pre-fill from Boond
+  is_valid: boolean;
+  hours_until_expiry: number;
 }
 ```
 
@@ -313,7 +348,19 @@ npm run lint                  # Lint
 
 ## Recent Changes Log
 
-### 2026-01-14
+### 2026-01-14 (session 2)
+- Added role and status filters to Users tab in Admin panel
+- Fixed actions alignment in Users table (centered with inline-flex)
+- Added delete user functionality for admin (with confirmation modal)
+- Fixed BoondManager invitation pre-fill issue:
+  - Created migration `006_add_names_to_invitations.py` for first_name, last_name columns
+  - Invitation now stores first_name, last_name from BoondManager
+  - AcceptInvitation form pre-fills with invitation data
+- Added state filter to BoondManager resources (default: "En cours")
+- Display manager name instead of ID in resource details modal
+- Made only user/resource names clickable for modals (not entire row)
+
+### 2026-01-14 (session 1)
 - Added phone number support (international format +33...) for users and invitations
 - Created migration `005_add_phone_fields.py` to add phone column to users and invitations tables
 - Added phone field to BoondManager resource sync (mobile/phone1)
