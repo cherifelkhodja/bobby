@@ -499,6 +499,10 @@ function InvitationsTab() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedRoles, setSelectedRoles] = useState<Record<string, UserRole>>({});
 
+  // Resource details modal state
+  const [selectedResource, setSelectedResource] = useState<BoondResource | null>(null);
+  const [isResourceModalOpen, setIsResourceModalOpen] = useState(false);
+
   // Email invitation form state
   const [emailInviteEmail, setEmailInviteEmail] = useState('');
   const [emailInviteRole, setEmailInviteRole] = useState<UserRole>('user');
@@ -843,9 +847,15 @@ function InvitationsTab() {
 
                   return (
                     <tr key={resource.id} className={isDisabled ? 'bg-gray-50 dark:bg-gray-900/50' : ''}>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td
+                        className="px-6 py-4 whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50"
+                        onClick={() => {
+                          setSelectedResource(resource);
+                          setIsResourceModalOpen(true);
+                        }}
+                      >
                         <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-primary dark:hover:text-primary-400">
                             {resource.first_name} {resource.last_name}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">{resource.email}</div>
@@ -904,6 +914,109 @@ function InvitationsTab() {
           </div>
         )}
       </Card>
+
+      {/* Resource Details Modal */}
+      <Modal
+        isOpen={isResourceModalOpen}
+        onClose={() => setIsResourceModalOpen(false)}
+        title="Details de la ressource BoondManager"
+      >
+        {selectedResource && (
+          <div className="space-y-4">
+            {/* Name and status */}
+            <div className="text-center pb-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {selectedResource.first_name} {selectedResource.last_name}
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {selectedResource.email}
+              </p>
+              {(() => {
+                const { hasAccount, hasPendingInvitation } = getResourceStatus(selectedResource);
+                if (hasAccount) return <Badge variant="success" className="mt-2">Inscrit</Badge>;
+                if (hasPendingInvitation) return <Badge variant="warning" className="mt-2">Invitation en attente</Badge>;
+                return <Badge variant="default" className="mt-2">Non inscrit</Badge>;
+              })()}
+            </div>
+
+            {/* Details */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500 dark:text-gray-400">ID Boond</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {selectedResource.id}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Agence</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {selectedResource.agency_name || '-'}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Type</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {selectedResource.resource_type_name || '-'}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Telephone</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {selectedResource.phone || '-'}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500 dark:text-gray-400">ID Manager Boond</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {selectedResource.manager_id || '-'}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Role suggere</span>
+                <Badge variant={ROLE_COLORS[selectedResource.suggested_role]}>
+                  {ROLE_LABELS[selectedResource.suggested_role]}
+                </Badge>
+              </div>
+            </div>
+
+            {/* Action */}
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+              {(() => {
+                const { hasAccount, hasPendingInvitation } = getResourceStatus(selectedResource);
+                if (hasAccount || hasPendingInvitation) {
+                  return (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setIsResourceModalOpen(false)}
+                    >
+                      Fermer
+                    </Button>
+                  );
+                }
+                return (
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      handleSendInvitation(selectedResource);
+                      setIsResourceModalOpen(false);
+                    }}
+                    isLoading={sendingResourceId === selectedResource.id}
+                    leftIcon={<Send className="h-4 w-4" />}
+                  >
+                    Envoyer une invitation
+                  </Button>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
