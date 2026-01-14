@@ -302,7 +302,24 @@ npm run build                 # Build
 npm run lint                  # Lint
 ```
 
+## Technical Debt / Future Migrations
+
+### Google Gemini SDK Migration
+- **Current**: `google-generativeai` (deprecated)
+- **Target**: `google.genai`
+- **File**: `backend/app/infrastructure/cv_transformer/gemini_client.py`
+- **Priority**: Medium (package still works but no longer receives updates)
+- **Reference**: https://github.com/google-gemini/deprecated-generative-ai-python
+
 ## Recent Changes Log
+
+### 2026-01-14
+- Added phone number support (international format +33...) for users and invitations
+- Created migration `005_add_phone_fields.py` to add phone column to users and invitations tables
+- Added phone field to BoondManager resource sync (mobile/phone1)
+- Added user details modal in Admin > Users with editable fields (name, phone, boond IDs)
+- Made user rows clickable to view/edit details
+- Phone is passed from invitation to user on registration
 
 ### 2026-01-13
 - Added CV Transformer feature for transforming CVs to standardized Word documents
