@@ -131,6 +131,8 @@ function UsersTab() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [editForm, setEditForm] = useState({
     first_name: '',
     last_name: '',
@@ -207,6 +209,30 @@ function UsersTab() {
       toast.error('Erreur lors de la modification');
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (userId: string) => adminApi.deleteUser(userId),
+    onSuccess: () => {
+      toast.success('Utilisateur supprime');
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setIsDeleteModalOpen(false);
+      setUserToDelete(null);
+    },
+    onError: () => {
+      toast.error('Erreur lors de la suppression');
+    },
+  });
+
+  const handleDeleteClick = (user: User) => {
+    setUserToDelete(user);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (userToDelete) {
+      deleteMutation.mutate(userToDelete.id);
+    }
+  };
 
   if (isLoading) {
     return <PageSpinner />;
@@ -300,6 +326,14 @@ function UsersTab() {
                         }
                       >
                         {user.is_active ? 'Desactiver' : 'Activer'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteClick(user)}
+                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </td>
@@ -481,6 +515,50 @@ function UsersTab() {
                 isLoading={updateUserMutation.isPending}
               >
                 Enregistrer
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setUserToDelete(null);
+        }}
+        title="Supprimer l'utilisateur"
+      >
+        {userToDelete && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Etes-vous sur de vouloir supprimer{' '}
+              <strong className="text-gray-900 dark:text-gray-100">
+                {userToDelete.first_name} {userToDelete.last_name}
+              </strong>{' '}
+              ?
+            </p>
+            <p className="text-sm text-red-600 dark:text-red-400">
+              Cette action est irreversible.
+            </p>
+
+            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setUserToDelete(null);
+                }}
+              >
+                Annuler
+              </Button>
+              <Button
+                variant="danger"
+                onClick={confirmDelete}
+                isLoading={deleteMutation.isPending}
+              >
+                Supprimer
               </Button>
             </div>
           </div>

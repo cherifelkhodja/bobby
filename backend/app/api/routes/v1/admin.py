@@ -532,3 +532,32 @@ async def deactivate_user(
     await user_repo.save(user)
 
     return {"message": "Utilisateur désactivé", "is_active": False}
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: UUID,
+    db: DbSession,
+    authorization: str = Header(default=""),
+):
+    """Delete a user account permanently (admin only)."""
+    admin_id = await require_admin(db, authorization)
+
+    if user_id == admin_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Vous ne pouvez pas supprimer votre propre compte"
+        )
+
+    user_repo = UserRepository(db)
+    user = await user_repo.get_by_id(user_id)
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+    deleted = await user_repo.delete(user_id)
+
+    if not deleted:
+        raise HTTPException(status_code=500, detail="Erreur lors de la suppression")
+
+    return {"message": "Utilisateur supprimé"}

@@ -101,6 +101,10 @@ export const adminApi = {
     await apiClient.post(`/admin/users/${userId}/deactivate`);
   },
 
+  deleteUser: async (userId: string): Promise<void> => {
+    await apiClient.delete(`/admin/users/${userId}`);
+  },
+
   // Invitations
   getInvitations: async (skip = 0, limit = 50): Promise<InvitationsListResponse> => {
     const response = await apiClient.get<InvitationsListResponse>('/invitations', {
