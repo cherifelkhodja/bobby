@@ -931,12 +931,14 @@ function InvitationsTab() {
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 {selectedResource.email}
               </p>
-              {(() => {
-                const { hasAccount, hasPendingInvitation } = getResourceStatus(selectedResource);
-                if (hasAccount) return <Badge variant="success" className="mt-2">Inscrit</Badge>;
-                if (hasPendingInvitation) return <Badge variant="warning" className="mt-2">Invitation en attente</Badge>;
-                return <Badge variant="default" className="mt-2">Non inscrit</Badge>;
-              })()}
+              <div className="mt-2">
+                {(() => {
+                  const { hasAccount, hasPendingInvitation } = getResourceStatus(selectedResource);
+                  if (hasAccount) return <Badge variant="success">Inscrit</Badge>;
+                  if (hasPendingInvitation) return <Badge variant="warning">Invitation en attente</Badge>;
+                  return <Badge variant="default">Non inscrit</Badge>;
+                })()}
+              </div>
             </div>
 
             {/* Details */}
