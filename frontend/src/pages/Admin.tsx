@@ -244,12 +244,14 @@ function UsersTab() {
               {data?.users.map((user) => (
                 <tr
                   key={user.id}
-                  onClick={() => openDetailsModal(user)}
-                  className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                  className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <div
+                        className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer hover:text-primary dark:hover:text-primary-400 hover:underline"
+                        onClick={() => openDetailsModal(user)}
+                      >
                         {user.first_name} {user.last_name}
                       </div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">{user.email}</div>
@@ -847,15 +849,15 @@ function InvitationsTab() {
 
                   return (
                     <tr key={resource.id} className={isDisabled ? 'bg-gray-50 dark:bg-gray-900/50' : ''}>
-                      <td
-                        className="px-6 py-4 whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50"
-                        onClick={() => {
-                          setSelectedResource(resource);
-                          setIsResourceModalOpen(true);
-                        }}
-                      >
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-primary dark:hover:text-primary-400">
+                          <div
+                            className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer hover:text-primary dark:hover:text-primary-400 hover:underline"
+                            onClick={() => {
+                              setSelectedResource(resource);
+                              setIsResourceModalOpen(true);
+                            }}
+                          >
                             {resource.first_name} {resource.last_name}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">{resource.email}</div>
