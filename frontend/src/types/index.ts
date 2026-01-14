@@ -124,6 +124,7 @@ export interface AcceptInvitationRequest {
   first_name: string;
   last_name: string;
   password: string;
+  phone?: string;
 }
 
 // Business Lead types

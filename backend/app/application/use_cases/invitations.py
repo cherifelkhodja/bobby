@@ -141,6 +141,7 @@ class AcceptInvitationCommand:
     first_name: str
     last_name: str
     password: str
+    phone: str | None = None
 
 
 class AcceptInvitationUseCase:
@@ -176,6 +177,7 @@ class AcceptInvitationUseCase:
             raise UserAlreadyExistsError(str(invitation.email))
 
         # Create user
+        # Use phone from command if provided (email invitations), else from invitation (Boond)
         user = User(
             email=invitation.email,
             first_name=command.first_name,
@@ -186,7 +188,7 @@ class AcceptInvitationUseCase:
             is_active=True,
             boond_resource_id=invitation.boond_resource_id,
             manager_boond_id=invitation.manager_boond_id,
-            phone=invitation.phone,
+            phone=command.phone or invitation.phone,
         )
 
         saved_user = await self.user_repository.save(user)

@@ -72,6 +72,7 @@ class AcceptInvitationRequest(BaseModel):
     first_name: str
     last_name: str
     password: str
+    phone: Optional[str] = None
 
 
 class InvitationsListResponse(BaseModel):
@@ -228,6 +229,7 @@ async def accept_invitation(
                 first_name=request.first_name,
                 last_name=request.last_name,
                 password=request.password,
+                phone=request.phone,
             )
         )
 
@@ -238,6 +240,7 @@ async def accept_invitation(
             last_name=user.last_name,
             full_name=user.full_name,
             role=str(user.role),
+            phone=user.phone,
             is_verified=user.is_verified,
             is_active=user.is_active,
             boond_resource_id=user.boond_resource_id,

@@ -18,6 +18,7 @@ const acceptInvitationSchema = z
   .object({
     first_name: z.string().min(1, 'Prenom requis'),
     last_name: z.string().min(1, 'Nom requis'),
+    phone: z.string().optional(),
     password: z
       .string()
       .min(8, 'Le mot de passe doit contenir au moins 8 caracteres'),
@@ -95,6 +96,7 @@ export function AcceptInvitation() {
         first_name: data.first_name,
         last_name: data.last_name,
         password: data.password,
+        phone: data.phone || undefined,
       });
       setIsSuccess(true);
       toast.success('Compte cree avec succes !');
@@ -212,6 +214,14 @@ export function AcceptInvitation() {
               {...register('last_name')}
             />
           </div>
+
+          <Input
+            label="Telephone (optionnel)"
+            type="tel"
+            placeholder="+33 6 12 34 56 78"
+            error={errors.phone?.message}
+            {...register('phone')}
+          />
 
           <Input
             label="Mot de passe"

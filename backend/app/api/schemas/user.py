@@ -17,6 +17,7 @@ class UserResponse(BaseModel):
     last_name: str
     full_name: str
     role: str
+    phone: Optional[str] = None
     is_verified: bool
     is_active: bool
     boond_resource_id: Optional[str] = None
