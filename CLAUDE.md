@@ -120,6 +120,35 @@ Transform CVs (PDF/DOCX) into standardized Word documents using Google Gemini AI
 - Stats tracking per user (admin only)
 - Template management in Admin panel
 
+**Data Processing** (`docx_generator.py`):
+- `_nettoyer_formations()`: Cleans None/null values from diplomes and certifications
+- Each formation has a `display` field for pre-formatted output:
+  - With year: `"2015: Master Informatique"`
+  - Without year: `"Master Informatique"` (no "none:" prefix)
+- `_formater_langues()`: Formats languages with bold name (e.g., **Français** : Natif)
+- `_preparer_experiences_avec_sauts_de_page()`: Adds page breaks between experiences
+
+**Template Variables**:
+```jinja2
+{{ profil.titre_cible }}
+{{ profil.annees_experience }}
+{% for t in resume_competences.techniques_list %}
+  {{ t.categorie }}: {{ t.valeurs }}
+{% endfor %}
+{% for d in formations.diplomes %}
+  {{ d.display }}  {# or {{ d.annee }}: {{ d.libelle }} #}
+{% endfor %}
+{% for c in formations.certifications %}
+  {{ c.display }}
+{% endfor %}
+{% for exp in experiences %}
+  {{ exp.client }}, {{ exp.periode }}, {{ exp.titre }}
+  {{ exp.contexte }}
+  {{ exp.environnement_technique }}
+  {{ exp.saut_de_page }}
+{% endfor %}
+```
+
 **Dependencies**:
 - `google-generativeai` - Gemini API client
 - `docxtpl` - Word template engine (Jinja2)
