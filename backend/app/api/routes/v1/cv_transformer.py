@@ -374,7 +374,7 @@ async def test_gemini_api(
         import google.generativeai as genai
 
         genai.configure(api_key=app_settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
         # Simple test prompt
         response = model.generate_content("Réponds uniquement 'OK' si tu fonctionnes.")

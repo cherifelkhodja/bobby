@@ -109,7 +109,7 @@ class GeminiClient:
         self._configure()
 
         try:
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
             prompt = CV_EXTRACTION_PROMPT + cv_text + "\n\nRéponds UNIQUEMENT avec le JSON valide, sans commentaires ni explications."
 
