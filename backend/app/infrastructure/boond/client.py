@@ -276,11 +276,15 @@ class BoondClient:
                     else:
                         suggested_role = "user"
 
+                    # Get phone number (mobile or phone1)
+                    phone = attrs.get("mobile", "") or attrs.get("phone1", "")
+
                     resources.append({
                         "id": str(item.get("id")),
                         "first_name": attrs.get("firstName", ""),
                         "last_name": attrs.get("lastName", ""),
                         "email": attrs.get("email1", "") or attrs.get("email2", ""),
+                        "phone": phone,
                         "manager_id": manager_id,
                         "agency_id": agency_id,
                         "agency_name": agency_name,

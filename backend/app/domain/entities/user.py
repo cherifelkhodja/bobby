@@ -21,6 +21,7 @@ class User:
     is_active: bool = True
     boond_resource_id: Optional[str] = None
     manager_boond_id: Optional[str] = None  # Manager's BoondManager ID
+    phone: Optional[str] = None  # International format +33...
     verification_token: Optional[str] = None
     reset_token: Optional[str] = None
     reset_token_expires: Optional[datetime] = None

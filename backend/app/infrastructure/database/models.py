@@ -43,6 +43,7 @@ class UserModel(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     boond_resource_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     manager_boond_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     verification_token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     reset_token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     reset_token_expires: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
@@ -186,6 +187,7 @@ class InvitationModel(Base):
     accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     boond_resource_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     manager_boond_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships

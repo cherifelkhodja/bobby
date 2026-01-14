@@ -38,6 +38,7 @@ class CreateInvitationRequest(BaseModel):
     role: str  # user, commercial, rh, admin
     boond_resource_id: Optional[str] = None
     manager_boond_id: Optional[str] = None
+    phone: Optional[str] = None  # International format +33...
 
 
 class InvitationResponse(BaseModel):
@@ -46,6 +47,7 @@ class InvitationResponse(BaseModel):
     id: UUID
     email: str
     role: str
+    phone: Optional[str] = None
     invited_by: UUID
     expires_at: str
     is_expired: bool
@@ -58,6 +60,7 @@ class InvitationValidationResponse(BaseModel):
 
     email: str
     role: str
+    phone: Optional[str] = None
     is_valid: bool
     hours_until_expiry: int
 
@@ -124,6 +127,7 @@ async def create_invitation(
                 invited_by=admin_id,
                 boond_resource_id=request.boond_resource_id,
                 manager_boond_id=request.manager_boond_id,
+                phone=request.phone,
             )
         )
 
@@ -131,6 +135,7 @@ async def create_invitation(
             id=invitation.id,
             email=str(invitation.email),
             role=str(invitation.role),
+            phone=invitation.phone,
             invited_by=invitation.invited_by,
             expires_at=invitation.expires_at.isoformat(),
             is_expired=invitation.is_expired,
@@ -165,6 +170,7 @@ async def list_invitations(
                 id=inv.id,
                 email=str(inv.email),
                 role=str(inv.role),
+                phone=inv.phone,
                 invited_by=inv.invited_by,
                 expires_at=inv.expires_at.isoformat(),
                 is_expired=inv.is_expired,
@@ -192,6 +198,7 @@ async def validate_invitation(
         return InvitationValidationResponse(
             email=str(invitation.email),
             role=str(invitation.role),
+            phone=invitation.phone,
             is_valid=invitation.is_valid,
             hours_until_expiry=invitation.hours_until_expiry,
         )
@@ -270,6 +277,7 @@ async def resend_invitation(
             id=invitation.id,
             email=str(invitation.email),
             role=str(invitation.role),
+            phone=invitation.phone,
             invited_by=invitation.invited_by,
             expires_at=invitation.expires_at.isoformat(),
             is_expired=invitation.is_expired,

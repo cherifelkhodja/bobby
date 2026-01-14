@@ -315,6 +315,7 @@ function InvitationsTab() {
 
   // Email invitation form state
   const [emailInviteEmail, setEmailInviteEmail] = useState('');
+  const [emailInvitePhone, setEmailInvitePhone] = useState('');
   const [emailInviteRole, setEmailInviteRole] = useState<UserRole>('user');
   const [isSendingEmailInvite, setIsSendingEmailInvite] = useState(false);
 
@@ -391,9 +392,11 @@ function InvitationsTab() {
       await adminApi.createInvitation({
         email: emailInviteEmail.trim(),
         role: emailInviteRole,
+        phone: emailInvitePhone.trim() || undefined,
       });
       toast.success('Invitation envoyee');
       setEmailInviteEmail('');
+      setEmailInvitePhone('');
       setEmailInviteRole('user');
       queryClient.invalidateQueries({ queryKey: ['admin-invitations'] });
     } catch (error: any) {
@@ -420,6 +423,7 @@ function InvitationsTab() {
       role: role,
       boond_resource_id: resource.id,
       manager_boond_id: resource.manager_id || undefined,
+      phone: resource.phone || undefined,
     });
   };
 
@@ -528,6 +532,19 @@ function InvitationsTab() {
               placeholder="prenom.nom@exemple.com"
               className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
               required
+            />
+          </div>
+          <div className="min-w-[150px]">
+            <label htmlFor="invite-phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Telephone
+            </label>
+            <input
+              id="invite-phone"
+              type="tel"
+              value={emailInvitePhone}
+              onChange={(e) => setEmailInvitePhone(e.target.value)}
+              placeholder="+33 6 12 34 56 78"
+              className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
             />
           </div>
           <div className="min-w-[150px]">

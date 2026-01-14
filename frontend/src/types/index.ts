@@ -80,6 +80,7 @@ export interface Invitation {
   id: string;
   email: string;
   role: UserRole;
+  phone?: string | null;
   invited_by: string;
   expires_at: string;
   is_expired: boolean;
@@ -90,6 +91,7 @@ export interface Invitation {
 export interface InvitationValidation {
   email: string;
   role: string;
+  phone?: string | null;
   is_valid: boolean;
   hours_until_expiry: number;
 }
@@ -99,6 +101,7 @@ export interface CreateInvitationRequest {
   role: UserRole;
   boond_resource_id?: string;
   manager_boond_id?: string;
+  phone?: string;
 }
 
 export interface BoondResource {
@@ -106,6 +109,7 @@ export interface BoondResource {
   first_name: string;
   last_name: string;
   email: string;
+  phone?: string | null;
   manager_id: string | null;
   agency_id: string | null;
   agency_name: string | null;

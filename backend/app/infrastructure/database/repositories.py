@@ -88,6 +88,7 @@ class UserRepository:
             model.is_active = user.is_active
             model.boond_resource_id = user.boond_resource_id
             model.manager_boond_id = user.manager_boond_id
+            model.phone = user.phone
             model.verification_token = user.verification_token
             model.reset_token = user.reset_token
             model.reset_token_expires = user.reset_token_expires
@@ -105,6 +106,7 @@ class UserRepository:
                 is_active=user.is_active,
                 boond_resource_id=user.boond_resource_id,
                 manager_boond_id=user.manager_boond_id,
+                phone=user.phone,
                 verification_token=user.verification_token,
                 reset_token=user.reset_token,
                 reset_token_expires=user.reset_token_expires,
@@ -152,6 +154,7 @@ class UserRepository:
             is_active=model.is_active,
             boond_resource_id=model.boond_resource_id,
             manager_boond_id=model.manager_boond_id,
+            phone=model.phone,
             verification_token=model.verification_token,
             reset_token=model.reset_token,
             reset_token_expires=model.reset_token_expires,
@@ -828,6 +831,7 @@ class InvitationRepository:
             model.accepted_at = invitation.accepted_at
             model.boond_resource_id = invitation.boond_resource_id
             model.manager_boond_id = invitation.manager_boond_id
+            model.phone = invitation.phone
         else:
             model = InvitationModel(
                 id=invitation.id,
@@ -839,6 +843,7 @@ class InvitationRepository:
                 accepted_at=invitation.accepted_at,
                 boond_resource_id=invitation.boond_resource_id,
                 manager_boond_id=invitation.manager_boond_id,
+                phone=invitation.phone,
                 created_at=invitation.created_at,
             )
             self.session.add(model)
@@ -911,6 +916,7 @@ class InvitationRepository:
             accepted_at=model.accepted_at,
             boond_resource_id=model.boond_resource_id,
             manager_boond_id=model.manager_boond_id,
+            phone=model.phone,
             created_at=model.created_at,
         )
 
