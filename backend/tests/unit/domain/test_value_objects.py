@@ -86,9 +86,9 @@ class TestCooptationStatus:
 class TestUserRole:
     """Tests for UserRole enum."""
 
-    def test_member_role(self):
-        role = UserRole.MEMBER
-        assert str(role) == "member"
+    def test_user_role(self):
+        role = UserRole.USER
+        assert str(role) == "user"
 
     def test_admin_role(self):
         role = UserRole.ADMIN

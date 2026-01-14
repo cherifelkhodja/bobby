@@ -80,7 +80,7 @@ class RegisterUserUseCase:
             password_hash=hash_password(command.password),
             first_name=command.first_name,
             last_name=command.last_name,
-            role=UserRole.MEMBER,
+            role=UserRole.USER,
             is_verified=False,
             verification_token=verification_token,
             boond_resource_id=command.boond_resource_id,

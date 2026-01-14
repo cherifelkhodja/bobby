@@ -22,7 +22,7 @@ class TestUser:
         assert user.email == Email("test@example.com")
         assert user.first_name == "Test"
         assert user.last_name == "User"
-        assert user.role == UserRole.MEMBER
+        assert user.role == UserRole.USER
         assert not user.is_verified
 
     def test_full_name(self):

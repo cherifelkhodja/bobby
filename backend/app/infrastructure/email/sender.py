@@ -315,8 +315,9 @@ class EmailService:
     ) -> bool:
         """Send invitation email to join the platform."""
         role_labels = {
-            "user": "Utilisateur",
+            "user": "Consultant",
             "commercial": "Commercial",
+            "rh": "Ressources Humaines",
             "admin": "Administrateur",
         }
         role_label = role_labels.get(role, role)
