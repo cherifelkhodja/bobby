@@ -359,6 +359,9 @@ npm run lint                  # Lint
 - Added state filter to BoondManager resources (default: "En cours")
 - Display manager name instead of ID in resource details modal
 - Made only user/resource names clickable for modals (not entire row)
+- Fixed CV Transformer "none:" prefix for formations/certifications without dates:
+  - Added `_nettoyer_formations()` method to clean None/null values
+  - Added `display` field for pre-formatted output (e.g., "2015: Master" or just "Master")
 
 ### 2026-01-14 (session 1)
 - Added phone number support (international format +33...) for users and invitations
