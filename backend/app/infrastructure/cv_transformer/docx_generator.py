@@ -3,7 +3,7 @@
 import io
 from typing import Any
 
-from docxtpl import DocxTemplate
+from docxtpl import DocxTemplate, RichText
 
 
 class DocxGenerator:
@@ -47,6 +47,7 @@ class DocxGenerator:
         """Prepare the template context from CV data.
 
         Ensures all expected variables are present to avoid template errors.
+        Applies formatting (page breaks, bold text) using RichText.
 
         Args:
             cv_data: Raw CV data from Gemini.
@@ -89,9 +90,63 @@ class DocxGenerator:
                 })
         resume_competences["techniques_list"] = techniques_list
 
+        # Format languages with bold (e.g., "Français : Natif" -> Français bold, rest normal)
+        langues_formatees = self._formater_langues(resume_competences.get("langues") or [])
+        resume_competences["langues_formatees"] = langues_formatees
+
+        # Add page breaks between experiences
+        experiences_avec_sauts = self._preparer_experiences_avec_sauts_de_page(experiences)
+
         return {
             "profil": profil,
             "resume_competences": resume_competences,
             "formations": formations,
-            "experiences": experiences,
+            "experiences": experiences_avec_sauts,
         }
+
+    def _formater_langues(self, langues: list) -> list:
+        """Format languages with bold language name and normal level.
+
+        Args:
+            langues: List of language strings (e.g., ["Français : Natif", "Anglais : Courant"])
+
+        Returns:
+            List of RichText objects with formatting.
+        """
+        langues_formatees = []
+
+        for langue in langues:
+            rt = RichText()
+            if " : " in langue:
+                parties = langue.split(" : ", 1)
+                rt.add(parties[0], bold=True)  # Language name in bold
+                rt.add(f" : {parties[1]}")     # Level in normal
+            else:
+                rt.add(langue, bold=True)
+            langues_formatees.append(rt)
+
+        return langues_formatees
+
+    def _preparer_experiences_avec_sauts_de_page(self, experiences: list) -> list:
+        """Add page breaks after each experience except the last one.
+
+        Args:
+            experiences: List of experience dictionaries.
+
+        Returns:
+            List of experiences with 'saut_de_page' RichText field.
+        """
+        experiences_preparees = []
+        total = len(experiences)
+
+        for index, experience in enumerate(experiences):
+            exp_copy = experience.copy() if isinstance(experience, dict) else {}
+            if index < total - 1:  # No page break after the last experience
+                rt = RichText()
+                rt.add('\f')  # Form feed character = page break
+                exp_copy["saut_de_page"] = rt
+            else:
+                exp_copy["saut_de_page"] = ""
+            experiences_preparees.append(exp_copy)
+
+        return experiences_preparees

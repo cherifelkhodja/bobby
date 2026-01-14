@@ -120,19 +120,8 @@ class GeminiClient:
             if not response.text:
                 raise ValueError("La réponse de Gemini est vide")
 
-            # Extract JSON from response (handle markdown code blocks)
-            json_text = response.text.strip()
-
-            # Remove markdown code blocks if present
-            if json_text.startswith("```"):
-                # Find the end of the opening code block marker
-                first_newline = json_text.find("\n")
-                if first_newline != -1:
-                    json_text = json_text[first_newline + 1:]
-                # Remove closing ```
-                if json_text.endswith("```"):
-                    json_text = json_text[:-3]
-                json_text = json_text.strip()
+            # Clean and extract JSON from response
+            json_text = self._nettoyer_reponse_json(response.text)
 
             # Parse JSON
             cv_data = json.loads(json_text)
@@ -174,3 +163,34 @@ class GeminiClient:
                 data["formations"]["diplomes"] = []
             if not isinstance(data["formations"].get("certifications"), list):
                 data["formations"]["certifications"] = []
+
+    def _nettoyer_reponse_json(self, reponse_brute: str) -> str:
+        """Clean Gemini response and extract valid JSON.
+
+        Handles markdown code blocks and extracts JSON content.
+
+        Args:
+            reponse_brute: Raw response text from Gemini.
+
+        Returns:
+            Cleaned JSON string.
+        """
+        reponse = reponse_brute.strip()
+
+        # Remove ```json at the beginning
+        if reponse.startswith("```json"):
+            reponse = reponse[7:]
+        elif reponse.startswith("```"):
+            reponse = reponse[3:]
+
+        # Remove ``` at the end
+        if reponse.endswith("```"):
+            reponse = reponse[:-3]
+
+        # Extract JSON between { and } (handles any extra text)
+        debut = reponse.find('{')
+        fin = reponse.rfind('}')
+        if debut != -1 and fin != -1 and fin > debut:
+            reponse = reponse[debut:fin + 1]
+
+        return reponse.strip()
