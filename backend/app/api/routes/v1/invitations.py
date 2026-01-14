@@ -225,15 +225,18 @@ async def accept_invitation(
         )
 
         return UserResponse(
-            id=user.id,
+            id=str(user.id),
             email=str(user.email),
             first_name=user.first_name,
             last_name=user.last_name,
+            full_name=user.full_name,
             role=str(user.role),
             is_verified=user.is_verified,
             is_active=user.is_active,
             boond_resource_id=user.boond_resource_id,
-            created_at=user.created_at.isoformat(),
+            manager_boond_id=user.manager_boond_id,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
         )
     except InvitationNotFoundError:
         raise HTTPException(status_code=404, detail="Invitation non trouvée")
