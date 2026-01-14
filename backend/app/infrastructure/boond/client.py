@@ -249,12 +249,12 @@ class BoondClient:
                     attrs = item.get("attributes", {})
                     relationships = item.get("relationships", {})
 
-                    # Get manager ID from relationships
-                    manager_data = relationships.get("manager", {}).get("data")
+                    # Get manager ID from relationships (mainManager in Boond API)
+                    manager_data = relationships.get("mainManager", {}).get("data")
                     manager_id = str(manager_data.get("id")) if manager_data else None
 
                     # Get agency from relationships
-                    agency_data = relationships.get("mainAgency", {}).get("data")
+                    agency_data = relationships.get("agency", {}).get("data")
                     agency_id = str(agency_data.get("id")) if agency_data else None
                     # Use included data first, fallback to hardcoded names
                     agency_name = agencies_map.get(agency_id) or self.AGENCY_NAMES.get(agency_id, "") if agency_id else ""
