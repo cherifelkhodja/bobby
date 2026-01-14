@@ -1,6 +1,6 @@
 """Add phone field to users and invitations tables.
 
-Revision ID: 005_add_phone_to_users_invitations
+Revision ID: 005_add_phone_fields
 Revises: 004_add_cv_transformer_tables
 Create Date: 2026-01-14
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '005_add_phone_to_users_invitations'
+revision: str = '005_add_phone_fields'
 down_revision: Union[str, None] = '004_add_cv_transformer_tables'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
