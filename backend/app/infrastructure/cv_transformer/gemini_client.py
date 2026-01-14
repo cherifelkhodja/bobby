@@ -16,56 +16,57 @@ from app.config import Settings
 CvData = dict[str, Any]
 
 # Prompt for Gemini to extract CV data
-CV_EXTRACTION_PROMPT = """Tu es un expert en recrutement IT. Convertis le texte d'un CV en JSON structuré.
+CV_EXTRACTION_PROMPT = """
+Tu es un expert en recrutement IT. Ta mission est de convertir le texte brut d'un CV en une structure JSON stricte.
 
-RÈGLES :
-1. FRANÇAIS uniquement - traduis tout en français si nécessaire
-2. ANONYMISATION : ne jamais inclure d'email, téléphone ou adresse du candidat
-3. DATES : "Depuis Mois Année" pour le poste actuel, "Mois Année à Mois Année" pour les autres
-4. NOMS COMPLETS des entreprises (pas de sigles seuls, développe-les)
-5. EXHAUSTIF sur les expériences (inclure toutes les missions), CONCIS sur les compétences
-6. Si une information n'est pas disponible, utilise une chaîne vide "" ou un tableau vide []
+RÈGLES IMPORTANTES :
+1. Langue : FRANÇAIS uniquement.
+2. Anonymisation : NE JAMAIS inclure l'email, le téléphone ou l'adresse du candidat.
+3. CONCISION sur les compétences, mais EXHAUSTIVITÉ sur les expériences.
+4. FORMAT DES DATES : Pour la PREMIÈRE expérience (la plus récente), utilise "Depuis Mois Année" (ex: "Depuis Mai 2024"). Pour les autres, utilise "Mois Année à Mois Année" (ex: "Janvier 2020 à Décembre 2022").
+5. NOMS DES CLIENTS : Toujours utiliser le nom COMPLET de l'entreprise/client, JAMAIS de sigle seul (ex: "Crédit Agricole CIB" et non "CACIB", "Société Générale" et non "SG", "BNP Paribas" et non "BNPP"). Note: "CIB" est accepté pour "Corporate and Investment Bank".
+
+RÈGLES POUR LES EXPÉRIENCES PROFESSIONNELLES :
+- CONSERVER TOUTES les réalisations/tâches du CV original, ne rien supprimer.
+- Si plusieurs missions chez le même client, créer une expérience par mission.
+- Le contexte doit être détaillé (reprendre la description de la mission).
+- Reformuler légèrement pour être professionnel mais NE PAS résumer excessivement.
+
+RÈGLES POUR LES COMPÉTENCES :
+- Si le CV contient déjà des compétences bien structurées (techniques, métiers, fonctionnelles), REPRENDS-LES TELLES QUELLES.
+- Compétences techniques : CHOISIS les catégories les plus PERTINENTES selon le CV. NE CRÉE PAS de catégories vides ou avec "None". Inclus UNIQUEMENT les catégories où il y a des compétences réelles.
+- Compétences métiers : UNIQUEMENT les secteurs d'activité majeurs (ex: Banque, Assurance, Retail). Maximum 2-3 items. Laisser vide [] si non pertinent.
+- Compétences fonctionnelles : UNIQUEMENT les savoir-faire organisationnels clés (ex: Gestion de projet, Agilité). Maximum 2-3 items. Laisser vide [] si non pertinent.
 
 FORMAT JSON ATTENDU :
 {
   "profil": {
-    "titre_cible": "Titre du poste cible ou actuel",
-    "annees_experience": "X ans"
+    "titre_cible": "String",
+    "annees_experience": "String (ex: 5 ans)"
   },
   "resume_competences": {
     "techniques": {
-      "Langages": "Python, JavaScript, TypeScript",
-      "Frameworks": "React, FastAPI, Django",
-      "Cloud": "AWS, GCP, Azure",
-      "Bases de données": "PostgreSQL, MongoDB",
-      "Outils": "Docker, Kubernetes, Git"
+       "Catégorie pertinente 1": "Valeurs séparées par virgules",
+       "Catégorie pertinente 2": "Valeurs séparées par virgules"
     },
-    "metiers": ["Banque", "Assurance", "E-commerce"],
-    "fonctionnelles": ["Gestion de projet", "Agilité Scrum", "Leadership technique"],
-    "langues": ["Français : Natif", "Anglais : Courant (B2/C1)"]
+    "metiers": ["Secteur 1", "Secteur 2"],
+    "fonctionnelles": ["Compétence 1", "Compétence 2"],
+    "langues": ["Français : Natif", "Anglais : Courant"]
   },
   "formations": {
-    "diplomes": [
-      {"annee": "2015", "libelle": "Master Informatique - Université Paris-Saclay"}
-    ],
-    "certifications": [
-      {"annee": "2020", "libelle": "AWS Solutions Architect Associate"}
-    ]
+    "diplomes": [ {"annee": "2015", "libelle": "Master Informatique"} ],
+    "certifications": [ {"annee": "2020", "libelle": "AWS Solutions Architect"} ]
   },
   "experiences": [
     {
-      "client": "Nom complet du client/entreprise",
-      "periode": "Depuis Janvier 2023",
-      "titre": "Tech Lead / Développeur Senior",
-      "contexte": "Description courte du contexte et des enjeux du projet",
+      "client": "Nom du client ou entreprise",
+      "periode": "Janvier 2020 à Décembre 2022 (ou 'Depuis Janvier 2023' si poste actuel)",
+      "titre": "Poste occupé",
+      "contexte": "Description courte du contexte (1-2 phrases)",
       "taches": {
-        "Réalisations": [
-          "Conception et développement de l'architecture microservices",
-          "Mise en place des pipelines CI/CD",
-          "Encadrement d'une équipe de 5 développeurs"
-        ]
+        "Réalisations": ["Tâche 1", "Tâche 2", "Tâche 3"]
       },
-      "environnement_technique": "Python, FastAPI, PostgreSQL, Docker, Kubernetes, AWS"
+      "environnement_technique": "Technologies utilisées séparées par des virgules"
     }
   ]
 }
@@ -111,7 +112,7 @@ class GeminiClient:
         try:
             model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
-            prompt = CV_EXTRACTION_PROMPT + cv_text + "\n\nRéponds UNIQUEMENT avec le JSON valide, sans commentaires ni explications."
+            prompt = CV_EXTRACTION_PROMPT + cv_text
 
             # Use asyncio.to_thread to avoid blocking the event loop
             response = await asyncio.to_thread(model.generate_content, prompt)
