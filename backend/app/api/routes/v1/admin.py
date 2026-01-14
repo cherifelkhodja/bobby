@@ -184,6 +184,7 @@ class BoondResourceResponse(BaseModel):
     email: str
     phone: Optional[str] = None
     manager_id: Optional[str] = None
+    manager_name: Optional[str] = None
     agency_id: Optional[str] = None
     agency_name: Optional[str] = None
     resource_type: Optional[int] = None
@@ -230,6 +231,7 @@ async def get_boond_resources(
                     email=r["email"],
                     phone=r.get("phone"),
                     manager_id=r.get("manager_id"),
+                    manager_name=r.get("manager_name"),
                     agency_id=r.get("agency_id"),
                     agency_name=r.get("agency_name", ""),
                     resource_type=r.get("resource_type"),

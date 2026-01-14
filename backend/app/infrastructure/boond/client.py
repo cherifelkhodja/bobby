@@ -215,6 +215,7 @@ class BoondClient:
             # Fetch resources with state filter (1=active, 2=mission)
             all_resources = []
             agencies_map = {}
+            managers_map = {}  # Map manager_id -> "FirstName LastName"
 
             for state in [1, 2]:
                 page = 1
@@ -229,12 +230,20 @@ class BoondClient:
                     resources_batch = data.get("data", [])
                     all_resources.extend(resources_batch)
 
-                    # Extract agencies from included data if available
+                    # Extract agencies and managers from included data
                     for included in data.get("included", []):
                         if included.get("type") == "agency":
                             agency_id = str(included.get("id"))
                             agency_name = included.get("attributes", {}).get("name", "")
                             agencies_map[agency_id] = agency_name
+                        elif included.get("type") == "resource":
+                            # Manager info from included
+                            manager_id = str(included.get("id"))
+                            attrs = included.get("attributes", {})
+                            first_name = attrs.get("firstName", "")
+                            last_name = attrs.get("lastName", "")
+                            if first_name or last_name:
+                                managers_map[manager_id] = f"{first_name} {last_name}".strip()
 
                     # Check for more pages
                     meta = data.get("meta", {})
@@ -279,6 +288,9 @@ class BoondClient:
                     # Get phone number (mobile or phone1)
                     phone = attrs.get("mobile", "") or attrs.get("phone1", "")
 
+                    # Get manager name from included data
+                    manager_name = managers_map.get(manager_id, "") if manager_id else ""
+
                     resources.append({
                         "id": str(item.get("id")),
                         "first_name": attrs.get("firstName", ""),
@@ -286,6 +298,7 @@ class BoondClient:
                         "email": attrs.get("email1", "") or attrs.get("email2", ""),
                         "phone": phone,
                         "manager_id": manager_id,
+                        "manager_name": manager_name,
                         "agency_id": agency_id,
                         "agency_name": agency_name,
                         "resource_type": resource_type,

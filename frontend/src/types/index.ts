@@ -112,6 +112,7 @@ export interface BoondResource {
   email: string;
   phone?: string | null;
   manager_id: string | null;
+  manager_name: string | null;
   agency_id: string | null;
   agency_name: string | null;
   resource_type: number | null;

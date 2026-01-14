@@ -974,9 +974,9 @@ function InvitationsTab() {
               </div>
 
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500 dark:text-gray-400">ID Manager Boond</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">Manager</span>
                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  {selectedResource.manager_id || '-'}
+                  {selectedResource.manager_name || '-'}
                 </span>
               </div>
 
