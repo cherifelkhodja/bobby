@@ -76,8 +76,11 @@ class DocxGenerator:
         # Merge with defaults
         profil = {**default_profil, **(cv_data.get("profil") or {})}
         resume_competences = {**default_resume, **(cv_data.get("resume_competences") or {})}
-        formations = {**default_formations, **(cv_data.get("formations") or {})}
+        formations_raw = {**default_formations, **(cv_data.get("formations") or {})}
         experiences = cv_data.get("experiences") or []
+
+        # Clean formations: remove None/null years and format properly
+        formations = self._nettoyer_formations(formations_raw)
 
         # Format techniques for easier template rendering
         # Convert dict to list of tuples for iteration in template
@@ -126,6 +129,58 @@ class DocxGenerator:
             langues_formatees.append(rt)
 
         return langues_formatees
+
+    def _nettoyer_formations(self, formations: dict[str, Any]) -> dict[str, Any]:
+        """Clean formations data by removing None values and formatting properly.
+
+        Args:
+            formations: Raw formations data from Gemini.
+
+        Returns:
+            Cleaned formations dictionary with formatted display field.
+        """
+        cleaned = {
+            "diplomes": [],
+            "certifications": [],
+        }
+
+        for diplome in formations.get("diplomes") or []:
+            if isinstance(diplome, dict):
+                annee = diplome.get("annee")
+                libelle = diplome.get("libelle", "")
+                # Skip if no libelle
+                if not libelle:
+                    continue
+                # Clean None/null values - set to empty string
+                if annee is None or str(annee).lower() in ("none", "null", ""):
+                    annee = ""
+                # Create display string: "2015: Master" or just "Master" if no year
+                display = f"{annee}: {libelle}" if annee else libelle
+                cleaned["diplomes"].append({
+                    "annee": annee,
+                    "libelle": libelle,
+                    "display": display,
+                })
+
+        for cert in formations.get("certifications") or []:
+            if isinstance(cert, dict):
+                annee = cert.get("annee")
+                libelle = cert.get("libelle", "")
+                # Skip if no libelle
+                if not libelle:
+                    continue
+                # Clean None/null values - set to empty string
+                if annee is None or str(annee).lower() in ("none", "null", ""):
+                    annee = ""
+                # Create display string: "2020: AWS" or just "AWS" if no year
+                display = f"{annee}: {libelle}" if annee else libelle
+                cleaned["certifications"].append({
+                    "annee": annee,
+                    "libelle": libelle,
+                    "display": display,
+                })
+
+        return cleaned
 
     def _preparer_experiences_avec_sauts_de_page(self, experiences: list) -> list:
         """Add page breaks after each experience except the last one.
