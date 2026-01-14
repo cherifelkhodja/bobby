@@ -52,9 +52,23 @@ export function AcceptInvitation() {
     register,
     handleSubmit,
     formState: { errors },
+    reset,
   } = useForm<AcceptInvitationFormData>({
     resolver: zodResolver(acceptInvitationSchema),
   });
+
+  // Set default values when invitation data is loaded
+  useEffect(() => {
+    if (invitation) {
+      reset({
+        first_name: invitation.first_name || '',
+        last_name: invitation.last_name || '',
+        phone: invitation.phone || '',
+        password: '',
+        confirmPassword: '',
+      });
+    }
+  }, [invitation, reset]);
 
   // Validate the invitation token on mount
   useEffect(() => {

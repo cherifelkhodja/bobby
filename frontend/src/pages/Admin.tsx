@@ -133,6 +133,8 @@ function UsersTab() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editForm, setEditForm] = useState({
     first_name: '',
     last_name: '',
@@ -145,6 +147,16 @@ function UsersTab() {
     queryKey: ['admin-users'],
     queryFn: () => adminApi.getUsers(0, 100),
   });
+
+  // Filter users based on selected filters
+  const filteredUsers = data?.users.filter(user => {
+    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+    const matchesStatus = statusFilter === 'all' ||
+      (statusFilter === 'active' && user.is_active) ||
+      (statusFilter === 'inactive' && !user.is_active) ||
+      (statusFilter === 'unverified' && !user.is_verified);
+    return matchesRole && matchesStatus;
+  }) || [];
 
   const updateUserMutation = useMutation({
     mutationFn: (data: { userId: string; updates: Parameters<typeof adminApi.updateUser>[1] }) =>
@@ -243,8 +255,59 @@ function UsersTab() {
       <Card>
         <CardHeader
           title="Gestion des utilisateurs"
-          subtitle={`${data?.total || 0} utilisateurs inscrits`}
+          subtitle={`${filteredUsers.length} sur ${data?.total || 0} utilisateurs`}
         />
+
+        {/* Filters */}
+        <div className="px-6 pb-4 flex flex-wrap gap-4">
+          <div className="flex items-center gap-2">
+            <label htmlFor="role-filter" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Rôle:
+            </label>
+            <select
+              id="role-filter"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary text-sm"
+            >
+              <option value="all">Tous</option>
+              <option value="user">{ROLE_LABELS.user}</option>
+              <option value="commercial">{ROLE_LABELS.commercial}</option>
+              <option value="rh">{ROLE_LABELS.rh}</option>
+              <option value="admin">{ROLE_LABELS.admin}</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="status-filter" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Statut:
+            </label>
+            <select
+              id="status-filter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary text-sm"
+            >
+              <option value="all">Tous</option>
+              <option value="active">Actif</option>
+              <option value="inactive">Inactif</option>
+              <option value="unverified">Non vérifié</option>
+            </select>
+          </div>
+
+          {(roleFilter !== 'all' || statusFilter !== 'all') && (
+            <button
+              onClick={() => {
+                setRoleFilter('all');
+                setStatusFilter('all');
+              }}
+              className="text-sm text-primary dark:text-primary-400 hover:text-primary-dark underline"
+            >
+              Réinitialiser les filtres
+            </button>
+          )}
+        </div>
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900">
@@ -253,7 +316,7 @@ function UsersTab() {
                   Utilisateur
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Role
+                  Rôle
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Statut
@@ -261,13 +324,13 @@ function UsersTab() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Inscription
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {data?.users.map((user) => (
+              {filteredUsers.map((user) => (
                 <tr
                   key={user.id}
                   className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
@@ -303,8 +366,8 @@ function UsersTab() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {new Date(user.created_at).toLocaleDateString('fr-FR')}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-2">
+                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                    <div className="inline-flex items-center gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -313,7 +376,7 @@ function UsersTab() {
                           setIsRoleModalOpen(true);
                         }}
                       >
-                        Changer role
+                        Rôle
                       </Button>
                       <Button
                         variant="ghost"
@@ -325,7 +388,7 @@ function UsersTab() {
                           })
                         }
                       >
-                        {user.is_active ? 'Desactiver' : 'Activer'}
+                        {user.is_active ? 'Désactiver' : 'Activer'}
                       </Button>
                       <Button
                         variant="ghost"
@@ -703,6 +766,8 @@ function InvitationsTab() {
       boond_resource_id: resource.id,
       manager_boond_id: resource.manager_id || undefined,
       phone: resource.phone || undefined,
+      first_name: resource.first_name,
+      last_name: resource.last_name,
     });
   };
 

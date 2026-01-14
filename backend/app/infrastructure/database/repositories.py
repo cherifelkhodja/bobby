@@ -832,6 +832,8 @@ class InvitationRepository:
             model.boond_resource_id = invitation.boond_resource_id
             model.manager_boond_id = invitation.manager_boond_id
             model.phone = invitation.phone
+            model.first_name = invitation.first_name
+            model.last_name = invitation.last_name
         else:
             model = InvitationModel(
                 id=invitation.id,
@@ -844,6 +846,8 @@ class InvitationRepository:
                 boond_resource_id=invitation.boond_resource_id,
                 manager_boond_id=invitation.manager_boond_id,
                 phone=invitation.phone,
+                first_name=invitation.first_name,
+                last_name=invitation.last_name,
                 created_at=invitation.created_at,
             )
             self.session.add(model)
@@ -917,6 +921,8 @@ class InvitationRepository:
             boond_resource_id=model.boond_resource_id,
             manager_boond_id=model.manager_boond_id,
             phone=model.phone,
+            first_name=model.first_name,
+            last_name=model.last_name,
             created_at=model.created_at,
         )
 

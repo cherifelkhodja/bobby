@@ -93,6 +93,8 @@ export interface InvitationValidation {
   email: string;
   role: string;
   phone?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   is_valid: boolean;
   hours_until_expiry: number;
 }
@@ -103,6 +105,8 @@ export interface CreateInvitationRequest {
   boond_resource_id?: string;
   manager_boond_id?: string;
   phone?: string;
+  first_name?: string;
+  last_name?: string;
 }
 
 export interface BoondResource {

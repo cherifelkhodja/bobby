@@ -39,6 +39,8 @@ class CreateInvitationRequest(BaseModel):
     boond_resource_id: Optional[str] = None
     manager_boond_id: Optional[str] = None
     phone: Optional[str] = None  # International format +33...
+    first_name: Optional[str] = None  # Pre-filled from BoondManager
+    last_name: Optional[str] = None  # Pre-filled from BoondManager
 
 
 class InvitationResponse(BaseModel):
@@ -61,6 +63,8 @@ class InvitationValidationResponse(BaseModel):
     email: str
     role: str
     phone: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     is_valid: bool
     hours_until_expiry: int
 
@@ -129,6 +133,8 @@ async def create_invitation(
                 boond_resource_id=request.boond_resource_id,
                 manager_boond_id=request.manager_boond_id,
                 phone=request.phone,
+                first_name=request.first_name,
+                last_name=request.last_name,
             )
         )
 
@@ -200,6 +206,8 @@ async def validate_invitation(
             email=str(invitation.email),
             role=str(invitation.role),
             phone=invitation.phone,
+            first_name=invitation.first_name,
+            last_name=invitation.last_name,
             is_valid=invitation.is_valid,
             hours_until_expiry=invitation.hours_until_expiry,
         )

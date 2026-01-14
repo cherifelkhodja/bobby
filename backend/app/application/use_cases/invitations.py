@@ -56,6 +56,8 @@ class CreateInvitationCommand:
     boond_resource_id: str | None = None
     manager_boond_id: str | None = None
     phone: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
 
 
 class CreateInvitationUseCase:
@@ -96,6 +98,8 @@ class CreateInvitationUseCase:
             boond_resource_id=command.boond_resource_id,
             manager_boond_id=command.manager_boond_id,
             phone=command.phone,
+            first_name=command.first_name,
+            last_name=command.last_name,
         )
 
         # Save invitation
@@ -251,6 +255,8 @@ class ResendInvitationUseCase:
             boond_resource_id=invitation.boond_resource_id,
             manager_boond_id=invitation.manager_boond_id,
             phone=invitation.phone,
+            first_name=invitation.first_name,
+            last_name=invitation.last_name,
         )
         new_invitation.id = invitation.id  # Keep same ID
 
