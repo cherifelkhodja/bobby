@@ -198,6 +198,15 @@ class BoondClient:
         "5": "Craftmania",
     }
 
+    # Hardcoded resource state names
+    RESOURCE_STATE_NAMES = {
+        0: "Sortie",
+        1: "En cours",
+        2: "Intercontrat",
+        3: "Arrivée prochaine",
+        7: "Sortie prochaine",
+    }
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=4),
@@ -205,19 +214,19 @@ class BoondClient:
     async def get_resources(self) -> list[dict]:
         """Fetch resources (employees) from BoondManager.
 
-        Only returns resources with state 1 or 2 (active).
+        Returns resources with all states (0, 1, 2, 3, 7).
         Uses included data for agencies to avoid extra API calls.
         Handles pagination to fetch all resources.
         """
         async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
             logger.info("Fetching resources from BoondManager")
 
-            # Fetch resources with state filter (1=active, 2=mission)
+            # Fetch resources with all states
             all_resources = []
             agencies_map = {}
             managers_map = {}  # Map manager_id -> "FirstName LastName"
 
-            for state in [1, 2]:
+            for state in [0, 1, 2, 3, 7]:
                 page = 1
                 while True:
                     response = await client.get(
@@ -291,6 +300,10 @@ class BoondClient:
                     # Get manager name from included data
                     manager_name = managers_map.get(manager_id, "") if manager_id else ""
 
+                    # Get resource state
+                    resource_state = attrs.get("state", None)
+                    resource_state_name = self.RESOURCE_STATE_NAMES.get(resource_state, "") if resource_state is not None else ""
+
                     resources.append({
                         "id": str(item.get("id")),
                         "first_name": attrs.get("firstName", ""),
@@ -303,6 +316,8 @@ class BoondClient:
                         "agency_name": agency_name,
                         "resource_type": resource_type,
                         "resource_type_name": resource_type_name,
+                        "state": resource_state,
+                        "state_name": resource_state_name,
                         "suggested_role": suggested_role,
                     })
                 except Exception as e:

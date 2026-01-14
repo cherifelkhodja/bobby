@@ -189,6 +189,8 @@ class BoondResourceResponse(BaseModel):
     agency_name: Optional[str] = None
     resource_type: Optional[int] = None
     resource_type_name: Optional[str] = None
+    state: Optional[int] = None
+    state_name: Optional[str] = None
     suggested_role: str = "user"
 
 
@@ -236,6 +238,8 @@ async def get_boond_resources(
                     agency_name=r.get("agency_name", ""),
                     resource_type=r.get("resource_type"),
                     resource_type_name=r.get("resource_type_name"),
+                    state=r.get("state"),
+                    state_name=r.get("state_name"),
                     suggested_role=r.get("suggested_role", "user"),
                 )
                 for r in resources

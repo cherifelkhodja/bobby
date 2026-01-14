@@ -494,11 +494,21 @@ function UsersTab() {
 // Invitations Tab
 // ============================================================================
 
+// State names mapping
+const STATE_NAMES: Record<number, string> = {
+  0: 'Sortie',
+  1: 'En cours',
+  2: 'Intercontrat',
+  3: 'Arrivée prochaine',
+  7: 'Sortie prochaine',
+};
+
 function InvitationsTab() {
   const queryClient = useQueryClient();
   const [sendingResourceId, setSendingResourceId] = useState<string | null>(null);
   const [agencyFilter, setAgencyFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [stateFilter, setStateFilter] = useState<string>('1'); // Default: En cours
   const [selectedRoles, setSelectedRoles] = useState<Record<string, UserRole>>({});
 
   // Resource details modal state
@@ -525,15 +535,17 @@ function InvitationsTab() {
     queryFn: () => adminApi.getUsers(0, 500),
   });
 
-  // Extract unique agencies and types for filter options
+  // Extract unique agencies, types and states for filter options
   const agencies = [...new Set(boondResourcesData?.resources.map(r => r.agency_name).filter((v): v is string => Boolean(v)) || [])].sort();
   const types = [...new Set(boondResourcesData?.resources.map(r => r.resource_type_name).filter((v): v is string => Boolean(v)) || [])].sort();
+  const states = [...new Set(boondResourcesData?.resources.map(r => r.state).filter((v): v is number => v !== null) || [])].sort((a, b) => a - b);
 
   // Filter resources based on selected filters
   const filteredResources = boondResourcesData?.resources.filter(resource => {
     const matchesAgency = agencyFilter === 'all' || resource.agency_name === agencyFilter;
     const matchesType = typeFilter === 'all' || resource.resource_type_name === typeFilter;
-    return matchesAgency && matchesType;
+    const matchesState = stateFilter === 'all' || resource.state === parseInt(stateFilter);
+    return matchesAgency && matchesType && matchesState;
   }) || [];
 
   const createMutation = useMutation({
@@ -796,15 +808,35 @@ function InvitationsTab() {
             </select>
           </div>
 
-          {(agencyFilter !== 'all' || typeFilter !== 'all') && (
+          <div className="flex items-center gap-2">
+            <label htmlFor="state-filter" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Etat:
+            </label>
+            <select
+              id="state-filter"
+              value={stateFilter}
+              onChange={(e) => setStateFilter(e.target.value)}
+              className="rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary text-sm"
+            >
+              <option value="all">Tous</option>
+              {states.map((state) => (
+                <option key={state} value={state.toString()}>
+                  {STATE_NAMES[state] || `Etat ${state}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {(agencyFilter !== 'all' || typeFilter !== 'all' || stateFilter !== '1') && (
             <button
               onClick={() => {
                 setAgencyFilter('all');
                 setTypeFilter('all');
+                setStateFilter('1');
               }}
               className="text-sm text-primary dark:text-primary-400 hover:text-primary-dark underline"
             >
-              Réinitialiser les filtres
+              Reinitialiser les filtres
             </button>
           )}
         </div>

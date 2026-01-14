@@ -117,6 +117,8 @@ export interface BoondResource {
   agency_name: string | null;
   resource_type: number | null;
   resource_type_name: string | null;
+  state: number | null;
+  state_name: string | null;
   suggested_role: UserRole;
 }
 
