@@ -71,6 +71,8 @@ FORMAT JSON ATTENDU :
   ]
 }
 
+Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.
+
 TEXTE DU CV À ANALYSER :
 """
 
