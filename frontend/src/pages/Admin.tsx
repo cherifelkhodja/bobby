@@ -130,11 +130,58 @@ function UsersTab() {
   const queryClient = useQueryClient();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    first_name: '',
+    last_name: '',
+    phone: '',
+    boond_resource_id: '',
+    manager_boond_id: '',
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-users'],
     queryFn: () => adminApi.getUsers(0, 100),
   });
+
+  const updateUserMutation = useMutation({
+    mutationFn: (data: { userId: string; updates: Parameters<typeof adminApi.updateUser>[1] }) =>
+      adminApi.updateUser(data.userId, data.updates),
+    onSuccess: () => {
+      toast.success('Utilisateur mis a jour');
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setIsDetailsModalOpen(false);
+    },
+    onError: () => {
+      toast.error('Erreur lors de la mise a jour');
+    },
+  });
+
+  const openDetailsModal = (user: User) => {
+    setSelectedUser(user);
+    setEditForm({
+      first_name: user.first_name,
+      last_name: user.last_name,
+      phone: user.phone || '',
+      boond_resource_id: user.boond_resource_id || '',
+      manager_boond_id: user.manager_boond_id || '',
+    });
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleSaveUser = () => {
+    if (!selectedUser) return;
+    updateUserMutation.mutate({
+      userId: selectedUser.id,
+      updates: {
+        first_name: editForm.first_name,
+        last_name: editForm.last_name,
+        phone: editForm.phone || null,
+        boond_resource_id: editForm.boond_resource_id || null,
+        manager_boond_id: editForm.manager_boond_id || null,
+      },
+    });
+  };
 
   const changeRoleMutation = useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: UserRole }) =>
@@ -195,7 +242,11 @@ function UsersTab() {
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {data?.users.map((user) => (
-                <tr key={user.id}>
+                <tr
+                  key={user.id}
+                  onClick={() => openDetailsModal(user)}
+                  className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -294,6 +345,141 @@ function UsersTab() {
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* User Details Modal */}
+      <Modal
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        title="Details de l'utilisateur"
+      >
+        {selectedUser && (
+          <div className="space-y-4">
+            {/* Read-only info */}
+            <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Statut</span>
+                <div className="flex items-center space-x-2">
+                  {selectedUser.is_active ? (
+                    <Badge variant="success">Actif</Badge>
+                  ) : (
+                    <Badge variant="error">Inactif</Badge>
+                  )}
+                  {!selectedUser.is_verified && (
+                    <Badge variant="warning">Non verifie</Badge>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Role</span>
+                <Badge variant={ROLE_COLORS[selectedUser.role]}>
+                  {ROLE_LABELS[selectedUser.role]}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Inscription</span>
+                <span className="text-sm text-gray-900 dark:text-gray-100">
+                  {new Date(selectedUser.created_at).toLocaleDateString('fr-FR')}
+                </span>
+              </div>
+            </div>
+
+            {/* Editable fields */}
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Prenom
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.first_name}
+                    onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+                    className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Nom
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.last_name}
+                    onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
+                    className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={selectedUser.email}
+                  disabled
+                  className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 shadow-sm cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Telephone
+                </label>
+                <input
+                  type="tel"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  placeholder="+33 6 12 34 56 78"
+                  className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  ID Boond Resource
+                </label>
+                <input
+                  type="text"
+                  value={editForm.boond_resource_id}
+                  onChange={(e) => setEditForm({ ...editForm, boond_resource_id: e.target.value })}
+                  placeholder="Non lie a BoondManager"
+                  className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  ID Boond Manager
+                </label>
+                <input
+                  type="text"
+                  value={editForm.manager_boond_id}
+                  onChange={(e) => setEditForm({ ...editForm, manager_boond_id: e.target.value })}
+                  placeholder="Non defini"
+                  className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
+                />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                variant="outline"
+                onClick={() => setIsDetailsModalOpen(false)}
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleSaveUser}
+                isLoading={updateUserMutation.isPending}
+              >
+                Enregistrer
+              </Button>
             </div>
           </div>
         )}

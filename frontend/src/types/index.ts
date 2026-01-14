@@ -8,6 +8,7 @@ export interface User {
   last_name: string;
   full_name: string;
   role: UserRole;
+  phone?: string | null;
   is_verified: boolean;
   is_active: boolean;
   boond_resource_id: string | null;

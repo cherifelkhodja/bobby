@@ -39,10 +39,13 @@ export interface InvitationsListResponse {
 }
 
 export interface UpdateUserRequest {
+  first_name?: string;
+  last_name?: string;
+  phone?: string | null;
   is_active?: boolean;
   role?: UserRole;
-  boond_resource_id?: string;
-  manager_boond_id?: string;
+  boond_resource_id?: string | null;
+  manager_boond_id?: string | null;
 }
 
 export const adminApi = {

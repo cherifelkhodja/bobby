@@ -1,7 +1,7 @@
 """Add phone field to users and invitations tables.
 
-Revision ID: 005
-Revises: 004
+Revision ID: 005_add_phone_to_users_invitations
+Revises: 004_add_cv_transformer_tables
 Create Date: 2026-01-14
 """
 from typing import Sequence, Union
@@ -11,8 +11,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '005'
-down_revision: Union[str, None] = '004'
+revision: str = '005_add_phone_to_users_invitations'
+down_revision: Union[str, None] = '004_add_cv_transformer_tables'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

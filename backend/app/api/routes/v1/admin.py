@@ -258,7 +258,9 @@ class UserAdminResponse(BaseModel):
     email: str
     first_name: str
     last_name: str
+    full_name: str
     role: str
+    phone: Optional[str] = None
     is_verified: bool
     is_active: bool
     boond_resource_id: Optional[str] = None
@@ -283,6 +285,9 @@ class ChangeRoleRequest(BaseModel):
 class UpdateUserRequest(BaseModel):
     """Request to update user."""
 
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
     is_active: Optional[bool] = None
     role: Optional[str] = None
     boond_resource_id: Optional[str] = None
@@ -310,7 +315,9 @@ async def list_users(
                 email=str(user.email),
                 first_name=user.first_name,
                 last_name=user.last_name,
+                full_name=user.full_name,
                 role=str(user.role),
+                phone=user.phone,
                 is_verified=user.is_verified,
                 is_active=user.is_active,
                 boond_resource_id=user.boond_resource_id,
@@ -344,7 +351,9 @@ async def get_user(
         email=str(user.email),
         first_name=user.first_name,
         last_name=user.last_name,
+        full_name=user.full_name,
         role=str(user.role),
+        phone=user.phone,
         is_verified=user.is_verified,
         is_active=user.is_active,
         boond_resource_id=user.boond_resource_id,
@@ -395,6 +404,15 @@ async def update_user(
     if request.manager_boond_id is not None:
         user.manager_boond_id = request.manager_boond_id or None
 
+    if request.first_name is not None:
+        user.first_name = request.first_name
+
+    if request.last_name is not None:
+        user.last_name = request.last_name
+
+    if request.phone is not None:
+        user.phone = request.phone or None
+
     updated_user = await user_repo.save(user)
 
     return UserAdminResponse(
@@ -402,7 +420,9 @@ async def update_user(
         email=str(updated_user.email),
         first_name=updated_user.first_name,
         last_name=updated_user.last_name,
+        full_name=updated_user.full_name,
         role=str(updated_user.role),
+        phone=updated_user.phone,
         is_verified=updated_user.is_verified,
         is_active=updated_user.is_active,
         boond_resource_id=updated_user.boond_resource_id,
@@ -446,7 +466,9 @@ async def change_user_role(
         email=str(updated_user.email),
         first_name=updated_user.first_name,
         last_name=updated_user.last_name,
+        full_name=updated_user.full_name,
         role=str(updated_user.role),
+        phone=updated_user.phone,
         is_verified=updated_user.is_verified,
         is_active=updated_user.is_active,
         boond_resource_id=updated_user.boond_resource_id,
