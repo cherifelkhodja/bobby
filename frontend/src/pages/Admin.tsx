@@ -313,6 +313,11 @@ function InvitationsTab() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedRoles, setSelectedRoles] = useState<Record<string, UserRole>>({});
 
+  // Email invitation form state
+  const [emailInviteEmail, setEmailInviteEmail] = useState('');
+  const [emailInviteRole, setEmailInviteRole] = useState<UserRole>('user');
+  const [isSendingEmailInvite, setIsSendingEmailInvite] = useState(false);
+
   const { data: invitationsData, isLoading: isLoadingInvitations } = useQuery({
     queryKey: ['admin-invitations'],
     queryFn: () => adminApi.getInvitations(0, 100),
@@ -374,6 +379,30 @@ function InvitationsTab() {
     },
   });
 
+  // Email invitation handler
+  const handleEmailInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailInviteEmail.trim()) {
+      toast.error('Email requis');
+      return;
+    }
+    setIsSendingEmailInvite(true);
+    try {
+      await adminApi.createInvitation({
+        email: emailInviteEmail.trim(),
+        role: emailInviteRole,
+      });
+      toast.success('Invitation envoyee');
+      setEmailInviteEmail('');
+      setEmailInviteRole('user');
+      queryClient.invalidateQueries({ queryKey: ['admin-invitations'] });
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Erreur lors de l\'envoi');
+    } finally {
+      setIsSendingEmailInvite(false);
+    }
+  };
+
   // Get the role for a resource (selected or suggested)
   const getRoleForResource = (resource: BoondResource): UserRole => {
     return selectedRoles[resource.id] || resource.suggested_role;
@@ -411,6 +440,53 @@ function InvitationsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Email Invitation Form */}
+      <Card>
+        <CardHeader
+          title="Invitation par email"
+          subtitle="Invitez un utilisateur directement par son adresse email"
+        />
+        <form onSubmit={handleEmailInvite} className="flex flex-wrap gap-4 items-end">
+          <div className="flex-1 min-w-[250px]">
+            <label htmlFor="invite-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Email
+            </label>
+            <input
+              id="invite-email"
+              type="email"
+              value={emailInviteEmail}
+              onChange={(e) => setEmailInviteEmail(e.target.value)}
+              placeholder="prenom.nom@exemple.com"
+              className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
+              required
+            />
+          </div>
+          <div className="min-w-[150px]">
+            <label htmlFor="invite-role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Role
+            </label>
+            <select
+              id="invite-role"
+              value={emailInviteRole}
+              onChange={(e) => setEmailInviteRole(e.target.value as UserRole)}
+              className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
+            >
+              <option value="user">{ROLE_LABELS.user}</option>
+              <option value="commercial">{ROLE_LABELS.commercial}</option>
+              <option value="rh">{ROLE_LABELS.rh}</option>
+              <option value="admin">{ROLE_LABELS.admin}</option>
+            </select>
+          </div>
+          <Button
+            type="submit"
+            isLoading={isSendingEmailInvite}
+            leftIcon={<Send className="h-4 w-4" />}
+          >
+            Envoyer l'invitation
+          </Button>
+        </form>
+      </Card>
+
       {/* Pending Invitations */}
       {invitationsData && invitationsData.invitations.length > 0 && (
         <Card>
