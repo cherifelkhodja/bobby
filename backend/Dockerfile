@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml ./
 
 # Install dependencies directly (simpler and more reliable)
-# v2: Added CV transformer deps (google-generativeai, docxtpl, pypdf, python-docx)
+# v3: Added openpyxl for quotation generator Excel templates
 RUN pip install --no-cache-dir \
     "fastapi>=0.109.0" \
     "uvicorn[standard]>=0.27.0" \
@@ -34,7 +34,8 @@ RUN pip install --no-cache-dir \
     "google-generativeai>=0.8.0" \
     "docxtpl>=0.18.0" \
     "pypdf>=4.0.0" \
-    "python-docx>=1.1.0"
+    "python-docx>=1.1.0" \
+    "openpyxl>=3.1.0"
 
 # Copy application code
 COPY . .
