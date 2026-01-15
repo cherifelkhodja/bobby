@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Eye, Sparkles, Check, AlertCircle, Loader2, Filter, TrendingUp, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, Eye, Sparkles, Check, AlertCircle, Loader2, Filter, TrendingUp } from 'lucide-react';
 
 import {
   getMyBoondOpportunities,
@@ -17,19 +17,13 @@ import type { BoondOpportunity, AnonymizedPreview } from '../types';
 
 type ViewStep = 'list' | 'anonymizing' | 'preview' | 'publishing' | 'success' | 'error';
 
-// State configuration with colors matching Boond
+// State configuration for open/active opportunities only (0, 5, 6, 7, 10)
 const STATE_CONFIG: Record<number, { name: string; color: string; bgClass: string; textClass: string }> = {
   0: { name: 'En cours', color: 'blue', bgClass: 'bg-blue-100 dark:bg-blue-900/30', textClass: 'text-blue-700 dark:text-blue-400' },
-  1: { name: 'Gagné', color: 'green', bgClass: 'bg-green-100 dark:bg-green-900/30', textClass: 'text-green-700 dark:text-green-400' },
-  2: { name: 'Perdu', color: 'red', bgClass: 'bg-red-100 dark:bg-red-900/30', textClass: 'text-red-700 dark:text-red-400' },
-  3: { name: 'Abandonné', color: 'gray', bgClass: 'bg-gray-200 dark:bg-gray-700', textClass: 'text-gray-700 dark:text-gray-300' },
-  4: { name: 'Gagné attente contrat', color: 'green', bgClass: 'bg-emerald-100 dark:bg-emerald-900/30', textClass: 'text-emerald-700 dark:text-emerald-400' },
   5: { name: 'Piste identifiée', color: 'yellow', bgClass: 'bg-yellow-100 dark:bg-yellow-900/30', textClass: 'text-yellow-700 dark:text-yellow-400' },
   6: { name: 'Récurrent', color: 'green', bgClass: 'bg-teal-100 dark:bg-teal-900/30', textClass: 'text-teal-700 dark:text-teal-400' },
   7: { name: 'AO ouvert', color: 'cyan', bgClass: 'bg-cyan-100 dark:bg-cyan-900/30', textClass: 'text-cyan-700 dark:text-cyan-400' },
-  8: { name: 'AO clos', color: 'indigo', bgClass: 'bg-indigo-100 dark:bg-indigo-900/30', textClass: 'text-indigo-700 dark:text-indigo-400' },
-  9: { name: 'Reporté', color: 'pink', bgClass: 'bg-pink-100 dark:bg-pink-900/30', textClass: 'text-pink-700 dark:text-pink-400' },
-  10: { name: 'Besoin en avant de phase', color: 'blue', bgClass: 'bg-sky-100 dark:bg-sky-900/30', textClass: 'text-sky-700 dark:text-sky-400' },
+  10: { name: 'Besoin en avant de phase', color: 'sky', bgClass: 'bg-sky-100 dark:bg-sky-900/30', textClass: 'text-sky-700 dark:text-sky-400' },
 };
 
 export function MyBoondOpportunities() {
@@ -57,7 +51,7 @@ export function MyBoondOpportunities() {
   const { stats, availableStates, availableClients, availableManagers } = useMemo(() => {
     if (!data?.items) {
       return {
-        stats: { total: 0, byState: {}, won: 0, inProgress: 0, lost: 0 },
+        stats: { total: 0, byState: {} as Record<number, number> },
         availableStates: [],
         availableClients: [],
         availableManagers: [],
@@ -67,19 +61,11 @@ export function MyBoondOpportunities() {
     const byState: Record<number, number> = {};
     const clientsMap: Record<string, number> = {};
     const managersMap: Record<string, number> = {};
-    let won = 0;
-    let inProgress = 0;
-    let lost = 0;
 
     data.items.forEach((opp) => {
       // Count by state
       if (opp.state !== null) {
         byState[opp.state] = (byState[opp.state] || 0) + 1;
-
-        // Categorize
-        if ([1, 4, 6].includes(opp.state)) won++;
-        else if ([0, 5, 7, 10].includes(opp.state)) inProgress++;
-        else if ([2, 3, 8, 9].includes(opp.state)) lost++;
       }
 
       // Count by client
@@ -107,7 +93,7 @@ export function MyBoondOpportunities() {
       .sort((a, b) => b.count - a.count);
 
     return {
-      stats: { total: data.items.length, byState, won, inProgress, lost },
+      stats: { total: data.items.length, byState },
       availableStates: states,
       availableClients: clients,
       availableManagers: managers,
@@ -278,56 +264,32 @@ export function MyBoondOpportunities() {
         </p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="!p-3">
+      {/* Stats Card */}
+      <Card className="!p-3">
+        <div className="flex items-center justify-between">
           <div className="flex items-center">
             <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
               <TrendingUp className="h-4 w-4 text-primary-600 dark:text-primary-400" />
             </div>
             <div className="ml-3">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Total</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Opportunités ouvertes</p>
               <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</p>
             </div>
           </div>
-        </Card>
-
-        <Card className="!p-3">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          {availableStates.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              {availableStates.map(({ state, count }) => (
+                <span
+                  key={state}
+                  className={`px-2 py-1 text-xs font-medium rounded-full ${STATE_CONFIG[state]?.bgClass || 'bg-gray-100'} ${STATE_CONFIG[state]?.textClass || 'text-gray-600'}`}
+                >
+                  {STATE_CONFIG[state]?.name || `État ${state}`}: {count}
+                </span>
+              ))}
             </div>
-            <div className="ml-3">
-              <p className="text-xs text-gray-500 dark:text-gray-400">En cours</p>
-              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{stats.inProgress}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="!p-3">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-            </div>
-            <div className="ml-3">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Gagnées</p>
-              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{stats.won}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="!p-3">
-          <div className="flex items-center">
-            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-              <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-            </div>
-            <div className="ml-3">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Perdues</p>
-              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{stats.lost}</p>
-            </div>
-          </div>
-        </Card>
-      </div>
+          )}
+        </div>
+      </Card>
 
       {/* Filters */}
       <Card className="!p-3">

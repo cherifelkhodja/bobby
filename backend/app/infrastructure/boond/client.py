@@ -429,8 +429,9 @@ class BoondClient:
         10: "blue",     # Besoin en avant de phase
     }
 
-    # States to include when fetching manager opportunities (all active states)
-    ACTIVE_OPPORTUNITY_STATES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    # States to include when fetching manager opportunities (open/active states only)
+    # 0: En cours, 5: Piste identifiée, 6: Récurrent, 7: AO ouvert, 10: Besoin en avant de phase
+    ACTIVE_OPPORTUNITY_STATES = [0, 5, 6, 7, 10]
 
     @retry(
         stop=stop_after_attempt(3),
