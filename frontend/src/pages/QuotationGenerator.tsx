@@ -26,6 +26,7 @@ import { quotationGeneratorApi, type PreviewBatchResponse, type BatchProgressRes
 import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { Modal } from '../components/ui/Modal';
 
 type Step = 'upload' | 'preview' | 'generating' | 'complete';
 
@@ -357,6 +358,8 @@ interface PreviewStepProps {
 }
 
 function PreviewStep({ data, isGenerating, onGenerate, onReset }: PreviewStepProps) {
+  const [selectedQuotation, setSelectedQuotation] = useState<QuotationPreviewItem | null>(null);
+
   return (
     <div className="space-y-6">
       {/* Summary */}
@@ -453,21 +456,33 @@ function PreviewStep({ data, isGenerating, onGenerate, onReset }: PreviewStepPro
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {data.quotations.map((q) => (
-                <QuotationRow key={q.row_index} quotation={q} />
+                <QuotationRow
+                  key={q.row_index}
+                  quotation={q}
+                  onSelect={() => setSelectedQuotation(q)}
+                />
               ))}
             </tbody>
           </table>
         </div>
       </Card>
+
+      {/* Quotation Details Modal */}
+      <QuotationDetailsModal
+        quotation={selectedQuotation}
+        isOpen={!!selectedQuotation}
+        onClose={() => setSelectedQuotation(null)}
+      />
     </div>
   );
 }
 
 interface QuotationRowProps {
   quotation: QuotationPreviewItem;
+  onSelect: () => void;
 }
 
-function QuotationRow({ quotation }: QuotationRowProps) {
+function QuotationRow({ quotation, onSelect }: QuotationRowProps) {
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
 
@@ -477,12 +492,17 @@ function QuotationRow({ quotation }: QuotationRowProps) {
         {quotation.row_index + 1}
       </td>
       <td className="px-4 py-3">
-        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-          {quotation.resource_name}
-        </div>
-        <div className="text-xs text-gray-500 dark:text-gray-400">
-          {quotation.resource_trigramme} • {quotation.opportunity_id}
-        </div>
+        <button
+          onClick={onSelect}
+          className="text-left hover:bg-gray-100 dark:hover:bg-gray-700 rounded p-1 -m-1 transition-colors"
+        >
+          <div className="text-sm font-medium text-primary hover:underline">
+            {quotation.resource_name}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {quotation.resource_trigramme} • {quotation.opportunity_id}
+          </div>
+        </button>
       </td>
       <td className="px-4 py-3">
         <div className="text-sm text-gray-900 dark:text-gray-100">
@@ -519,6 +539,132 @@ function QuotationRow({ quotation }: QuotationRowProps) {
         )}
       </td>
     </tr>
+  );
+}
+
+interface QuotationDetailsModalProps {
+  quotation: QuotationPreviewItem | null;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+function QuotationDetailsModal({ quotation, isOpen, onClose }: QuotationDetailsModalProps) {
+  if (!quotation) return null;
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
+
+  const DetailRow = ({ label, value }: { label: string; value: string | number | null | undefined }) => (
+    <div className="py-2 grid grid-cols-2 gap-4 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
+      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</dt>
+      <dd className="text-sm text-gray-900 dark:text-gray-100">{value || '-'}</dd>
+    </div>
+  );
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Détails du devis" size="lg">
+      <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+        {/* Resource Info */}
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
+            <span className="w-2 h-2 bg-primary rounded-full mr-2" />
+            Consultant
+          </h4>
+          <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+            <DetailRow label="Nom" value={quotation.resource_name} />
+            <DetailRow label="Trigramme" value={quotation.resource_trigramme} />
+            <DetailRow label="Resource ID" value={quotation.resource_id} />
+          </dl>
+        </div>
+
+        {/* BoondManager Relationships */}
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
+            <span className="w-2 h-2 bg-blue-500 rounded-full mr-2" />
+            BoondManager IDs
+          </h4>
+          <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+            <DetailRow label="Opportunity ID" value={quotation.opportunity_id} />
+            <DetailRow label="Company ID" value={quotation.company_id} />
+            <DetailRow label="Company Detail ID" value={quotation.company_detail_id} />
+            <DetailRow label="Contact ID" value={quotation.contact_id} />
+          </dl>
+        </div>
+
+        {/* Client Info */}
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
+            <span className="w-2 h-2 bg-green-500 rounded-full mr-2" />
+            Client
+          </h4>
+          <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+            <DetailRow label="Société" value={quotation.company_name} />
+            <DetailRow label="Contact" value={quotation.contact_name} />
+          </dl>
+        </div>
+
+        {/* Period & Pricing */}
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
+            <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2" />
+            Période & Tarification
+          </h4>
+          <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+            <DetailRow label="Date début PO" value={quotation.period.start} />
+            <DetailRow label="Date fin PO" value={quotation.period.end} />
+            <DetailRow label="Date début projet" value={quotation.start_project} />
+            <DetailRow label="TJM" value={formatCurrency(quotation.tjm)} />
+            <DetailRow label="Quantité (jours)" value={quotation.quantity} />
+            <DetailRow label="Total HT" value={formatCurrency(quotation.total_ht)} />
+            <DetailRow label="Total TTC" value={formatCurrency(quotation.total_ttc)} />
+          </dl>
+        </div>
+
+        {/* Thales C22 Fields */}
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
+            <span className="w-2 h-2 bg-purple-500 rounded-full mr-2" />
+            C22 Thales
+          </h4>
+          <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+            <DetailRow label="Domaine C22" value={quotation.c22_domain} />
+            <DetailRow label="Activité C22" value={quotation.c22_activity} />
+            <DetailRow label="Complexité" value={quotation.complexity} />
+            <DetailRow label="GFA (Prix max)" value={formatCurrency(quotation.max_price)} />
+          </dl>
+        </div>
+
+        {/* Other Fields */}
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
+            <span className="w-2 h-2 bg-orange-500 rounded-full mr-2" />
+            Autres informations
+          </h4>
+          <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+            <DetailRow label="Référence SOW" value={quotation.sow_reference} />
+            <DetailRow label="Objet du besoin" value={quotation.object_of_need} />
+            <DetailRow label="Commentaires" value={quotation.comments} />
+          </dl>
+        </div>
+
+        {/* Validation Status */}
+        {!quotation.is_valid && quotation.validation_errors.length > 0 && (
+          <div>
+            <h4 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center">
+              <span className="w-2 h-2 bg-red-500 rounded-full mr-2" />
+              Erreurs de validation
+            </h4>
+            <ul className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 space-y-1">
+              {quotation.validation_errors.map((error, index) => (
+                <li key={index} className="text-sm text-red-600 dark:text-red-400">
+                  • {error}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
 

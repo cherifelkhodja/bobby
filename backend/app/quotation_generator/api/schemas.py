@@ -11,16 +11,35 @@ class QuotationPreviewItem(BaseModel):
     """Single quotation in preview."""
 
     row_index: int
+    # Resource info
     resource_name: str
     resource_trigramme: str
+    resource_id: str
+    # BoondManager relationships
     opportunity_id: str
     company_name: str
+    company_id: str
+    company_detail_id: str
     contact_name: str
+    contact_id: str
+    # Period
     period: dict[str, str]
+    # Pricing
     tjm: float
     quantity: int
     total_ht: float
     total_ttc: float
+    # Thales C22 fields
+    c22_domain: str
+    c22_activity: str
+    complexity: str
+    max_price: float  # GFA
+    # Other Thales fields
+    sow_reference: str
+    object_of_need: str
+    comments: Optional[str] = None
+    start_project: str
+    # Validation
     is_valid: bool
     validation_errors: list[str]
 

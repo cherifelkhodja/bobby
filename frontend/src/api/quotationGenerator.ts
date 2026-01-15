@@ -8,19 +8,38 @@ import { apiClient } from './client';
 
 export interface QuotationPreviewItem {
   row_index: number;
+  // Resource info
   resource_name: string;
   resource_trigramme: string;
+  resource_id: string;
+  // BoondManager relationships
   opportunity_id: string;
   company_name: string;
+  company_id: string;
+  company_detail_id: string;
   contact_name: string;
+  contact_id: string;
+  // Period
   period: {
     start: string;
     end: string;
   };
+  // Pricing
   tjm: number;
   quantity: number;
   total_ht: number;
   total_ttc: number;
+  // Thales C22 fields
+  c22_domain: string;
+  c22_activity: string;
+  complexity: string;
+  max_price: number; // GFA
+  // Other Thales fields
+  sow_reference: string;
+  object_of_need: string;
+  comments: string | null;
+  start_project: string;
+  // Validation
   is_valid: boolean;
   validation_errors: string[];
 }
