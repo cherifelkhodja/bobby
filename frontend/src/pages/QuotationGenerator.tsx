@@ -554,6 +554,17 @@ function QuotationDetailsModal({ quotation, isOpen, onClose }: QuotationDetailsM
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
 
+  // Format name: Prénom NOM
+  const formatName = (fullName: string) => {
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      const firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+      const lastName = parts.slice(1).join(' ').toUpperCase();
+      return `${firstName} ${lastName}`;
+    }
+    return fullName;
+  };
+
   const DetailRow = ({ label, value }: { label: string; value: string | number | null | undefined }) => (
     <div className="py-2 grid grid-cols-2 gap-4 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
       <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</dt>
@@ -571,7 +582,7 @@ function QuotationDetailsModal({ quotation, isOpen, onClose }: QuotationDetailsM
             Consultant
           </h4>
           <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-            <DetailRow label="Nom" value={quotation.resource_name} />
+            <DetailRow label="Nom" value={formatName(quotation.resource_name)} />
             <DetailRow label="Trigramme" value={quotation.resource_trigramme} />
             <DetailRow label="Resource ID" value={quotation.resource_id} />
           </dl>
@@ -581,25 +592,13 @@ function QuotationDetailsModal({ quotation, isOpen, onClose }: QuotationDetailsM
         <div>
           <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
             <span className="w-2 h-2 bg-blue-500 rounded-full mr-2" />
-            BoondManager IDs
+            BoondManager
           </h4>
           <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-            <DetailRow label="Opportunity ID" value={quotation.opportunity_id} />
-            <DetailRow label="Company ID" value={quotation.company_id} />
-            <DetailRow label="Company Detail ID" value={quotation.company_detail_id} />
-            <DetailRow label="Contact ID" value={quotation.contact_id} />
-          </dl>
-        </div>
-
-        {/* Client Info */}
-        <div>
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
-            <span className="w-2 h-2 bg-green-500 rounded-full mr-2" />
-            Client
-          </h4>
-          <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-            <DetailRow label="Société" value={quotation.company_name} />
-            <DetailRow label="Contact" value={quotation.contact_name} />
+            <DetailRow label="Opportunité" value={`${quotation.opportunity_id}`} />
+            <DetailRow label="Société" value={`${quotation.company_id} - ${quotation.company_name}`} />
+            <DetailRow label="Détail facturation" value={quotation.company_detail_id} />
+            <DetailRow label="Contact" value={`${quotation.contact_id} - ${quotation.contact_name}`} />
           </dl>
         </div>
 

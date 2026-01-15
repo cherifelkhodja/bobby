@@ -561,14 +561,6 @@ class CSVParserService:
             unit_price_ht=Money(amount=tjm),
         )
 
-        # Add comment about max_price source if auto-filled
-        if max_price_source == "grille":
-            auto_comment = f"Max GFA: {max_price}€ (grille tarifaire IDF)"
-            if comments:
-                comments = f"{comments} | {auto_comment}"
-            else:
-                comments = auto_comment
-
         return Quotation(
             resource_id=resource_id,
             resource_name=resource_name,
@@ -741,14 +733,6 @@ class CSVParserService:
             quantity=quantity,
             unit_price_ht=Money(amount=tjm),
         )
-
-        # Add comment about max_price source if auto-filled
-        if max_price_source == "grille":
-            auto_comment = f"Max GFA: {max_price}€ (grille tarifaire IDF)"
-            if comments:
-                comments = f"{comments} | {auto_comment}"
-            else:
-                comments = auto_comment
 
         return Quotation(
             resource_id=resource_id,
