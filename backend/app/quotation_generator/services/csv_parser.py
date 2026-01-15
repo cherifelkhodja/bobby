@@ -18,6 +18,7 @@ from app.quotation_generator.domain.exceptions import (
     MissingColumnsError,
 )
 from app.quotation_generator.domain.value_objects import Money, Period
+from app.quotation_generator.services.pricing_grid import PricingGridService
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +48,14 @@ COLUMN_MAPPING = {
     "c22_domain": ["c22_domain", "domaine_c22", "domaine"],
     "c22_activity": ["c22_activity", "activite_c22", "activite"],
     "complexity": ["complexity", "complexite", "niveau"],
+    "region": ["region", "région", "zone", "localisation", "activity_country"],
     "max_price": ["max_price", "prix_max", "gfa_max", "prix_plafond"],
     "start_project": ["start_project", "debut_projet", "date_debut_projet"],
     "comments": ["comments", "commentaires", "notes", "remarques"],
 }
 
 # Required columns (must be present)
+# Note: max_price is NOT required - it can be auto-filled for 124-DATA domain
 REQUIRED_COLUMNS = [
     "resource_id",
     "resource_name",
@@ -71,7 +74,7 @@ REQUIRED_COLUMNS = [
     "c22_domain",
     "c22_activity",
     "complexity",
-    "max_price",
+    "region",  # Required for auto-fill
     "start_project",
 ]
 
@@ -83,12 +86,14 @@ class CSVParserService:
     - Column name mapping (French/English)
     - Data type conversion
     - Validation of required fields
+    - Auto-fill of max_price from pricing grid (for 124-DATA domain)
     - Creation of domain entities
     """
 
     def __init__(self) -> None:
         """Initialize the CSV parser service."""
         self._column_map: dict[str, str] = {}
+        self._pricing_grid = PricingGridService()
 
     def parse(self, file_content: bytes, user_id: UUID) -> QuotationBatch:
         """Parse CSV content into a QuotationBatch.
@@ -255,7 +260,6 @@ class CSVParserService:
 
         # Parse money values
         tjm = self._parse_decimal(self._get_value(row, "tjm"), "tjm")
-        max_price = self._parse_decimal(self._get_value(row, "max_price"), "max_price")
 
         # Parse quantity
         quantity = self._parse_int(self._get_value(row, "quantity"), "quantity")
@@ -275,9 +279,39 @@ class CSVParserService:
         c22_domain = self._require_value(row, "c22_domain")
         c22_activity = self._require_value(row, "c22_activity")
         complexity = self._require_value(row, "complexity")
+        region = self._require_value(row, "region")
 
         # Optional fields
         comments = self._get_value(row, "comments")
+
+        # Parse max_price - auto-fill if not provided and domain is 124-DATA
+        max_price_str = self._get_value(row, "max_price")
+        max_price: Decimal
+        max_price_source = "csv"
+
+        if max_price_str:
+            # User provided max_price in CSV
+            max_price = self._parse_decimal(max_price_str, "max_price")
+        else:
+            # Try to auto-fill from pricing grid
+            auto_price = self._pricing_grid.get_max_gfa(
+                activity=c22_activity,
+                region=region,
+                complexity=complexity,
+            )
+            if auto_price:
+                max_price = auto_price
+                max_price_source = "grille"
+                logger.info(
+                    f"Row {row_index + 2}: Auto-filled max_price={max_price} "
+                    f"for activity={c22_activity}, region={region}, complexity={complexity}"
+                )
+            else:
+                # No auto-fill available (not 124-DATA domain)
+                raise ValueError(
+                    f"max_price requis pour le domaine {c22_domain}. "
+                    f"L'auto-complétion n'est disponible que pour le domaine 124-DATA."
+                )
 
         # Create line item
         line = QuotationLine(
@@ -285,6 +319,12 @@ class CSVParserService:
             quantity=quantity,
             unit_price_ht=Money(amount=tjm),
         )
+
+        # Add comment about max_price source if auto-filled
+        if max_price_source == "grille" and comments:
+            comments = f"{comments} | Max GFA: {max_price}€ (grille tarifaire)"
+        elif max_price_source == "grille":
+            comments = f"Max GFA: {max_price}€ (grille tarifaire)"
 
         return Quotation(
             resource_id=resource_id,

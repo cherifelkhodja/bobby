@@ -317,9 +317,11 @@ async def upload_template(
 
 # Example CSV endpoint
 
-EXAMPLE_CSV_CONTENT = """resource_id,resource_name,trigramme,opportunity_id,company_id,company_name,contact_id,contact_name,start_date,end_date,tjm,quantity,sow_reference,object_of_need,c22_domain,c22_activity,complexity,max_price,start_project,comments
-12345,Jean DUPONT,JDU,98765,11111,THALES SIX GTS,22222,Marie MARTIN,2025-02-01,2025-04-30,550,60,SOW-2025-001,Développement application web,Informatique,Développement,Senior,650,2025-02-01,Mission de 3 mois
-12346,Pierre DURAND,PDU,98766,11111,THALES SIX GTS,22222,Marie MARTIN,2025-03-01,2025-05-31,600,65,SOW-2025-002,Architecture microservices,Informatique,Architecture,Expert,750,2025-03-01,
+# Example CSV with region column - max_price is auto-filled for 124-DATA domain
+EXAMPLE_CSV_CONTENT = """resource_id,resource_name,trigramme,opportunity_id,company_id,company_name,contact_id,contact_name,start_date,end_date,tjm,quantity,sow_reference,object_of_need,c22_domain,c22_activity,region,complexity,max_price,start_project,comments
+12345,Jean DUPONT,JDU,98765,11111,THALES SIX GTS,22222,Marie MARTIN,2025-02-01,2025-04-30,550,60,SOW-2025-001,Développement application web,124-DATA,Data Analyst,IDF,Medium,,2025-02-01,Max GFA auto-calculé depuis grille
+12346,Pierre DURAND,PDU,98766,11111,THALES SIX GTS,22222,Marie MARTIN,2025-03-01,2025-05-31,600,65,SOW-2025-002,Architecture microservices,124-DATA,AI/ML Engineer,Région,Expert,,2025-03-01,
+12347,Sophie MARTIN,SMA,98767,11111,THALES SIX GTS,22222,Marie MARTIN,2025-04-01,2025-06-30,500,45,SOW-2025-003,Support technique,Autre,Support,IDF,Simple,600,2025-04-01,Domaine hors grille - max_price requis
 """
 
 
