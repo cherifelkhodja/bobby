@@ -11,7 +11,6 @@ import {
 import { getErrorMessage } from '../api/client';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
 import type { BoondOpportunity, BoondOpportunityDetail, AnonymizedPreview } from '../types';
@@ -28,7 +27,6 @@ const STATE_CONFIG: Record<number, { name: string; color: string; bgClass: strin
 };
 
 export function MyBoondOpportunities() {
-  const [search, setSearch] = useState('');
   const [stateFilter, setStateFilter] = useState<number | 'all'>('all');
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [managerFilter, setManagerFilter] = useState<string>('all');
@@ -132,7 +130,7 @@ export function MyBoondOpportunities() {
     },
   });
 
-  // Filter opportunities by search, state, client and manager
+  // Filter opportunities by state, client and manager
   const filteredOpportunities = useMemo(() => {
     return data?.items.filter((opp) => {
       // State filter
@@ -150,17 +148,9 @@ export function MyBoondOpportunities() {
         if (managerName !== managerFilter) return false;
       }
 
-      // Search filter
-      if (!search) return true;
-      const searchLower = search.toLowerCase();
-      return (
-        opp.title.toLowerCase().includes(searchLower) ||
-        opp.reference.toLowerCase().includes(searchLower) ||
-        opp.company_name?.toLowerCase().includes(searchLower) ||
-        opp.manager_name?.toLowerCase().includes(searchLower)
-      );
+      return true;
     }) || [];
-  }, [data?.items, search, stateFilter, clientFilter, managerFilter]);
+  }, [data?.items, stateFilter, clientFilter, managerFilter]);
 
   const handlePropose = async (opportunity: BoondOpportunity) => {
     setSelectedOpportunity(opportunity);
@@ -339,18 +329,8 @@ export function MyBoondOpportunities() {
 
       {/* Filters */}
       <Card className="!p-3">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Rechercher..."
-              className="pl-9 text-sm h-9"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
             <select
               value={stateFilter}
               onChange={(e) => setStateFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
@@ -389,7 +369,6 @@ export function MyBoondOpportunities() {
                 ))}
               </select>
             )}
-          </div>
         </div>
       </Card>
 
