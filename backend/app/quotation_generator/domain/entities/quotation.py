@@ -274,7 +274,7 @@ class Quotation:
             "object_of_need": self.object_of_need,
             "eacq_number": self.eacq_number,
             "reference": boond_reference or self.boond_reference or "",
-            "sales_representative": "M Cherif EL KHODJA\n+33 7 57 81 73 83\ncherif.elkhodja@geminiconsulting.fr",
+            "sales_representative": "M Cherif EL KHODJA / +33 7 57 81 73 83 / cherif.elkhodja@geminiconsulting.fr",
             "renewal": "YES" if self.is_renewal else "NO",
             "initial_first_starting_date": self.start_project.strftime(date_fmt),
             "total_uo": str(self.quantity),
