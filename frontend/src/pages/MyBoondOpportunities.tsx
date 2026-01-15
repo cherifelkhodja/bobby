@@ -218,7 +218,8 @@ export function MyBoondOpportunities() {
         company_name: selectedOpportunity.company_name,
         description: selectedOpportunity.description,
       },
-      end_date: selectedOpportunity.end_date,
+      // Send null if end_date is empty string (Pydantic can't parse "" as date)
+      end_date: selectedOpportunity.end_date || null,
     });
   };
 
