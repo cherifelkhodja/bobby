@@ -189,18 +189,36 @@ class CSVParserService:
         return ';' if semicolon_count > comma_count else ','
 
     def _is_empty_row(self, row: dict) -> bool:
-        """Check if a row is empty (all values are empty or None).
+        """Check if a row is empty or is a total/summary row.
 
         Args:
             row: CSV row dictionary.
 
         Returns:
-            True if row is empty.
+            True if row should be skipped.
         """
         # Check if resource_id is empty - this usually indicates an empty/total row
         resource_id_col = self._column_map.get("resource_id")
         if resource_id_col and not row.get(resource_id_col, "").strip():
             return True
+
+        # Check if quantity is 0 or empty - likely a total row
+        quantity_col = self._column_map.get("quantity")
+        if quantity_col:
+            qty_str = row.get(quantity_col, "").strip()
+            if not qty_str:
+                return True
+            # Parse quantity and skip if 0
+            try:
+                qty_normalized = qty_str.replace(" ", "").replace(",", ".")
+                if "." in qty_normalized:
+                    qty_normalized = qty_normalized.split(".")[0]
+                if int(qty_normalized) == 0:
+                    logger.debug(f"Skipping row with quantity=0")
+                    return True
+            except (ValueError, TypeError):
+                pass  # Let the parser handle invalid quantity
+
         return False
 
     def _decode_content(self, content: bytes) -> str:
