@@ -146,33 +146,9 @@ class TemplateNotFoundError(QuotationGeneratorError):
 
 
 class PDFConversionError(QuotationGeneratorError):
-    """Error converting Excel to PDF.
+    """Error converting Excel to PDF."""
 
-    Attributes:
-        filename: Name of the file that failed to convert.
-        stderr: Error output from conversion process.
-    """
-
-    def __init__(
-        self,
-        filename: str,
-        stderr: Optional[str] = None,
-    ) -> None:
-        """Initialize with conversion error details.
-
-        Args:
-            filename: Name of the file that failed.
-            stderr: Standard error output.
-        """
-        self.filename = filename
-        self.stderr = stderr
-        message = f"Failed to convert '{filename}' to PDF"
-        if stderr:
-            message += f": {stderr[:200]}"
-        super().__init__(
-            message,
-            details={"filename": filename, "stderr": stderr},
-        )
+    pass
 
 
 class PDFMergeError(QuotationGeneratorError):
@@ -188,23 +164,9 @@ class PDFMergeError(QuotationGeneratorError):
 
 
 class BatchNotFoundError(QuotationGeneratorError):
-    """Batch not found.
+    """Batch not found."""
 
-    Attributes:
-        batch_id: The batch ID that was not found.
-    """
-
-    def __init__(self, batch_id: str) -> None:
-        """Initialize with batch ID.
-
-        Args:
-            batch_id: The missing batch ID.
-        """
-        self.batch_id = batch_id
-        super().__init__(
-            f"Batch '{batch_id}' not found",
-            details={"batch_id": batch_id},
-        )
+    pass
 
 
 class BatchExpiredError(QuotationGeneratorError):

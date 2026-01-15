@@ -214,9 +214,7 @@ class CSVParserService:
                 missing.append(f"{required} ({', '.join(possible)})")
 
         if missing:
-            raise MissingColumnsError(
-                f"Missing required columns: {', '.join(missing)}"
-            )
+            raise MissingColumnsError(missing)
 
     def _get_value(self, row: dict, field_name: str) -> Optional[str]:
         """Get value from row using column mapping.
