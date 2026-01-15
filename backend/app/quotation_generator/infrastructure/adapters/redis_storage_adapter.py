@@ -104,6 +104,7 @@ class RedisStorageAdapter(BatchStoragePort):
             "created_at": batch.created_at.isoformat(),
             "started_at": batch.started_at.isoformat() if batch.started_at else None,
             "completed_at": batch.completed_at.isoformat() if batch.completed_at else None,
+            "merged_pdf_path": batch.merged_pdf_path,
             "zip_file_path": batch.zip_file_path,
             "error_message": batch.error_message,
             "quotations": [self._quotation_to_dict(q) for q in batch.quotations],
@@ -127,6 +128,9 @@ class RedisStorageAdapter(BatchStoragePort):
                 "start_date": quotation.period.start_date.isoformat(),
                 "end_date": quotation.period.end_date.isoformat(),
             },
+            "period_name": quotation.period_name,
+            "quotation_date": quotation.quotation_date.isoformat() if quotation.quotation_date else None,
+            "need_title": quotation.need_title,
             "line": {
                 "description": quotation.line.description,
                 "quantity": quotation.line.quantity,
@@ -141,6 +145,7 @@ class RedisStorageAdapter(BatchStoragePort):
             "max_price": str(quotation.max_price.amount),
             "start_project": quotation.start_project.isoformat(),
             "comments": quotation.comments,
+            "pdf_path": quotation.pdf_path,
             "status": quotation.status.value,
             "boond_quotation_id": quotation.boond_quotation_id,
             "boond_reference": quotation.boond_reference,
@@ -159,6 +164,7 @@ class RedisStorageAdapter(BatchStoragePort):
             created_at=datetime.fromisoformat(data["created_at"]),
             started_at=datetime.fromisoformat(data["started_at"]) if data.get("started_at") else None,
             completed_at=datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None,
+            merged_pdf_path=data.get("merged_pdf_path"),
             zip_file_path=data.get("zip_file_path"),
             error_message=data.get("error_message"),
         )
@@ -176,6 +182,11 @@ class RedisStorageAdapter(BatchStoragePort):
         period_data = data["period"]
         line_data = data["line"]
 
+        # Parse quotation_date if present
+        quotation_date = None
+        if data.get("quotation_date"):
+            quotation_date = date.fromisoformat(data["quotation_date"])
+
         quotation = Quotation(
             id=UUID(data["id"]),
             row_index=data["row_index"],
@@ -192,6 +203,9 @@ class RedisStorageAdapter(BatchStoragePort):
                 start_date=date.fromisoformat(period_data["start_date"]),
                 end_date=date.fromisoformat(period_data["end_date"]),
             ),
+            period_name=data.get("period_name", ""),
+            quotation_date=quotation_date,
+            need_title=data.get("need_title", ""),
             line=QuotationLine(
                 description=line_data["description"],
                 quantity=line_data["quantity"],
@@ -206,6 +220,7 @@ class RedisStorageAdapter(BatchStoragePort):
             max_price=Money(amount=Decimal(data["max_price"])),
             start_project=date.fromisoformat(data["start_project"]),
             comments=data.get("comments"),
+            pdf_path=data.get("pdf_path"),
             status=QuotationStatus(data["status"]),
             boond_quotation_id=data.get("boond_quotation_id"),
             boond_reference=data.get("boond_reference"),
