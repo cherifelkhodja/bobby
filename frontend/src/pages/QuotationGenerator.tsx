@@ -160,7 +160,7 @@ export function QuotationGenerator() {
         </div>
         {step !== 'upload' && (
           <Button variant="outline" onClick={handleReset}>
-            Nouveau batch
+            Nouvelle génération
           </Button>
         )}
       </div>
@@ -877,7 +877,6 @@ interface CompleteStepProps {
 }
 
 function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
-  const [isDownloadingMerged, setIsDownloadingMerged] = useState(false);
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [downloadingRow, setDownloadingRow] = useState<number | null>(null);
 
@@ -904,18 +903,6 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
   const completedCount = batchDetails?.completed ?? progress.completed;
   const failedCount = batchDetails?.failed ?? progress.failed;
   const totalCount = batchDetails?.total ?? progress.total;
-
-  const handleDownloadMergedPdf = async () => {
-    setIsDownloadingMerged(true);
-    try {
-      await quotationGeneratorApi.downloadMergedPdfAsFile(batchId);
-      toast.success('Téléchargement du PDF fusionné démarré');
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, 'Erreur lors du téléchargement'));
-    } finally {
-      setIsDownloadingMerged(false);
-    }
-  };
 
   const handleDownloadZip = async () => {
     setIsDownloadingZip(true);
@@ -988,20 +975,10 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
 
           <div className="mt-8 flex space-x-4">
             <Button variant="outline" onClick={onReset}>
-              Nouveau batch
+              Nouvelle génération
             </Button>
             {completedCount > 0 && (
               <Button
-                onClick={handleDownloadMergedPdf}
-                isLoading={isDownloadingMerged}
-                leftIcon={<Download className="w-4 h-4" />}
-              >
-                Télécharger PDF fusionné
-              </Button>
-            )}
-            {completedCount > 0 && (
-              <Button
-                variant="outline"
                 onClick={handleDownloadZip}
                 isLoading={isDownloadingZip}
                 leftIcon={<Download className="w-4 h-4" />}

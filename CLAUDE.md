@@ -375,7 +375,70 @@ npm run lint                  # Lint
 - **Priority**: Medium (package still works but no longer receives updates)
 - **Reference**: https://github.com/google-gemini/deprecated-generative-ai-python
 
+### 7. Quotation Generator (Thales PSTF)
+Generate quotations for Thales using BoondManager data and Excel templates.
+
+**Access**: admin role only
+
+**Features**:
+- Upload CSV with consultant/period data (simplified or full format)
+- Auto-enrichment from BoondManager (resource, opportunity, company, contacts)
+- Auto-fill max_price from pricing grid (124-Data domain)
+- Preview with validation before generation
+- Async background generation
+- For each quotation:
+  - Create quotation in BoondManager API
+  - Download BoondManager PDF
+  - Fill Excel PSTF template
+  - Merge both PDFs
+- Download results as ZIP
+- Delete rows from preview before generation
+- Change contact per quotation
+
+**CSV Columns** (simplified format):
+- `firstName`, `lastName` - Consultant name (enriched from BoondManager)
+- `po_start_date`, `po_end_date` - Period dates
+- `periode` - Human-readable period (e.g., "Q1 2026")
+- `date` - Quotation date
+- `amount_ht_unit` - TJM (daily rate)
+- `total_uo` - Number of days (quantity)
+- `C22_domain`, `C22_activity`, `complexity` - Thales classification
+- `max_price` - Optional, auto-filled from pricing grid for 124-Data
+- `sow_reference`, `object_of_need` - SOW info
+
+**Pricing Grid**:
+- Auto-fills `max_price` for domain `124-Data` based on activity/complexity/region
+- For unsupported domains: sets `max_price=0` with comment "Pas de grille pour ce périmètre"
+
+**Files**:
+- Backend: `backend/app/quotation_generator/`
+- API: `backend/app/quotation_generator/api/routes.py`
+- Frontend: `frontend/src/pages/QuotationGenerator.tsx`
+- API client: `frontend/src/api/quotationGenerator.ts`
+
+**Key API Endpoints** (`/api/v1/quotation-generator`):
+- `POST /preview` - Parse CSV and return preview
+- `POST /batches/{batch_id}/generate` - Start async generation
+- `GET /batches/{batch_id}/progress` - Get generation progress
+- `GET /batches/{batch_id}/details` - Get full batch details
+- `PATCH /batches/{batch_id}/quotations/{row_index}/contact` - Update contact
+- `DELETE /batches/{batch_id}/quotations/{row_index}` - Delete quotation from preview
+- `GET /batches/{batch_id}/download/zip` - Download all PDFs as ZIP
+
 ## Recent Changes Log
+
+### 2026-01-15
+**Quotation Generator - Major Fixes**:
+- Fixed Redis serialization: added `period_name`, `quotation_date`, `need_title`, `pdf_path`, `merged_pdf_path` to storage
+- Fixed template PDF filename collision: template now uses `_template.pdf` suffix to avoid being deleted
+- Fixed background task garbage collection: tasks stored in module-level set
+- Fixed error quotation creation: use `quantity=1` instead of `quantity=0`
+- Fixed download buttons: show based on `completedCount > 0` instead of stored paths
+- Added delete button (trash icon) to remove quotations from preview
+- Added name formatting as "Prénom NOM" (e.g., "Raphael COLLARD")
+- Unsupported domains now allowed with `max_price=0` and comment "Pas de grille pour ce périmètre"
+- Removed "Télécharger PDF fusionné" button, kept only "Télécharger ZIP"
+- Renamed "Nouveau batch" to "Nouvelle génération"
 
 ### 2026-01-14 (session 2)
 - Added role and status filters to Users tab in Admin panel
