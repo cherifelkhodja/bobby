@@ -411,3 +411,49 @@ class BoondManagerAdapter(ERPPort):
         Used for testing or when starting a new batch.
         """
         self._quotation_counter.clear()
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+        reraise=True,
+    )
+    async def download_quotation_pdf(self, quotation_id: str) -> bytes:
+        """Download the PDF of a quotation from BoondManager.
+
+        Args:
+            quotation_id: The BoondManager quotation ID.
+
+        Returns:
+            PDF content as bytes.
+
+        Raises:
+            BoondManagerAPIError: If the download fails.
+        """
+        async with self._get_client() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/apps/quotations/quotations/{quotation_id}/download",
+                    auth=self._auth,
+                )
+
+                if response.status_code == 404:
+                    raise BoondManagerAPIError(
+                        status_code=404,
+                        message=f"Quotation {quotation_id} not found",
+                    )
+
+                if response.status_code >= 400:
+                    raise BoondManagerAPIError(
+                        status_code=response.status_code,
+                        message=f"Error downloading quotation PDF: {response.text[:200]}",
+                    )
+
+                logger.info(f"Downloaded PDF for quotation {quotation_id}")
+                return response.content
+
+            except httpx.RequestError as e:
+                logger.error(f"Network error downloading quotation PDF: {e}")
+                raise BoondManagerAPIError(
+                    status_code=0,
+                    message=f"Network error: {str(e)}",
+                ) from e

@@ -117,3 +117,18 @@ class ERPPort(ABC):
             BoondManagerAPIError: If the API call fails.
         """
         ...
+
+    @abstractmethod
+    async def download_quotation_pdf(self, quotation_id: str) -> bytes:
+        """Download the PDF of a quotation from the ERP.
+
+        Args:
+            quotation_id: The quotation ID.
+
+        Returns:
+            PDF content as bytes.
+
+        Raises:
+            BoondManagerAPIError: If the download fails.
+        """
+        ...

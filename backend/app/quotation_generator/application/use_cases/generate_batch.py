@@ -3,7 +3,6 @@
 import asyncio
 import logging
 import tempfile
-import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
@@ -34,11 +33,11 @@ class GenerateBatchUseCase:
     1. Retrieves the batch from storage
     2. For each quotation:
        a. Creates quotation in BoondManager
-       b. Fills the PSTF Excel template
-       c. Converts Excel to PDF
-    3. Merges all PDFs into one per quotation
-    4. Creates ZIP archive
-    5. Updates batch status throughout
+       b. Downloads the BoondManager quotation PDF
+       c. Fills the PSTF Excel template and converts to PDF
+       d. Merges BoondManager PDF + Template PDF
+    3. Merges all quotation PDFs into one final PDF
+    4. Updates batch status throughout
     """
 
     def __init__(
@@ -127,10 +126,15 @@ class GenerateBatchUseCase:
                     quotation
                 )
 
-                # Step 2: Fill template
+                # Step 2: Download BoondManager quotation PDF
                 quotation.mark_as_processing(QuotationStatus.FILLING_TEMPLATE)
                 await self._update_progress(batch)
 
+                boond_pdf_content = await self.erp_adapter.download_quotation_pdf(boond_id)
+                boond_pdf_path = batch_output_dir / f"{quotation.resource_trigramme}_boond_{boond_reference}.pdf"
+                boond_pdf_path.write_bytes(boond_pdf_content)
+
+                # Step 3: Fill template
                 filled_template = self.template_filler.fill_template(
                     template_content,
                     quotation,
@@ -142,12 +146,24 @@ class GenerateBatchUseCase:
                 excel_path = batch_output_dir / excel_filename
                 excel_path.write_bytes(filled_template)
 
-                # Step 3: Convert to PDF
+                # Step 4: Convert template to PDF
                 quotation.mark_as_processing(QuotationStatus.CONVERTING_PDF)
                 await self._update_progress(batch)
 
-                pdf_path = await self.pdf_converter.convert_to_pdf(excel_path)
-                generated_files.append(pdf_path)
+                template_pdf_path = await self.pdf_converter.convert_to_pdf(excel_path)
+
+                # Step 5: Merge BoondManager PDF + Template PDF
+                merged_pdf_path = batch_output_dir / f"{quotation.resource_trigramme}_{boond_reference}.pdf"
+                await self.pdf_converter.merge_pdfs(
+                    [boond_pdf_path, template_pdf_path],
+                    merged_pdf_path,
+                )
+                generated_files.append(merged_pdf_path)
+
+                # Clean up intermediate files
+                boond_pdf_path.unlink(missing_ok=True)
+                template_pdf_path.unlink(missing_ok=True)
+                excel_path.unlink(missing_ok=True)
 
                 # Mark as completed
                 quotation.mark_as_completed(boond_id, boond_reference)
@@ -176,14 +192,14 @@ class GenerateBatchUseCase:
                 quotation.mark_as_failed(f"Unexpected error: {str(e)}")
                 await self._update_progress(batch)
 
-        # Create ZIP archive
+        # Merge all quotation PDFs into one final PDF
         if generated_files:
-            zip_path = await self._create_zip_archive(batch, generated_files)
+            final_pdf_path = await self._create_final_pdf(batch, generated_files)
 
             if batch.has_errors:
-                batch.mark_partial(str(zip_path))
+                batch.mark_partial(str(final_pdf_path))
             else:
-                batch.mark_completed(str(zip_path))
+                batch.mark_completed(str(final_pdf_path))
         else:
             batch.mark_failed("No quotations were successfully generated")
 
@@ -203,30 +219,36 @@ class GenerateBatchUseCase:
         """
         await self.batch_storage.save_batch(batch)
 
-    async def _create_zip_archive(
+    async def _create_final_pdf(
         self,
         batch: QuotationBatch,
         pdf_files: list[Path],
     ) -> Path:
-        """Create ZIP archive with generated PDFs.
+        """Create final merged PDF with all quotations.
 
         Args:
             batch: The batch being processed.
-            pdf_files: List of PDF file paths.
+            pdf_files: List of PDF file paths to merge.
 
         Returns:
-            Path to the ZIP archive.
+            Path to the final merged PDF.
         """
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        zip_filename = f"devis_thales_{timestamp}.zip"
-        zip_path = self.output_dir / str(batch.id) / zip_filename
+        final_filename = f"devis_thales_{timestamp}.pdf"
+        final_path = self.output_dir / str(batch.id) / final_filename
 
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-            for pdf_path in pdf_files:
-                zipf.write(pdf_path, pdf_path.name)
+        # If only one PDF, just rename it
+        if len(pdf_files) == 1:
+            pdf_files[0].rename(final_path)
+        else:
+            # Merge all PDFs into one
+            await self.pdf_converter.merge_pdfs(pdf_files, final_path)
+            # Clean up individual files
+            for pdf_file in pdf_files:
+                pdf_file.unlink(missing_ok=True)
 
-        logger.info(f"Created ZIP archive: {zip_path} with {len(pdf_files)} files")
-        return zip_path
+        logger.info(f"Created final PDF: {final_path} with {len(pdf_files)} quotations")
+        return final_path
 
 
 class StartGenerationUseCase:

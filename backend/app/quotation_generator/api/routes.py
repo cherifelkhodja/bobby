@@ -229,8 +229,8 @@ async def list_user_batches(
     "/batches/{batch_id}/download",
     responses={
         200: {
-            "content": {"application/zip": {}},
-            "description": "ZIP file with generated quotations",
+            "content": {"application/pdf": {}},
+            "description": "PDF file with merged quotations (BoondManager + Template)",
         },
         404: {"model": ErrorResponse, "description": "Batch not found"},
         409: {"model": ErrorResponse, "description": "Download not ready"},
@@ -241,17 +241,20 @@ async def download_batch(
     current_user: AdminUser,
     use_case: DownloadBatchUseCase = Depends(get_download_batch_use_case),
 ) -> FileResponse:
-    """Download generated quotations as ZIP.
+    """Download generated quotations as PDF.
 
-    Returns a ZIP file containing all generated PDF quotations.
+    Returns a single PDF file containing all quotations:
+    - BoondManager quotation PDF
+    - Filled template PDF
+    All merged together.
     """
     try:
-        zip_path = await use_case.execute(batch_id)
+        pdf_path = await use_case.execute(batch_id)
 
         return FileResponse(
-            path=zip_path,
-            filename=zip_path.name,
-            media_type="application/zip",
+            path=pdf_path,
+            filename=pdf_path.name,
+            media_type="application/pdf",
         )
 
     except BatchNotFoundError as e:
