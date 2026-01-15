@@ -6,7 +6,7 @@ import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Set
 from uuid import UUID
 
 from app.quotation_generator.domain.entities import QuotationBatch
@@ -25,6 +25,9 @@ from app.quotation_generator.domain.value_objects import BatchStatus, QuotationS
 from app.quotation_generator.services.template_filler import TemplateFillerService
 
 logger = logging.getLogger(__name__)
+
+# Keep track of background tasks to prevent garbage collection
+_background_tasks: Set[asyncio.Task] = set()
 
 
 class GenerateBatchUseCase:
@@ -327,9 +330,12 @@ class StartGenerationUseCase:
         await self.batch_storage.save_batch(batch)
 
         # Start generation in background with a fresh use case (new DB session)
-        asyncio.create_task(
+        # Keep reference to prevent garbage collection
+        task = asyncio.create_task(
             self._run_generation(batch_id, template_name)
         )
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
 
         return {
             "batch_id": str(batch_id),
