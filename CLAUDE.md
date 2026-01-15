@@ -425,6 +425,81 @@ Generate quotations for Thales using BoondManager data and Excel templates.
 - `DELETE /batches/{batch_id}/quotations/{row_index}` - Delete quotation from preview
 - `GET /batches/{batch_id}/download/zip` - Download all PDFs as ZIP
 
+### 8. HR Feature - Job Postings & Applications (Turnover-IT)
+Allow HR users to publish job postings from BoondManager opportunities and manage applications.
+
+**Access**: admin, rh roles only
+
+**Features**:
+- View all open opportunities from BoondManager
+- Create job posting drafts from opportunities
+- Publish to Turnover-IT (JobConnect API v2)
+- Public application form at `/postuler/{token}` (no auth required)
+- CV upload to S3-compatible storage (Scaleway Object Storage)
+- AI-powered CV matching using Gemini (score 0-100)
+- Application status workflow: nouveau → en_cours → entretien → accepte/refuse
+- Create candidates in BoondManager from applications
+
+**Application Form Fields** (French):
+- Prénom, NOM (auto-formatted: "Jean DUPONT")
+- Email, Téléphone (+33...)
+- Titre du poste
+- TJM minimum/maximum
+- Date de disponibilité
+- CV upload (PDF/DOCX, max 16 Mo)
+
+**Matching Score Colors**:
+- ≥80%: green (`bg-green-100 text-green-800`)
+- 50-79%: orange (`bg-orange-100 text-orange-800`)
+- <50%: red (`bg-red-100 text-red-800`)
+
+**Backend Files**:
+- Domain: `backend/app/domain/entities/job_posting.py`, `job_application.py`
+- Value Objects: `backend/app/domain/value_objects/status.py` (extended)
+- Infrastructure: `backend/app/infrastructure/turnoverit/`, `storage/`, `matching/`
+- Use Cases: `backend/app/application/use_cases/job_postings.py`, `job_applications.py`
+- API: `backend/app/api/routes/v1/hr.py`, `public_applications.py`
+- Migration: `backend/alembic/versions/008_add_hr_feature_tables.py`
+
+**Frontend Files**:
+- Pages: `HRDashboard.tsx`, `CreateJobPosting.tsx`, `JobPostingDetails.tsx`, `PublicApplication.tsx`
+- API: `frontend/src/api/hr.ts`
+- Types: Extended `frontend/src/types/index.ts`
+
+**Database Tables**:
+- `job_postings` - Job posting drafts and published listings
+- `job_applications` - Applications with matching scores and status history
+
+**Key API Endpoints** (`/api/v1/hr`):
+- `GET /opportunities` - List open opportunities with job posting status
+- `POST /job-postings` - Create job posting draft
+- `GET /job-postings` - List job postings
+- `GET /job-postings/{id}` - Get posting details
+- `POST /job-postings/{id}/publish` - Publish to Turnover-IT
+- `POST /job-postings/{id}/close` - Close posting
+- `GET /job-postings/{id}/applications` - List applications
+- `PATCH /applications/{id}/status` - Change application status
+- `PATCH /applications/{id}/note` - Update notes
+- `GET /applications/{id}/cv` - Get CV download URL (presigned)
+- `POST /applications/{id}/create-in-boond` - Create candidate in BoondManager
+
+**Public Endpoints** (`/api/v1/postuler`):
+- `GET /{token}` - Get job posting info (public)
+- `POST /{token}` - Submit application (multipart form)
+
+**Environment Variables**:
+```env
+# Turnover-IT (JobConnect API v2)
+TURNOVERIT_API_KEY=your-api-key
+
+# Scaleway Object Storage (S3-compatible)
+S3_ENDPOINT_URL=https://s3.fr-par.scw.cloud
+S3_BUCKET_NAME=esn-cooptation-cvs
+S3_REGION=fr-par
+S3_ACCESS_KEY=your-access-key
+S3_SECRET_KEY=your-secret-key
+```
+
 ## Recent Changes Log
 
 ### 2026-01-15
