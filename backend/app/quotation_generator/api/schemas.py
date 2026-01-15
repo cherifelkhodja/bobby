@@ -38,6 +38,7 @@ class QuotationPreviewItem(BaseModel):
     # Other Thales fields
     sow_reference: str
     object_of_need: str
+    need_title: str
     comments: Optional[str] = None
     start_project: str
     # Additional Thales fields

@@ -57,6 +57,7 @@ COLUMN_MAPPING = {
     # Thales-specific
     "sow_reference": ["sow_reference", "ref_sow", "sow", "reference_sow"],
     "object_of_need": ["object_of_need", "objet_besoin", "besoin", "object"],
+    "need_title": ["need_title", "titre_besoin", "title_need", "titre_du_besoin"],
     "eacq_number": ["eacq_number", "eacq", "numero_eacq"],
     "c22_domain": ["c22_domain", "C22_domain", "domaine_c22", "domaine"],
     "c22_activity": ["c22_activity", "C22_activity", "activite_c22", "activite"],
@@ -501,6 +502,7 @@ class CSVParserService:
         # Optional fields
         sow_reference = self._get_value(row, "sow_reference") or ""
         object_of_need = self._get_value(row, "object_of_need") or ""
+        need_title = self._get_value(row, "need_title") or ""
         region = self._get_value(row, "region")  # Optional, defaults to IDF in pricing grid
         comments = self._get_value(row, "comments")
         title = self._get_value(row, "title")
@@ -579,6 +581,7 @@ class CSVParserService:
             line=line,
             sow_reference=sow_reference,
             object_of_need=object_of_need,
+            need_title=need_title,
             c22_domain=c22_domain,
             c22_activity=c22_activity,
             complexity=complexity,
@@ -683,6 +686,7 @@ class CSVParserService:
         # Optional fields
         sow_reference = self._get_value(row, "sow_reference") or ""
         object_of_need = self._get_value(row, "object_of_need") or ""
+        need_title = self._get_value(row, "need_title") or ""
         region = self._get_value(row, "region")
         comments = self._get_value(row, "comments")
         title = self._get_value(row, "title")
@@ -756,6 +760,7 @@ class CSVParserService:
             line=line,
             sow_reference=sow_reference,
             object_of_need=object_of_need,
+            need_title=need_title,
             c22_domain=c22_domain,
             c22_activity=c22_activity,
             complexity=complexity,

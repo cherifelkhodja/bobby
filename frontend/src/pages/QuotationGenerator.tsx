@@ -562,6 +562,16 @@ function QuotationDetailsModal({ quotation, isOpen, onClose }: QuotationDetailsM
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
 
+  // Format date: YYYY-MM-DD -> DD/MM/YYYY
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '-';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  };
+
   // Format name: Prénom NOM
   const formatName = (fullName: string) => {
     const parts = fullName.trim().split(/\s+/);
@@ -617,13 +627,13 @@ function QuotationDetailsModal({ quotation, isOpen, onClose }: QuotationDetailsM
             Période & Tarification
           </h4>
           <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-            <DetailRow label="Date du devis" value={new Date().toISOString().split('T')[0]} />
+            <DetailRow label="Date du devis" value={formatDate(new Date().toISOString().split('T')[0])} />
             <DetailRow label="Renouvellement" value={quotation.is_renewal ? 'Oui' : 'Non'} />
             {quotation.is_renewal && (
-              <DetailRow label="Date début initiale" value={quotation.start_project} />
+              <DetailRow label="Date début initiale" value={formatDate(quotation.start_project)} />
             )}
-            <DetailRow label="Date début PO" value={quotation.period.start} />
-            <DetailRow label="Date fin PO" value={quotation.period.end} />
+            <DetailRow label="Date début PO" value={formatDate(quotation.period.start)} />
+            <DetailRow label="Date fin PO" value={formatDate(quotation.period.end)} />
             <DetailRow label="N° EACQ" value={quotation.eacq_number} />
             <DetailRow label="TJM" value={formatCurrency(quotation.tjm)} />
             <DetailRow label="Quantité (jours)" value={quotation.quantity} />
@@ -673,6 +683,7 @@ function QuotationDetailsModal({ quotation, isOpen, onClose }: QuotationDetailsM
           <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
             <DetailRow label="Référence SOW" value={quotation.sow_reference} />
             <DetailRow label="Objet du besoin" value={quotation.object_of_need} />
+            <DetailRow label="Titre du besoin" value={quotation.need_title} />
             <DetailRow label="Commentaires" value={quotation.comments} />
           </dl>
         </div>

@@ -38,6 +38,7 @@ export interface QuotationPreviewItem {
   // Other Thales fields
   sow_reference: string;
   object_of_need: string;
+  need_title: string;
   comments: string | null;
   start_project: string;
   // Additional Thales fields

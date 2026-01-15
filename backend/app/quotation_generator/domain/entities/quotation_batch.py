@@ -251,6 +251,7 @@ class QuotationBatch:
                     "max_price": q.max_price.to_float(),
                     "sow_reference": q.sow_reference,
                     "object_of_need": q.object_of_need,
+                    "need_title": q.need_title,
                     "comments": q.comments,
                     "start_project": q.start_project.isoformat(),
                     # Additional Thales fields

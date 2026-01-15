@@ -74,6 +74,8 @@ class Quotation:
     comments: Optional[str] = None
     # Period display name (e.g., "Janvier 2026")
     period_name: str = ""
+    # Title of the need
+    need_title: str = ""
     # Additional Thales fields
     eacq_number: str = "mail"
     is_renewal: bool = True
