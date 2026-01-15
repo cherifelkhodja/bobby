@@ -5,20 +5,22 @@
  * - Users: User management (list, edit, role change, delete)
  * - Invitations: Invite users via email or from BoondManager
  * - BoondManager: Connection status and synchronization
- * - Templates: CV template management
+ * - Templates: CV and quotation template management
  * - Stats: CV transformation statistics
+ * - API: API connections tests (Boond, Gemini)
  */
 
 import { useState } from 'react';
-import { Users, Mail, Settings, FileText, BarChart3 } from 'lucide-react';
+import { Users, Mail, Settings, FileText, BarChart3, Plug } from 'lucide-react';
 
 import { UsersTab } from './UsersTab';
 import { InvitationsTab } from './InvitationsTab';
 import { BoondTab } from './BoondTab';
 import { TemplatesTab } from './TemplatesTab';
 import { StatsTab } from './StatsTab';
+import { ApiTab } from './ApiTab';
 
-type TabType = 'users' | 'invitations' | 'boond' | 'templates' | 'stats';
+type TabType = 'users' | 'invitations' | 'boond' | 'templates' | 'stats' | 'api';
 
 interface TabConfig {
   id: TabType;
@@ -30,8 +32,9 @@ const TABS: TabConfig[] = [
   { id: 'users', label: 'Utilisateurs', icon: Users },
   { id: 'invitations', label: 'Invitations', icon: Mail },
   { id: 'boond', label: 'BoondManager', icon: Settings },
-  { id: 'templates', label: 'Templates CV', icon: FileText },
-  { id: 'stats', label: 'Statistiques CV', icon: BarChart3 },
+  { id: 'templates', label: 'Templates', icon: FileText },
+  { id: 'stats', label: 'Statistiques', icon: BarChart3 },
+  { id: 'api', label: 'API', icon: Plug },
 ];
 
 export function Admin() {
@@ -72,6 +75,7 @@ export function Admin() {
       {activeTab === 'boond' && <BoondTab />}
       {activeTab === 'templates' && <TemplatesTab />}
       {activeTab === 'stats' && <StatsTab />}
+      {activeTab === 'api' && <ApiTab />}
     </div>
   );
 }
@@ -82,3 +86,4 @@ export { InvitationsTab } from './InvitationsTab';
 export { BoondTab } from './BoondTab';
 export { TemplatesTab } from './TemplatesTab';
 export { StatsTab } from './StatsTab';
+export { ApiTab } from './ApiTab';
