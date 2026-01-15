@@ -522,7 +522,7 @@ async def update_quotation_contact(
 
 @router.delete(
     "/batches/{batch_id}/quotations/{row_index}",
-    response_model=PreviewResponse,
+    response_model=PreviewBatchResponse,
     responses={
         404: {"model": ErrorResponse, "description": "Batch or quotation not found"},
     },
@@ -532,7 +532,7 @@ async def delete_quotation(
     row_index: int,
     current_user: AdminUser,
     batch_storage: RedisStorageAdapter = Depends(get_batch_storage),
-) -> PreviewResponse:
+) -> PreviewBatchResponse:
     """Delete a quotation from the batch.
 
     This removes a quotation before generation. Returns updated preview data.
@@ -570,7 +570,7 @@ async def delete_quotation(
         valid_count = sum(1 for q in batch.quotations if q.is_valid)
         invalid_count = len(batch.quotations) - valid_count
 
-        return PreviewResponse(
+        return PreviewBatchResponse(
             batch_id=str(batch.id),
             quotations=preview_data["quotations"],
             valid_count=valid_count,
