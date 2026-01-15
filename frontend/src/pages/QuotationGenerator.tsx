@@ -861,8 +861,6 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
 
   // Use batchDetails for accurate data (progress might be stale)
   const hasErrors = batchDetails?.has_errors ?? progress.has_errors;
-  const mergedPdfPath = batchDetails?.merged_pdf_path ?? progress.merged_pdf_path;
-  const zipFilePath = batchDetails?.zip_file_path ?? progress.zip_file_path;
   const completedCount = batchDetails?.completed ?? progress.completed;
   const failedCount = batchDetails?.failed ?? progress.failed;
   const totalCount = batchDetails?.total ?? progress.total;
@@ -952,7 +950,7 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
             <Button variant="outline" onClick={onReset}>
               Nouveau batch
             </Button>
-            {mergedPdfPath && (
+            {completedCount > 0 && (
               <Button
                 onClick={handleDownloadMergedPdf}
                 isLoading={isDownloadingMerged}
@@ -961,7 +959,7 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
                 Télécharger PDF fusionné
               </Button>
             )}
-            {zipFilePath && (
+            {completedCount > 0 && (
               <Button
                 variant="outline"
                 onClick={handleDownloadZip}
