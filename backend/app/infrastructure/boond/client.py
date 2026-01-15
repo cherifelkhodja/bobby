@@ -399,18 +399,38 @@ class BoondClient:
                 "message": f"Erreur: {str(e)}",
             }
 
-    # Opportunity states for filtering
-    # 0: Perdue, 5: En cours, 6: Signée, 7: Abandonnée, 10: En attente
+    # Opportunity states - all states from BoondManager
     OPPORTUNITY_STATE_NAMES = {
-        0: "Perdue",
-        5: "En cours",
-        6: "Signée",
-        7: "Abandonnée",
-        10: "En attente",
+        0: "En cours",
+        1: "Gagné",
+        2: "Perdu",
+        3: "Abandonné",
+        4: "Gagné attente contrat",
+        5: "Piste identifiée",
+        6: "Récurrent",
+        7: "AO ouvert",
+        8: "AO clos",
+        9: "Reporté",
+        10: "Besoin en avant de phase",
     }
 
-    # States to include when fetching manager opportunities (active states)
-    ACTIVE_OPPORTUNITY_STATES = [0, 5, 6, 7, 10]
+    # Color categories for frontend display
+    OPPORTUNITY_STATE_COLORS = {
+        0: "blue",      # En cours
+        1: "green",     # Gagné
+        2: "red",       # Perdu
+        3: "gray",      # Abandonné
+        4: "green",     # Gagné attente contrat
+        5: "yellow",    # Piste identifiée
+        6: "green",     # Récurrent
+        7: "cyan",      # AO ouvert
+        8: "indigo",    # AO clos
+        9: "pink",      # Reporté
+        10: "blue",     # Besoin en avant de phase
+    }
+
+    # States to include when fetching manager opportunities (all active states)
+    ACTIVE_OPPORTUNITY_STATES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     @retry(
         stop=stop_after_attempt(3),
@@ -487,6 +507,7 @@ class BoondClient:
                     # Get state
                     opp_state = attrs.get("state", None)
                     opp_state_name = self.OPPORTUNITY_STATE_NAMES.get(opp_state, "") if opp_state is not None else ""
+                    opp_state_color = self.OPPORTUNITY_STATE_COLORS.get(opp_state, "gray") if opp_state is not None else "gray"
 
                     opportunities.append({
                         "id": str(item.get("id")),
@@ -499,6 +520,7 @@ class BoondClient:
                         "company_name": company_name,
                         "state": opp_state,
                         "state_name": opp_state_name,
+                        "state_color": opp_state_color,
                     })
                 except Exception as e:
                     logger.warning(f"Failed to parse opportunity {item.get('id')}: {e}")

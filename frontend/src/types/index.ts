@@ -271,6 +271,7 @@ export interface BoondOpportunity {
   company_name: string | null;
   state: number | null;
   state_name: string | null;
+  state_color: string | null;
   is_published: boolean;
 }
 
