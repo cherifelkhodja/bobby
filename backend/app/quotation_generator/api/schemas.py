@@ -31,6 +31,8 @@ class QuotationPreviewItem(BaseModel):
     contact_id: str
     # Available contacts for selection
     available_contacts: list[ContactInfo] = Field(default_factory=list)
+    # Quotation date (from CSV start date)
+    quotation_date: str  # Date du devis (DD/MM/YYYY)
     # Period
     period: dict[str, str]
     period_name: str  # Human-readable period name (e.g., "Janvier 2026")

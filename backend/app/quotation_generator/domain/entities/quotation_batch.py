@@ -236,6 +236,7 @@ class QuotationBatch:
                     "company_detail_id": q.company_detail_id,
                     "contact_name": q.contact_name,
                     "contact_id": q.contact_id,
+                    "quotation_date": q.period.format_start("%d/%m/%Y"),  # Date du devis
                     "period": {
                         "start": q.period.format_start(),
                         "end": q.period.format_end(),
