@@ -169,12 +169,14 @@ export function QuotationGenerator() {
         />
       )}
 
-      {step === 'preview' && previewData && (
+      {step === 'preview' && previewData && batchId && (
         <PreviewStep
           data={previewData}
+          batchId={batchId}
           isGenerating={generateMutation.isPending}
           onGenerate={() => generateMutation.mutate()}
           onReset={handleReset}
+          onDataUpdate={setPreviewData}
         />
       )}
 
@@ -341,13 +343,39 @@ function UploadStep({
 
 interface PreviewStepProps {
   data: PreviewBatchResponse;
+  batchId: string;
   isGenerating: boolean;
   onGenerate: () => void;
   onReset: () => void;
+  onDataUpdate: (data: PreviewBatchResponse) => void;
 }
 
-function PreviewStep({ data, isGenerating, onGenerate, onReset }: PreviewStepProps) {
+function PreviewStep({ data, batchId, isGenerating, onGenerate, onReset, onDataUpdate }: PreviewStepProps) {
   const [selectedQuotation, setSelectedQuotation] = useState<QuotationPreviewItem | null>(null);
+  const [updatingContact, setUpdatingContact] = useState<number | null>(null);
+
+  // Handle contact change
+  const handleContactChange = async (rowIndex: number, contactId: string, contactName: string) => {
+    setUpdatingContact(rowIndex);
+    try {
+      await quotationGeneratorApi.updateQuotationContact(batchId, rowIndex, contactId, contactName);
+      // Update the quotation in the local data
+      const updatedQuotations = data.quotations.map((q) =>
+        q.row_index === rowIndex
+          ? { ...q, contact_id: contactId, contact_name: contactName }
+          : q
+      );
+      onDataUpdate({
+        ...data,
+        quotations: updatedQuotations,
+      });
+      toast.success('Contact mis à jour');
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Erreur lors de la mise à jour du contact');
+    } finally {
+      setUpdatingContact(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -449,6 +477,8 @@ function PreviewStep({ data, isGenerating, onGenerate, onReset }: PreviewStepPro
                   key={q.row_index}
                   quotation={q}
                   onSelect={() => setSelectedQuotation(q)}
+                  onContactChange={handleContactChange}
+                  isUpdatingContact={updatingContact === q.row_index}
                 />
               ))}
             </tbody>
@@ -469,9 +499,11 @@ function PreviewStep({ data, isGenerating, onGenerate, onReset }: PreviewStepPro
 interface QuotationRowProps {
   quotation: QuotationPreviewItem;
   onSelect: () => void;
+  onContactChange: (rowIndex: number, contactId: string, contactName: string) => void;
+  isUpdatingContact: boolean;
 }
 
-function QuotationRow({ quotation, onSelect }: QuotationRowProps) {
+function QuotationRow({ quotation, onSelect, onContactChange, isUpdatingContact }: QuotationRowProps) {
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
 
@@ -776,17 +808,24 @@ interface CompleteStepProps {
 }
 
 function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
-  const hasErrors = progress.has_errors;
   const [isDownloadingMerged, setIsDownloadingMerged] = useState(false);
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [downloadingRow, setDownloadingRow] = useState<number | null>(null);
 
-  // Fetch batch details with quotation statuses
+  // Fetch batch details with quotation statuses (includes latest paths)
   const { data: batchDetails } = useQuery({
     queryKey: ['batch-details', batchId],
     queryFn: () => quotationGeneratorApi.getBatchDetails(batchId),
     enabled: !!batchId,
   });
+
+  // Use batchDetails for accurate data (progress might be stale)
+  const hasErrors = batchDetails?.has_errors ?? progress.has_errors;
+  const mergedPdfPath = batchDetails?.merged_pdf_path ?? progress.merged_pdf_path;
+  const zipFilePath = batchDetails?.zip_file_path ?? progress.zip_file_path;
+  const completedCount = batchDetails?.completed ?? progress.completed;
+  const failedCount = batchDetails?.failed ?? progress.failed;
+  const totalCount = batchDetails?.total ?? progress.total;
 
   const handleDownloadMergedPdf = async () => {
     setIsDownloadingMerged(true);
@@ -836,8 +875,8 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
           title={hasErrors ? 'Génération terminée avec des erreurs' : 'Génération terminée'}
           subtitle={
             hasErrors
-              ? `${progress.completed} devis générés, ${progress.failed} échoués`
-              : `${progress.completed} devis générés avec succès`
+              ? `${completedCount} devis générés, ${failedCount} échoués`
+              : `${completedCount} devis générés avec succès`
           }
         />
 
@@ -851,19 +890,19 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
           <div className="mt-6 grid grid-cols-3 gap-8">
             <div className="text-center">
               <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                {progress.total}
+                {totalCount}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
             </div>
             <div className="text-center">
               <p className="text-3xl font-bold text-green-600">
-                {progress.completed}
+                {completedCount}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">Réussis</p>
             </div>
             <div className="text-center">
               <p className="text-3xl font-bold text-red-600">
-                {progress.failed}
+                {failedCount}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">Échoués</p>
             </div>
@@ -873,7 +912,7 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
             <Button variant="outline" onClick={onReset}>
               Nouveau batch
             </Button>
-            {progress.merged_pdf_path && (
+            {mergedPdfPath && (
               <Button
                 onClick={handleDownloadMergedPdf}
                 isLoading={isDownloadingMerged}
@@ -882,7 +921,7 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
                 Télécharger PDF fusionné
               </Button>
             )}
-            {progress.zip_file_path && (
+            {zipFilePath && (
               <Button
                 variant="outline"
                 onClick={handleDownloadZip}

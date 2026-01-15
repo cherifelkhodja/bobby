@@ -6,6 +6,11 @@ import { apiClient } from './client';
 
 // Types
 
+export interface ContactInfo {
+  id: string;
+  name: string;
+}
+
 export interface QuotationPreviewItem {
   row_index: number;
   // Resource info
@@ -19,6 +24,7 @@ export interface QuotationPreviewItem {
   company_detail_id: string;
   contact_name: string;
   contact_id: string;
+  available_contacts: ContactInfo[];
   // Period
   period: {
     start: string;
@@ -344,6 +350,22 @@ export const quotationGeneratorApi = {
           'Content-Type': 'multipart/form-data',
         },
       }
+    );
+    return response.data;
+  },
+
+  /**
+   * Update quotation contact.
+   */
+  updateQuotationContact: async (
+    batchId: string,
+    rowIndex: number,
+    contactId: string,
+    contactName: string
+  ): Promise<{ success: boolean; contact_id: string; contact_name: string }> => {
+    const response = await apiClient.patch<{ success: boolean; contact_id: string; contact_name: string }>(
+      `/quotation-generator/batches/${batchId}/quotations/${rowIndex}/contact`,
+      { contact_id: contactId, contact_name: contactName }
     );
     return response.data;
   },
