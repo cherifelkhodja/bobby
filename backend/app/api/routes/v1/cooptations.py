@@ -27,6 +27,7 @@ from app.infrastructure.database.repositories import (
     CandidateRepository,
     CooptationRepository,
     OpportunityRepository,
+    PublishedOpportunityRepository,
     UserRepository,
 )
 from app.infrastructure.email.sender import EmailService
@@ -58,6 +59,7 @@ async def create_cooptation(
     cooptation_repo = CooptationRepository(db)
     candidate_repo = CandidateRepository(db)
     opportunity_repo = OpportunityRepository(db)
+    published_opportunity_repo = PublishedOpportunityRepository(db)
     user_repo = UserRepository(db)
     email_service = EmailService(settings)
 
@@ -65,6 +67,7 @@ async def create_cooptation(
         cooptation_repo,
         candidate_repo,
         opportunity_repo,
+        published_opportunity_repo,
         user_repo,
         boond,
         email_service,

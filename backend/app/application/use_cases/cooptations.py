@@ -10,7 +10,7 @@ from app.application.read_models.cooptation import (
     CooptationStatsReadModel,
     StatusChangeReadModel,
 )
-from app.domain.entities import Candidate, Cooptation
+from app.domain.entities import Candidate, Cooptation, Opportunity
 from app.domain.exceptions import (
     CandidateAlreadyExistsError,
     CooptationNotFoundError,
@@ -22,6 +22,7 @@ from app.infrastructure.database.repositories import (
     CandidateRepository,
     CooptationRepository,
     OpportunityRepository,
+    PublishedOpportunityRepository,
     UserRepository,
 )
 from app.infrastructure.email.sender import EmailService
@@ -50,6 +51,7 @@ class CreateCooptationUseCase:
         cooptation_repository: CooptationRepository,
         candidate_repository: CandidateRepository,
         opportunity_repository: OpportunityRepository,
+        published_opportunity_repository: PublishedOpportunityRepository,
         user_repository: UserRepository,
         boond_client: BoondClient,
         email_service: EmailService,
@@ -57,14 +59,38 @@ class CreateCooptationUseCase:
         self.cooptation_repository = cooptation_repository
         self.candidate_repository = candidate_repository
         self.opportunity_repository = opportunity_repository
+        self.published_opportunity_repository = published_opportunity_repository
         self.user_repository = user_repository
         self.boond_client = boond_client
         self.email_service = email_service
 
     async def execute(self, command: CreateCooptationCommand) -> CooptationReadModel:
         """Create a new cooptation."""
-        # Check if opportunity exists
+        # Check if opportunity exists in regular opportunities
         opportunity = await self.opportunity_repository.get_by_id(command.opportunity_id)
+
+        # If not found, check in published opportunities
+        if not opportunity:
+            published = await self.published_opportunity_repository.get_by_id(
+                command.opportunity_id
+            )
+            if published:
+                # Convert PublishedOpportunity to Opportunity for the cooptation
+                opportunity = Opportunity(
+                    id=published.id,
+                    title=published.title,
+                    reference=f"PUB-{published.boond_opportunity_id}",
+                    external_id=published.boond_opportunity_id,
+                    description=published.description,
+                    skills=published.skills,
+                    end_date=published.end_date,
+                    is_active=published.status.is_visible_to_consultants,
+                    is_shared=True,
+                    owner_id=published.published_by,
+                    created_at=published.created_at,
+                    updated_at=published.updated_at,
+                )
+
         if not opportunity:
             raise OpportunityNotFoundError(str(command.opportunity_id))
 
