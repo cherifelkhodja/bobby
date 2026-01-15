@@ -56,10 +56,16 @@ RÈGLES D'ANONYMISATION :
    - Si une information n'est pas dans le texte original, ne l'ajoute pas
    - Reste fidèle au contenu technique
 
+5. PRÉSERVE LA MISE EN FORME :
+   - Conserve les sauts de ligne (\\n) pour séparer les paragraphes
+   - Si le texte original contient des listes à puces, utilise des tirets (-) ou des puces (•) dans la sortie
+   - Structure le texte en paragraphes distincts pour une meilleure lisibilité
+   - Utilise des sauts de ligne entre les sections (contexte, missions, profil, etc.)
+
 FORMAT DE SORTIE (JSON strict) :
 {{
   "title": "Titre anonymisé du poste",
-  "description": "Description anonymisée et reformulée",
+  "description": "Description anonymisée avec sauts de ligne (\\n) préservés",
   "skills": ["Compétence1", "Compétence2", "Compétence3"]
 }}
 
