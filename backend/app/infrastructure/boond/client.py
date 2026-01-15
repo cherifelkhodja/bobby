@@ -648,7 +648,7 @@ class BoondClient:
                 "place": attrs.get("place", ""),
                 "duration": attrs.get("duration"),
                 "start_date": attrs.get("startDate"),
-                "end_date": attrs.get("endDate"),
+                "end_date": attrs.get("closingDate"),  # Use closingDate as end_date
                 "closing_date": attrs.get("closingDate"),
                 "answer_date": attrs.get("answerDate"),
                 "company_id": company_id,
