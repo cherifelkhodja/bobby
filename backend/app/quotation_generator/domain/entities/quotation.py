@@ -200,10 +200,16 @@ class Quotation:
                     "language": "fr",
                     "paymentTerm": 52,
                     "legals": THALES_LEGALS,
+                    "informationComments": "",
                     "discountRate": 0,
                     "startDate": self.period.format_start(),
                     "endDate": self.period.format_end(),
+                    "schedules": [],
                     "quotationRecords": [self.line.to_boond_record()],
+                    "showCompanyRegistrationNumberOnPDF": False,
+                    "showCompanyVATNumberOnPDF": False,
+                    "showCompanyNumberOnPDF": False,
+                    "showCommentsOnPDF": False,
                     "showFooterOnPDF": True,
                     "showOpportunityReferenceOnPDF": True,
                 },
@@ -211,18 +217,18 @@ class Quotation:
                     "mainManager": {"data": {"id": "1", "type": "resource"}},
                     "opportunity": {
                         "data": {
-                            "id": self.opportunity_id.replace("AO", ""),
+                            "id": str(self.opportunity_id).replace("AO", ""),
                             "type": "opportunity",
                         }
                     },
                     "company": {
-                        "data": {"id": self.company_id, "type": "company"}
+                        "data": {"id": str(self.company_id), "type": "company"}
                     },
                     "contact": {
-                        "data": {"id": self.contact_id, "type": "contact"}
+                        "data": {"id": str(self.contact_id), "type": "contact"}
                     },
                     "billingDetail": {
-                        "data": {"id": self.company_detail_id, "type": "detail"}
+                        "data": {"id": str(self.company_detail_id), "type": "detail"}
                     },
                 },
             }

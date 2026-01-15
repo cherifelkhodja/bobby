@@ -70,7 +70,7 @@ class BoondManagerAdapter(ERPPort):
                 )
 
                 response = await client.post(
-                    f"{self.base_url}/quotations",
+                    f"{self.base_url}/apps/quotations/quotations",
                     auth=self._auth,
                     json=payload,
                 )
