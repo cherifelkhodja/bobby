@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, Calendar, Briefcase, Eye, Sparkles, ChevronRight } from 'lucide-react';
+import { Search, Plus, Calendar, Briefcase, Eye, Sparkles } from 'lucide-react';
 
 import { listPublishedOpportunities } from '../api/publishedOpportunities';
 import { Card } from '../components/ui/Card';
