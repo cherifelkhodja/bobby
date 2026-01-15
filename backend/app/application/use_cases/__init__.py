@@ -21,6 +21,25 @@ from app.application.use_cases.cv_transformer import (
     UploadTemplateUseCase,
     GetTransformationStatsUseCase,
 )
+from app.application.use_cases.job_applications import (
+    CreateCandidateInBoondUseCase,
+    GetApplicationCvUrlUseCase,
+    GetApplicationUseCase,
+    ListApplicationsForPostingUseCase,
+    SubmitApplicationUseCase,
+    UpdateApplicationNoteUseCase,
+    UpdateApplicationStatusUseCase,
+)
+from app.application.use_cases.job_postings import (
+    CloseJobPostingUseCase,
+    CreateJobPostingUseCase,
+    GetJobPostingByTokenUseCase,
+    GetJobPostingUseCase,
+    ListJobPostingsUseCase,
+    ListOpenOpportunitiesForHRUseCase,
+    PublishJobPostingUseCase,
+    UpdateJobPostingUseCase,
+)
 from app.application.use_cases.opportunities import (
     ListOpportunitiesUseCase,
     SyncOpportunitiesUseCase,
@@ -60,6 +79,23 @@ __all__ = [
     "GetTemplatesUseCase",
     "UploadTemplateUseCase",
     "GetTransformationStatsUseCase",
+    # HR - Job Postings
+    "CloseJobPostingUseCase",
+    "CreateJobPostingUseCase",
+    "GetJobPostingByTokenUseCase",
+    "GetJobPostingUseCase",
+    "ListJobPostingsUseCase",
+    "ListOpenOpportunitiesForHRUseCase",
+    "PublishJobPostingUseCase",
+    "UpdateJobPostingUseCase",
+    # HR - Job Applications
+    "CreateCandidateInBoondUseCase",
+    "GetApplicationCvUrlUseCase",
+    "GetApplicationUseCase",
+    "ListApplicationsForPostingUseCase",
+    "SubmitApplicationUseCase",
+    "UpdateApplicationNoteUseCase",
+    "UpdateApplicationStatusUseCase",
     # Opportunities
     "ListOpportunitiesUseCase",
     "SyncOpportunitiesUseCase",

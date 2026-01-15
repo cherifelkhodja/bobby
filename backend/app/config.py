@@ -58,6 +58,17 @@ class Settings(BaseSettings):
     # Google Gemini API
     GEMINI_API_KEY: str = ""
 
+    # Turnover-IT API
+    TURNOVERIT_API_KEY: str = ""
+    TURNOVERIT_API_URL: str = "https://api.turnover-it.com/jobconnect/v2"
+
+    # S3/MinIO Storage (Scaleway Object Storage)
+    S3_ENDPOINT_URL: str = ""  # e.g., https://s3.fr-par.scw.cloud (empty for AWS S3)
+    S3_BUCKET_NAME: str = "esn-cooptation-cvs"
+    S3_REGION: str = "fr-par"
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+
     # Feature flags
     FEATURE_MAGIC_LINK: bool = True
     FEATURE_EMAIL_NOTIFICATIONS: bool = True

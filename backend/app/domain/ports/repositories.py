@@ -4,12 +4,16 @@ from typing import Optional, Protocol
 from uuid import UUID
 
 from app.domain.entities import (
+    ApplicationStatus,
     BusinessLead,
     Candidate,
     Cooptation,
     CvTemplate,
     CvTransformationLog,
     Invitation,
+    JobApplication,
+    JobPosting,
+    JobPostingStatus,
     Opportunity,
     User,
 )
@@ -309,4 +313,126 @@ class CvTransformationLogRepositoryPort(Protocol):
 
     async def get_total_count(self, success_only: bool = True) -> int:
         """Get total transformation count."""
+        ...
+
+
+class JobPostingRepositoryPort(Protocol):
+    """Port for job posting persistence operations."""
+
+    async def get_by_id(self, posting_id: UUID) -> Optional[JobPosting]:
+        """Get job posting by ID."""
+        ...
+
+    async def get_by_token(self, token: str) -> Optional[JobPosting]:
+        """Get job posting by application token."""
+        ...
+
+    async def get_by_opportunity_id(self, opportunity_id: UUID) -> Optional[JobPosting]:
+        """Get job posting by linked opportunity ID."""
+        ...
+
+    async def get_by_turnoverit_reference(self, reference: str) -> Optional[JobPosting]:
+        """Get job posting by Turnover-IT reference."""
+        ...
+
+    async def save(self, posting: JobPosting) -> JobPosting:
+        """Save job posting (create or update)."""
+        ...
+
+    async def delete(self, posting_id: UUID) -> bool:
+        """Delete job posting by ID."""
+        ...
+
+    async def list_all(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        status: Optional[JobPostingStatus] = None,
+    ) -> list[JobPosting]:
+        """List all job postings with optional status filter."""
+        ...
+
+    async def list_published(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[JobPosting]:
+        """List published job postings."""
+        ...
+
+    async def list_by_creator(
+        self,
+        user_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[JobPosting]:
+        """List job postings created by a specific user."""
+        ...
+
+    async def count_all(self, status: Optional[JobPostingStatus] = None) -> int:
+        """Count all job postings with optional status filter."""
+        ...
+
+    async def count_by_creator(self, user_id: UUID) -> int:
+        """Count job postings created by a specific user."""
+        ...
+
+
+class JobApplicationRepositoryPort(Protocol):
+    """Port for job application persistence operations."""
+
+    async def get_by_id(self, application_id: UUID) -> Optional[JobApplication]:
+        """Get job application by ID."""
+        ...
+
+    async def get_by_email_and_posting(
+        self,
+        email: str,
+        posting_id: UUID,
+    ) -> Optional[JobApplication]:
+        """Get application by email and posting (to check for duplicates)."""
+        ...
+
+    async def save(self, application: JobApplication) -> JobApplication:
+        """Save job application (create or update)."""
+        ...
+
+    async def delete(self, application_id: UUID) -> bool:
+        """Delete job application by ID."""
+        ...
+
+    async def list_by_posting(
+        self,
+        posting_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+        status: Optional[ApplicationStatus] = None,
+        sort_by_score: bool = True,
+    ) -> list[JobApplication]:
+        """List applications for a job posting with optional status filter."""
+        ...
+
+    async def list_all(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        status: Optional[ApplicationStatus] = None,
+    ) -> list[JobApplication]:
+        """List all applications with optional status filter."""
+        ...
+
+    async def count_by_posting(
+        self,
+        posting_id: UUID,
+        status: Optional[ApplicationStatus] = None,
+    ) -> int:
+        """Count applications for a job posting with optional status filter."""
+        ...
+
+    async def count_new_by_posting(self, posting_id: UUID) -> int:
+        """Count new (unread) applications for a job posting."""
+        ...
+
+    async def get_stats_by_posting(self, posting_id: UUID) -> dict[str, int]:
+        """Get application statistics for a job posting (by status)."""
         ...

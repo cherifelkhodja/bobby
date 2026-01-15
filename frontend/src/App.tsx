@@ -14,6 +14,8 @@ import { Profile } from './pages/Profile';
 import { Admin } from './pages/Admin';
 import { CvTransformer } from './pages/CvTransformer';
 import { QuotationGenerator } from './pages/QuotationGenerator';
+import HRDashboard from './pages/HRDashboard';
+import PublicApplication from './pages/PublicApplication';
 import type { UserRole } from './types';
 
 interface ProtectedRouteProps {

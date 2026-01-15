@@ -257,3 +257,251 @@ export interface CvTransformationUserStats {
   user_name: string;
   count: number;
 }
+
+// HR Feature types
+
+// Job Posting types
+export type JobPostingStatus = 'draft' | 'published' | 'closed';
+export type ContractType = 'CDI' | 'CDD' | 'FREELANCE' | 'INTERIM' | 'STAGE' | 'ALTERNANCE';
+export type RemotePolicy = 'NONE' | 'PARTIAL' | 'FULL';
+export type ExperienceLevel = 'JUNIOR' | 'INTERMEDIATE' | 'SENIOR' | 'EXPERT';
+
+export interface JobPosting {
+  id: string;
+  opportunity_id: string;
+  opportunity_title: string | null;
+  opportunity_reference: string | null;
+  client_name: string | null;
+  title: string;
+  description: string;
+  qualifications: string;
+  location_country: string;
+  location_region: string | null;
+  location_postal_code: string | null;
+  location_city: string | null;
+  contract_types: ContractType[];
+  skills: string[];
+  experience_level: ExperienceLevel | null;
+  remote: RemotePolicy | null;
+  start_date: string | null;
+  duration_months: number | null;
+  salary_min_annual: number | null;
+  salary_max_annual: number | null;
+  salary_min_daily: number | null;
+  salary_max_daily: number | null;
+  employer_overview: string | null;
+  status: JobPostingStatus;
+  status_display: string;
+  turnoverit_reference: string | null;
+  turnoverit_public_url: string | null;
+  application_token: string;
+  application_url: string | null;
+  created_by: string | null;
+  created_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+  closed_at: string | null;
+  applications_total: number;
+  applications_new: number;
+}
+
+export interface JobPostingListResponse {
+  items: JobPosting[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface JobPostingPublic {
+  title: string;
+  description: string;
+  qualifications: string;
+  location_country: string;
+  location_region: string | null;
+  location_city: string | null;
+  contract_types: ContractType[];
+  skills: string[];
+  experience_level: ExperienceLevel | null;
+  remote: RemotePolicy | null;
+  start_date: string | null;
+  duration_months: number | null;
+  salary_min_daily: number | null;
+  salary_max_daily: number | null;
+  employer_overview: string | null;
+}
+
+export interface CreateJobPostingRequest {
+  opportunity_id: string;
+  title: string;
+  description: string;
+  qualifications: string;
+  location_country: string;
+  location_region?: string;
+  location_postal_code?: string;
+  location_city?: string;
+  contract_types: string[];
+  skills: string[];
+  experience_level?: string;
+  remote?: string;
+  start_date?: string;
+  duration_months?: number;
+  salary_min_annual?: number;
+  salary_max_annual?: number;
+  salary_min_daily?: number;
+  salary_max_daily?: number;
+  employer_overview?: string;
+}
+
+export interface UpdateJobPostingRequest {
+  title?: string;
+  description?: string;
+  qualifications?: string;
+  location_country?: string;
+  location_region?: string;
+  location_postal_code?: string;
+  location_city?: string;
+  contract_types?: string[];
+  skills?: string[];
+  experience_level?: string;
+  remote?: string;
+  start_date?: string;
+  duration_months?: number;
+  salary_min_annual?: number;
+  salary_max_annual?: number;
+  salary_min_daily?: number;
+  salary_max_daily?: number;
+  employer_overview?: string;
+}
+
+// HR Opportunity (with job posting info)
+export interface OpportunityForHR {
+  id: string;
+  external_id: string;
+  title: string;
+  reference: string;
+  client_name: string | null;
+  description: string | null;
+  skills: string[];
+  location: string | null;
+  budget: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  manager_name: string | null;
+  synced_at: string;
+  has_job_posting: boolean;
+  job_posting_id: string | null;
+  job_posting_status: JobPostingStatus | null;
+  applications_count: number;
+  new_applications_count: number;
+}
+
+export interface OpportunityForHRListResponse {
+  items: OpportunityForHR[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+// Job Application types
+export type ApplicationStatus = 'nouveau' | 'en_cours' | 'entretien' | 'accepte' | 'refuse';
+
+export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
+  nouveau: 'Nouveau',
+  en_cours: 'En cours',
+  entretien: 'Entretien',
+  accepte: 'Accepté',
+  refuse: 'Refusé',
+};
+
+export const APPLICATION_STATUS_COLORS: Record<ApplicationStatus, string> = {
+  nouveau: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  en_cours: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+  entretien: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  accepte: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  refuse: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+};
+
+export interface MatchingDetails {
+  score: number;
+  strengths: string[];
+  gaps: string[];
+  summary: string;
+}
+
+export interface ApplicationStatusChange {
+  from_status: string;
+  to_status: string;
+  changed_at: string;
+  changed_by: string | null;
+  changed_by_name: string | null;
+  comment: string | null;
+}
+
+export interface JobApplication {
+  id: string;
+  job_posting_id: string;
+  job_posting_title: string | null;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  job_title: string;
+  tjm_min: number;
+  tjm_max: number;
+  tjm_range: string;
+  availability_date: string;
+  cv_s3_key: string;
+  cv_filename: string;
+  cv_download_url: string | null;
+  matching_score: number | null;
+  matching_details: MatchingDetails | null;
+  status: ApplicationStatus;
+  status_display: string;
+  status_history: ApplicationStatusChange[];
+  notes: string | null;
+  boond_candidate_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobApplicationListResponse {
+  items: JobApplication[];
+  total: number;
+  page: number;
+  page_size: number;
+  stats: Record<string, number>;
+}
+
+export interface SubmitApplicationRequest {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  job_title: string;
+  tjm_min: number;
+  tjm_max: number;
+  availability_date: string;
+  cv: File;
+}
+
+export interface ApplicationSubmissionResult {
+  success: boolean;
+  application_id: string;
+  message: string;
+}
+
+export interface CvDownloadUrlResponse {
+  url: string;
+  filename: string;
+  expires_in: number;
+}
+
+// Matching score helper
+export function getMatchingScoreColor(score: number | null): string {
+  if (score === null) return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+  if (score >= 80) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+  if (score >= 50) return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
+  return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+}

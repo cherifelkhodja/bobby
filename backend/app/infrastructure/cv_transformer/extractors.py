@@ -60,6 +60,28 @@ def extract_text_from_pdf(file_content: bytes | BinaryIO) -> str:
         raise ValueError(f"Erreur lors de la lecture du PDF: {str(e)}")
 
 
+def extract_text_from_bytes(content: bytes, filename: str) -> str:
+    """Extract text from file content based on file extension.
+
+    Args:
+        content: File content as bytes.
+        filename: Original filename to determine file type.
+
+    Returns:
+        Extracted text.
+
+    Raises:
+        ValueError: If extraction fails or file type is not supported.
+    """
+    filename_lower = filename.lower()
+    if filename_lower.endswith(".pdf"):
+        return extract_text_from_pdf(content)
+    elif filename_lower.endswith(".docx"):
+        return extract_text_from_docx(content)
+    else:
+        raise ValueError(f"Format de fichier non supporté: {filename}")
+
+
 def extract_text_from_docx(file_content: bytes | BinaryIO) -> str:
     """Extract text content from a DOCX file.
 

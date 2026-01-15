@@ -156,3 +156,175 @@ class CvDocumentGeneratorPort(Protocol):
             ValueError: If generation fails.
         """
         ...
+
+
+class TurnoverITServicePort(Protocol):
+    """Port for Turnover-IT API operations."""
+
+    async def create_job(self, job_payload: dict[str, Any]) -> str:
+        """Create a job posting on Turnover-IT.
+
+        Args:
+            job_payload: Job data formatted for Turnover-IT API.
+
+        Returns:
+            Turnover-IT job reference/ID.
+
+        Raises:
+            TurnoverITError: If API call fails.
+        """
+        ...
+
+    async def update_job(self, reference: str, job_payload: dict[str, Any]) -> bool:
+        """Update an existing job posting on Turnover-IT.
+
+        Args:
+            reference: Turnover-IT job reference.
+            job_payload: Updated job data.
+
+        Returns:
+            True if update was successful.
+
+        Raises:
+            TurnoverITError: If API call fails.
+        """
+        ...
+
+    async def close_job(self, reference: str) -> bool:
+        """Close/deactivate a job posting on Turnover-IT.
+
+        Args:
+            reference: Turnover-IT job reference.
+
+        Returns:
+            True if closing was successful.
+
+        Raises:
+            TurnoverITError: If API call fails.
+        """
+        ...
+
+    async def get_skills(self, search: Optional[str] = None) -> list[dict[str, str]]:
+        """Get available skills from Turnover-IT.
+
+        Args:
+            search: Optional search query to filter skills.
+
+        Returns:
+            List of skills with name and slug.
+        """
+        ...
+
+    async def health_check(self) -> bool:
+        """Check Turnover-IT API availability.
+
+        Returns:
+            True if API is available.
+        """
+        ...
+
+
+class S3StorageServicePort(Protocol):
+    """Port for S3/MinIO object storage operations."""
+
+    async def upload_file(
+        self,
+        key: str,
+        content: bytes,
+        content_type: str,
+    ) -> str:
+        """Upload a file to S3 storage.
+
+        Args:
+            key: Storage key/path for the file.
+            content: File content as bytes.
+            content_type: MIME type of the file.
+
+        Returns:
+            The storage key of the uploaded file.
+
+        Raises:
+            S3StorageError: If upload fails.
+        """
+        ...
+
+    async def download_file(self, key: str) -> bytes:
+        """Download a file from S3 storage.
+
+        Args:
+            key: Storage key/path of the file.
+
+        Returns:
+            File content as bytes.
+
+        Raises:
+            S3StorageError: If download fails.
+        """
+        ...
+
+    async def get_presigned_url(self, key: str, expires_in: int = 3600) -> str:
+        """Generate a presigned URL for file download.
+
+        Args:
+            key: Storage key/path of the file.
+            expires_in: URL expiration time in seconds (default 1 hour).
+
+        Returns:
+            Presigned URL for direct download.
+
+        Raises:
+            S3StorageError: If URL generation fails.
+        """
+        ...
+
+    async def delete_file(self, key: str) -> bool:
+        """Delete a file from S3 storage.
+
+        Args:
+            key: Storage key/path of the file.
+
+        Returns:
+            True if deletion was successful.
+
+        Raises:
+            S3StorageError: If deletion fails.
+        """
+        ...
+
+    async def file_exists(self, key: str) -> bool:
+        """Check if a file exists in S3 storage.
+
+        Args:
+            key: Storage key/path of the file.
+
+        Returns:
+            True if file exists.
+        """
+        ...
+
+
+class CvMatchingServicePort(Protocol):
+    """Port for AI-powered CV matching analysis."""
+
+    async def calculate_match(
+        self,
+        cv_text: str,
+        job_description: str,
+    ) -> dict[str, Any]:
+        """Calculate matching score between CV and job description.
+
+        Args:
+            cv_text: Extracted text from candidate's CV.
+            job_description: Job posting description and requirements.
+
+        Returns:
+            Matching result dictionary with:
+                - score: int (0-100)
+                - strengths: list[str] - matching skills/experience
+                - gaps: list[str] - missing requirements
+                - summary: str - brief analysis summary
+
+        Raises:
+            CvMatchingError: If analysis fails.
+        """
+        ...

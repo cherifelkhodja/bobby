@@ -278,3 +278,116 @@ class CvTransformationLogModel(Base):
     template: Mapped[Optional["CvTemplateModel"]] = relationship(
         "CvTemplateModel", foreign_keys=[template_id]
     )
+
+
+class JobPostingModel(Base):
+    """Job Posting database model for Turnover-IT integration."""
+
+    __tablename__ = "job_postings"
+
+    id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    opportunity_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("opportunities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    qualifications: Mapped[str] = mapped_column(Text, nullable=False)
+    location_country: Mapped[str] = mapped_column(String(50), nullable=False)
+    location_region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    location_postal_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    location_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    contract_types: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    skills: Mapped[Optional[list]] = mapped_column(JSON, nullable=True, default=list)
+    experience_level: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    remote: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    start_date: Mapped[Optional[datetime]] = mapped_column(Date, nullable=True)
+    duration_months: Mapped[Optional[int]] = mapped_column(nullable=True)
+    salary_min_annual: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    salary_max_annual: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    salary_min_daily: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    salary_max_daily: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    employer_overview: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="draft", index=True
+    )
+    turnoverit_reference: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, unique=True, index=True
+    )
+    turnoverit_public_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    application_token: Mapped[str] = mapped_column(
+        String(255), nullable=False, unique=True, index=True
+    )
+    created_by: Mapped[Optional[UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Relationships
+    opportunity: Mapped["OpportunityModel"] = relationship(
+        "OpportunityModel", foreign_keys=[opportunity_id]
+    )
+    creator: Mapped[Optional["UserModel"]] = relationship(
+        "UserModel", foreign_keys=[created_by]
+    )
+    applications: Mapped[list["JobApplicationModel"]] = relationship(
+        "JobApplicationModel", back_populates="job_posting", cascade="all, delete-orphan"
+    )
+
+
+class JobApplicationModel(Base):
+    """Job Application database model for Turnover-IT candidates."""
+
+    __tablename__ = "job_applications"
+
+    id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    job_posting_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("job_postings.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    first_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    phone: Mapped[str] = mapped_column(String(30), nullable=False)
+    job_title: Mapped[str] = mapped_column(String(200), nullable=False)
+    tjm_min: Mapped[float] = mapped_column(Float, nullable=False)
+    tjm_max: Mapped[float] = mapped_column(Float, nullable=False)
+    availability_date: Mapped[datetime] = mapped_column(Date, nullable=False)
+    cv_s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    cv_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    cv_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    matching_score: Mapped[Optional[int]] = mapped_column(nullable=True, index=True)
+    matching_details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="nouveau", index=True
+    )
+    status_history: Mapped[Optional[list]] = mapped_column(JSON, nullable=True, default=list)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    boond_candidate_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    job_posting: Mapped["JobPostingModel"] = relationship(
+        "JobPostingModel", back_populates="applications"
+    )

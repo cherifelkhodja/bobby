@@ -14,8 +14,10 @@ from app.api.routes.v1 import (
     cooptations_router,
     cv_transformer_router,
     health_router,
+    hr_router,
     invitations_router,
     opportunities_router,
+    public_applications_router,
     users_router,
 )
 from app.quotation_generator.api import router as quotation_generator_router
@@ -72,4 +74,6 @@ app.include_router(cooptations_router, prefix="/api/v1/cooptations", tags=["Coop
 app.include_router(invitations_router, prefix="/api/v1/invitations", tags=["Invitations"])
 app.include_router(cv_transformer_router, prefix="/api/v1/cv-transformer", tags=["CV Transformer"])
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
+app.include_router(hr_router, prefix="/api/v1/hr", tags=["HR"])
+app.include_router(public_applications_router, prefix="/api/v1/postuler", tags=["Public Applications"])
 app.include_router(quotation_generator_router, prefix="/api/v1", tags=["Quotation Generator"])
