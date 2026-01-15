@@ -183,7 +183,8 @@ class GeminiAnonymizer:
                 ),
             )
 
-            response_text = response.text
+            # Extract text from response with fallback methods
+            response_text = self._extract_response_text(response)
             if not response_text:
                 raise ValueError("La réponse de Gemini est vide")
 
@@ -227,6 +228,49 @@ class GeminiAnonymizer:
         except Exception as e:
             logger.error(f"Unexpected error during anonymization: {type(e).__name__}: {e}")
             raise ValueError(f"Erreur inattendue lors de l'anonymisation. Veuillez réessayer.")
+
+    def _extract_response_text(self, response) -> str | None:
+        """Extract text from Gemini response with multiple fallback methods.
+
+        Args:
+            response: The GenerateContentResponse from Gemini.
+
+        Returns:
+            Extracted text or None if extraction fails.
+        """
+        # Method 1: Try standard .text property
+        try:
+            if hasattr(response, 'text') and response.text:
+                return response.text
+        except (KeyError, ValueError, AttributeError) as e:
+            logger.warning(f"Standard response.text failed: {type(e).__name__}: {e}")
+
+        # Method 2: Try accessing candidates directly
+        try:
+            if hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                if hasattr(candidate, 'content') and candidate.content:
+                    if hasattr(candidate.content, 'parts') and candidate.content.parts:
+                        part = candidate.content.parts[0]
+                        if hasattr(part, 'text'):
+                            return part.text
+        except (KeyError, IndexError, AttributeError) as e:
+            logger.warning(f"Candidate access failed: {type(e).__name__}: {e}")
+
+        # Method 3: Try to convert response to string representation
+        try:
+            # Some SDK versions allow direct string representation
+            response_str = str(response)
+            if response_str and '{' in response_str:
+                return response_str
+        except Exception as e:
+            logger.warning(f"String conversion failed: {type(e).__name__}: {e}")
+
+        # Log response structure for debugging
+        logger.error(f"Failed to extract text. Response type: {type(response)}")
+        logger.error(f"Response attributes: {dir(response)}")
+
+        return None
 
     def _clean_json_response(self, raw_response: str) -> str:
         """Clean Gemini response and extract valid JSON.
