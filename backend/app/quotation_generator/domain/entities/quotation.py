@@ -61,7 +61,6 @@ class Quotation:
 
     # Period and pricing
     period: Period
-    period_name: str = ""  # Human-readable period name from CSV (e.g., "Janvier 2026")
     line: QuotationLine
 
     # Thales-specific fields
@@ -73,6 +72,8 @@ class Quotation:
     max_price: Money
     start_project: date
     comments: Optional[str] = None
+    # Period display name (e.g., "Janvier 2026")
+    period_name: str = ""
     # Additional Thales fields
     eacq_number: str = "mail"
     is_renewal: bool = True
