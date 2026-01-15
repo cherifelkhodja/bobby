@@ -90,6 +90,8 @@ class CreateCooptationUseCase:
                     created_at=published.created_at,
                     updated_at=published.updated_at,
                 )
+                # Save to opportunities table for foreign key constraint
+                opportunity = await self.opportunity_repository.save(opportunity)
 
         if not opportunity:
             raise OpportunityNotFoundError(str(command.opportunity_id))
