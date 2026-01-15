@@ -31,6 +31,7 @@ export interface QuotationPreviewItem {
     end: string;
   };
   period_name: string; // Human-readable period name (e.g., "Janvier 2026")
+  quotation_date: string; // Date du devis (DD/MM/YYYY)
   // Pricing
   tjm: number;
   quantity: number;

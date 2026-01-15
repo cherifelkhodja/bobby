@@ -194,7 +194,7 @@ class Quotation:
 
         Uses:
         - date: quotation_date from CSV (or period.start_date if not specified)
-        - number: need_title (project name from BoondManager)
+        - number: object_of_need (titre du besoin from CSV)
         - quotationRecords.description: "Prestation de services, {period_name}"
 
         Returns:
@@ -211,6 +211,9 @@ class Quotation:
         # Use quotation_date from CSV if available, otherwise period start
         effective_date = self.quotation_date or self.period.start_date
 
+        # Title: use object_of_need first, then need_title, then fallback
+        title = self.object_of_need or self.need_title or "Prestation"
+
         return {
             "data": {
                 "type": "quotation",
@@ -223,7 +226,7 @@ class Quotation:
                     "exchangeRateAgency": 1,
                     "turnoverInvoicedExcludingTax": self.total_ht.to_float(),
                     "turnoverInvoicedIncludingTax": self.total_ttc.to_float(),
-                    "number": self.need_title or "Prestation",  # Project name
+                    "number": title,  # Titre du besoin (object_of_need from CSV)
                     "language": "fr",
                     "paymentTerm": 52,
                     "legals": THALES_LEGALS,

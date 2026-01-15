@@ -648,7 +648,7 @@ function QuotationDetailsModal({ quotation, isOpen, onClose }: QuotationDetailsM
             Période & Tarification
           </h4>
           <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-            <DetailRow label="Date du devis" value={formatDate(new Date().toISOString().split('T')[0])} />
+            <DetailRow label="Date du devis" value={quotation.quotation_date} />
             <DetailRow label="Renouvellement" value={quotation.is_renewal ? 'Oui' : 'Non'} />
             {quotation.is_renewal && (
               <DetailRow label="Date début initiale" value={formatDate(quotation.start_project)} />
