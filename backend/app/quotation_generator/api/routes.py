@@ -88,7 +88,7 @@ async def preview_batch(
     try:
         result = await use_case.execute(
             file=file.file,
-            user_id=current_user.id,
+            user_id=current_user,  # AdminUser is already a UUID
         )
 
         return PreviewBatchResponse(
@@ -217,7 +217,7 @@ async def list_user_batches(
     use_case: ListUserBatchesUseCase = Depends(get_list_user_batches_use_case),
 ) -> UserBatchesResponse:
     """List recent batches for the current user."""
-    batches = await use_case.execute(current_user.id, limit)
+    batches = await use_case.execute(current_user, limit)  # AdminUser is already a UUID
     return UserBatchesResponse(batches=batches)
 
 
