@@ -35,6 +35,8 @@ const STATE_CONFIG: Record<number, { name: string; color: string; bgClass: strin
 export function MyBoondOpportunities() {
   const [search, setSearch] = useState('');
   const [stateFilter, setStateFilter] = useState<number | 'all'>('all');
+  const [clientFilter, setClientFilter] = useState<string>('all');
+  const [managerFilter, setManagerFilter] = useState<string>('all');
   const [selectedOpportunity, setSelectedOpportunity] = useState<BoondOpportunity | null>(null);
   const [detailModalOpportunity, setDetailModalOpportunity] = useState<BoondOpportunity | null>(null);
   const [step, setStep] = useState<ViewStep>('list');
@@ -51,16 +53,26 @@ export function MyBoondOpportunities() {
     queryFn: getMyBoondOpportunities,
   });
 
-  // Calculate stats
-  const stats = useMemo(() => {
-    if (!data?.items) return { total: 0, byState: {}, won: 0, inProgress: 0, lost: 0 };
+  // Calculate stats and available filters
+  const { stats, availableStates, availableClients, availableManagers } = useMemo(() => {
+    if (!data?.items) {
+      return {
+        stats: { total: 0, byState: {}, won: 0, inProgress: 0, lost: 0 },
+        availableStates: [],
+        availableClients: [],
+        availableManagers: [],
+      };
+    }
 
     const byState: Record<number, number> = {};
+    const clientsMap: Record<string, number> = {};
+    const managersMap: Record<string, number> = {};
     let won = 0;
     let inProgress = 0;
     let lost = 0;
 
     data.items.forEach((opp) => {
+      // Count by state
       if (opp.state !== null) {
         byState[opp.state] = (byState[opp.state] || 0) + 1;
 
@@ -69,17 +81,38 @@ export function MyBoondOpportunities() {
         else if ([0, 5, 7, 10].includes(opp.state)) inProgress++;
         else if ([2, 3, 8, 9].includes(opp.state)) lost++;
       }
+
+      // Count by client
+      const clientName = opp.company_name || 'Sans client';
+      clientsMap[clientName] = (clientsMap[clientName] || 0) + 1;
+
+      // Count by manager
+      const managerName = opp.manager_name || 'Sans manager';
+      managersMap[managerName] = (managersMap[managerName] || 0) + 1;
     });
 
-    return { total: data.items.length, byState, won, inProgress, lost };
-  }, [data?.items]);
-
-  // Available states for filter (only states that have opportunities)
-  const availableStates = useMemo(() => {
-    return Object.entries(stats.byState)
+    // Sort states by count
+    const states = Object.entries(byState)
       .map(([state, count]) => ({ state: parseInt(state), count }))
       .sort((a, b) => b.count - a.count);
-  }, [stats.byState]);
+
+    // Sort clients by count
+    const clients = Object.entries(clientsMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+
+    // Sort managers by count
+    const managers = Object.entries(managersMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+
+    return {
+      stats: { total: data.items.length, byState, won, inProgress, lost },
+      availableStates: states,
+      availableClients: clients,
+      availableManagers: managers,
+    };
+  }, [data?.items]);
 
   // Anonymize mutation
   const anonymizeMutation = useMutation({
@@ -109,11 +142,23 @@ export function MyBoondOpportunities() {
     },
   });
 
-  // Filter opportunities by search and state
+  // Filter opportunities by search, state, client and manager
   const filteredOpportunities = useMemo(() => {
     return data?.items.filter((opp) => {
       // State filter
       if (stateFilter !== 'all' && opp.state !== stateFilter) return false;
+
+      // Client filter
+      if (clientFilter !== 'all') {
+        const clientName = opp.company_name || 'Sans client';
+        if (clientName !== clientFilter) return false;
+      }
+
+      // Manager filter
+      if (managerFilter !== 'all') {
+        const managerName = opp.manager_name || 'Sans manager';
+        if (managerName !== managerFilter) return false;
+      }
 
       // Search filter
       if (!search) return true;
@@ -121,10 +166,11 @@ export function MyBoondOpportunities() {
       return (
         opp.title.toLowerCase().includes(searchLower) ||
         opp.reference.toLowerCase().includes(searchLower) ||
-        opp.company_name?.toLowerCase().includes(searchLower)
+        opp.company_name?.toLowerCase().includes(searchLower) ||
+        opp.manager_name?.toLowerCase().includes(searchLower)
       );
     }) || [];
-  }, [data?.items, search, stateFilter]);
+  }, [data?.items, search, stateFilter, clientFilter, managerFilter]);
 
   const handlePropose = (opportunity: BoondOpportunity) => {
     setSelectedOpportunity(opportunity);
@@ -188,13 +234,13 @@ export function MyBoondOpportunities() {
     const config = state !== null ? STATE_CONFIG[state] : null;
     if (!config) {
       return (
-        <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
           {stateName || 'Inconnu'}
         </span>
       );
     }
     return (
-      <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${config.bgClass} ${config.textClass}`}>
+      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${config.bgClass} ${config.textClass}`}>
         {config.name}
       </span>
     );
@@ -218,6 +264,8 @@ export function MyBoondOpportunities() {
     );
   }
 
+  const hasActiveFilters = search || stateFilter !== 'all' || clientFilter !== 'all' || managerFilter !== 'all';
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -225,80 +273,80 @@ export function MyBoondOpportunities() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
           Mes opportunités Boond
         </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">
+        <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm">
           Publiez vos opportunités anonymisées pour la cooptation
         </p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="!p-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="!p-3">
           <div className="flex items-center">
             <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
-              <TrendingUp className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+              <TrendingUp className="h-4 w-4 text-primary-600 dark:text-primary-400" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</p>
+            <div className="ml-3">
+              <p className="text-xs text-gray-500 dark:text-gray-400">Total</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</p>
             </div>
           </div>
         </Card>
 
-        <Card className="!p-4">
+        <Card className="!p-3">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400">En cours</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.inProgress}</p>
+            <div className="ml-3">
+              <p className="text-xs text-gray-500 dark:text-gray-400">En cours</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{stats.inProgress}</p>
             </div>
           </div>
         </Card>
 
-        <Card className="!p-4">
+        <Card className="!p-3">
           <div className="flex items-center">
             <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Gagnées</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.won}</p>
+            <div className="ml-3">
+              <p className="text-xs text-gray-500 dark:text-gray-400">Gagnées</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{stats.won}</p>
             </div>
           </div>
         </Card>
 
-        <Card className="!p-4">
+        <Card className="!p-3">
           <div className="flex items-center">
             <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-              <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Perdues/Fermées</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.lost}</p>
+            <div className="ml-3">
+              <p className="text-xs text-gray-500 dark:text-gray-400">Perdues</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{stats.lost}</p>
             </div>
           </div>
         </Card>
       </div>
 
       {/* Filters */}
-      <Card className="!p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
+      <Card className="!p-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Rechercher par titre, référence ou client..."
-              className="pl-10"
+              placeholder="Rechercher..."
+              className="pl-9 text-sm h-9"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-gray-400" />
+          <div className="flex items-center gap-2 flex-wrap">
+            <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
             <select
               value={stateFilter}
               onChange={(e) => setStateFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-              className="px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
               <option value="all">Tous les états ({stats.total})</option>
               {availableStates.map(({ state, count }) => (
@@ -307,6 +355,32 @@ export function MyBoondOpportunities() {
                 </option>
               ))}
             </select>
+            <select
+              value={clientFilter}
+              onChange={(e) => setClientFilter(e.target.value)}
+              className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent max-w-[180px]"
+            >
+              <option value="all">Tous les clients</option>
+              {availableClients.map(({ name, count }) => (
+                <option key={name} value={name}>
+                  {name} ({count})
+                </option>
+              ))}
+            </select>
+            {availableManagers.length > 1 && (
+              <select
+                value={managerFilter}
+                onChange={(e) => setManagerFilter(e.target.value)}
+                className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent max-w-[180px]"
+              >
+                <option value="all">Tous les managers</option>
+                {availableManagers.map(({ name, count }) => (
+                  <option key={name} value={name}>
+                    {name} ({count})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
       </Card>
@@ -320,8 +394,8 @@ export function MyBoondOpportunities() {
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
             Aucune opportunité trouvée
           </h3>
-          <p className="text-gray-500 dark:text-gray-400">
-            {search || stateFilter !== 'all'
+          <p className="text-gray-500 dark:text-gray-400 text-sm">
+            {hasActiveFilters
               ? "Aucun résultat pour vos critères de recherche."
               : "Vous n'avez pas d'opportunité en tant que manager principal dans BoondManager."}
           </p>
@@ -329,25 +403,25 @@ export function MyBoondOpportunities() {
       ) : (
         <Card className="overflow-hidden !p-0">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-800/50">
                 <tr>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 text-sm">
+                  <th className="text-left py-2.5 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
                     Titre
                   </th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 text-sm">
+                  <th className="text-left py-2.5 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
                     Référence
                   </th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 text-sm">
+                  <th className="text-left py-2.5 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
                     Client
                   </th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 text-sm">
+                  <th className="text-left py-2.5 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
                     État
                   </th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 text-sm">
+                  <th className="text-left py-2.5 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
                     Date fin
                   </th>
-                  <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 text-sm">
+                  <th className="text-right py-2.5 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
                     Actions
                   </th>
                 </tr>
@@ -358,42 +432,42 @@ export function MyBoondOpportunities() {
                     key={opportunity.id}
                     className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
                   >
-                    <td className="py-3 px-4">
+                    <td className="py-2.5 px-4">
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => setDetailModalOpportunity(opportunity)}
-                          className="text-left text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                          className="text-left text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 font-medium"
                         >
                           {opportunity.title}
                         </button>
                         {opportunity.is_published && (
-                          <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                          <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                             Publiée
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4">
-                      <span className="text-gray-500 dark:text-gray-400 font-mono text-sm">
+                    <td className="py-2.5 px-4">
+                      <span className="text-gray-500 dark:text-gray-400 font-mono">
                         {opportunity.reference}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
+                    <td className="py-2.5 px-4 text-gray-600 dark:text-gray-400">
                       {opportunity.company_name || '-'}
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-2.5 px-4">
                       {getStateBadge(opportunity.state, opportunity.state_name)}
                     </td>
-                    <td className="py-3 px-4 text-gray-600 dark:text-gray-400 text-sm">
+                    <td className="py-2.5 px-4 text-gray-600 dark:text-gray-400">
                       {formatDate(opportunity.end_date)}
                     </td>
-                    <td className="py-3 px-4">
-                      <div className="flex justify-end gap-2">
+                    <td className="py-2.5 px-4">
+                      <div className="flex justify-end gap-1">
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => setDetailModalOpportunity(opportunity)}
-                          leftIcon={<Eye className="h-4 w-4" />}
+                          leftIcon={<Eye className="h-3.5 w-3.5" />}
                         >
                           Voir
                         </Button>
@@ -401,7 +475,7 @@ export function MyBoondOpportunities() {
                           size="sm"
                           onClick={() => handlePropose(opportunity)}
                           disabled={opportunity.is_published}
-                          leftIcon={<Sparkles className="h-4 w-4" />}
+                          leftIcon={<Sparkles className="h-3.5 w-3.5" />}
                         >
                           {opportunity.is_published ? 'Déjà publiée' : 'Proposer'}
                         </Button>
@@ -412,10 +486,10 @@ export function MyBoondOpportunities() {
               </tbody>
             </table>
           </div>
-          <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/30">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="px-4 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/30">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               {filteredOpportunities.length} opportunité{filteredOpportunities.length > 1 ? 's' : ''} affichée{filteredOpportunities.length > 1 ? 's' : ''}
-              {(search || stateFilter !== 'all') && ` sur ${stats.total}`}
+              {hasActiveFilters && ` sur ${stats.total}`}
             </p>
           </div>
         </Card>
@@ -443,7 +517,7 @@ export function MyBoondOpportunities() {
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Référence
                 </label>
-                <p className="text-gray-900 dark:text-gray-100 font-mono">
+                <p className="text-gray-900 dark:text-gray-100 font-mono text-sm">
                   {detailModalOpportunity.reference}
                 </p>
               </div>
@@ -478,7 +552,7 @@ export function MyBoondOpportunities() {
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Description
               </label>
-              <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap mt-1 max-h-64 overflow-y-auto">
+              <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap mt-1 max-h-64 overflow-y-auto text-sm">
                 {detailModalOpportunity.description || 'Aucune description'}
               </p>
             </div>
@@ -542,7 +616,7 @@ export function MyBoondOpportunities() {
               <textarea
                 value={editedDescription}
                 onChange={(e) => setEditedDescription(e.target.value)}
-                className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 min-h-[200px]"
+                className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 min-h-[200px] text-sm"
               />
             </div>
 

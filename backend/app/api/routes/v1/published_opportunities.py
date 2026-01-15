@@ -39,15 +39,21 @@ async def list_my_boond_opportunities(
     boond: Boond,
     user_id: AdminOrCommercialUser,
 ):
-    """List Boond opportunities where current user is main manager.
+    """List Boond opportunities.
+
+    For admins: returns ALL opportunities from BoondManager.
+    For commercials: returns only opportunities where user is main manager.
 
     Requires admin or commercial role.
     """
-    # Get user's boond_resource_id
+    # Get user's boond_resource_id and role
     user_repo = UserRepository(db)
     user = await user_repo.get_by_id(user_id)
 
-    if not user or not user.boond_resource_id:
+    is_admin = user and user.role == "admin"
+
+    # Non-admins need a boond_resource_id
+    if not is_admin and (not user or not user.boond_resource_id):
         raise HTTPException(
             status_code=400,
             detail="Vous n'avez pas d'identifiant BoondManager configuré",
@@ -58,7 +64,10 @@ async def list_my_boond_opportunities(
     use_case = GetMyBoondOpportunitiesUseCase(boond, published_repo)
 
     try:
-        result = await use_case.execute(user.boond_resource_id)
+        result = await use_case.execute(
+            manager_boond_id=user.boond_resource_id if user else None,
+            is_admin=is_admin,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

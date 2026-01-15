@@ -438,40 +438,56 @@ class BoondClient:
     )
     async def get_manager_opportunities(
         self,
-        manager_boond_id: str,
+        manager_boond_id: Optional[str] = None,
         states: Optional[list[int]] = None,
+        fetch_all: bool = False,
     ) -> list[dict]:
-        """Fetch opportunities where the user is the main manager.
+        """Fetch opportunities from BoondManager.
 
         Args:
             manager_boond_id: The BoondManager resource ID of the manager.
+                              Required if fetch_all is False.
             states: List of opportunity states to filter. Defaults to ACTIVE_OPPORTUNITY_STATES.
+            fetch_all: If True, fetch ALL opportunities (for admin view).
 
         Returns:
             List of opportunity dicts with id, title, reference, description, etc.
         """
+        if not fetch_all and not manager_boond_id:
+            raise ValueError("manager_boond_id is required when fetch_all is False")
+
         if states is None:
             states = self.ACTIVE_OPPORTUNITY_STATES
 
-        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
-            logger.info(f"Fetching opportunities for manager {manager_boond_id}")
+        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
+            if fetch_all:
+                logger.info("Fetching ALL opportunities (admin mode)")
+            else:
+                logger.info(f"Fetching opportunities for manager {manager_boond_id}")
 
             all_opportunities = []
             companies_map = {}
+            managers_map = {}
 
             for state in states:
                 page = 1
                 while True:
+                    # Build params
+                    params = {
+                        "page": page,
+                        "maxResults": 500,
+                        "opportunityStates": state,
+                    }
+
+                    # Only filter by manager if not fetching all
+                    if not fetch_all:
+                        params["perimeterManagersType"] = "main"
+                        params["perimeterManagers"] = manager_boond_id
+
                     response = await client.get(
                         f"{self.base_url}/opportunities",
                         auth=self._auth,
-                        params={
-                            "page": page,
-                            "maxResults": 500,
-                            "perimeterManagersType": "main",
-                            "perimeterManagers": manager_boond_id,
-                            "opportunityStates": state,
-                        },
+                        params=params,
                     )
                     response.raise_for_status()
                     data = response.json()
@@ -479,12 +495,18 @@ class BoondClient:
                     opportunities_batch = data.get("data", [])
                     all_opportunities.extend(opportunities_batch)
 
-                    # Extract company names from included data
+                    # Extract company and resource (manager) names from included data
                     for included in data.get("included", []):
-                        if included.get("type") == "company":
-                            company_id = str(included.get("id"))
-                            company_name = included.get("attributes", {}).get("name", "")
-                            companies_map[company_id] = company_name
+                        inc_type = included.get("type")
+                        inc_id = str(included.get("id"))
+                        inc_attrs = included.get("attributes", {})
+
+                        if inc_type == "company":
+                            companies_map[inc_id] = inc_attrs.get("name", "")
+                        elif inc_type == "resource":
+                            first_name = inc_attrs.get("firstName", "")
+                            last_name = inc_attrs.get("lastName", "")
+                            managers_map[inc_id] = f"{first_name} {last_name}".strip()
 
                     # Check for more pages
                     meta = data.get("meta", {})
@@ -504,6 +526,11 @@ class BoondClient:
                     company_id = str(company_data.get("id")) if company_data else None
                     company_name = companies_map.get(company_id, "") if company_id else ""
 
+                    # Get main manager info
+                    main_manager_data = relationships.get("mainManager", {}).get("data")
+                    manager_id = str(main_manager_data.get("id")) if main_manager_data else None
+                    manager_name = managers_map.get(manager_id, "") if manager_id else ""
+
                     # Get state
                     opp_state = attrs.get("state", None)
                     opp_state_name = self.OPPORTUNITY_STATE_NAMES.get(opp_state, "") if opp_state is not None else ""
@@ -518,6 +545,8 @@ class BoondClient:
                         "end_date": attrs.get("endDate"),
                         "company_id": company_id,
                         "company_name": company_name,
+                        "manager_id": manager_id,
+                        "manager_name": manager_name,
                         "state": opp_state,
                         "state_name": opp_state_name,
                         "state_color": opp_state_color,
@@ -525,5 +554,5 @@ class BoondClient:
                 except Exception as e:
                     logger.warning(f"Failed to parse opportunity {item.get('id')}: {e}")
 
-            logger.info(f"Fetched {len(opportunities)} opportunities for manager {manager_boond_id}")
+            logger.info(f"Fetched {len(opportunities)} opportunities")
             return opportunities

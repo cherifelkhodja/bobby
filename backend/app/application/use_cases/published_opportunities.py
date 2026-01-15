@@ -29,24 +29,30 @@ class GetMyBoondOpportunitiesUseCase:
         self._boond_client = boond_client
         self._published_repository = published_opportunity_repository
 
-    async def execute(self, manager_boond_id: str) -> BoondOpportunityListReadModel:
-        """Fetch opportunities for the manager from BoondManager.
+    async def execute(
+        self,
+        manager_boond_id: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> BoondOpportunityListReadModel:
+        """Fetch opportunities from BoondManager.
 
         Args:
             manager_boond_id: The user's BoondManager resource ID.
+            is_admin: If True, fetch ALL opportunities (admin view).
 
         Returns:
             List of Boond opportunities with publication status.
 
         Raises:
-            ValueError: If manager_boond_id is not set.
+            ValueError: If manager_boond_id is not set and user is not admin.
         """
-        if not manager_boond_id:
+        if not is_admin and not manager_boond_id:
             raise ValueError("L'utilisateur n'a pas d'identifiant BoondManager configuré")
 
         # Fetch opportunities from Boond
         boond_opportunities = await self._boond_client.get_manager_opportunities(
-            manager_boond_id
+            manager_boond_id=manager_boond_id,
+            fetch_all=is_admin,
         )
 
         # Get already published IDs
@@ -64,6 +70,9 @@ class GetMyBoondOpportunitiesUseCase:
                 company_name=opp.get("company_name"),
                 state=opp.get("state"),
                 state_name=opp.get("state_name"),
+                state_color=opp.get("state_color"),
+                manager_id=opp.get("manager_id"),
+                manager_name=opp.get("manager_name"),
                 is_published=opp["id"] in published_ids,
             )
             for opp in boond_opportunities

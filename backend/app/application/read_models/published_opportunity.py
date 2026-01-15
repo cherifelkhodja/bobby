@@ -20,6 +20,9 @@ class BoondOpportunityReadModel(BaseModel):
     company_name: Optional[str] = None
     state: Optional[int] = None
     state_name: Optional[str] = None
+    state_color: Optional[str] = None
+    manager_id: Optional[str] = None
+    manager_name: Optional[str] = None
     is_published: bool = False
 
 
