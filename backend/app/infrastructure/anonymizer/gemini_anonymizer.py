@@ -163,6 +163,9 @@ class GeminiAnonymizer:
 
         Returns:
             Cleaned JSON string.
+
+        Raises:
+            ValueError: If no valid JSON structure found.
         """
         response = raw_response.strip()
 
@@ -176,10 +179,16 @@ class GeminiAnonymizer:
         if response.endswith("```"):
             response = response[:-3]
 
+        response = response.strip()
+
         # Extract JSON between { and } (handles any extra text)
         start = response.find('{')
         end = response.rfind('}')
         if start != -1 and end != -1 and end > start:
             response = response[start:end + 1]
+        else:
+            # Log the problematic response for debugging
+            logger.error(f"No valid JSON structure found in response: {response[:200]}")
+            raise ValueError(f"Réponse Gemini invalide (pas de JSON trouvé)")
 
         return response.strip()
