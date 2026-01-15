@@ -326,7 +326,7 @@ function UploadStep({
 
       <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex justify-between items-start">
         <p className="text-sm text-blue-700 dark:text-blue-400">
-          <strong>Colonnes requises :</strong> Prénom, Nom, po_start_date, po_end_date,
+          <strong>Colonnes requises :</strong> firstName, lastName, po_start_date, po_end_date,
           amount_ht_unit, total_uo, C22_domain, C22_activity, complexity
           <br />
           <span className="text-blue-600 dark:text-blue-300">

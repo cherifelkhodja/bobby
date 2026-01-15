@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 COLUMN_MAPPING = {
     # Resource info
     "resource_id": ["ressource_id", "resource_id", "id_resource", "id_ressource"],
-    "resource_first_name": ["Prénom", "Prenom", "prenom", "first_name", "prénom", "PRÉNOM", "PRENOM"],
-    "resource_last_name": ["Nom", "nom", "last_name", "NOM"],
+    "resource_first_name": ["Prénom", "Prenom", "prenom", "first_name", "prénom", "PRÉNOM", "PRENOM", "firstName", "firstname", "FirstName"],
+    "resource_last_name": ["Nom", "nom", "last_name", "NOM", "lastName", "lastname", "LastName"],
     "resource_name": ["ressource_name", "resource_name", "nom_resource", "nom_ressource", "consultant"],
     "resource_trigramme": ["ressource_trigramme", "trigramme", "resource_trigramme", "code"],
     # BoondManager relationships

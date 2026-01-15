@@ -317,9 +317,9 @@ async def upload_template(
 
 # Example CSV endpoint
 
-# SIMPLIFIED CSV format - IDs are auto-fetched from BoondManager via Prénom/Nom
+# SIMPLIFIED CSV format - IDs are auto-fetched from BoondManager via firstName/lastName
 # max_price is auto-filled for 124-Data domain based on activity and complexity
-EXAMPLE_CSV_CONTENT = """Prénom;Nom;po_start_date;po_end_date;amount_ht_unit;total_uo;C22_domain;C22_activity;complexity;max_price;sow_reference;object_of_need;additional_comments
+EXAMPLE_CSV_CONTENT = """firstName;lastName;po_start_date;po_end_date;amount_ht_unit;total_uo;C22_domain;C22_activity;complexity;max_price;sow_reference;object_of_need;additional_comments
 Raphael;COLLARD;2026-01-01;2026-03-31;725;63;124-Data;9-Data Engineer  - Talend (ETL);Complex;;Talend Technical Expert;Talend Technical Expert;
 Jean;DUPONT;2026-02-01;2026-04-30;650;60;124-Data;1-Data Analyst;Medium;;Data Analysis Q1;Analyse de données;
 Pierre;DURAND;2026-03-01;2026-05-31;690;55;124-Data;2-Data Architect;Complex;;Architecture Data;Conception architecture data;
