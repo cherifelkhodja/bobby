@@ -9,6 +9,7 @@ from app.api.dependencies import AdminOrCommercialUser, CurrentUserId
 from app.api.schemas.published_opportunity import (
     AnonymizedPreviewResponse,
     AnonymizeRequest,
+    BoondOpportunityDetailResponse,
     BoondOpportunityListResponse,
     BoondOpportunityResponse,
     PublishedOpportunityListResponse,
@@ -18,6 +19,7 @@ from app.api.schemas.published_opportunity import (
 from app.application.use_cases.published_opportunities import (
     AnonymizeOpportunityUseCase,
     CloseOpportunityUseCase,
+    GetBoondOpportunityDetailUseCase,
     GetMyBoondOpportunitiesUseCase,
     GetPublishedOpportunityUseCase,
     ListPublishedOpportunitiesUseCase,
@@ -78,6 +80,32 @@ async def list_my_boond_opportunities(
         ],
         total=result.total,
     )
+
+
+@router.get("/my-boond/{opportunity_id}", response_model=BoondOpportunityDetailResponse)
+async def get_boond_opportunity_detail(
+    opportunity_id: str,
+    db: DbSession,
+    boond: Boond,
+    user_id: AdminOrCommercialUser,
+):
+    """Get detailed information for a Boond opportunity.
+
+    Fetches full opportunity details including description and criteria
+    from the /opportunities/{id}/information endpoint.
+
+    Requires admin or commercial role.
+    """
+    published_repo = PublishedOpportunityRepository(db)
+
+    use_case = GetBoondOpportunityDetailUseCase(boond, published_repo)
+
+    try:
+        result = await use_case.execute(opportunity_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return BoondOpportunityDetailResponse(**result.model_dump())
 
 
 @router.post("/anonymize", response_model=AnonymizedPreviewResponse)

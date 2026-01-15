@@ -6,6 +6,7 @@ from uuid import UUID
 
 from app.application.read_models.published_opportunity import (
     AnonymizedPreviewReadModel,
+    BoondOpportunityDetailReadModel,
     BoondOpportunityListReadModel,
     BoondOpportunityReadModel,
     PublishedOpportunityListReadModel,
@@ -81,6 +82,63 @@ class GetMyBoondOpportunitiesUseCase:
         return BoondOpportunityListReadModel(
             items=items,
             total=len(items),
+        )
+
+
+class GetBoondOpportunityDetailUseCase:
+    """Use case for fetching detailed opportunity information from Boond."""
+
+    def __init__(
+        self,
+        boond_client: BoondClient,
+        published_opportunity_repository: PublishedOpportunityRepository,
+    ) -> None:
+        self._boond_client = boond_client
+        self._published_repository = published_opportunity_repository
+
+    async def execute(self, opportunity_id: str) -> BoondOpportunityDetailReadModel:
+        """Fetch detailed opportunity information from BoondManager.
+
+        Uses the /opportunities/{id}/information endpoint to get full details
+        including description and criteria.
+
+        Args:
+            opportunity_id: The BoondManager opportunity ID.
+
+        Returns:
+            Detailed opportunity information.
+        """
+        # Fetch from Boond
+        opp = await self._boond_client.get_opportunity_information(opportunity_id)
+
+        # Check if already published
+        is_published = await self._published_repository.exists_by_boond_id(opportunity_id)
+
+        return BoondOpportunityDetailReadModel(
+            id=opp["id"],
+            title=opp["title"],
+            reference=opp["reference"],
+            description=opp.get("description"),
+            criteria=opp.get("criteria"),
+            expertise_area=opp.get("expertise_area"),
+            place=opp.get("place"),
+            duration=opp.get("duration"),
+            start_date=opp.get("start_date"),
+            end_date=opp.get("end_date"),
+            closing_date=opp.get("closing_date"),
+            answer_date=opp.get("answer_date"),
+            company_id=opp.get("company_id"),
+            company_name=opp.get("company_name"),
+            manager_id=opp.get("manager_id"),
+            manager_name=opp.get("manager_name"),
+            contact_id=opp.get("contact_id"),
+            contact_name=opp.get("contact_name"),
+            agency_id=opp.get("agency_id"),
+            agency_name=opp.get("agency_name"),
+            state=opp.get("state"),
+            state_name=opp.get("state_name"),
+            state_color=opp.get("state_color"),
+            is_published=is_published,
         )
 
 

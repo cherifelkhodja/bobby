@@ -282,6 +282,33 @@ export interface BoondOpportunityListResponse {
   total: number;
 }
 
+export interface BoondOpportunityDetail {
+  id: string;
+  title: string;
+  reference: string;
+  description: string | null;
+  criteria: string | null;
+  expertise_area: string | null;
+  place: string | null;
+  duration: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  closing_date: string | null;
+  answer_date: string | null;
+  company_id: string | null;
+  company_name: string | null;
+  manager_id: string | null;
+  manager_name: string | null;
+  contact_id: string | null;
+  contact_name: string | null;
+  agency_id: string | null;
+  agency_name: string | null;
+  state: number | null;
+  state_name: string | null;
+  state_color: string | null;
+  is_published: boolean;
+}
+
 export interface AnonymizeRequest {
   boond_opportunity_id: string;
   title: string;

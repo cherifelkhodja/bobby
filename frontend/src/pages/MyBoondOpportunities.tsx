@@ -4,6 +4,7 @@ import { Search, Eye, Sparkles, Check, AlertCircle, Loader2, Filter, TrendingUp 
 
 import {
   getMyBoondOpportunities,
+  getBoondOpportunityDetail,
   anonymizeOpportunity,
   publishOpportunity,
 } from '../api/publishedOpportunities';
@@ -13,9 +14,9 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
-import type { BoondOpportunity, AnonymizedPreview } from '../types';
+import type { BoondOpportunity, BoondOpportunityDetail, AnonymizedPreview } from '../types';
 
-type ViewStep = 'list' | 'anonymizing' | 'preview' | 'publishing' | 'success' | 'error';
+type ViewStep = 'list' | 'loading-detail' | 'anonymizing' | 'preview' | 'publishing' | 'success' | 'error';
 
 // State configuration for open/active opportunities only (0, 5, 6, 7, 10)
 const STATE_CONFIG: Record<number, { name: string; color: string; bgClass: string; textClass: string }> = {
@@ -32,7 +33,10 @@ export function MyBoondOpportunities() {
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [managerFilter, setManagerFilter] = useState<string>('all');
   const [selectedOpportunity, setSelectedOpportunity] = useState<BoondOpportunity | null>(null);
+  const [selectedOpportunityDetail, setSelectedOpportunityDetail] = useState<BoondOpportunityDetail | null>(null);
   const [detailModalOpportunity, setDetailModalOpportunity] = useState<BoondOpportunity | null>(null);
+  const [detailModalData, setDetailModalData] = useState<BoondOpportunityDetail | null>(null);
+  const [detailModalLoading, setDetailModalLoading] = useState(false);
   const [step, setStep] = useState<ViewStep>('list');
   const [preview, setPreview] = useState<AnonymizedPreview | null>(null);
   const [editedTitle, setEditedTitle] = useState('');
@@ -158,16 +162,32 @@ export function MyBoondOpportunities() {
     }) || [];
   }, [data?.items, search, stateFilter, clientFilter, managerFilter]);
 
-  const handlePropose = (opportunity: BoondOpportunity) => {
+  const handlePropose = async (opportunity: BoondOpportunity) => {
     setSelectedOpportunity(opportunity);
+    setSelectedOpportunityDetail(null);
     setErrorMessage(null);
-    setStep('anonymizing');
+    setStep('loading-detail');
 
-    anonymizeMutation.mutate({
-      boond_opportunity_id: opportunity.id,
-      title: opportunity.title,
-      description: opportunity.description,
-    });
+    try {
+      // Fetch detailed info (with description and criteria)
+      const detail = await getBoondOpportunityDetail(opportunity.id);
+      setSelectedOpportunityDetail(detail);
+      setStep('anonymizing');
+
+      // Build full description by combining description and criteria
+      const fullDescription = [detail.description, detail.criteria]
+        .filter(Boolean)
+        .join('\n\nCritères:\n');
+
+      anonymizeMutation.mutate({
+        boond_opportunity_id: opportunity.id,
+        title: opportunity.title,
+        description: fullDescription || null,
+      });
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+      setStep('error');
+    }
   };
 
   const handleRegenerate = () => {
@@ -175,10 +195,16 @@ export function MyBoondOpportunities() {
     setStep('anonymizing');
     setErrorMessage(null);
 
+    // Use detail data if available
+    const detail = selectedOpportunityDetail;
+    const fullDescription = detail
+      ? [detail.description, detail.criteria].filter(Boolean).join('\n\nCritères:\n')
+      : selectedOpportunity.description;
+
     anonymizeMutation.mutate({
       boond_opportunity_id: selectedOpportunity.id,
       title: selectedOpportunity.title,
-      description: selectedOpportunity.description,
+      description: fullDescription || null,
     });
   };
 
@@ -204,11 +230,33 @@ export function MyBoondOpportunities() {
 
   const handleCloseModal = () => {
     setSelectedOpportunity(null);
+    setSelectedOpportunityDetail(null);
     setPreview(null);
     setStep('list');
     setErrorMessage(null);
     setEditedTitle('');
     setEditedDescription('');
+  };
+
+  const handleOpenDetailModal = async (opportunity: BoondOpportunity) => {
+    setDetailModalOpportunity(opportunity);
+    setDetailModalData(null);
+    setDetailModalLoading(true);
+
+    try {
+      const detail = await getBoondOpportunityDetail(opportunity.id);
+      setDetailModalData(detail);
+    } catch {
+      // If detail fetch fails, just show basic info
+    } finally {
+      setDetailModalLoading(false);
+    }
+  };
+
+  const handleCloseDetailModal = () => {
+    setDetailModalOpportunity(null);
+    setDetailModalData(null);
+    setDetailModalLoading(false);
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -397,7 +445,7 @@ export function MyBoondOpportunities() {
                     <td className="py-2.5 px-4">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => setDetailModalOpportunity(opportunity)}
+                          onClick={() => handleOpenDetailModal(opportunity)}
                           className="text-left text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 font-medium"
                         >
                           {opportunity.title}
@@ -428,7 +476,7 @@ export function MyBoondOpportunities() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => setDetailModalOpportunity(opportunity)}
+                          onClick={() => handleOpenDetailModal(opportunity)}
                           leftIcon={<Eye className="h-3.5 w-3.5" />}
                         >
                           Voir
@@ -460,12 +508,18 @@ export function MyBoondOpportunities() {
       {/* Detail Modal */}
       <Modal
         isOpen={!!detailModalOpportunity}
-        onClose={() => setDetailModalOpportunity(null)}
+        onClose={handleCloseDetailModal}
         title="Détail de l'opportunité"
         size="lg"
       >
         {detailModalOpportunity && (
           <div className="space-y-4">
+            {detailModalLoading && (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-5 w-5 text-primary-500 animate-spin mr-2" />
+                <span className="text-sm text-gray-500">Chargement des détails...</span>
+              </div>
+            )}
             <div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Titre
@@ -488,7 +542,7 @@ export function MyBoondOpportunities() {
                   Client
                 </label>
                 <p className="text-gray-900 dark:text-gray-100">
-                  {detailModalOpportunity.company_name || '-'}
+                  {(detailModalData?.company_name || detailModalOpportunity.company_name) || '-'}
                 </p>
               </div>
             </div>
@@ -506,18 +560,62 @@ export function MyBoondOpportunities() {
                   Date de fin
                 </label>
                 <p className="text-gray-900 dark:text-gray-100">
-                  {formatDate(detailModalOpportunity.end_date)}
+                  {formatDate(detailModalData?.end_date || detailModalOpportunity.end_date)}
                 </p>
               </div>
             </div>
+            {detailModalData && (
+              <div className="grid grid-cols-2 gap-4">
+                {detailModalData.contact_name && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Contact
+                    </label>
+                    <p className="text-gray-900 dark:text-gray-100">
+                      {detailModalData.contact_name}
+                    </p>
+                  </div>
+                )}
+                {detailModalData.agency_name && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Agence
+                    </label>
+                    <p className="text-gray-900 dark:text-gray-100">
+                      {detailModalData.agency_name}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
             <div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Description
               </label>
-              <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap mt-1 max-h-64 overflow-y-auto text-sm">
-                {detailModalOpportunity.description || 'Aucune description'}
+              <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap mt-1 max-h-48 overflow-y-auto text-sm bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md">
+                {(detailModalData?.description || detailModalOpportunity.description) || 'Aucune description'}
               </p>
             </div>
+            {detailModalData?.criteria && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Critères
+                </label>
+                <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap mt-1 max-h-48 overflow-y-auto text-sm bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md">
+                  {detailModalData.criteria}
+                </p>
+              </div>
+            )}
+            {detailModalData?.expertise_area && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Domaine d'expertise
+                </label>
+                <p className="text-gray-900 dark:text-gray-100">
+                  {detailModalData.expertise_area}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </Modal>
@@ -527,7 +625,9 @@ export function MyBoondOpportunities() {
         isOpen={!!selectedOpportunity && step !== 'list'}
         onClose={handleCloseModal}
         title={
-          step === 'anonymizing'
+          step === 'loading-detail'
+            ? 'Chargement des informations...'
+            : step === 'anonymizing'
             ? 'Anonymisation en cours...'
             : step === 'preview'
             ? 'Prévisualisation'
@@ -539,6 +639,16 @@ export function MyBoondOpportunities() {
         }
         size="lg"
       >
+        {/* Loading detail state */}
+        {step === 'loading-detail' && (
+          <div className="text-center py-8">
+            <Loader2 className="h-12 w-12 text-primary-500 animate-spin mx-auto mb-4" />
+            <p className="text-gray-600 dark:text-gray-400">
+              Récupération des informations de l'opportunité...
+            </p>
+          </div>
+        )}
+
         {/* Anonymizing state */}
         {step === 'anonymizing' && (
           <div className="text-center py-8">

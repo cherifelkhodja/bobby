@@ -2,6 +2,7 @@ import { apiClient } from './client';
 import type {
   AnonymizeRequest,
   AnonymizedPreview,
+  BoondOpportunityDetail,
   BoondOpportunityListResponse,
   PaginationParams,
   PublishedOpportunity,
@@ -18,6 +19,20 @@ const BASE_PATH = '/published-opportunities';
 export async function getMyBoondOpportunities(): Promise<BoondOpportunityListResponse> {
   const response = await apiClient.get<BoondOpportunityListResponse>(
     `${BASE_PATH}/my-boond`
+  );
+  return response.data;
+}
+
+/**
+ * Get detailed information for a Boond opportunity.
+ * Includes description and criteria from /opportunities/{id}/information endpoint.
+ * Requires admin or commercial role.
+ */
+export async function getBoondOpportunityDetail(
+  opportunityId: string
+): Promise<BoondOpportunityDetail> {
+  const response = await apiClient.get<BoondOpportunityDetail>(
+    `${BASE_PATH}/my-boond/${opportunityId}`
   );
   return response.data;
 }
