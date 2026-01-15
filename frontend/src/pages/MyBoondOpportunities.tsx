@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Eye, Sparkles, Check, AlertCircle, Loader2, X, Calendar } from 'lucide-react';
+import { Search, Eye, Sparkles, Check, AlertCircle, Loader2 } from 'lucide-react';
 
 import {
   getMyBoondOpportunities,
@@ -8,7 +8,7 @@ import {
   publishOpportunity,
 } from '../api/publishedOpportunities';
 import { getErrorMessage } from '../api/client';
-import { Card, CardHeader } from '../components/ui/Card';
+import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
@@ -166,8 +166,6 @@ export function MyBoondOpportunities() {
       </div>
     );
   }
-
-  const isProcessing = step === 'anonymizing' || step === 'publishing';
 
   return (
     <div>
