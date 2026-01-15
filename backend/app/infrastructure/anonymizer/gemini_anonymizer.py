@@ -170,7 +170,13 @@ class GeminiAnonymizer:
         logger.info(f"Using Gemini model: {model_to_use}")
 
         try:
-            model = genai.GenerativeModel(model_to_use)
+            # Configure model with JSON response format to ensure proper parsing
+            model = genai.GenerativeModel(
+                model_to_use,
+                generation_config=genai.GenerationConfig(
+                    response_mime_type="application/json",
+                ),
+            )
 
             prompt = ANONYMIZATION_PROMPT.format(
                 title=title,
