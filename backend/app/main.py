@@ -18,6 +18,7 @@ from app.api.routes.v1 import (
     opportunities_router,
     users_router,
 )
+from app.quotation_generator.api import router as quotation_generator_router
 from app.config import settings
 from app.infrastructure.database.connection import engine
 from app.infrastructure.database.seed import seed_admin_user
@@ -71,3 +72,4 @@ app.include_router(cooptations_router, prefix="/api/v1/cooptations", tags=["Coop
 app.include_router(invitations_router, prefix="/api/v1/invitations", tags=["Invitations"])
 app.include_router(cv_transformer_router, prefix="/api/v1/cv-transformer", tags=["CV Transformer"])
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
+app.include_router(quotation_generator_router, prefix="/api/v1", tags=["Quotation Generator"])

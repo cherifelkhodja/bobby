@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Users, Settings, Shield, FileText } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Users, Settings, Shield, FileText, FileSpreadsheet } from 'lucide-react';
 
 import { useAuthStore } from '../../stores/authStore';
 
@@ -16,6 +16,7 @@ const toolsItems = [
 
 const adminItems = [
   { to: '/admin', icon: Shield, label: 'Administration' },
+  { to: '/quotation-generator', icon: FileSpreadsheet, label: 'Génération Devis' },
 ];
 
 export function Sidebar() {

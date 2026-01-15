@@ -13,6 +13,7 @@ import { MyCooptations } from './pages/MyCooptations';
 import { Profile } from './pages/Profile';
 import { Admin } from './pages/Admin';
 import { CvTransformer } from './pages/CvTransformer';
+import { QuotationGenerator } from './pages/QuotationGenerator';
 import type { UserRole } from './types';
 
 interface ProtectedRouteProps {
@@ -76,6 +77,14 @@ function App() {
           element={
             <ProtectedRoute requireAdmin>
               <Admin />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="quotation-generator"
+          element={
+            <ProtectedRoute requireAdmin>
+              <QuotationGenerator />
             </ProtectedRoute>
           }
         />

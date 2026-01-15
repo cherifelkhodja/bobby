@@ -1,0 +1,155 @@
+"""API dependencies for quotation generator."""
+
+from functools import lru_cache
+from typing import Annotated
+
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.dependencies import get_db, AdminUser
+from app.config import Settings, get_settings
+from app.quotation_generator.application.use_cases import (
+    PreviewBatchUseCase,
+    GenerateBatchUseCase,
+    GetBatchProgressUseCase,
+    DownloadBatchUseCase,
+    UploadTemplateUseCase,
+    ListTemplatesUseCase,
+)
+from app.quotation_generator.application.use_cases.generate_batch import (
+    StartGenerationUseCase,
+)
+from app.quotation_generator.application.use_cases.get_progress import (
+    GetBatchDetailsUseCase,
+    ListUserBatchesUseCase,
+)
+from app.quotation_generator.infrastructure.adapters import (
+    BoondManagerAdapter,
+    LibreOfficeAdapter,
+    RedisStorageAdapter,
+    PostgresTemplateRepository,
+)
+from app.quotation_generator.services import CSVParserService, TemplateFillerService
+
+
+def get_csv_parser() -> CSVParserService:
+    """Get CSV parser service."""
+    return CSVParserService()
+
+
+def get_template_filler() -> TemplateFillerService:
+    """Get template filler service."""
+    return TemplateFillerService()
+
+
+async def get_batch_storage(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> RedisStorageAdapter:
+    """Get batch storage adapter."""
+    return RedisStorageAdapter(settings.REDIS_URL)
+
+
+async def get_erp_adapter(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> BoondManagerAdapter:
+    """Get ERP (BoondManager) adapter."""
+    return BoondManagerAdapter(settings)
+
+
+def get_pdf_converter() -> LibreOfficeAdapter:
+    """Get PDF converter adapter."""
+    return LibreOfficeAdapter()
+
+
+async def get_template_repository(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> PostgresTemplateRepository:
+    """Get template repository."""
+    return PostgresTemplateRepository(db)
+
+
+# Use Case factories
+
+
+async def get_preview_batch_use_case(
+    csv_parser: Annotated[CSVParserService, Depends(get_csv_parser)],
+    batch_storage: Annotated[RedisStorageAdapter, Depends(get_batch_storage)],
+) -> PreviewBatchUseCase:
+    """Get preview batch use case."""
+    return PreviewBatchUseCase(csv_parser, batch_storage)
+
+
+async def get_generate_batch_use_case(
+    batch_storage: Annotated[RedisStorageAdapter, Depends(get_batch_storage)],
+    erp_adapter: Annotated[BoondManagerAdapter, Depends(get_erp_adapter)],
+    template_repository: Annotated[
+        PostgresTemplateRepository, Depends(get_template_repository)
+    ],
+    pdf_converter: Annotated[LibreOfficeAdapter, Depends(get_pdf_converter)],
+    template_filler: Annotated[TemplateFillerService, Depends(get_template_filler)],
+) -> GenerateBatchUseCase:
+    """Get generate batch use case."""
+    return GenerateBatchUseCase(
+        batch_storage=batch_storage,
+        erp_adapter=erp_adapter,
+        template_repository=template_repository,
+        pdf_converter=pdf_converter,
+        template_filler=template_filler,
+    )
+
+
+async def get_start_generation_use_case(
+    batch_storage: Annotated[RedisStorageAdapter, Depends(get_batch_storage)],
+    generate_use_case: Annotated[
+        GenerateBatchUseCase, Depends(get_generate_batch_use_case)
+    ],
+) -> StartGenerationUseCase:
+    """Get start generation use case."""
+    return StartGenerationUseCase(batch_storage, generate_use_case)
+
+
+async def get_progress_use_case(
+    batch_storage: Annotated[RedisStorageAdapter, Depends(get_batch_storage)],
+) -> GetBatchProgressUseCase:
+    """Get batch progress use case."""
+    return GetBatchProgressUseCase(batch_storage)
+
+
+async def get_batch_details_use_case(
+    batch_storage: Annotated[RedisStorageAdapter, Depends(get_batch_storage)],
+) -> GetBatchDetailsUseCase:
+    """Get batch details use case."""
+    return GetBatchDetailsUseCase(batch_storage)
+
+
+async def get_list_user_batches_use_case(
+    batch_storage: Annotated[RedisStorageAdapter, Depends(get_batch_storage)],
+) -> ListUserBatchesUseCase:
+    """Get list user batches use case."""
+    return ListUserBatchesUseCase(batch_storage)
+
+
+async def get_download_batch_use_case(
+    batch_storage: Annotated[RedisStorageAdapter, Depends(get_batch_storage)],
+) -> DownloadBatchUseCase:
+    """Get download batch use case."""
+    return DownloadBatchUseCase(batch_storage)
+
+
+async def get_upload_template_use_case(
+    template_repository: Annotated[
+        PostgresTemplateRepository, Depends(get_template_repository)
+    ],
+    template_filler: Annotated[TemplateFillerService, Depends(get_template_filler)],
+) -> UploadTemplateUseCase:
+    """Get upload template use case."""
+    return UploadTemplateUseCase(template_repository, template_filler)
+
+
+async def get_list_templates_use_case(
+    template_repository: Annotated[
+        PostgresTemplateRepository, Depends(get_template_repository)
+    ],
+) -> ListTemplatesUseCase:
+    """Get list templates use case."""
+    return ListTemplatesUseCase(template_repository)
