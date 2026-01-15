@@ -180,14 +180,29 @@ class GeminiAnonymizer:
             # Use asyncio.to_thread to avoid blocking the event loop
             response = await asyncio.to_thread(model.generate_content, prompt)
 
-            if not response.text:
+            # Safely extract text from response
+            try:
+                response_text = response.text
+            except (KeyError, ValueError, AttributeError) as e:
+                # Handle cases where response.text fails (blocked content, etc.)
+                logger.error(f"Failed to extract text from Gemini response: {type(e).__name__}: {e}")
+                # Try to get more info about the response
+                if hasattr(response, 'candidates') and response.candidates:
+                    candidate = response.candidates[0]
+                    if hasattr(candidate, 'finish_reason'):
+                        logger.error(f"Finish reason: {candidate.finish_reason}")
+                    if hasattr(candidate, 'safety_ratings'):
+                        logger.error(f"Safety ratings: {candidate.safety_ratings}")
+                raise ValueError("La réponse de Gemini n'a pas pu être extraite. Veuillez réessayer.")
+
+            if not response_text:
                 raise ValueError("La réponse de Gemini est vide")
 
             # Log raw response for debugging
-            logger.debug(f"Raw Gemini response: {response.text[:500]}")
+            logger.debug(f"Raw Gemini response: {response_text[:500]}")
 
             # Clean and extract JSON from response
-            json_text = self._clean_json_response(response.text)
+            json_text = self._clean_json_response(response_text)
 
             # Parse JSON
             data = json.loads(json_text)
