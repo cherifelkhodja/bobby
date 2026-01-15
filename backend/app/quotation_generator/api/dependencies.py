@@ -112,12 +112,30 @@ async def get_generate_batch_use_case(
 
 async def get_start_generation_use_case(
     batch_storage: Annotated[RedisStorageAdapter, Depends(get_batch_storage)],
-    generate_use_case: Annotated[
-        GenerateBatchUseCase, Depends(get_generate_batch_use_case)
-    ],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> StartGenerationUseCase:
-    """Get start generation use case."""
-    return StartGenerationUseCase(batch_storage, generate_use_case)
+    """Get start generation use case.
+
+    Uses a factory to create GenerateBatchUseCase with fresh DB session
+    for background task execution.
+    """
+    from app.infrastructure.database.connection import async_session_factory
+
+    def create_generate_use_case() -> GenerateBatchUseCase:
+        """Factory that creates GenerateBatchUseCase with fresh DB session."""
+        # Create a new session for the background task
+        session = async_session_factory()
+        template_repository = PostgresTemplateRepository(session)
+
+        return GenerateBatchUseCase(
+            batch_storage=RedisStorageAdapter(settings.REDIS_URL),
+            erp_adapter=BoondManagerAdapter(settings),
+            template_repository=template_repository,
+            pdf_converter=LibreOfficeAdapter(),
+            template_filler=TemplateFillerService(),
+        )
+
+    return StartGenerationUseCase(batch_storage, create_generate_use_case)
 
 
 async def get_progress_use_case(

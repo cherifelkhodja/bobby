@@ -6,7 +6,7 @@ import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 from uuid import UUID
 
 from app.quotation_generator.domain.entities import QuotationBatch
@@ -235,16 +235,16 @@ class StartGenerationUseCase:
     def __init__(
         self,
         batch_storage: BatchStoragePort,
-        generate_use_case: GenerateBatchUseCase,
+        generate_use_case_factory: Callable[[], GenerateBatchUseCase],
     ) -> None:
         """Initialize use case.
 
         Args:
             batch_storage: Storage for batch state.
-            generate_use_case: The generation use case to run.
+            generate_use_case_factory: Factory to create GenerateBatchUseCase with fresh DB session.
         """
         self.batch_storage = batch_storage
-        self.generate_use_case = generate_use_case
+        self.generate_use_case_factory = generate_use_case_factory
 
     async def execute(
         self,
@@ -272,9 +272,9 @@ class StartGenerationUseCase:
         batch.status = BatchStatus.PENDING
         await self.batch_storage.save_batch(batch)
 
-        # Start generation in background
+        # Start generation in background with a fresh use case (new DB session)
         asyncio.create_task(
-            self.generate_use_case.execute(batch_id, template_name)
+            self._run_generation(batch_id, template_name)
         )
 
         return {
@@ -282,3 +282,30 @@ class StartGenerationUseCase:
             "status": "started",
             "total_quotations": batch.total_count,
         }
+
+    async def _run_generation(self, batch_id: UUID, template_name: str) -> None:
+        """Run generation with a fresh use case instance.
+
+        This creates a new DB session for the background task.
+        """
+        try:
+            # Create fresh use case with new DB session
+            generate_use_case = self.generate_use_case_factory()
+
+            # Execute with proper session management
+            session = generate_use_case.template_repository.session
+            try:
+                await generate_use_case.execute(batch_id, template_name)
+            finally:
+                # Close the session when done
+                await session.close()
+        except Exception as e:
+            logger.error(f"Background generation failed: {e}", exc_info=True)
+            # Try to mark batch as failed
+            try:
+                batch = await self.batch_storage.get_batch(batch_id)
+                if batch and batch.status != BatchStatus.COMPLETED:
+                    batch.mark_failed(f"Generation error: {str(e)}")
+                    await self.batch_storage.save_batch(batch)
+            except Exception:
+                pass
