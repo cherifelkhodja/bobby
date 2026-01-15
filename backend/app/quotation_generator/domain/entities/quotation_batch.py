@@ -252,6 +252,13 @@ class QuotationBatch:
                     "object_of_need": q.object_of_need,
                     "comments": q.comments,
                     "start_project": q.start_project.isoformat(),
+                    # Additional Thales fields
+                    "eacq_number": q.eacq_number,
+                    "is_renewal": q.is_renewal,
+                    "in_situ_ratio": q.in_situ_ratio,
+                    "subcontracting": q.subcontracting,
+                    "tier2_supplier": q.tier2_supplier,
+                    "tier3_supplier": q.tier3_supplier,
                     "is_valid": q.is_valid,
                     "validation_errors": q.validation_errors,
                 }

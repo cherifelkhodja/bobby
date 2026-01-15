@@ -72,6 +72,13 @@ class Quotation:
     max_price: Money
     start_project: date
     comments: Optional[str] = None
+    # Additional Thales fields
+    eacq_number: str = "mail"
+    is_renewal: bool = True
+    in_situ_ratio: str = "50%"
+    subcontracting: bool = False
+    tier2_supplier: str = ""
+    tier3_supplier: str = ""
 
     # Internal state
     id: UUID = field(default_factory=uuid4)
@@ -248,10 +255,10 @@ class Quotation:
             "procurement_buyer": "M Chérif GUESSOUM",
             "sow_reference": self.sow_reference,
             "object_of_need": self.object_of_need,
-            "eacq_number": "mail",
+            "eacq_number": self.eacq_number,
             "reference": boond_reference or self.boond_reference or "",
             "sales_representative": "M Cherif EL KHODJA\n+33 7 57 81 73 83\ncherif.elkhodja@geminiconsulting.fr",
-            "renewal": "YES",
+            "renewal": "YES" if self.is_renewal else "NO",
             "initial_first_starting_date": self.start_project.strftime("%Y-%m-%d"),
             "total_uo": str(self.quantity),
             "po_start_date": self.period.format_start(),
@@ -261,10 +268,10 @@ class Quotation:
             "activity_country": "France (IDF)",
             "complexity_level": self.complexity,
             "gfa_max_price": f"{self.max_price.amount:.2f}",
-            "in_situ_ratio": "50%",
-            "subcontracting": "NO",
-            "tier2_supplier": "",
-            "tier3_supplier": "",
+            "in_situ_ratio": self.in_situ_ratio,
+            "subcontracting": "YES" if self.subcontracting else "NO",
+            "tier2_supplier": self.tier2_supplier,
+            "tier3_supplier": self.tier3_supplier,
             "additional_comments": self.comments or "",
         }
 

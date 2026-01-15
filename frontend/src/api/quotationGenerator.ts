@@ -39,6 +39,13 @@ export interface QuotationPreviewItem {
   object_of_need: string;
   comments: string | null;
   start_project: string;
+  // Additional Thales fields
+  eacq_number: string;
+  is_renewal: boolean;
+  in_situ_ratio: string;
+  subcontracting: boolean;
+  tier2_supplier: string;
+  tier3_supplier: string;
   // Validation
   is_valid: boolean;
   validation_errors: string[];

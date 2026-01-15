@@ -610,9 +610,14 @@ function QuotationDetailsModal({ quotation, isOpen, onClose }: QuotationDetailsM
             Période & Tarification
           </h4>
           <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+            <DetailRow label="Date du devis" value={new Date().toISOString().split('T')[0]} />
+            <DetailRow label="Renouvellement" value={quotation.is_renewal ? 'Oui' : 'Non'} />
+            {quotation.is_renewal && (
+              <DetailRow label="Date début initiale" value={quotation.start_project} />
+            )}
             <DetailRow label="Date début PO" value={quotation.period.start} />
             <DetailRow label="Date fin PO" value={quotation.period.end} />
-            <DetailRow label="Date début projet" value={quotation.start_project} />
+            <DetailRow label="N° EACQ" value={quotation.eacq_number} />
             <DetailRow label="TJM" value={formatCurrency(quotation.tjm)} />
             <DetailRow label="Quantité (jours)" value={quotation.quantity} />
             <DetailRow label="Total HT" value={formatCurrency(quotation.total_ht)} />
@@ -631,6 +636,24 @@ function QuotationDetailsModal({ quotation, isOpen, onClose }: QuotationDetailsM
             <DetailRow label="Activité C22" value={quotation.c22_activity} />
             <DetailRow label="Complexité" value={quotation.complexity} />
             <DetailRow label="GFA (Prix max)" value={formatCurrency(quotation.max_price)} />
+            <DetailRow label="Taux présentiel" value={quotation.in_situ_ratio} />
+          </dl>
+        </div>
+
+        {/* Subcontracting */}
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
+            <span className="w-2 h-2 bg-pink-500 rounded-full mr-2" />
+            Sous-traitance
+          </h4>
+          <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+            <DetailRow label="Sous-traitance" value={quotation.subcontracting ? 'Oui' : 'Non'} />
+            {quotation.subcontracting && (
+              <>
+                <DetailRow label="Fournisseur Tier 2" value={quotation.tier2_supplier || '-'} />
+                <DetailRow label="Fournisseur Tier 3" value={quotation.tier3_supplier || '-'} />
+              </>
+            )}
           </dl>
         </div>
 

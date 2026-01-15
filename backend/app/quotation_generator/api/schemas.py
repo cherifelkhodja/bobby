@@ -39,6 +39,13 @@ class QuotationPreviewItem(BaseModel):
     object_of_need: str
     comments: Optional[str] = None
     start_project: str
+    # Additional Thales fields
+    eacq_number: str
+    is_renewal: bool
+    in_situ_ratio: str
+    subcontracting: bool
+    tier2_supplier: str
+    tier3_supplier: str
     # Validation
     is_valid: bool
     validation_errors: list[str]

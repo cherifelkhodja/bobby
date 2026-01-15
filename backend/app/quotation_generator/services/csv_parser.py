@@ -503,6 +503,16 @@ class CSVParserService:
         title = self._get_value(row, "title")
         description = self._get_value(row, "description")
 
+        # Additional Thales fields with defaults
+        eacq_number = self._get_value(row, "eacq_number") or "mail"
+        renewal_str = self._get_value(row, "renewal")
+        is_renewal = self._parse_bool(renewal_str, default=True)
+        in_situ_ratio = self._get_value(row, "in_situ_ratio") or "50%"
+        subcontracting_str = self._get_value(row, "subcontracting")
+        subcontracting = self._parse_bool(subcontracting_str, default=False)
+        tier2_supplier = self._get_value(row, "tier2_supplier") or ""
+        tier3_supplier = self._get_value(row, "tier3_supplier") or ""
+
         # Parse max_price - auto-fill if not provided and domain is 124-Data
         max_price_str = self._get_value(row, "max_price")
         max_price: Decimal
@@ -579,6 +589,12 @@ class CSVParserService:
             max_price=Money(amount=max_price),
             start_project=start_project,
             comments=comments,
+            eacq_number=eacq_number,
+            is_renewal=is_renewal,
+            in_situ_ratio=in_situ_ratio,
+            subcontracting=subcontracting,
+            tier2_supplier=tier2_supplier,
+            tier3_supplier=tier3_supplier,
             row_index=row_index,
         )
 
@@ -673,6 +689,16 @@ class CSVParserService:
         title = self._get_value(row, "title")
         description = self._get_value(row, "description")
 
+        # Additional Thales fields with defaults
+        eacq_number = self._get_value(row, "eacq_number") or "mail"
+        renewal_str = self._get_value(row, "renewal")
+        is_renewal = self._parse_bool(renewal_str, default=True)
+        in_situ_ratio = self._get_value(row, "in_situ_ratio") or "50%"
+        subcontracting_str = self._get_value(row, "subcontracting")
+        subcontracting = self._parse_bool(subcontracting_str, default=False)
+        tier2_supplier = self._get_value(row, "tier2_supplier") or ""
+        tier3_supplier = self._get_value(row, "tier3_supplier") or ""
+
         # Parse max_price - auto-fill if not provided and domain is 124-Data
         max_price_str = self._get_value(row, "max_price")
         max_price: Decimal
@@ -744,6 +770,12 @@ class CSVParserService:
             max_price=Money(amount=max_price),
             start_project=start_project,
             comments=comments,
+            eacq_number=eacq_number,
+            is_renewal=is_renewal,
+            in_situ_ratio=in_situ_ratio,
+            subcontracting=subcontracting,
+            tier2_supplier=tier2_supplier,
+            tier3_supplier=tier3_supplier,
             row_index=row_index,
         )
 
@@ -862,6 +894,29 @@ class CSVParserService:
             return int(normalized)
         except ValueError:
             raise ValueError(f"Invalid integer format for {field_name}: {value}")
+
+    def _parse_bool(self, value: Optional[str], default: bool = False) -> bool:
+        """Parse boolean from string.
+
+        Recognizes: yes/no, oui/non, true/false, 1/0
+
+        Args:
+            value: Boolean string.
+            default: Default value if string is empty/None.
+
+        Returns:
+            Parsed boolean.
+        """
+        if not value:
+            return default
+
+        value_lower = value.lower().strip()
+        if value_lower in ("yes", "oui", "true", "1", "y", "o"):
+            return True
+        if value_lower in ("no", "non", "false", "0", "n"):
+            return False
+
+        return default
 
     def _create_error_quotation(
         self, row: dict, row_index: int, error_message: str
