@@ -7,7 +7,7 @@ import asyncio
 import json
 from typing import Any
 
-from google import genai
+import google.generativeai as genai
 
 from app.config import Settings
 
@@ -87,15 +87,15 @@ class GeminiClient:
             settings: Application settings containing the API key.
         """
         self.settings = settings
-        self._client: genai.Client | None = None
+        self._configured = False
 
-    def _get_client(self) -> genai.Client:
-        """Get or create the Gemini API client."""
-        if self._client is None:
+    def _configure(self) -> None:
+        """Configure the Gemini API with credentials."""
+        if not self._configured:
             if not self.settings.GEMINI_API_KEY:
                 raise ValueError("GEMINI_API_KEY n'est pas configurée")
-            self._client = genai.Client(api_key=self.settings.GEMINI_API_KEY)
-        return self._client
+            genai.configure(api_key=self.settings.GEMINI_API_KEY)
+            self._configured = True
 
     async def extract_cv_data(self, cv_text: str) -> CvData:
         """Extract structured data from CV text using Gemini.
@@ -109,17 +109,15 @@ class GeminiClient:
         Raises:
             ValueError: If the API key is not configured or extraction fails.
         """
-        client = self._get_client()
+        self._configure()
 
         try:
+            model = genai.GenerativeModel("gemini-2.5-flash-lite")
+
             prompt = CV_EXTRACTION_PROMPT + cv_text
 
             # Use asyncio.to_thread to avoid blocking the event loop
-            response = await asyncio.to_thread(
-                client.models.generate_content,
-                model="gemini-2.5-flash-lite",
-                contents=prompt,
-            )
+            response = await asyncio.to_thread(model.generate_content, prompt)
 
             if not response.text:
                 raise ValueError("La réponse de Gemini est vide")
