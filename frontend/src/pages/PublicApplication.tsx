@@ -29,7 +29,7 @@ const applicationSchema = z.object({
   phone: z
     .string()
     .min(10, 'Numéro de téléphone invalide')
-    .regex(/^\+?[0-9\s\-]+$/, 'Format de téléphone invalide'),
+    .regex(/^\+?[0-9\s-]+$/, 'Format de téléphone invalide'),
   job_title: z.string().min(1, 'Le titre du poste est requis').max(200),
   tjm_min: z.number().min(0, 'Le TJM minimum doit être positif'),
   tjm_max: z.number().min(0, 'Le TJM maximum doit être positif'),
