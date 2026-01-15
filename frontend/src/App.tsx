@@ -15,6 +15,8 @@ import { Admin } from './pages/Admin';
 import { CvTransformer } from './pages/CvTransformer';
 import { QuotationGenerator } from './pages/QuotationGenerator';
 import HRDashboard from './pages/HRDashboard';
+import CreateJobPosting from './pages/CreateJobPosting';
+import JobPostingDetails from './pages/JobPostingDetails';
 import PublicApplication from './pages/PublicApplication';
 import type { UserRole } from './types';
 
@@ -96,6 +98,22 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin', 'rh']}>
               <HRDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="rh/annonces/nouvelle/:oppId"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'rh']}>
+              <CreateJobPosting />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="rh/annonces/:postingId"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'rh']}>
+              <JobPostingDetails />
             </ProtectedRoute>
           }
         />
