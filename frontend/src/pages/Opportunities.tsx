@@ -45,6 +45,11 @@ export function Opportunities() {
     skills: pub.skills,
     location: null,
     is_open: pub.status === 'published',
+    is_shared: true, // Published opportunities are shared
+    owner_id: null,
+    days_until_deadline: null,
+    synced_at: pub.created_at,
+    created_at: pub.created_at,
   });
 
   if (isLoading) {
