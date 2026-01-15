@@ -841,6 +841,17 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [downloadingRow, setDownloadingRow] = useState<number | null>(null);
 
+  // Format name as "Prénom NOM"
+  const formatName = (fullName: string) => {
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      const firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+      const lastName = parts.slice(1).join(' ').toUpperCase();
+      return `${firstName} ${lastName}`;
+    }
+    return fullName;
+  };
+
   // Fetch batch details with quotation statuses (includes latest paths)
   const { data: batchDetails } = useQuery({
     queryKey: ['batch-details', batchId],
@@ -1001,7 +1012,7 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {q.resource_name}
+                        {formatName(q.resource_name)}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {q.resource_trigramme}
@@ -1018,7 +1029,7 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {q.status === 'completed' && q.pdf_path ? (
+                      {q.status === 'completed' ? (
                         <Button
                           size="sm"
                           variant="outline"
