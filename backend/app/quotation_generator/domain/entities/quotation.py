@@ -211,8 +211,8 @@ class Quotation:
         # Use quotation_date from CSV if available, otherwise period start
         effective_date = self.quotation_date or self.period.start_date
 
-        # Title: use object_of_need first, then need_title, then fallback
-        title = self.object_of_need or self.need_title or "Prestation"
+        # Title: use need_title first (Titre du besoin), then object_of_need, then fallback
+        title = self.need_title or self.object_of_need or "Prestation"
 
         return {
             "data": {
