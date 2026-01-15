@@ -9,9 +9,8 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
-import google.generativeai as genai
+from google import genai
 
 from app.config import Settings
 
@@ -57,11 +56,11 @@ RÈGLES D'ANONYMISATION :
    - Reste fidèle au contenu technique
 
 FORMAT DE SORTIE (JSON strict) :
-{
+{{
   "title": "Titre anonymisé du poste",
   "description": "Description anonymisée et reformulée",
   "skills": ["Compétence1", "Compétence2", "Compétence3"]
-}
+}}
 
 ENTRÉE À ANONYMISER :
 Titre: {title}
@@ -91,15 +90,15 @@ class GeminiAnonymizer:
             settings: Application settings containing the API key.
         """
         self.settings = settings
-        self._configured = False
+        self._client: genai.Client | None = None
 
-    def _configure(self) -> None:
-        """Configure the Gemini API with credentials."""
-        if not self._configured:
+    def _get_client(self) -> genai.Client:
+        """Get or create the Gemini client."""
+        if self._client is None:
             if not self.settings.GEMINI_API_KEY:
                 raise ValueError("GEMINI_API_KEY n'est pas configurée")
-            genai.configure(api_key=self.settings.GEMINI_API_KEY)
-            self._configured = True
+            self._client = genai.Client(api_key=self.settings.GEMINI_API_KEY)
+        return self._client
 
     async def test_model(self, model_name: str) -> dict:
         """Test a Gemini model with a simple prompt.
@@ -113,16 +112,15 @@ class GeminiAnonymizer:
         Raises:
             ValueError: If the test fails.
         """
-        self._configure()
-
         import time
         start_time = time.time()
 
         try:
-            model = genai.GenerativeModel(model_name)
+            client = self._get_client()
             response = await asyncio.to_thread(
-                model.generate_content,
-                "Réponds uniquement avec le JSON suivant: {\"status\": \"ok\"}"
+                client.models.generate_content,
+                model=model_name,
+                contents='Réponds uniquement avec le JSON suivant: {"status": "ok"}',
             )
             elapsed = time.time() - start_time
 
@@ -164,19 +162,11 @@ class GeminiAnonymizer:
         Raises:
             ValueError: If the API key is not configured or anonymization fails.
         """
-        self._configure()
-
         model_to_use = model_name or self.DEFAULT_MODEL
         logger.info(f"Using Gemini model: {model_to_use}")
 
         try:
-            # Configure model with JSON response format to ensure proper parsing
-            model = genai.GenerativeModel(
-                model_to_use,
-                generation_config=genai.GenerationConfig(
-                    response_mime_type="application/json",
-                ),
-            )
+            client = self._get_client()
 
             prompt = ANONYMIZATION_PROMPT.format(
                 title=title,
@@ -184,38 +174,16 @@ class GeminiAnonymizer:
             )
 
             # Use asyncio.to_thread to avoid blocking the event loop
-            response = await asyncio.to_thread(model.generate_content, prompt)
+            response = await asyncio.to_thread(
+                client.models.generate_content,
+                model=model_to_use,
+                contents=prompt,
+                config=genai.types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                ),
+            )
 
-            # Safely extract text from response
-            # Use direct access to candidates to avoid SDK parsing issues with newer models
-            response_text = None
-            try:
-                # First try the standard way
-                response_text = response.text
-            except (KeyError, ValueError, AttributeError) as e:
-                # If standard access fails, try direct candidate access
-                logger.warning(f"Standard response.text failed ({type(e).__name__}), trying direct candidate access")
-                try:
-                    if hasattr(response, 'candidates') and response.candidates:
-                        candidate = response.candidates[0]
-                        if hasattr(candidate, 'content') and candidate.content:
-                            parts = candidate.content.parts
-                            if parts:
-                                response_text = parts[0].text
-                except Exception as inner_e:
-                    logger.error(f"Direct candidate access also failed: {inner_e}")
-
-                if not response_text:
-                    # Log diagnostic info
-                    logger.error(f"Failed to extract text from Gemini response: {type(e).__name__}: {e}")
-                    if hasattr(response, 'candidates') and response.candidates:
-                        candidate = response.candidates[0]
-                        if hasattr(candidate, 'finish_reason'):
-                            logger.error(f"Finish reason: {candidate.finish_reason}")
-                        if hasattr(candidate, 'safety_ratings'):
-                            logger.error(f"Safety ratings: {candidate.safety_ratings}")
-                    raise ValueError("La réponse de Gemini n'a pas pu être extraite. Veuillez réessayer.")
-
+            response_text = response.text
             if not response_text:
                 raise ValueError("La réponse de Gemini est vide")
 
@@ -253,10 +221,6 @@ class GeminiAnonymizer:
         except json.JSONDecodeError as e:
             logger.error(f"JSON parsing error: {e}. JSON text was: {json_text[:200] if 'json_text' in locals() else 'N/A'}")
             raise ValueError(f"Erreur de parsing JSON. Veuillez réessayer.")
-        except KeyError as e:
-            # KeyError can happen when Gemini SDK fails to parse response
-            logger.error(f"KeyError during anonymization (likely malformed Gemini response): {e}")
-            raise ValueError(f"Réponse Gemini mal formée. Veuillez réessayer avec un autre modèle.")
         except ValueError:
             # Re-raise ValueError as-is (already formatted)
             raise
