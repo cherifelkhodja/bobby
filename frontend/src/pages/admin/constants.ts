@@ -30,3 +30,7 @@ export const PREDEFINED_TEMPLATES = [
   { name: 'gemini', displayName: 'Template Gemini', description: 'Format standard Gemini Consulting' },
   { name: 'craftmania', displayName: 'Template Craftmania', description: 'Format standard Craftmania' },
 ] as const;
+
+export const QUOTATION_TEMPLATES = [
+  { name: 'thales_pstf', displayName: 'Template Thales PSTF', description: 'Devis Prestation de Service Thales' },
+] as const;
