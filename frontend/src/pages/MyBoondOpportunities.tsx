@@ -123,7 +123,10 @@ export function MyBoondOpportunities() {
     mutationFn: publishOpportunity,
     onSuccess: () => {
       setStep('success');
-      queryClient.invalidateQueries({ queryKey: ['my-boond-opportunities'] });
+      // Defer query invalidation to avoid render interference
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['my-boond-opportunities'] });
+      }, 100);
     },
     onError: (error) => {
       setErrorMessage(getErrorMessage(error));
