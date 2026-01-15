@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import tempfile
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
@@ -160,13 +161,13 @@ class GenerateBatchUseCase:
                 )
                 generated_files.append(merged_pdf_path)
 
-                # Clean up intermediate files
+                # Clean up intermediate files (keep merged PDF)
                 boond_pdf_path.unlink(missing_ok=True)
                 template_pdf_path.unlink(missing_ok=True)
                 excel_path.unlink(missing_ok=True)
 
-                # Mark as completed
-                quotation.mark_as_completed(boond_id, boond_reference)
+                # Mark as completed with PDF path
+                quotation.mark_as_completed(boond_id, boond_reference, str(merged_pdf_path))
                 await self._update_progress(batch)
 
                 logger.info(
@@ -192,14 +193,18 @@ class GenerateBatchUseCase:
                 quotation.mark_as_failed(f"Unexpected error: {str(e)}")
                 await self._update_progress(batch)
 
-        # Merge all quotation PDFs into one final PDF
+        # Create final outputs (merged PDF and ZIP)
         if generated_files:
+            # Create merged PDF
             final_pdf_path = await self._create_final_pdf(batch, generated_files)
 
+            # Create ZIP archive of all individual PDFs
+            zip_path = await self._create_zip_archive(batch, generated_files)
+
             if batch.has_errors:
-                batch.mark_partial(str(final_pdf_path))
+                batch.mark_partial(str(final_pdf_path), str(zip_path))
             else:
-                batch.mark_completed(str(final_pdf_path))
+                batch.mark_completed(str(final_pdf_path), str(zip_path))
         else:
             batch.mark_failed("No quotations were successfully generated")
 
@@ -226,6 +231,8 @@ class GenerateBatchUseCase:
     ) -> Path:
         """Create final merged PDF with all quotations.
 
+        Individual PDFs are kept for individual download.
+
         Args:
             batch: The batch being processed.
             pdf_files: List of PDF file paths to merge.
@@ -237,18 +244,42 @@ class GenerateBatchUseCase:
         final_filename = f"devis_thales_{timestamp}.pdf"
         final_path = self.output_dir / str(batch.id) / final_filename
 
-        # If only one PDF, just rename it
+        # If only one PDF, copy it (keep original for individual download)
         if len(pdf_files) == 1:
-            pdf_files[0].rename(final_path)
+            import shutil
+            shutil.copy(pdf_files[0], final_path)
         else:
-            # Merge all PDFs into one
+            # Merge all PDFs into one (keep individual files)
             await self.pdf_converter.merge_pdfs(pdf_files, final_path)
-            # Clean up individual files
-            for pdf_file in pdf_files:
-                pdf_file.unlink(missing_ok=True)
 
         logger.info(f"Created final PDF: {final_path} with {len(pdf_files)} quotations")
         return final_path
+
+    async def _create_zip_archive(
+        self,
+        batch: QuotationBatch,
+        pdf_files: list[Path],
+    ) -> Path:
+        """Create ZIP archive with all individual quotation PDFs.
+
+        Args:
+            batch: The batch being processed.
+            pdf_files: List of PDF file paths to include.
+
+        Returns:
+            Path to the ZIP archive.
+        """
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        zip_filename = f"devis_thales_{timestamp}.zip"
+        zip_path = self.output_dir / str(batch.id) / zip_filename
+
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for pdf_file in pdf_files:
+                # Use just the filename in the ZIP
+                zf.write(pdf_file, pdf_file.name)
+
+        logger.info(f"Created ZIP archive: {zip_path} with {len(pdf_files)} PDFs")
+        return zip_path
 
 
 class StartGenerationUseCase:

@@ -105,7 +105,8 @@ class BatchProgressResponse(BaseModel):
     progress_percentage: float
     is_complete: bool
     has_errors: bool
-    zip_file_path: Optional[str] = None
+    merged_pdf_path: Optional[str] = None  # Merged PDF with all quotations
+    zip_file_path: Optional[str] = None  # ZIP archive with individual PDFs
     error_message: Optional[str] = None
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
@@ -122,6 +123,7 @@ class QuotationStatusItem(BaseModel):
     status: str
     boond_quotation_id: Optional[str] = None
     boond_reference: Optional[str] = None
+    pdf_path: Optional[str] = None  # Path to individual PDF for this quotation
     error_message: Optional[str] = None
     is_valid: bool
     validation_errors: list[str]
@@ -143,7 +145,8 @@ class BatchDetailsResponse(BaseModel):
     progress_percentage: float
     is_complete: bool
     has_errors: bool
-    zip_file_path: Optional[str] = None
+    merged_pdf_path: Optional[str] = None  # Merged PDF with all quotations
+    zip_file_path: Optional[str] = None  # ZIP archive with individual PDFs
     error_message: Optional[str] = None
     quotations: list[QuotationStatusItem]
 

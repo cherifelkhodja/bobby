@@ -97,6 +97,7 @@ class GetBatchDetailsUseCase:
                 "status": q.status.value,
                 "boond_quotation_id": q.boond_quotation_id,
                 "boond_reference": q.boond_reference,
+                "pdf_path": q.pdf_path,  # Individual PDF path for download
                 "error_message": q.error_message,
                 "is_valid": q.is_valid,
                 "validation_errors": q.validation_errors,
@@ -116,7 +117,8 @@ class GetBatchDetailsUseCase:
             "progress_percentage": round(batch.progress_percentage, 1),
             "is_complete": batch.is_complete,
             "has_errors": batch.has_errors,
-            "zip_file_path": batch.zip_file_path,
+            "merged_pdf_path": batch.merged_pdf_path,  # Merged PDF with all quotations
+            "zip_file_path": batch.zip_file_path,  # ZIP archive with individual PDFs
             "error_message": batch.error_message,
             "quotations": quotations,
         }

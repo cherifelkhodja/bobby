@@ -128,17 +128,6 @@ export function QuotationGenerator() {
     input.click();
   }, [handleFile]);
 
-  // Download handler
-  const handleDownload = async () => {
-    if (!batchId) return;
-    try {
-      await quotationGeneratorApi.downloadBatchAsFile(batchId);
-      toast.success('Téléchargement démarré');
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Erreur lors du téléchargement');
-    }
-  };
-
   // Reset to start
   const handleReset = () => {
     setStep('upload');
@@ -193,10 +182,10 @@ export function QuotationGenerator() {
         <GeneratingStep progress={progressData} />
       )}
 
-      {step === 'complete' && progressData && (
+      {step === 'complete' && progressData && batchId && (
         <CompleteStep
           progress={progressData}
-          onDownload={handleDownload}
+          batchId={batchId}
           onReset={handleReset}
         />
       )}
@@ -782,63 +771,210 @@ function GeneratingStep({ progress }: GeneratingStepProps) {
 
 interface CompleteStepProps {
   progress: BatchProgressResponse;
-  onDownload: () => void;
+  batchId: string;
   onReset: () => void;
 }
 
-function CompleteStep({ progress, onDownload, onReset }: CompleteStepProps) {
+function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
   const hasErrors = progress.has_errors;
+  const [isDownloadingMerged, setIsDownloadingMerged] = useState(false);
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const [downloadingRow, setDownloadingRow] = useState<number | null>(null);
+
+  // Fetch batch details with quotation statuses
+  const { data: batchDetails } = useQuery({
+    queryKey: ['batch-details', batchId],
+    queryFn: () => quotationGeneratorApi.getBatchDetails(batchId),
+    enabled: !!batchId,
+  });
+
+  const handleDownloadMergedPdf = async () => {
+    setIsDownloadingMerged(true);
+    try {
+      await quotationGeneratorApi.downloadMergedPdfAsFile(batchId);
+      toast.success('Téléchargement du PDF fusionné démarré');
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Erreur lors du téléchargement');
+    } finally {
+      setIsDownloadingMerged(false);
+    }
+  };
+
+  const handleDownloadZip = async () => {
+    setIsDownloadingZip(true);
+    try {
+      await quotationGeneratorApi.downloadZipAsFile(batchId);
+      toast.success('Téléchargement du ZIP démarré');
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Erreur lors du téléchargement');
+    } finally {
+      setIsDownloadingZip(false);
+    }
+  };
+
+  const handleDownloadIndividual = async (rowIndex: number, reference: string) => {
+    setDownloadingRow(rowIndex);
+    try {
+      await quotationGeneratorApi.downloadIndividualPdfAsFile(
+        batchId,
+        rowIndex,
+        `devis_${reference}.pdf`
+      );
+      toast.success(`Téléchargement de ${reference} démarré`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Erreur lors du téléchargement');
+    } finally {
+      setDownloadingRow(null);
+    }
+  };
 
   return (
-    <Card>
-      <CardHeader
-        title={hasErrors ? 'Génération terminée avec des erreurs' : 'Génération terminée'}
-        subtitle={
-          hasErrors
-            ? `${progress.completed} devis générés, ${progress.failed} échoués`
-            : `${progress.completed} devis générés avec succès`
-        }
-      />
+    <div className="space-y-6">
+      {/* Summary Card */}
+      <Card>
+        <CardHeader
+          title={hasErrors ? 'Génération terminée avec des erreurs' : 'Génération terminée'}
+          subtitle={
+            hasErrors
+              ? `${progress.completed} devis générés, ${progress.failed} échoués`
+              : `${progress.completed} devis générés avec succès`
+          }
+        />
 
-      <div className="mt-6 flex flex-col items-center">
-        {hasErrors ? (
-          <AlertCircle className="w-16 h-16 text-yellow-500" />
-        ) : (
-          <CheckCircle className="w-16 h-16 text-green-500" />
-        )}
-
-        <div className="mt-6 grid grid-cols-3 gap-8">
-          <div className="text-center">
-            <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-              {progress.total}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
-          </div>
-          <div className="text-center">
-            <p className="text-3xl font-bold text-green-600">
-              {progress.completed}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Réussis</p>
-          </div>
-          <div className="text-center">
-            <p className="text-3xl font-bold text-red-600">
-              {progress.failed}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Échoués</p>
-          </div>
-        </div>
-
-        <div className="mt-8 flex space-x-4">
-          <Button variant="outline" onClick={onReset}>
-            Nouveau batch
-          </Button>
-          {progress.zip_file_path && (
-            <Button onClick={onDownload} leftIcon={<Download className="w-4 h-4" />}>
-              Télécharger le ZIP
-            </Button>
+        <div className="mt-6 flex flex-col items-center">
+          {hasErrors ? (
+            <AlertCircle className="w-16 h-16 text-yellow-500" />
+          ) : (
+            <CheckCircle className="w-16 h-16 text-green-500" />
           )}
+
+          <div className="mt-6 grid grid-cols-3 gap-8">
+            <div className="text-center">
+              <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                {progress.total}
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
+            </div>
+            <div className="text-center">
+              <p className="text-3xl font-bold text-green-600">
+                {progress.completed}
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Réussis</p>
+            </div>
+            <div className="text-center">
+              <p className="text-3xl font-bold text-red-600">
+                {progress.failed}
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Échoués</p>
+            </div>
+          </div>
+
+          <div className="mt-8 flex space-x-4">
+            <Button variant="outline" onClick={onReset}>
+              Nouveau batch
+            </Button>
+            {progress.merged_pdf_path && (
+              <Button
+                onClick={handleDownloadMergedPdf}
+                isLoading={isDownloadingMerged}
+                leftIcon={<Download className="w-4 h-4" />}
+              >
+                Télécharger PDF fusionné
+              </Button>
+            )}
+            {progress.zip_file_path && (
+              <Button
+                variant="outline"
+                onClick={handleDownloadZip}
+                isLoading={isDownloadingZip}
+                leftIcon={<Download className="w-4 h-4" />}
+              >
+                Télécharger ZIP
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+
+      {/* Quotation Download Table */}
+      {batchDetails && batchDetails.quotations.length > 0 && (
+        <Card>
+          <CardHeader
+            title="Téléchargement individuel"
+            subtitle="Téléchargez les devis individuellement"
+          />
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    #
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    Consultant
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    Référence Devis
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    Statut
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {batchDetails.quotations.map((q) => (
+                  <tr key={q.row_index} className={q.status !== 'completed' ? 'bg-red-50 dark:bg-red-900/10' : ''}>
+                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                      {q.row_index + 1}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {q.resource_name}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {q.resource_trigramme}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                      {q.boond_reference || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {q.status === 'completed' ? (
+                        <Badge variant="success">Généré</Badge>
+                      ) : (
+                        <Badge variant="error">Erreur</Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {q.status === 'completed' && q.pdf_path ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          isLoading={downloadingRow === q.row_index}
+                          onClick={() => handleDownloadIndividual(q.row_index, q.boond_reference || `row_${q.row_index}`)}
+                          leftIcon={<Download className="w-3 h-3" />}
+                        >
+                          PDF
+                        </Button>
+                      ) : q.error_message ? (
+                        <span className="text-xs text-red-500" title={q.error_message}>
+                          {q.error_message.substring(0, 30)}...
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+    </div>
   );
 }

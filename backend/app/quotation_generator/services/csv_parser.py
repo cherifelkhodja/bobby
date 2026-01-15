@@ -44,6 +44,8 @@ COLUMN_MAPPING = {
     "company_detail_id": ["company_detail_id", "id_detail_facturation", "detail_id"],
     "contact_id": ["contact_id", "id_contact"],
     "contact_name": ["contact_name", "nom_contact", "contact"],
+    # Quotation date (date du devis)
+    "quotation_date": ["date", "date_devis", "quotation_date"],
     # Period - using po_start_date and po_end_date from actual CSV
     "start_date": ["po_start_date", "start_date", "date_debut", "debut", "date_start"],
     "end_date": ["po_end_date", "end_date", "date_fin", "fin", "date_end"],
@@ -469,6 +471,12 @@ class CSVParserService:
         start_date = self._parse_date(self._get_value(row, "start_date"), "start_date")
         end_date = self._parse_date(self._get_value(row, "end_date"), "end_date")
 
+        # Parse quotation_date (date du devis) - optional, defaults to start_date
+        quotation_date_str = self._get_value(row, "quotation_date")
+        quotation_date: Optional[date] = None
+        if quotation_date_str:
+            quotation_date = self._parse_date(quotation_date_str, "quotation_date")
+
         # Parse start_project - optional, defaults to start_date
         start_project_str = self._get_value(row, "start_project")
         if start_project_str:
@@ -579,6 +587,7 @@ class CSVParserService:
             contact_name=contact_name,
             period=Period(start_date=start_date, end_date=end_date),
             period_name=period_name,
+            quotation_date=quotation_date,
             line=line,
             sow_reference=sow_reference,
             object_of_need=object_of_need,
@@ -616,6 +625,12 @@ class CSVParserService:
         # Parse dates
         start_date = self._parse_date(self._get_value(row, "start_date"), "start_date")
         end_date = self._parse_date(self._get_value(row, "end_date"), "end_date")
+
+        # Parse quotation_date (date du devis) - optional, defaults to start_date
+        quotation_date_str = self._get_value(row, "quotation_date")
+        quotation_date: Optional[date] = None
+        if quotation_date_str:
+            quotation_date = self._parse_date(quotation_date_str, "quotation_date")
 
         # Parse start_project - optional, defaults to start_date
         start_project_str = self._get_value(row, "start_project")
@@ -761,6 +776,7 @@ class CSVParserService:
             contact_name=contact_name,
             period=Period(start_date=start_date, end_date=end_date),
             period_name=period_name,
+            quotation_date=quotation_date,
             line=line,
             sow_reference=sow_reference,
             object_of_need=object_of_need,

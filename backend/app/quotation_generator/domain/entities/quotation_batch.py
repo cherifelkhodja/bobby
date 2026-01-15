@@ -35,7 +35,8 @@ class QuotationBatch:
     created_at: datetime = field(default_factory=datetime.utcnow)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    zip_file_path: Optional[str] = None
+    merged_pdf_path: Optional[str] = None  # All quotations merged into one PDF
+    zip_file_path: Optional[str] = None  # ZIP archive with individual PDFs
     error_message: Optional[str] = None
 
     @property
@@ -150,24 +151,28 @@ class QuotationBatch:
         self.status = BatchStatus.PROCESSING
         self.started_at = datetime.utcnow()
 
-    def mark_completed(self, zip_path: str) -> None:
+    def mark_completed(self, merged_pdf_path: str, zip_path: Optional[str] = None) -> None:
         """Mark batch as successfully completed.
 
         Args:
-            zip_path: Path to the generated ZIP file.
+            merged_pdf_path: Path to the merged PDF with all quotations.
+            zip_path: Path to the ZIP archive with individual PDFs.
         """
         self.status = BatchStatus.COMPLETED
         self.completed_at = datetime.utcnow()
+        self.merged_pdf_path = merged_pdf_path
         self.zip_file_path = zip_path
 
-    def mark_partial(self, zip_path: str) -> None:
+    def mark_partial(self, merged_pdf_path: str, zip_path: Optional[str] = None) -> None:
         """Mark batch as partially completed (some failed).
 
         Args:
-            zip_path: Path to the generated ZIP file.
+            merged_pdf_path: Path to the merged PDF with all quotations.
+            zip_path: Path to the ZIP archive with individual PDFs.
         """
         self.status = BatchStatus.PARTIAL
         self.completed_at = datetime.utcnow()
+        self.merged_pdf_path = merged_pdf_path
         self.zip_file_path = zip_path
 
     def mark_failed(self, error: str) -> None:
@@ -209,6 +214,7 @@ class QuotationBatch:
             "progress_percentage": round(self.progress_percentage, 1),
             "is_complete": self.is_complete,
             "has_errors": self.has_errors,
+            "merged_pdf_path": self.merged_pdf_path,
             "zip_file_path": self.zip_file_path,
             "error_message": self.error_message,
             "started_at": self.started_at.isoformat() if self.started_at else None,
@@ -236,7 +242,7 @@ class QuotationBatch:
                     "company_detail_id": q.company_detail_id,
                     "contact_name": q.contact_name,
                     "contact_id": q.contact_id,
-                    "quotation_date": q.period.format_start("%d/%m/%Y"),  # Date du devis
+                    "quotation_date": (q.quotation_date or q.period.start_date).strftime("%d/%m/%Y"),  # Date du devis
                     "period": {
                         "start": q.period.format_start(),
                         "end": q.period.format_end(),

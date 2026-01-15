@@ -269,6 +269,89 @@ async def download_batch(
         )
 
 
+@router.get(
+    "/batches/{batch_id}/download/zip",
+    responses={
+        200: {
+            "content": {"application/zip": {}},
+            "description": "ZIP archive with individual quotation PDFs",
+        },
+        404: {"model": ErrorResponse, "description": "Batch not found"},
+        409: {"model": ErrorResponse, "description": "Download not ready"},
+    },
+)
+async def download_batch_zip(
+    batch_id: UUID,
+    current_user: AdminUser,
+    use_case: DownloadBatchUseCase = Depends(get_download_batch_use_case),
+) -> FileResponse:
+    """Download all quotations as a ZIP archive.
+
+    Returns a ZIP file containing individual PDF files for each quotation.
+    """
+    try:
+        zip_path = await use_case.execute_zip(batch_id)
+
+        return FileResponse(
+            path=zip_path,
+            filename=zip_path.name,
+            media_type="application/zip",
+        )
+
+    except BatchNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.message,
+        )
+    except DownloadNotReadyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=e.message,
+        )
+
+
+@router.get(
+    "/batches/{batch_id}/quotations/{row_index}/download",
+    responses={
+        200: {
+            "content": {"application/pdf": {}},
+            "description": "Individual quotation PDF (BoondManager + Template)",
+        },
+        404: {"model": ErrorResponse, "description": "Batch or quotation not found"},
+        409: {"model": ErrorResponse, "description": "Download not ready"},
+    },
+)
+async def download_individual_quotation(
+    batch_id: UUID,
+    row_index: int,
+    current_user: AdminUser,
+    use_case: DownloadBatchUseCase = Depends(get_download_batch_use_case),
+) -> FileResponse:
+    """Download an individual quotation PDF.
+
+    Returns the merged PDF for a specific quotation (BoondManager quotation + filled template).
+    """
+    try:
+        pdf_path = await use_case.execute_individual(batch_id, row_index)
+
+        return FileResponse(
+            path=pdf_path,
+            filename=pdf_path.name,
+            media_type="application/pdf",
+        )
+
+    except BatchNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.message,
+        )
+    except DownloadNotReadyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=e.message,
+        )
+
+
 # Template management endpoints
 
 

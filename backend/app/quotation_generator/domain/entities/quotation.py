@@ -71,6 +71,8 @@ class Quotation:
     complexity: str
     max_price: Money
     start_project: date
+    # Date du devis (from CSV 'date' column, defaults to period start)
+    quotation_date: Optional[date] = None
     comments: Optional[str] = None
     # Period display name (e.g., "Janvier 2026")
     period_name: str = ""
@@ -90,6 +92,7 @@ class Quotation:
     status: QuotationStatus = QuotationStatus.PENDING
     boond_quotation_id: Optional[str] = None
     boond_reference: Optional[str] = None
+    pdf_path: Optional[str] = None  # Path to generated PDF file
     error_message: Optional[str] = None
     validation_errors: list[str] = field(default_factory=list)
 
@@ -190,7 +193,7 @@ class Quotation:
         """Convert to BoondManager API payload format.
 
         Uses:
-        - date: start_date from period (CSV)
+        - date: quotation_date from CSV (or period.start_date if not specified)
         - number: need_title (project name from BoondManager)
         - quotationRecords.description: "Prestation de services, {period_name}"
 
@@ -205,11 +208,14 @@ class Quotation:
         else:
             line_record["description"] = "Prestation de services"
 
+        # Use quotation_date from CSV if available, otherwise period start
+        effective_date = self.quotation_date or self.period.start_date
+
         return {
             "data": {
                 "type": "quotation",
                 "attributes": {
-                    "date": self.period.start_date.isoformat(),  # Date from CSV
+                    "date": effective_date.isoformat(),  # Date du devis from CSV
                     "state": 0,  # Draft
                     "currency": 0,  # EUR
                     "exchangeRate": 1,
@@ -300,16 +306,18 @@ class Quotation:
         """
         self.status = step
 
-    def mark_as_completed(self, boond_id: str, reference: str) -> None:
+    def mark_as_completed(self, boond_id: str, reference: str, pdf_path: Optional[str] = None) -> None:
         """Mark quotation as successfully completed.
 
         Args:
             boond_id: BoondManager quotation ID.
             reference: BoondManager reference.
+            pdf_path: Path to the generated PDF file.
         """
         self.status = QuotationStatus.COMPLETED
         self.boond_quotation_id = boond_id
         self.boond_reference = reference
+        self.pdf_path = pdf_path
         self.error_message = None
 
     def mark_as_failed(self, error: str) -> None:

@@ -83,7 +83,8 @@ export interface BatchProgressResponse {
   progress_percentage: number;
   is_complete: boolean;
   has_errors: boolean;
-  zip_file_path: string | null;
+  merged_pdf_path: string | null;  // Merged PDF with all quotations
+  zip_file_path: string | null;     // ZIP archive with individual PDFs
   error_message: string | null;
   started_at: string | null;
   completed_at: string | null;
@@ -98,6 +99,7 @@ export interface QuotationStatusItem {
   status: string;
   boond_quotation_id: string | null;
   boond_reference: string | null;
+  pdf_path: string | null;  // Path to individual PDF for download
   error_message: string | null;
   is_valid: boolean;
   validation_errors: string[];
@@ -210,9 +212,9 @@ export const quotationGeneratorApi = {
   },
 
   /**
-   * Download batch ZIP file.
+   * Download merged PDF with all quotations.
    */
-  downloadBatch: async (batchId: string): Promise<Blob> => {
+  downloadMergedPdf: async (batchId: string): Promise<Blob> => {
     const response = await apiClient.get(
       `/quotation-generator/batches/${batchId}/download`,
       {
@@ -223,10 +225,38 @@ export const quotationGeneratorApi = {
   },
 
   /**
-   * Download batch and trigger browser download.
+   * Download merged PDF and trigger browser download.
    */
-  downloadBatchAsFile: async (batchId: string, filename?: string): Promise<void> => {
-    const blob = await quotationGeneratorApi.downloadBatch(batchId);
+  downloadMergedPdfAsFile: async (batchId: string, filename?: string): Promise<void> => {
+    const blob = await quotationGeneratorApi.downloadMergedPdf(batchId);
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || `devis_thales_${batchId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
+  /**
+   * Download ZIP archive with all individual PDFs.
+   */
+  downloadZip: async (batchId: string): Promise<Blob> => {
+    const response = await apiClient.get(
+      `/quotation-generator/batches/${batchId}/download/zip`,
+      {
+        responseType: 'blob',
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Download ZIP and trigger browser download.
+   */
+  downloadZipAsFile: async (batchId: string, filename?: string): Promise<void> => {
+    const blob = await quotationGeneratorApi.downloadZip(batchId);
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -235,6 +265,47 @@ export const quotationGeneratorApi = {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
+  },
+
+  /**
+   * Download individual quotation PDF.
+   */
+  downloadIndividualPdf: async (batchId: string, rowIndex: number): Promise<Blob> => {
+    const response = await apiClient.get(
+      `/quotation-generator/batches/${batchId}/quotations/${rowIndex}/download`,
+      {
+        responseType: 'blob',
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Download individual quotation PDF and trigger browser download.
+   */
+  downloadIndividualPdfAsFile: async (
+    batchId: string,
+    rowIndex: number,
+    filename?: string
+  ): Promise<void> => {
+    const blob = await quotationGeneratorApi.downloadIndividualPdf(batchId, rowIndex);
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || `devis_${rowIndex}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
+  // Legacy aliases for backwards compatibility
+  downloadBatch: async (batchId: string): Promise<Blob> => {
+    return quotationGeneratorApi.downloadMergedPdf(batchId);
+  },
+
+  downloadBatchAsFile: async (batchId: string, filename?: string): Promise<void> => {
+    return quotationGeneratorApi.downloadMergedPdfAsFile(batchId, filename);
   },
 
   /**
