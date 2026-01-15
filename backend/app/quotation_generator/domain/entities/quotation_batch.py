@@ -240,6 +240,7 @@ class QuotationBatch:
                         "start": q.period.format_start(),
                         "end": q.period.format_end(),
                     },
+                    "period_name": q.period_name,
                     "tjm": q.tjm.to_float(),
                     "quantity": q.quantity,
                     "total_ht": q.total_ht.to_float(),

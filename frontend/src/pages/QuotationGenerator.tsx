@@ -486,6 +486,17 @@ function QuotationRow({ quotation, onSelect }: QuotationRowProps) {
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
 
+  // Format name: Prénom NOM
+  const formatName = (fullName: string) => {
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      const firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+      const lastName = parts.slice(1).join(' ').toUpperCase();
+      return `${firstName} ${lastName}`;
+    }
+    return fullName;
+  };
+
   return (
     <tr className={quotation.is_valid ? '' : 'bg-red-50 dark:bg-red-900/10'}>
       <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
@@ -497,10 +508,7 @@ function QuotationRow({ quotation, onSelect }: QuotationRowProps) {
           className="text-left hover:bg-gray-100 dark:hover:bg-gray-700 rounded p-1 -m-1 transition-colors"
         >
           <div className="text-sm font-medium text-primary hover:underline">
-            {quotation.resource_name}
-          </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            {quotation.resource_trigramme} • {quotation.opportunity_id}
+            {formatName(quotation.resource_name)}
           </div>
         </button>
       </td>
@@ -513,7 +521,7 @@ function QuotationRow({ quotation, onSelect }: QuotationRowProps) {
         </div>
       </td>
       <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-        {quotation.period.start} → {quotation.period.end}
+        {quotation.period_name || `${quotation.period.start} → ${quotation.period.end}`}
       </td>
       <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-gray-100">
         {formatCurrency(quotation.tjm)}

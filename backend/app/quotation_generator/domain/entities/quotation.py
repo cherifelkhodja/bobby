@@ -61,6 +61,7 @@ class Quotation:
 
     # Period and pricing
     period: Period
+    period_name: str = ""  # Human-readable period name from CSV (e.g., "Janvier 2026")
     line: QuotationLine
 
     # Thales-specific fields

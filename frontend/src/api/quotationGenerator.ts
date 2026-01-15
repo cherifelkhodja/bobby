@@ -24,6 +24,7 @@ export interface QuotationPreviewItem {
     start: string;
     end: string;
   };
+  period_name: string; // Human-readable period name (e.g., "Janvier 2026")
   // Pricing
   tjm: number;
   quantity: number;

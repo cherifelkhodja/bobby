@@ -475,6 +475,9 @@ class CSVParserService:
         else:
             start_project = start_date
 
+        # Get period name from CSV (human-readable, e.g., "Janvier 2026")
+        period_name = self._get_value(row, "period_name") or ""
+
         # Parse money values
         tjm = self._parse_decimal(self._get_value(row, "tjm"), "tjm")
 
@@ -572,6 +575,7 @@ class CSVParserService:
             contact_id=contact_id,
             contact_name=contact_name,
             period=Period(start_date=start_date, end_date=end_date),
+            period_name=period_name,
             line=line,
             sow_reference=sow_reference,
             object_of_need=object_of_need,
@@ -615,6 +619,9 @@ class CSVParserService:
             start_project = self._parse_date(start_project_str, "start_project")
         else:
             start_project = start_date
+
+        # Get period name from CSV (human-readable, e.g., "Janvier 2026")
+        period_name = self._get_value(row, "period_name") or ""
 
         # Parse money values
         tjm = self._parse_decimal(self._get_value(row, "tjm"), "tjm")
@@ -745,6 +752,7 @@ class CSVParserService:
             contact_id=contact_id,
             contact_name=contact_name,
             period=Period(start_date=start_date, end_date=end_date),
+            period_name=period_name,
             line=line,
             sow_reference=sow_reference,
             object_of_need=object_of_need,

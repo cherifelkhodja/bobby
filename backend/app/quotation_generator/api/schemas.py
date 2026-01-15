@@ -24,6 +24,7 @@ class QuotationPreviewItem(BaseModel):
     contact_id: str
     # Period
     period: dict[str, str]
+    period_name: str  # Human-readable period name (e.g., "Janvier 2026")
     # Pricing
     tjm: float
     quantity: int
