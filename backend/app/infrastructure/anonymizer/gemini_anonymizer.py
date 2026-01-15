@@ -111,7 +111,7 @@ class GeminiAnonymizer:
         self._configure()
 
         try:
-            model = genai.GenerativeModel("gemini-2.5-flash-lite")
+            model = genai.GenerativeModel("gemini-2.0-flash")
 
             prompt = ANONYMIZATION_PROMPT.format(
                 title=title,
@@ -124,19 +124,30 @@ class GeminiAnonymizer:
             if not response.text:
                 raise ValueError("La réponse de Gemini est vide")
 
+            # Log raw response for debugging
+            logger.debug(f"Raw Gemini response: {response.text[:500]}")
+
             # Clean and extract JSON from response
             json_text = self._clean_json_response(response.text)
 
             # Parse JSON
             data = json.loads(json_text)
 
+            # Validate that data is a dict
+            if not isinstance(data, dict):
+                logger.error(f"Gemini returned non-dict JSON: {type(data)}")
+                raise ValueError("La réponse Gemini n'est pas un objet JSON valide")
+
             # Validate and extract fields
-            anonymized_title = data.get("title", title)
-            anonymized_description = data.get("description", description)
+            anonymized_title = data.get("title") or title
+            anonymized_description = data.get("description") or description
             skills = data.get("skills", [])
 
             if not isinstance(skills, list):
                 skills = []
+
+            # Ensure skills are strings
+            skills = [str(s) for s in skills if s]
 
             return AnonymizedOpportunity(
                 title=anonymized_title,
@@ -145,13 +156,14 @@ class GeminiAnonymizer:
             )
 
         except json.JSONDecodeError as e:
-            logger.error(f"JSON parsing error during anonymization: {e}")
-            raise ValueError(f"Erreur de parsing JSON: {str(e)}")
+            logger.error(f"JSON parsing error: {e}. JSON text was: {json_text[:200] if 'json_text' in locals() else 'N/A'}")
+            raise ValueError(f"Erreur de parsing JSON. Veuillez réessayer.")
+        except ValueError:
+            # Re-raise ValueError as-is (already formatted)
+            raise
         except Exception as e:
-            if "API key" in str(e).lower() or "GEMINI" in str(e):
-                raise
-            logger.error(f"Error during anonymization: {e}")
-            raise ValueError(f"Erreur lors de l'anonymisation: {str(e)}")
+            logger.error(f"Unexpected error during anonymization: {type(e).__name__}: {e}")
+            raise ValueError(f"Erreur inattendue lors de l'anonymisation. Veuillez réessayer.")
 
     def _clean_json_response(self, raw_response: str) -> str:
         """Clean Gemini response and extract valid JSON.
