@@ -510,7 +510,7 @@ export function MyBoondOpportunities() {
         isOpen={!!detailModalOpportunity}
         onClose={handleCloseDetailModal}
         title="Détail de l'opportunité"
-        size="lg"
+        size="3xl"
       >
         {detailModalOpportunity && (
           <div className="space-y-4">
