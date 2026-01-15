@@ -963,16 +963,16 @@ class CSVParserService:
             contact_name=self._get_value(row, "contact_name") or "Unknown",
             period=Period(start_date=today, end_date=today),
             line=QuotationLine(
-                description="ERROR",
-                quantity=0,
-                unit_price_ht=Money(amount=Decimal("0")),
+                description="ERROR - Parsing failed",
+                quantity=1,  # Must be positive to pass validation
+                unit_price_ht=Money(amount=Decimal("1")),  # Must be positive
             ),
             sow_reference=self._get_value(row, "sow_reference") or "",
             object_of_need=self._get_value(row, "object_of_need") or "",
             c22_domain=self._get_value(row, "c22_domain") or "Unknown",
             c22_activity=self._get_value(row, "c22_activity") or "Unknown",
             complexity=self._get_value(row, "complexity") or "Unknown",
-            max_price=Money(amount=Decimal("0")),
+            max_price=Money(amount=Decimal("1")),  # Must be positive
             start_project=today,
             row_index=row_index,
             validation_errors=[f"CSV parsing error: {error_message}"],
