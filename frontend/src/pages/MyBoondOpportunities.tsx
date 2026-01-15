@@ -337,7 +337,7 @@ export function MyBoondOpportunities() {
               onChange={(e) => setStateFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
               className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
-              <option value="all">État ({stats.total})</option>
+              <option value="all">Tous les états ({stats.total})</option>
               {availableStates.map(({ state, count }) => (
                 <option key={state} value={state}>
                   {STATE_CONFIG[state]?.name || `État ${state}`} ({count})
