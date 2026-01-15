@@ -14,6 +14,7 @@ import { Profile } from './pages/Profile';
 import { Admin } from './pages/Admin';
 import { CvTransformer } from './pages/CvTransformer';
 import { QuotationGenerator } from './pages/QuotationGenerator';
+import { MyBoondOpportunities } from './pages/MyBoondOpportunities';
 import type { UserRole } from './types';
 
 interface ProtectedRouteProps {
@@ -69,6 +70,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin', 'commercial', 'rh']}>
               <CvTransformer />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="my-boond-opportunities"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'commercial']}>
+              <MyBoondOpportunities />
             </ProtectedRoute>
           }
         />

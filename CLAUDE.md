@@ -425,9 +425,118 @@ Generate quotations for Thales using BoondManager data and Excel templates.
 - `DELETE /batches/{batch_id}/quotations/{row_index}` - Delete quotation from preview
 - `GET /batches/{batch_id}/download/zip` - Download all PDFs as ZIP
 
+### 8. Published Opportunities (Anonymized Boond)
+Allow commercials and admins to publish anonymized opportunities for cooptation.
+
+**Access**: admin, commercial roles only
+
+**Features**:
+- View Boond opportunities where user is main manager
+- AI-powered anonymization using Gemini (removes client names, internal references)
+- Preview and edit anonymized content before publishing
+- Skills extraction from job description
+- Anti-duplicate check (boond_opportunity_id unique)
+- Published opportunities visible to all consultants for cooptation
+
+**Workflow**:
+1. Commercial views their Boond opportunities (filtered by manager principal)
+2. Clicks "Proposer" to anonymize with AI
+3. Reviews/edits the anonymized title and description
+4. Publishes the opportunity (saved in database)
+5. Consultants can see published opportunities and propose candidates
+
+**Boond Opportunity States** (filtered for publication):
+- 0: Perdue
+- 5: En cours
+- 6: Signée
+- 7: Abandonnée
+- 10: En attente
+
+**Anonymization Rules**:
+- Client names → Generic descriptions ("BNP Paribas" → "Grande banque française")
+- Internal project names → Generic ("Projet Phoenix" → "Projet de transformation")
+- Preserves: technical skills, methodologies, duration, experience level
+
+**Files**:
+- Domain entity: `backend/app/domain/entities/published_opportunity.py`
+- Value object: `backend/app/domain/value_objects/status.py` (OpportunityStatus)
+- Repository: `backend/app/infrastructure/database/repositories.py` (PublishedOpportunityRepository)
+- Anonymizer: `backend/app/infrastructure/anonymizer/gemini_anonymizer.py`
+- Use cases: `backend/app/application/use_cases/published_opportunities.py`
+- API routes: `backend/app/api/routes/v1/published_opportunities.py`
+- Frontend page: `frontend/src/pages/MyBoondOpportunities.tsx`
+- API client: `frontend/src/api/publishedOpportunities.ts`
+
+**API Endpoints** (`/api/v1/published-opportunities`):
+- `GET /my-boond` - List Boond opportunities for current manager (admin/commercial)
+- `POST /anonymize` - Anonymize opportunity with AI (admin/commercial)
+- `POST /publish` - Publish anonymized opportunity (admin/commercial)
+- `GET /` - List published opportunities (all authenticated users)
+- `GET /{id}` - Get published opportunity detail (all authenticated users)
+- `PATCH /{id}/close` - Close opportunity (publisher or admin)
+
+**Database Model** (migration `008_add_published_opportunities.py`):
+```python
+id: UUID (PK)
+boond_opportunity_id: String(50), unique, not null  # Anti-doublon
+title: String(255), not null                        # Anonymisé
+description: Text, not null                         # Anonymisé
+skills: ARRAY(String(100))                          # Extraites par IA
+original_title: String(255)                         # Interne uniquement
+original_data: JSON                                 # Backup Boond
+end_date: Date, nullable
+status: String(20), default='published'             # draft/published/closed
+published_by: UUID, FK(users.id)
+created_at, updated_at: DateTime
+```
+
+**TypeScript Types**:
+```typescript
+type PublishedOpportunityStatus = 'draft' | 'published' | 'closed';
+
+interface BoondOpportunity {
+  id: string;
+  title: string;
+  reference: string;
+  description: string | null;
+  company_name: string | null;
+  state: number | null;
+  state_name: string | null;
+  is_published: boolean;
+}
+
+interface PublishedOpportunity {
+  id: string;
+  boond_opportunity_id: string;
+  title: string;
+  description: string;
+  skills: string[];
+  end_date: string | null;
+  status: PublishedOpportunityStatus;
+  status_display: string;
+  created_at: string;
+  updated_at: string;
+}
+```
+
 ## Recent Changes Log
 
-### 2026-01-15
+### 2026-01-15 (session 2)
+**Published Opportunities Feature**:
+- Created migration `008_add_published_opportunities.py` for published_opportunities table
+- Added `OpportunityStatus` value object (draft/published/closed)
+- Created `PublishedOpportunity` entity with business methods
+- Added `PublishedOpportunityModel` to SQLAlchemy models
+- Created `PublishedOpportunityRepository` with CRUD operations
+- Extended `BoondClient` with `get_manager_opportunities()` method
+- Created `GeminiAnonymizer` for AI-powered opportunity anonymization
+- Created use cases: GetMyBoondOpportunities, Anonymize, Publish, List, Close
+- Added API routes at `/api/v1/published-opportunities`
+- Created `MyBoondOpportunities` page with table, detail modal, anonymization flow
+- Added "Commercial" section in sidebar for admin/commercial roles
+- Added `AdminOrCommercialUser` dependency for route protection
+
+### 2026-01-15 (session 1)
 **Quotation Generator - Major Fixes**:
 - Fixed Redis serialization: added `period_name`, `quotation_date`, `need_title`, `pdf_path`, `merged_pdf_path` to storage
 - Fixed template PDF filename collision: template now uses `_template.pdf` suffix to avoid being deleted

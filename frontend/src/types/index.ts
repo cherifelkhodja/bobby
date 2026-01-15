@@ -257,3 +257,68 @@ export interface CvTransformationUserStats {
   user_name: string;
   count: number;
 }
+
+// Published Opportunity types
+export type PublishedOpportunityStatus = 'draft' | 'published' | 'closed';
+
+export interface BoondOpportunity {
+  id: string;
+  title: string;
+  reference: string;
+  description: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  company_name: string | null;
+  state: number | null;
+  state_name: string | null;
+  is_published: boolean;
+}
+
+export interface BoondOpportunityListResponse {
+  items: BoondOpportunity[];
+  total: number;
+}
+
+export interface AnonymizeRequest {
+  boond_opportunity_id: string;
+  title: string;
+  description?: string | null;
+}
+
+export interface AnonymizedPreview {
+  boond_opportunity_id: string;
+  original_title: string;
+  anonymized_title: string;
+  anonymized_description: string;
+  skills: string[];
+}
+
+export interface PublishRequest {
+  boond_opportunity_id: string;
+  title: string;
+  description: string;
+  skills: string[];
+  original_title: string;
+  original_data?: Record<string, unknown> | null;
+  end_date?: string | null;
+}
+
+export interface PublishedOpportunity {
+  id: string;
+  boond_opportunity_id: string;
+  title: string;
+  description: string;
+  skills: string[];
+  end_date: string | null;
+  status: PublishedOpportunityStatus;
+  status_display: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PublishedOpportunityListResponse {
+  items: PublishedOpportunity[];
+  total: number;
+  page: number;
+  page_size: number;
+}

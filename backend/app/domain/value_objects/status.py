@@ -89,3 +89,29 @@ class CooptationStatus(str, Enum):
             CooptationStatus.REJECTED: set(),
         }
         return new_status in valid_transitions.get(self, set())
+
+
+class OpportunityStatus(str, Enum):
+    """Published opportunity status lifecycle."""
+
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    CLOSED = "closed"
+
+    def __str__(self) -> str:
+        return self.value
+
+    @property
+    def display_name(self) -> str:
+        """Human-readable status name."""
+        names = {
+            OpportunityStatus.DRAFT: "Brouillon",
+            OpportunityStatus.PUBLISHED: "Publiée",
+            OpportunityStatus.CLOSED: "Clôturée",
+        }
+        return names[self]
+
+    @property
+    def is_visible_to_consultants(self) -> bool:
+        """Check if opportunity is visible to consultants for cooptation."""
+        return self == OpportunityStatus.PUBLISHED

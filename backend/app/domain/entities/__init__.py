@@ -7,6 +7,7 @@ from app.domain.entities.cv_template import CvTemplate
 from app.domain.entities.cv_transformation_log import CvTransformationLog
 from app.domain.entities.invitation import Invitation
 from app.domain.entities.opportunity import Opportunity
+from app.domain.entities.published_opportunity import PublishedOpportunity
 from app.domain.entities.user import User
 
 __all__ = [
@@ -18,5 +19,6 @@ __all__ = [
     "CvTransformationLog",
     "Invitation",
     "Opportunity",
+    "PublishedOpportunity",
     "User",
 ]

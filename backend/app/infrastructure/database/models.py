@@ -5,6 +5,7 @@ from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import (
+    ARRAY,
     Boolean,
     DateTime,
     Enum,
@@ -278,3 +279,35 @@ class CvTransformationLogModel(Base):
     template: Mapped[Optional["CvTemplateModel"]] = relationship(
         "CvTemplateModel", foreign_keys=[template_id]
     )
+
+
+class PublishedOpportunityModel(Base):
+    """Published Opportunity database model for anonymized opportunities."""
+
+    __tablename__ = "published_opportunities"
+
+    id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    boond_opportunity_id: Mapped[str] = mapped_column(
+        String(50), unique=True, nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    skills: Mapped[Optional[list]] = mapped_column(ARRAY(String(100)), nullable=True)
+    original_title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    original_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    end_date: Mapped[Optional[datetime]] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="published", index=True
+    )
+    published_by: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    publisher: Mapped["UserModel"] = relationship("UserModel", foreign_keys=[published_by])

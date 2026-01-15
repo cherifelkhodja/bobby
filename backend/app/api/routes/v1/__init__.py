@@ -7,6 +7,7 @@ from app.api.routes.v1.cv_transformer import router as cv_transformer_router
 from app.api.routes.v1.health import router as health_router
 from app.api.routes.v1.invitations import router as invitations_router
 from app.api.routes.v1.opportunities import router as opportunities_router
+from app.api.routes.v1.published_opportunities import router as published_opportunities_router
 from app.api.routes.v1.users import router as users_router
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "health_router",
     "invitations_router",
     "opportunities_router",
+    "published_opportunities_router",
     "users_router",
 ]

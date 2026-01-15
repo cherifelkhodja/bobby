@@ -398,3 +398,110 @@ class BoondClient:
                 "status_code": 0,
                 "message": f"Erreur: {str(e)}",
             }
+
+    # Opportunity states for filtering
+    # 0: Perdue, 5: En cours, 6: Signée, 7: Abandonnée, 10: En attente
+    OPPORTUNITY_STATE_NAMES = {
+        0: "Perdue",
+        5: "En cours",
+        6: "Signée",
+        7: "Abandonnée",
+        10: "En attente",
+    }
+
+    # States to include when fetching manager opportunities (active states)
+    ACTIVE_OPPORTUNITY_STATES = [0, 5, 6, 7, 10]
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+    )
+    async def get_manager_opportunities(
+        self,
+        manager_boond_id: str,
+        states: Optional[list[int]] = None,
+    ) -> list[dict]:
+        """Fetch opportunities where the user is the main manager.
+
+        Args:
+            manager_boond_id: The BoondManager resource ID of the manager.
+            states: List of opportunity states to filter. Defaults to ACTIVE_OPPORTUNITY_STATES.
+
+        Returns:
+            List of opportunity dicts with id, title, reference, description, etc.
+        """
+        if states is None:
+            states = self.ACTIVE_OPPORTUNITY_STATES
+
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+            logger.info(f"Fetching opportunities for manager {manager_boond_id}")
+
+            all_opportunities = []
+            companies_map = {}
+
+            for state in states:
+                page = 1
+                while True:
+                    response = await client.get(
+                        f"{self.base_url}/opportunities",
+                        auth=self._auth,
+                        params={
+                            "page": page,
+                            "maxResults": 500,
+                            "perimeterManagersType": "main",
+                            "perimeterManagers": manager_boond_id,
+                            "opportunitiesStates": state,
+                        },
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+
+                    opportunities_batch = data.get("data", [])
+                    all_opportunities.extend(opportunities_batch)
+
+                    # Extract company names from included data
+                    for included in data.get("included", []):
+                        if included.get("type") == "company":
+                            company_id = str(included.get("id"))
+                            company_name = included.get("attributes", {}).get("name", "")
+                            companies_map[company_id] = company_name
+
+                    # Check for more pages
+                    meta = data.get("meta", {})
+                    total_pages = meta.get("totalPages", 1)
+                    if page >= total_pages:
+                        break
+                    page += 1
+
+            opportunities = []
+            for item in all_opportunities:
+                try:
+                    attrs = item.get("attributes", {})
+                    relationships = item.get("relationships", {})
+
+                    # Get company info
+                    company_data = relationships.get("company", {}).get("data")
+                    company_id = str(company_data.get("id")) if company_data else None
+                    company_name = companies_map.get(company_id, "") if company_id else ""
+
+                    # Get state
+                    opp_state = attrs.get("state", None)
+                    opp_state_name = self.OPPORTUNITY_STATE_NAMES.get(opp_state, "") if opp_state is not None else ""
+
+                    opportunities.append({
+                        "id": str(item.get("id")),
+                        "title": attrs.get("title", ""),
+                        "reference": attrs.get("reference", ""),
+                        "description": attrs.get("description", ""),
+                        "start_date": attrs.get("startDate"),
+                        "end_date": attrs.get("endDate"),
+                        "company_id": company_id,
+                        "company_name": company_name,
+                        "state": opp_state,
+                        "state_name": opp_state_name,
+                    })
+                except Exception as e:
+                    logger.warning(f"Failed to parse opportunity {item.get('id')}: {e}")
+
+            logger.info(f"Fetched {len(opportunities)} opportunities for manager {manager_boond_id}")
+            return opportunities

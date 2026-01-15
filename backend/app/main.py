@@ -16,6 +16,7 @@ from app.api.routes.v1 import (
     health_router,
     invitations_router,
     opportunities_router,
+    published_opportunities_router,
     users_router,
 )
 from app.quotation_generator.api import router as quotation_generator_router
@@ -71,5 +72,6 @@ app.include_router(opportunities_router, prefix="/api/v1/opportunities", tags=["
 app.include_router(cooptations_router, prefix="/api/v1/cooptations", tags=["Cooptations"])
 app.include_router(invitations_router, prefix="/api/v1/invitations", tags=["Invitations"])
 app.include_router(cv_transformer_router, prefix="/api/v1/cv-transformer", tags=["CV Transformer"])
+app.include_router(published_opportunities_router, prefix="/api/v1/published-opportunities", tags=["Published Opportunities"])
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(quotation_generator_router, prefix="/api/v1", tags=["Quotation Generator"])
