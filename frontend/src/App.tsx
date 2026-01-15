@@ -51,6 +51,7 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/accept-invitation" element={<AcceptInvitation />} />
+      <Route path="/postuler/:token" element={<PublicApplication />} />
 
       {/* Protected routes */}
       <Route
@@ -87,6 +88,14 @@ function App() {
           element={
             <ProtectedRoute requireAdmin>
               <QuotationGenerator />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="rh"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'rh']}>
+              <HRDashboard />
             </ProtectedRoute>
           }
         />

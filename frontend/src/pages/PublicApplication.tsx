@@ -78,16 +78,12 @@ export default function PublicApplication() {
     register,
     handleSubmit,
     formState: { errors },
-    watch,
   } = useForm<ApplicationFormData>({
     resolver: zodResolver(applicationSchema),
     defaultValues: {
       phone: '+33',
     },
   });
-
-  const tjmMin = watch('tjm_min');
-  const tjmMax = watch('tjm_max');
 
   // Submit mutation
   const submitMutation = useMutation({
