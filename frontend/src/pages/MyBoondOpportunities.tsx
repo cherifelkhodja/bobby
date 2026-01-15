@@ -335,24 +335,24 @@ export function MyBoondOpportunities() {
             <select
               value={stateFilter}
               onChange={(e) => setStateFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-              className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
-              <option value="all">Tous les états</option>
-              {availableStates.map(({ state }) => (
+              <option value="all">État ({stats.total})</option>
+              {availableStates.map(({ state, count }) => (
                 <option key={state} value={state}>
-                  {STATE_CONFIG[state]?.name || `État ${state}`}
+                  {STATE_CONFIG[state]?.name || `État ${state}`} ({count})
                 </option>
               ))}
             </select>
             <select
               value={clientFilter}
               onChange={(e) => setClientFilter(e.target.value)}
-              className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent max-w-[180px]"
+              className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
-              <option value="all">Tous les clients</option>
-              {availableClients.map(({ name }) => (
+              <option value="all">Client ({availableClients.length})</option>
+              {availableClients.map(({ name, count }) => (
                 <option key={name} value={name}>
-                  {name}
+                  {name} ({count})
                 </option>
               ))}
             </select>
@@ -360,12 +360,12 @@ export function MyBoondOpportunities() {
               <select
                 value={managerFilter}
                 onChange={(e) => setManagerFilter(e.target.value)}
-                className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent max-w-[180px]"
+                className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
-                <option value="all">Tous les managers</option>
-                {availableManagers.map(({ name }) => (
+                <option value="all">Manager ({availableManagers.length})</option>
+                {availableManagers.map(({ name, count }) => (
                   <option key={name} value={name}>
-                    {name}
+                    {name} ({count})
                   </option>
                 ))}
               </select>
