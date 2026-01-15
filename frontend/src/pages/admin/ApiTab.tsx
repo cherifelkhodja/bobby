@@ -10,7 +10,6 @@ import { Zap, RefreshCw, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner';
 
 import { adminApi } from '../../api/admin';
-import { cvTransformerApi } from '../../api/cvTransformer';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
