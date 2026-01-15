@@ -23,12 +23,12 @@ from app.quotation_generator.services.pricing_grid import PricingGridService
 logger = logging.getLogger(__name__)
 
 
-# Expected CSV columns mapping (French -> English field names)
+# Expected CSV columns mapping (actual column names from CSV -> internal field names)
 COLUMN_MAPPING = {
     # Resource info
-    "resource_id": ["resource_id", "id_resource", "id_ressource"],
-    "resource_name": ["resource_name", "nom_resource", "nom_ressource", "consultant"],
-    "resource_trigramme": ["trigramme", "resource_trigramme", "code"],
+    "resource_id": ["ressource_id", "resource_id", "id_resource", "id_ressource"],
+    "resource_name": ["ressource_name", "resource_name", "nom_resource", "nom_ressource", "consultant"],
+    "resource_trigramme": ["ressource_trigramme", "trigramme", "resource_trigramme", "code"],
     # BoondManager relationships
     "opportunity_id": ["opportunity_id", "id_opportunite", "ao", "affaire"],
     "company_id": ["company_id", "id_societe", "id_company"],
@@ -36,26 +36,30 @@ COLUMN_MAPPING = {
     "company_detail_id": ["company_detail_id", "id_detail_facturation", "detail_id"],
     "contact_id": ["contact_id", "id_contact"],
     "contact_name": ["contact_name", "nom_contact", "contact"],
-    # Period
-    "start_date": ["start_date", "date_debut", "debut", "date_start"],
-    "end_date": ["end_date", "date_fin", "fin", "date_end"],
-    # Pricing
-    "tjm": ["tjm", "taux_journalier", "daily_rate", "tarif"],
-    "quantity": ["quantity", "quantite", "nb_jours", "jours", "days"],
+    # Period - using po_start_date and po_end_date from actual CSV
+    "start_date": ["po_start_date", "start_date", "date_debut", "debut", "date_start"],
+    "end_date": ["po_end_date", "end_date", "date_fin", "fin", "date_end"],
+    # Pricing - amount_ht_unit is TJM, total_uo is quantity
+    "tjm": ["amount_ht_unit", "tjm", "taux_journalier", "daily_rate", "tarif"],
+    "quantity": ["total_uo", "quantity", "quantite", "nb_jours", "jours", "days"],
     # Thales-specific
     "sow_reference": ["sow_reference", "ref_sow", "sow", "reference_sow"],
     "object_of_need": ["object_of_need", "objet_besoin", "besoin", "object"],
-    "c22_domain": ["c22_domain", "domaine_c22", "domaine"],
-    "c22_activity": ["c22_activity", "activite_c22", "activite"],
+    "c22_domain": ["c22_domain", "C22_domain", "domaine_c22", "domaine"],
+    "c22_activity": ["c22_activity", "C22_activity", "activite_c22", "activite"],
     "complexity": ["complexity", "complexite", "niveau"],
     "region": ["region", "région", "zone", "localisation", "activity_country"],
     "max_price": ["max_price", "prix_max", "gfa_max", "prix_plafond"],
-    "start_project": ["start_project", "debut_projet", "date_debut_projet"],
-    "comments": ["comments", "commentaires", "notes", "remarques"],
+    "start_project": ["initial_first_starting_date", "start_project", "debut_projet", "date_debut_projet"],
+    "comments": ["additional_comments", "comments", "commentaires", "notes", "remarques"],
+    # Additional fields from actual CSV (optional)
+    "title": ["title", "titre"],
+    "description": ["description"],
 }
 
 # Required columns (must be present)
-# Note: max_price is NOT required - it can be auto-filled for 124-DATA domain
+# Note: max_price is NOT required - it can be auto-filled for 124-Data domain
+# Note: region is NOT required - defaults to IDF
 REQUIRED_COLUMNS = [
     "resource_id",
     "resource_name",
@@ -69,13 +73,9 @@ REQUIRED_COLUMNS = [
     "end_date",
     "tjm",
     "quantity",
-    "sow_reference",
-    "object_of_need",
     "c22_domain",
     "c22_activity",
     "complexity",
-    "region",  # Required for auto-fill
-    "start_project",
 ]
 
 
@@ -83,10 +83,11 @@ class CSVParserService:
     """Service for parsing CSV files into QuotationBatch entities.
 
     This service handles:
+    - Semicolon (;) and comma (,) delimiters auto-detection
     - Column name mapping (French/English)
     - Data type conversion
     - Validation of required fields
-    - Auto-fill of max_price from pricing grid (for 124-DATA domain)
+    - Auto-fill of max_price from pricing grid (for 124-Data domain)
     - Creation of domain entities
     """
 
@@ -113,8 +114,12 @@ class CSVParserService:
             # Detect encoding and decode
             text_content = self._decode_content(file_content)
 
+            # Detect delimiter (semicolon or comma)
+            delimiter = self._detect_delimiter(text_content)
+            logger.info(f"Detected CSV delimiter: '{delimiter}'")
+
             # Parse CSV
-            reader = csv.DictReader(io.StringIO(text_content))
+            reader = csv.DictReader(io.StringIO(text_content), delimiter=delimiter)
 
             if not reader.fieldnames:
                 raise CSVParsingError("CSV file is empty or has no headers")
@@ -130,6 +135,10 @@ class CSVParserService:
 
             # Parse rows
             for row_index, row in enumerate(reader):
+                # Skip empty rows (like total rows at the end)
+                if self._is_empty_row(row):
+                    continue
+
                 try:
                     quotation = self._parse_row(row, row_index)
                     batch.add_quotation(quotation)
@@ -162,6 +171,37 @@ class CSVParserService:
         """
         content = file.read()
         return self.parse(content, user_id)
+
+    def _detect_delimiter(self, content: str) -> str:
+        """Detect CSV delimiter by analyzing the first line.
+
+        Args:
+            content: CSV content as string.
+
+        Returns:
+            Delimiter character (';' or ',')
+        """
+        first_line = content.split('\n')[0] if '\n' in content else content
+        semicolon_count = first_line.count(';')
+        comma_count = first_line.count(',')
+
+        # Use semicolon if it appears more often in the header
+        return ';' if semicolon_count > comma_count else ','
+
+    def _is_empty_row(self, row: dict) -> bool:
+        """Check if a row is empty (all values are empty or None).
+
+        Args:
+            row: CSV row dictionary.
+
+        Returns:
+            True if row is empty.
+        """
+        # Check if resource_id is empty - this usually indicates an empty/total row
+        resource_id_col = self._column_map.get("resource_id")
+        if resource_id_col and not row.get(resource_id_col, "").strip():
+            return True
+        return False
 
     def _decode_content(self, content: bytes) -> str:
         """Decode CSV content trying multiple encodings.
@@ -254,9 +294,13 @@ class CSVParserService:
         # Parse dates
         start_date = self._parse_date(self._get_value(row, "start_date"), "start_date")
         end_date = self._parse_date(self._get_value(row, "end_date"), "end_date")
-        start_project = self._parse_date(
-            self._get_value(row, "start_project"), "start_project"
-        )
+
+        # Parse start_project - optional, defaults to start_date
+        start_project_str = self._get_value(row, "start_project")
+        if start_project_str:
+            start_project = self._parse_date(start_project_str, "start_project")
+        else:
+            start_project = start_date
 
         # Parse money values
         tjm = self._parse_decimal(self._get_value(row, "tjm"), "tjm")
@@ -274,17 +318,19 @@ class CSVParserService:
         company_detail_id = self._get_value(row, "company_detail_id") or company_id
         contact_id = self._require_value(row, "contact_id")
         contact_name = self._require_value(row, "contact_name")
-        sow_reference = self._require_value(row, "sow_reference")
-        object_of_need = self._require_value(row, "object_of_need")
         c22_domain = self._require_value(row, "c22_domain")
         c22_activity = self._require_value(row, "c22_activity")
         complexity = self._require_value(row, "complexity")
-        region = self._require_value(row, "region")
 
         # Optional fields
+        sow_reference = self._get_value(row, "sow_reference") or ""
+        object_of_need = self._get_value(row, "object_of_need") or ""
+        region = self._get_value(row, "region")  # Optional, defaults to IDF in pricing grid
         comments = self._get_value(row, "comments")
+        title = self._get_value(row, "title")
+        description = self._get_value(row, "description")
 
-        # Parse max_price - auto-fill if not provided and domain is 124-DATA
+        # Parse max_price - auto-fill if not provided and domain is 124-Data
         max_price_str = self._get_value(row, "max_price")
         max_price: Decimal
         max_price_source = "csv"
@@ -295,36 +341,50 @@ class CSVParserService:
         else:
             # Try to auto-fill from pricing grid
             auto_price = self._pricing_grid.get_max_gfa(
-                activity=c22_activity,
-                region=region,
+                c22_domain=c22_domain,
+                c22_activity=c22_activity,
                 complexity=complexity,
+                region=region,
             )
             if auto_price:
                 max_price = auto_price
                 max_price_source = "grille"
                 logger.info(
                     f"Row {row_index + 2}: Auto-filled max_price={max_price} "
-                    f"for activity={c22_activity}, region={region}, complexity={complexity}"
+                    f"for domain={c22_domain}, activity={c22_activity}, complexity={complexity}"
                 )
             else:
-                # No auto-fill available (not 124-DATA domain)
-                raise ValueError(
-                    f"max_price requis pour le domaine {c22_domain}. "
-                    f"L'auto-complétion n'est disponible que pour le domaine 124-DATA."
-                )
+                # Domain not supported - max_price is required
+                if self._pricing_grid.is_domain_supported(c22_domain):
+                    # Domain is supported but activity not found
+                    raise ValueError(
+                        f"Activité '{c22_activity}' non trouvée dans la grille tarifaire 124-Data. "
+                        f"Veuillez spécifier max_price manuellement."
+                    )
+                else:
+                    # Domain not supported at all
+                    raise ValueError(
+                        f"max_price requis pour le domaine '{c22_domain}'. "
+                        f"L'auto-complétion n'est disponible que pour le domaine 124-Data."
+                    )
+
+        # Build description for line item
+        line_description = title or description or f"Prestation de conseil - {resource_name}"
 
         # Create line item
         line = QuotationLine(
-            description=f"Prestation de conseil - {resource_name}",
+            description=line_description,
             quantity=quantity,
             unit_price_ht=Money(amount=tjm),
         )
 
         # Add comment about max_price source if auto-filled
-        if max_price_source == "grille" and comments:
-            comments = f"{comments} | Max GFA: {max_price}€ (grille tarifaire)"
-        elif max_price_source == "grille":
-            comments = f"Max GFA: {max_price}€ (grille tarifaire)"
+        if max_price_source == "grille":
+            auto_comment = f"Max GFA: {max_price}€ (grille tarifaire IDF)"
+            if comments:
+                comments = f"{comments} | {auto_comment}"
+            else:
+                comments = auto_comment
 
         return Quotation(
             resource_id=resource_id,
@@ -403,8 +463,14 @@ class CSVParserService:
     def _parse_decimal(self, value: Optional[str], field_name: str) -> Decimal:
         """Parse decimal from string.
 
+        Handles formats like:
+        - "550" (simple)
+        - "1 130" (with space as thousand separator)
+        - "1 070,00" (with comma as decimal separator)
+        - "1,130.00" (with comma as thousand separator)
+
         Args:
-            value: Decimal string (accepts comma or dot).
+            value: Decimal string.
             field_name: Field name for error messages.
 
         Returns:
@@ -416,8 +482,17 @@ class CSVParserService:
         if not value:
             raise ValueError(f"Missing required field: {field_name}")
 
-        # Normalize: remove spaces, replace comma with dot
-        normalized = value.replace(" ", "").replace(",", ".").replace("€", "")
+        # Normalize: remove spaces, handle European/French format
+        normalized = value.replace(" ", "").replace("€", "")
+
+        # Handle French format: "1 070,00" -> "1070.00"
+        # If comma is present and appears to be decimal separator
+        if "," in normalized and "." not in normalized:
+            # Comma is decimal separator
+            normalized = normalized.replace(",", ".")
+        elif "," in normalized and "." in normalized:
+            # Both present - comma is thousand separator
+            normalized = normalized.replace(",", "")
 
         try:
             return Decimal(normalized)
@@ -440,7 +515,7 @@ class CSVParserService:
         if not value:
             raise ValueError(f"Missing required field: {field_name}")
 
-        # Remove decimal part if present
+        # Remove spaces and handle decimal part if present
         normalized = value.replace(" ", "").replace(",", ".")
         if "." in normalized:
             normalized = normalized.split(".")[0]
@@ -482,8 +557,8 @@ class CSVParserService:
                 quantity=0,
                 unit_price_ht=Money(amount=Decimal("0")),
             ),
-            sow_reference=self._get_value(row, "sow_reference") or "UNKNOWN",
-            object_of_need=self._get_value(row, "object_of_need") or "Unknown",
+            sow_reference=self._get_value(row, "sow_reference") or "",
+            object_of_need=self._get_value(row, "object_of_need") or "",
             c22_domain=self._get_value(row, "c22_domain") or "Unknown",
             c22_activity=self._get_value(row, "c22_activity") or "Unknown",
             complexity=self._get_value(row, "complexity") or "Unknown",
