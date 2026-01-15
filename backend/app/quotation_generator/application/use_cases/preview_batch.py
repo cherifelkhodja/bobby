@@ -68,8 +68,9 @@ class PreviewBatchUseCase:
         """
         logger.info(f"Starting preview batch for user {user_id}")
 
-        # Parse CSV
-        batch = self.csv_parser.parse_file(file, user_id)
+        # Parse CSV (async version supports enrichment from BoondManager)
+        file_content = file.read()
+        batch = await self.csv_parser.parse_async(file_content, user_id)
 
         # Validate all quotations
         validation_errors = batch.validate_all()

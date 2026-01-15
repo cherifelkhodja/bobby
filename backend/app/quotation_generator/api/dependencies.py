@@ -31,11 +31,22 @@ from app.quotation_generator.infrastructure.adapters import (
     PostgresTemplateRepository,
 )
 from app.quotation_generator.services import CSVParserService, TemplateFillerService
+from app.quotation_generator.services.boond_enrichment import BoondEnrichmentService
 
 
-def get_csv_parser() -> CSVParserService:
-    """Get CSV parser service."""
-    return CSVParserService()
+async def get_enrichment_service(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> BoondEnrichmentService:
+    """Get BoondManager enrichment service."""
+    return BoondEnrichmentService(settings)
+
+
+async def get_csv_parser(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> CSVParserService:
+    """Get CSV parser service with enrichment."""
+    enrichment_service = BoondEnrichmentService(settings)
+    return CSVParserService(enrichment_service=enrichment_service)
 
 
 def get_template_filler() -> TemplateFillerService:

@@ -317,12 +317,12 @@ async def upload_template(
 
 # Example CSV endpoint
 
-# Example CSV matching the actual Thales export format (semicolon delimiter)
+# SIMPLIFIED CSV format - IDs are auto-fetched from BoondManager via Prénom/Nom
 # max_price is auto-filled for 124-Data domain based on activity and complexity
-EXAMPLE_CSV_CONTENT = """ressource_id;Prénom;Nom;ressource_name;ressource_trigramme;opportunity_id;company_name;company_id;company_detail_id;contact_name;contact_id;date;po_start_date;po_end_date;state;Periode;Title;description;amount_ht_unit;total_uo;tax_rate;turnover_ht;turnover_ttc;total_amount_ht;total_amount_ttc;renewal;initial_first_starting_date;sow_reference;object_of_need;eacq_number;C22_domain;C22_activity;complexity;max_price;in_situ_ratio;subcontracting;tier2_supplier;tier3_supplier;additional_comments
-COMP001;Jean;DUPONT;Jean DUPONT;JDU;1001;Thales Global Services;31;14;Marie MARTIN;1043;2025-12-31;2026-01-01;2026-03-31;0;Q1 2026;Data Analyst;Prestation de services Q1 2026;650;60;20;39000;46800;39000;46800;;01/01/2026;SOW-2026-001;Analyse de données;;124-Data;1-Data Analyst;Medium;;;;;;
-COMP002;Pierre;DURAND;Pierre DURAND;PDU;1002;Thales Global Services;31;14;Marie MARTIN;1043;2025-12-31;2026-02-01;2026-04-30;0;Q1 2026;Data Engineer;Prestation de services Q1 2026;725;55;20;39875;47850;39875;47850;;01/02/2026;SOW-2026-002;Pipeline ETL;;124-Data;9-Data Engineer  - Talend (ETL);Complex;1 070,00;;;;;
-COMP003;Sophie;MARTIN;Sophie MARTIN;SMA;1003;Thales Global Services;31;14;Marie MARTIN;1043;2025-12-31;2026-03-01;2026-05-31;0;Q2 2026;DevOps Engineer;Prestation de services Q2 2026;600;45;20;27000;32400;27000;32400;;01/03/2026;SOW-2026-003;Infrastructure Cloud;;124-PROJ;DevOps;Simple;800;;;;;Domaine hors grille 124-Data
+EXAMPLE_CSV_CONTENT = """Prénom;Nom;po_start_date;po_end_date;amount_ht_unit;total_uo;C22_domain;C22_activity;complexity;max_price;sow_reference;object_of_need;additional_comments
+Raphael;COLLARD;2026-01-01;2026-03-31;725;63;124-Data;9-Data Engineer  - Talend (ETL);Complex;;Talend Technical Expert;Talend Technical Expert;
+Jean;DUPONT;2026-02-01;2026-04-30;650;60;124-Data;1-Data Analyst;Medium;;Data Analysis Q1;Analyse de données;
+Pierre;DURAND;2026-03-01;2026-05-31;690;55;124-Data;2-Data Architect;Complex;;Architecture Data;Conception architecture data;
 """
 
 
