@@ -349,7 +349,7 @@ export function MyBoondOpportunities() {
               onChange={(e) => setClientFilter(e.target.value)}
               className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
-              <option value="all">Client ({availableClients.length})</option>
+              <option value="all">Tous les clients ({availableClients.length})</option>
               {availableClients.map(({ name, count }) => (
                 <option key={name} value={name}>
                   {name} ({count})
@@ -362,7 +362,7 @@ export function MyBoondOpportunities() {
                 onChange={(e) => setManagerFilter(e.target.value)}
                 className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
-                <option value="all">Manager ({availableManagers.length})</option>
+                <option value="all">Tous les managers ({availableManagers.length})</option>
                 {availableManagers.map(({ name, count }) => (
                   <option key={name} value={name}>
                     {name} ({count})
