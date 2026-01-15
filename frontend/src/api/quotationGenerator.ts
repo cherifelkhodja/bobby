@@ -2,7 +2,7 @@
  * API client for quotation generator endpoints.
  */
 
-import api from './client';
+import { apiClient } from './client';
 
 // Types
 
@@ -121,7 +121,7 @@ export const quotationGeneratorApi = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await api.post<PreviewBatchResponse>(
+    const response = await apiClient.post<PreviewBatchResponse>(
       '/quotation-generator/preview',
       formData,
       {
@@ -140,7 +140,7 @@ export const quotationGeneratorApi = {
     batchId: string,
     templateName: string = 'thales_pstf'
   ): Promise<StartGenerationResponse> => {
-    const response = await api.post<StartGenerationResponse>(
+    const response = await apiClient.post<StartGenerationResponse>(
       '/quotation-generator/generate',
       {
         batch_id: batchId,
@@ -154,7 +154,7 @@ export const quotationGeneratorApi = {
    * Get batch progress.
    */
   getBatchProgress: async (batchId: string): Promise<BatchProgressResponse> => {
-    const response = await api.get<BatchProgressResponse>(
+    const response = await apiClient.get<BatchProgressResponse>(
       `/quotation-generator/batches/${batchId}/progress`
     );
     return response.data;
@@ -164,7 +164,7 @@ export const quotationGeneratorApi = {
    * Get batch details with quotation statuses.
    */
   getBatchDetails: async (batchId: string): Promise<BatchDetailsResponse> => {
-    const response = await api.get<BatchDetailsResponse>(
+    const response = await apiClient.get<BatchDetailsResponse>(
       `/quotation-generator/batches/${batchId}`
     );
     return response.data;
@@ -174,7 +174,7 @@ export const quotationGeneratorApi = {
    * List user's recent batches.
    */
   listBatches: async (limit: number = 10): Promise<BatchSummary[]> => {
-    const response = await api.get<{ batches: BatchSummary[] }>(
+    const response = await apiClient.get<{ batches: BatchSummary[] }>(
       '/quotation-generator/batches',
       { params: { limit } }
     );
@@ -185,7 +185,7 @@ export const quotationGeneratorApi = {
    * Download batch ZIP file.
    */
   downloadBatch: async (batchId: string): Promise<Blob> => {
-    const response = await api.get(
+    const response = await apiClient.get(
       `/quotation-generator/batches/${batchId}/download`,
       {
         responseType: 'blob',
@@ -213,7 +213,7 @@ export const quotationGeneratorApi = {
    * List available templates.
    */
   listTemplates: async (): Promise<TemplateInfo[]> => {
-    const response = await api.get<TemplateListResponse>(
+    const response = await apiClient.get<TemplateListResponse>(
       '/quotation-generator/templates'
     );
     return response.data.templates;
@@ -237,7 +237,7 @@ export const quotationGeneratorApi = {
     }
     formData.append('validate_variables', validateVariables.toString());
 
-    const response = await api.post<UploadTemplateResponse>(
+    const response = await apiClient.post<UploadTemplateResponse>(
       `/quotation-generator/templates/${name}`,
       formData,
       {

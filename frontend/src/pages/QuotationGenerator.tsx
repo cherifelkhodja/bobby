@@ -10,17 +10,15 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   Upload,
   FileSpreadsheet,
   AlertCircle,
   CheckCircle,
-  XCircle,
   Download,
   RefreshCw,
   Play,
-  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -28,7 +26,6 @@ import { quotationGeneratorApi, type PreviewBatchResponse, type BatchProgressRes
 import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { PageSpinner } from '../components/ui/Spinner';
 
 type Step = 'upload' | 'preview' | 'generating' | 'complete';
 
@@ -65,7 +62,7 @@ export function QuotationGenerator() {
   });
 
   // Progress polling
-  const { data: progressData, refetch: refetchProgress } = useQuery({
+  const { data: progressData } = useQuery({
     queryKey: ['batch-progress', batchId],
     queryFn: () => quotationGeneratorApi.getBatchProgress(batchId!),
     enabled: step === 'generating' && !!batchId,
