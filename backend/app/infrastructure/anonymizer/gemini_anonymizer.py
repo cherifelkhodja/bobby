@@ -232,6 +232,10 @@ class GeminiAnonymizer:
         except json.JSONDecodeError as e:
             logger.error(f"JSON parsing error: {e}. JSON text was: {json_text[:200] if 'json_text' in locals() else 'N/A'}")
             raise ValueError(f"Erreur de parsing JSON. Veuillez réessayer.")
+        except KeyError as e:
+            # KeyError can happen when Gemini SDK fails to parse response
+            logger.error(f"KeyError during anonymization (likely malformed Gemini response): {e}")
+            raise ValueError(f"Réponse Gemini mal formée. Veuillez réessayer avec un autre modèle.")
         except ValueError:
             # Re-raise ValueError as-is (already formatted)
             raise
