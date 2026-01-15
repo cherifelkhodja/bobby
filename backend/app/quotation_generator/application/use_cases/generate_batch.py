@@ -147,11 +147,12 @@ class GenerateBatchUseCase:
                 excel_path = batch_output_dir / excel_filename
                 excel_path.write_bytes(filled_template)
 
-                # Step 4: Convert template to PDF
+                # Step 4: Convert template to PDF (use _template suffix to avoid collision with merged)
                 quotation.mark_as_processing(QuotationStatus.CONVERTING_PDF)
                 await self._update_progress(batch)
 
-                template_pdf_path = await self.pdf_converter.convert_to_pdf(excel_path)
+                template_pdf_path = batch_output_dir / f"{quotation.resource_trigramme}_{boond_reference}_template.pdf"
+                await self.pdf_converter.convert_to_pdf(excel_path, template_pdf_path)
 
                 # Step 5: Merge BoondManager PDF + Template PDF
                 merged_pdf_path = batch_output_dir / f"{quotation.resource_trigramme}_{boond_reference}.pdf"
