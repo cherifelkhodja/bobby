@@ -12,6 +12,7 @@ import { getErrorMessage } from '../api/client';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
+import { Input } from '../components/ui/Input';
 import { PageSpinner } from '../components/ui/Spinner';
 import type { BoondOpportunity, BoondOpportunityDetail, AnonymizedPreview } from '../types';
 
