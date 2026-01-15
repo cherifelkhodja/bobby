@@ -165,9 +165,9 @@ class Quotation:
         if self.line.quantity <= 0:
             errors.append("Quantity must be positive")
 
-        # Validate max price
-        if self.max_price.amount <= 0:
-            errors.append("Max price must be positive")
+        # Validate max price (0 is allowed when no pricing grid exists for the domain)
+        if self.max_price.amount < 0:
+            errors.append("Max price cannot be negative")
 
         # Validate required string fields
         required_strings = [
