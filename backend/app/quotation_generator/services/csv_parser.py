@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 COLUMN_MAPPING = {
     # Resource info
     "resource_id": ["ressource_id", "resource_id", "id_resource", "id_ressource"],
-    "resource_first_name": ["Prénom", "prenom", "first_name", "prénom"],
-    "resource_last_name": ["Nom", "nom", "last_name"],
+    "resource_first_name": ["Prénom", "Prenom", "prenom", "first_name", "prénom", "PRÉNOM", "PRENOM"],
+    "resource_last_name": ["Nom", "nom", "last_name", "NOM"],
     "resource_name": ["ressource_name", "resource_name", "nom_resource", "nom_ressource", "consultant"],
     "resource_trigramme": ["ressource_trigramme", "trigramme", "resource_trigramme", "code"],
     # BoondManager relationships
@@ -334,10 +334,19 @@ class CSVParserService:
         Returns:
             True if row should be skipped.
         """
-        # Check if resource_id is empty - this usually indicates an empty/total row
-        resource_id_col = self._column_map.get("resource_id")
-        if resource_id_col and not row.get(resource_id_col, "").strip():
-            return True
+        # For simplified format, check first_name/last_name
+        if self._is_simplified_format:
+            first_name_col = self._column_map.get("resource_first_name")
+            last_name_col = self._column_map.get("resource_last_name")
+            if first_name_col and not row.get(first_name_col, "").strip():
+                return True
+            if last_name_col and not row.get(last_name_col, "").strip():
+                return True
+        else:
+            # For full format, check resource_id
+            resource_id_col = self._column_map.get("resource_id")
+            if resource_id_col and not row.get(resource_id_col, "").strip():
+                return True
 
         # Check if quantity is 0 or empty - likely a total row
         quantity_col = self._column_map.get("quantity")
@@ -351,7 +360,7 @@ class CSVParserService:
                 if "." in qty_normalized:
                     qty_normalized = qty_normalized.split(".")[0]
                 if int(qty_normalized) == 0:
-                    logger.debug(f"Skipping row with quantity=0")
+                    logger.debug("Skipping row with quantity=0")
                     return True
             except (ValueError, TypeError):
                 pass  # Let the parser handle invalid quantity
