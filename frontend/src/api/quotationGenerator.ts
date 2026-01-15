@@ -372,6 +372,19 @@ export const quotationGeneratorApi = {
   },
 
   /**
+   * Delete a quotation from the batch.
+   */
+  deleteQuotation: async (
+    batchId: string,
+    rowIndex: number
+  ): Promise<PreviewBatchResponse> => {
+    const response = await apiClient.delete<PreviewBatchResponse>(
+      `/quotation-generator/batches/${batchId}/quotations/${rowIndex}`
+    );
+    return response.data;
+  },
+
+  /**
    * Download example CSV file.
    */
   downloadExampleCsv: async (): Promise<void> => {

@@ -19,6 +19,8 @@ import {
   Download,
   RefreshCw,
   Play,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -362,6 +364,23 @@ interface PreviewStepProps {
 function PreviewStep({ data, batchId, isGenerating, onGenerate, onReset, onDataUpdate }: PreviewStepProps) {
   const [selectedQuotation, setSelectedQuotation] = useState<QuotationPreviewItem | null>(null);
   const [updatingContact, setUpdatingContact] = useState<number | null>(null);
+  const [deletingRow, setDeletingRow] = useState<number | null>(null);
+
+  // Handle delete quotation
+  const handleDeleteQuotation = async (rowIndex: number) => {
+    if (!confirm('Supprimer cette ligne ?')) return;
+
+    setDeletingRow(rowIndex);
+    try {
+      const updatedData = await quotationGeneratorApi.deleteQuotation(batchId, rowIndex);
+      onDataUpdate(updatedData);
+      toast.success('Ligne supprimée');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Erreur lors de la suppression'));
+    } finally {
+      setDeletingRow(null);
+    }
+  };
 
   // Handle contact change
   const handleContactChange = async (rowIndex: number, contactId: string, contactName: string) => {
@@ -478,6 +497,9 @@ function PreviewStep({ data, batchId, isGenerating, onGenerate, onReset, onDataU
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Statut
                 </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -488,6 +510,8 @@ function PreviewStep({ data, batchId, isGenerating, onGenerate, onReset, onDataU
                   onSelect={() => setSelectedQuotation(q)}
                   onContactChange={handleContactChange}
                   isUpdatingContact={updatingContact === q.row_index}
+                  onDelete={handleDeleteQuotation}
+                  isDeleting={deletingRow === q.row_index}
                 />
               ))}
             </tbody>
@@ -510,9 +534,11 @@ interface QuotationRowProps {
   onSelect: () => void;
   onContactChange: (rowIndex: number, contactId: string, contactName: string) => void;
   isUpdatingContact: boolean;
+  onDelete: (rowIndex: number) => void;
+  isDeleting: boolean;
 }
 
-function QuotationRow({ quotation, onSelect, onContactChange, isUpdatingContact }: QuotationRowProps) {
+function QuotationRow({ quotation, onSelect, onContactChange, isUpdatingContact, onDelete, isDeleting }: QuotationRowProps) {
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
 
@@ -595,6 +621,20 @@ function QuotationRow({ quotation, onSelect, onContactChange, isUpdatingContact 
             )}
           </div>
         )}
+      </td>
+      <td className="px-4 py-3 text-center">
+        <button
+          onClick={() => onDelete(quotation.row_index)}
+          disabled={isDeleting}
+          className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50 transition-colors"
+          title="Supprimer"
+        >
+          {isDeleting ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Trash2 className="w-4 h-4" />
+          )}
+        </button>
       </td>
     </tr>
   );

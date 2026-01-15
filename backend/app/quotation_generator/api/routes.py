@@ -518,3 +518,71 @@ async def update_quotation_contact(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update contact: {str(e)}",
         )
+
+
+@router.delete(
+    "/batches/{batch_id}/quotations/{row_index}",
+    response_model=PreviewResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Batch or quotation not found"},
+    },
+)
+async def delete_quotation(
+    batch_id: UUID,
+    row_index: int,
+    current_user: AdminUser,
+    batch_storage: RedisStorageAdapter = Depends(get_batch_storage),
+) -> PreviewResponse:
+    """Delete a quotation from the batch.
+
+    This removes a quotation before generation. Returns updated preview data.
+    """
+    try:
+        # Get batch from storage
+        batch = await batch_storage.get_batch(batch_id)
+        if not batch:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Batch {batch_id} not found",
+            )
+
+        # Find and remove quotation by row_index
+        original_count = len(batch.quotations)
+        batch.quotations = [q for q in batch.quotations if q.row_index != row_index]
+
+        if len(batch.quotations) == original_count:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Quotation with row_index {row_index} not found in batch",
+            )
+
+        # Reindex remaining quotations
+        for i, q in enumerate(batch.quotations):
+            q.row_index = i
+
+        # Save batch back to storage
+        await batch_storage.save_batch(batch, ttl_seconds=3600)
+
+        logger.info(f"Deleted quotation {row_index} from batch {batch_id}")
+
+        # Return updated preview
+        preview_data = batch.to_preview_dict()
+        valid_count = sum(1 for q in batch.quotations if q.is_valid)
+        invalid_count = len(batch.quotations) - valid_count
+
+        return PreviewResponse(
+            batch_id=str(batch.id),
+            quotations=preview_data["quotations"],
+            valid_count=valid_count,
+            invalid_count=invalid_count,
+            total_quotations=len(batch.quotations),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting quotation: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete quotation: {str(e)}",
+        )
