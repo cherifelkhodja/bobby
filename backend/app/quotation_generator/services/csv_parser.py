@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 COLUMN_MAPPING = {
     # Resource info
     "resource_id": ["ressource_id", "resource_id", "id_resource", "id_ressource"],
+    "resource_first_name": ["Prénom", "prenom", "first_name", "prénom"],
+    "resource_last_name": ["Nom", "nom", "last_name"],
     "resource_name": ["ressource_name", "resource_name", "nom_resource", "nom_ressource", "consultant"],
     "resource_trigramme": ["ressource_trigramme", "trigramme", "resource_trigramme", "code"],
     # BoondManager relationships
@@ -39,22 +41,33 @@ COLUMN_MAPPING = {
     # Period - using po_start_date and po_end_date from actual CSV
     "start_date": ["po_start_date", "start_date", "date_debut", "debut", "date_start"],
     "end_date": ["po_end_date", "end_date", "date_fin", "fin", "date_end"],
+    "period_name": ["Periode", "periode", "period", "période"],
     # Pricing - amount_ht_unit is TJM, total_uo is quantity
     "tjm": ["amount_ht_unit", "tjm", "taux_journalier", "daily_rate", "tarif"],
     "quantity": ["total_uo", "quantity", "quantite", "nb_jours", "jours", "days"],
+    "tax_rate": ["tax_rate", "taux_tva", "tva"],
+    "turnover_ht": ["turnover_ht", "ca_ht"],
+    "total_amount_ht": ["total_amount_ht", "montant_total_ht"],
     # Thales-specific
     "sow_reference": ["sow_reference", "ref_sow", "sow", "reference_sow"],
     "object_of_need": ["object_of_need", "objet_besoin", "besoin", "object"],
+    "eacq_number": ["eacq_number", "eacq", "numero_eacq"],
     "c22_domain": ["c22_domain", "C22_domain", "domaine_c22", "domaine"],
     "c22_activity": ["c22_activity", "C22_activity", "activite_c22", "activite"],
     "complexity": ["complexity", "complexite", "niveau"],
     "region": ["region", "région", "zone", "localisation", "activity_country"],
     "max_price": ["max_price", "prix_max", "gfa_max", "prix_plafond"],
+    "in_situ_ratio": ["in_situ_ratio", "ratio_site", "taux_presentiel"],
+    "subcontracting": ["subcontracting", "sous_traitance"],
+    "tier2_supplier": ["tier2_supplier", "fournisseur_tier2"],
+    "tier3_supplier": ["tier3_supplier", "fournisseur_tier3"],
     "start_project": ["initial_first_starting_date", "start_project", "debut_projet", "date_debut_projet"],
     "comments": ["additional_comments", "comments", "commentaires", "notes", "remarques"],
     # Additional fields from actual CSV (optional)
-    "title": ["title", "titre"],
+    "title": ["Title", "title", "titre"],
     "description": ["description"],
+    "renewal": ["renewal", "renouvellement"],
+    "state": ["state", "etat", "statut"],
 }
 
 # Required columns (must be present)

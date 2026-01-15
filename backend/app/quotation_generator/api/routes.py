@@ -317,11 +317,12 @@ async def upload_template(
 
 # Example CSV endpoint
 
-# Example CSV with region column - max_price is auto-filled for 124-DATA domain
-EXAMPLE_CSV_CONTENT = """resource_id,resource_name,trigramme,opportunity_id,company_id,company_name,contact_id,contact_name,start_date,end_date,tjm,quantity,sow_reference,object_of_need,c22_domain,c22_activity,region,complexity,max_price,start_project,comments
-12345,Jean DUPONT,JDU,98765,11111,THALES SIX GTS,22222,Marie MARTIN,2025-02-01,2025-04-30,550,60,SOW-2025-001,Développement application web,124-DATA,Data Analyst,IDF,Medium,,2025-02-01,Max GFA auto-calculé depuis grille
-12346,Pierre DURAND,PDU,98766,11111,THALES SIX GTS,22222,Marie MARTIN,2025-03-01,2025-05-31,600,65,SOW-2025-002,Architecture microservices,124-DATA,AI/ML Engineer,Région,Expert,,2025-03-01,
-12347,Sophie MARTIN,SMA,98767,11111,THALES SIX GTS,22222,Marie MARTIN,2025-04-01,2025-06-30,500,45,SOW-2025-003,Support technique,Autre,Support,IDF,Simple,600,2025-04-01,Domaine hors grille - max_price requis
+# Example CSV matching the actual Thales export format (semicolon delimiter)
+# max_price is auto-filled for 124-Data domain based on activity and complexity
+EXAMPLE_CSV_CONTENT = """ressource_id;Prénom;Nom;ressource_name;ressource_trigramme;opportunity_id;company_name;company_id;company_detail_id;contact_name;contact_id;date;po_start_date;po_end_date;state;Periode;Title;description;amount_ht_unit;total_uo;tax_rate;turnover_ht;turnover_ttc;total_amount_ht;total_amount_ttc;renewal;initial_first_starting_date;sow_reference;object_of_need;eacq_number;C22_domain;C22_activity;complexity;max_price;in_situ_ratio;subcontracting;tier2_supplier;tier3_supplier;additional_comments
+COMP001;Jean;DUPONT;Jean DUPONT;JDU;1001;Thales Global Services;31;14;Marie MARTIN;1043;2025-12-31;2026-01-01;2026-03-31;0;Q1 2026;Data Analyst;Prestation de services Q1 2026;650;60;20;39000;46800;39000;46800;;01/01/2026;SOW-2026-001;Analyse de données;;124-Data;1-Data Analyst;Medium;;;;;;
+COMP002;Pierre;DURAND;Pierre DURAND;PDU;1002;Thales Global Services;31;14;Marie MARTIN;1043;2025-12-31;2026-02-01;2026-04-30;0;Q1 2026;Data Engineer;Prestation de services Q1 2026;725;55;20;39875;47850;39875;47850;;01/02/2026;SOW-2026-002;Pipeline ETL;;124-Data;9-Data Engineer  - Talend (ETL);Complex;1 070,00;;;;;
+COMP003;Sophie;MARTIN;Sophie MARTIN;SMA;1003;Thales Global Services;31;14;Marie MARTIN;1043;2025-12-31;2026-03-01;2026-05-31;0;Q2 2026;DevOps Engineer;Prestation de services Q2 2026;600;45;20;27000;32400;27000;32400;;01/03/2026;SOW-2026-003;Infrastructure Cloud;;124-PROJ;DevOps;Simple;800;;;;;Domaine hors grille 124-Data
 """
 
 
