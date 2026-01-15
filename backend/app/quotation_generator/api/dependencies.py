@@ -6,7 +6,8 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_db, AdminUser
+from app.dependencies import get_db
+from app.api.dependencies import AdminUser
 from app.config import Settings, get_settings
 from app.quotation_generator.application.use_cases import (
     PreviewBatchUseCase,
