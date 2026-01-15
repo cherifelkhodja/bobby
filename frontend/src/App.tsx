@@ -15,6 +15,7 @@ import { Admin } from './pages/Admin';
 import { CvTransformer } from './pages/CvTransformer';
 import { QuotationGenerator } from './pages/QuotationGenerator';
 import { MyBoondOpportunities } from './pages/MyBoondOpportunities';
+import { OpportunityDetail } from './pages/OpportunityDetail';
 import type { UserRole } from './types';
 
 interface ProtectedRouteProps {
@@ -63,6 +64,7 @@ function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="opportunities" element={<Opportunities />} />
+        <Route path="opportunities/:id" element={<OpportunityDetail />} />
         <Route path="my-cooptations" element={<MyCooptations />} />
         <Route path="profile" element={<Profile />} />
         <Route

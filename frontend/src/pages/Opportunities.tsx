@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, Calendar, Briefcase, Eye, Sparkles } from 'lucide-react';
+import { Search, Plus, Calendar, Briefcase, ArrowRight, Sparkles } from 'lucide-react';
 
 import { listPublishedOpportunities } from '../api/publishedOpportunities';
 import { Card } from '../components/ui/Card';
@@ -12,10 +13,10 @@ import { CreateCooptationForm } from '../components/cooptations/CreateCooptation
 import type { PublishedOpportunity, Opportunity } from '../types';
 
 export function Opportunities() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
-  const [detailOpportunity, setDetailOpportunity] = useState<PublishedOpportunity | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['published-opportunities', page, search],
@@ -97,11 +98,12 @@ export function Opportunities() {
           </p>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
+        <div className="grid gap-4">
           {data?.items.map((opportunity) => (
             <Card
               key={opportunity.id}
-              className="group hover:shadow-lg hover:border-primary-200 dark:hover:border-primary-800 transition-all duration-200 !p-0 overflow-hidden"
+              className="group hover:shadow-lg hover:border-primary-200 dark:hover:border-primary-800 transition-all duration-200 !p-0 overflow-hidden cursor-pointer"
+              onClick={() => navigate(`/opportunities/${opportunity.id}`)}
             >
               {/* Accent bar */}
               <div className="h-1 bg-gradient-to-r from-primary-500 to-primary-400" />
@@ -111,14 +113,9 @@ export function Opportunities() {
                   <div className="flex-1 min-w-0">
                     {/* Title & Status */}
                     <div className="flex items-start gap-3 mb-3">
-                      <button
-                        onClick={() => setDetailOpportunity(opportunity)}
-                        className="text-left group/title"
-                      >
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 group-hover/title:text-primary-600 dark:group-hover/title:text-primary-400 transition-colors">
-                          {opportunity.title}
-                        </h3>
-                      </button>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                        {opportunity.title}
+                      </h3>
                       <span className={`shrink-0 px-2.5 py-1 text-xs font-semibold rounded-full ${
                         opportunity.status === 'published'
                           ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
@@ -171,7 +168,10 @@ export function Opportunities() {
                   <div className="flex flex-col gap-2 shrink-0">
                     <Button
                       size="sm"
-                      onClick={() => setSelectedOpportunity(toOpportunityFormat(opportunity))}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedOpportunity(toOpportunityFormat(opportunity));
+                      }}
                       leftIcon={<Plus className="h-4 w-4" />}
                       disabled={opportunity.status !== 'published'}
                       className="whitespace-nowrap"
@@ -181,11 +181,14 @@ export function Opportunities() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setDetailOpportunity(opportunity)}
-                      leftIcon={<Eye className="h-4 w-4" />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/opportunities/${opportunity.id}`);
+                      }}
+                      rightIcon={<ArrowRight className="h-4 w-4" />}
                       className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                     >
-                      Détails
+                      Voir plus
                     </Button>
                   </div>
                 </div>
@@ -219,91 +222,6 @@ export function Opportunities() {
           </Button>
         </div>
       )}
-
-      {/* Detail Modal */}
-      <Modal
-        isOpen={!!detailOpportunity}
-        onClose={() => setDetailOpportunity(null)}
-        title={detailOpportunity?.title || ''}
-        size="2xl"
-      >
-        {detailOpportunity && (
-          <div className="space-y-6">
-            {/* Status badge */}
-            <div className="flex items-center gap-3">
-              <span className={`px-3 py-1.5 text-sm font-semibold rounded-full ${
-                detailOpportunity.status === 'published'
-                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
-                  : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-              }`}>
-                {detailOpportunity.status === 'published' ? 'Active' : detailOpportunity.status_display}
-              </span>
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                Publiée le {formatDate(detailOpportunity.created_at)}
-              </span>
-            </div>
-
-            {/* Description */}
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                Description de la mission
-              </h4>
-              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
-                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
-                  {detailOpportunity.description}
-                </p>
-              </div>
-            </div>
-
-            {/* Skills */}
-            {detailOpportunity.skills.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                  Compétences recherchées
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {detailOpportunity.skills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="px-3 py-1.5 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-lg text-sm font-medium"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* End date */}
-            {detailOpportunity.end_date && (
-              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-4 py-3">
-                <Calendar className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                <span>Date de fin prévue : <strong>{formatDate(detailOpportunity.end_date)}</strong></span>
-              </div>
-            )}
-
-            {/* Action */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <Button
-                variant="outline"
-                onClick={() => setDetailOpportunity(null)}
-              >
-                Fermer
-              </Button>
-              <Button
-                onClick={() => {
-                  setSelectedOpportunity(toOpportunityFormat(detailOpportunity));
-                  setDetailOpportunity(null);
-                }}
-                leftIcon={<Plus className="h-4 w-4" />}
-                disabled={detailOpportunity.status !== 'published'}
-              >
-                Proposer un candidat
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
 
       {/* Cooptation Form Modal */}
       <Modal
