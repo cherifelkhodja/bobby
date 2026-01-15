@@ -531,6 +531,7 @@ class CSVParserService:
         max_price_str = self._get_value(row, "max_price")
         max_price: Decimal
         max_price_source = "csv"
+        no_grid_comment = ""
 
         if max_price_str:
             # User provided max_price in CSV
@@ -551,19 +552,21 @@ class CSVParserService:
                     f"for domain={c22_domain}, activity={c22_activity}, complexity={complexity}"
                 )
             else:
-                # Domain not supported - max_price is required
-                if self._pricing_grid.is_domain_supported(c22_domain):
-                    # Domain is supported but activity not found
-                    raise ValueError(
-                        f"Activité '{c22_activity}' non trouvée dans la grille tarifaire 124-Data. "
-                        f"Veuillez spécifier max_price manuellement."
-                    )
-                else:
-                    # Domain not supported at all
-                    raise ValueError(
-                        f"max_price requis pour le domaine '{c22_domain}'. "
-                        f"L'auto-complétion n'est disponible que pour le domaine 124-Data."
-                    )
+                # Domain not supported - set max_price to 0 and add comment
+                max_price = Decimal("0")
+                no_grid_comment = "Pas de grille pour ce périmètre"
+                logger.info(
+                    f"Row {row_index + 2}: No pricing grid for domain={c22_domain}, "
+                    f"setting max_price=0 with comment"
+                )
+
+        # Combine comments
+        final_comments = comments or ""
+        if no_grid_comment:
+            if final_comments:
+                final_comments = f"{final_comments}\n{no_grid_comment}"
+            else:
+                final_comments = no_grid_comment
 
         # Build description for line item
         line_description = title or description or f"Prestation de conseil - {resource_name}"
@@ -597,7 +600,7 @@ class CSVParserService:
             complexity=complexity,
             max_price=Money(amount=max_price),
             start_project=start_project,
-            comments=comments,
+            comments=final_comments or None,
             eacq_number=eacq_number,
             is_renewal=is_renewal,
             in_situ_ratio=in_situ_ratio,
@@ -725,6 +728,7 @@ class CSVParserService:
         max_price_str = self._get_value(row, "max_price")
         max_price: Decimal
         max_price_source = "csv"
+        no_grid_comment = ""
 
         if max_price_str:
             max_price = self._parse_decimal(max_price_str, "max_price")
@@ -743,16 +747,21 @@ class CSVParserService:
                     f"for domain={c22_domain}, activity={c22_activity}, complexity={complexity}"
                 )
             else:
-                if self._pricing_grid.is_domain_supported(c22_domain):
-                    raise ValueError(
-                        f"Activité '{c22_activity}' non trouvée dans la grille tarifaire 124-Data. "
-                        f"Veuillez spécifier max_price manuellement."
-                    )
-                else:
-                    raise ValueError(
-                        f"max_price requis pour le domaine '{c22_domain}'. "
-                        f"L'auto-complétion n'est disponible que pour le domaine 124-Data."
-                    )
+                # Domain not supported - set max_price to 0 and add comment
+                max_price = Decimal("0")
+                no_grid_comment = "Pas de grille pour ce périmètre"
+                logger.info(
+                    f"Row {row_index + 2}: No pricing grid for domain={c22_domain}, "
+                    f"setting max_price=0 with comment"
+                )
+
+        # Combine comments
+        final_comments = comments or ""
+        if no_grid_comment:
+            if final_comments:
+                final_comments = f"{final_comments}\n{no_grid_comment}"
+            else:
+                final_comments = no_grid_comment
 
         # Build description for line item
         line_description = title or description or f"Prestation de conseil - {resource_name}"
@@ -786,7 +795,7 @@ class CSVParserService:
             complexity=complexity,
             max_price=Money(amount=max_price),
             start_project=start_project,
-            comments=comments,
+            comments=final_comments or None,
             eacq_number=eacq_number,
             is_renewal=is_renewal,
             in_situ_ratio=in_situ_ratio,
