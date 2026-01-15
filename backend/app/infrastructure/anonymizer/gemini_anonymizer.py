@@ -187,19 +187,34 @@ class GeminiAnonymizer:
             response = await asyncio.to_thread(model.generate_content, prompt)
 
             # Safely extract text from response
+            # Use direct access to candidates to avoid SDK parsing issues with newer models
+            response_text = None
             try:
+                # First try the standard way
                 response_text = response.text
             except (KeyError, ValueError, AttributeError) as e:
-                # Handle cases where response.text fails (blocked content, etc.)
-                logger.error(f"Failed to extract text from Gemini response: {type(e).__name__}: {e}")
-                # Try to get more info about the response
-                if hasattr(response, 'candidates') and response.candidates:
-                    candidate = response.candidates[0]
-                    if hasattr(candidate, 'finish_reason'):
-                        logger.error(f"Finish reason: {candidate.finish_reason}")
-                    if hasattr(candidate, 'safety_ratings'):
-                        logger.error(f"Safety ratings: {candidate.safety_ratings}")
-                raise ValueError("La réponse de Gemini n'a pas pu être extraite. Veuillez réessayer.")
+                # If standard access fails, try direct candidate access
+                logger.warning(f"Standard response.text failed ({type(e).__name__}), trying direct candidate access")
+                try:
+                    if hasattr(response, 'candidates') and response.candidates:
+                        candidate = response.candidates[0]
+                        if hasattr(candidate, 'content') and candidate.content:
+                            parts = candidate.content.parts
+                            if parts:
+                                response_text = parts[0].text
+                except Exception as inner_e:
+                    logger.error(f"Direct candidate access also failed: {inner_e}")
+
+                if not response_text:
+                    # Log diagnostic info
+                    logger.error(f"Failed to extract text from Gemini response: {type(e).__name__}: {e}")
+                    if hasattr(response, 'candidates') and response.candidates:
+                        candidate = response.candidates[0]
+                        if hasattr(candidate, 'finish_reason'):
+                            logger.error(f"Finish reason: {candidate.finish_reason}")
+                        if hasattr(candidate, 'safety_ratings'):
+                            logger.error(f"Safety ratings: {candidate.safety_ratings}")
+                    raise ValueError("La réponse de Gemini n'a pas pu être extraite. Veuillez réessayer.")
 
             if not response_text:
                 raise ValueError("La réponse de Gemini est vide")
