@@ -30,6 +30,15 @@ import { Modal } from '../components/ui/Modal';
 
 type Step = 'upload' | 'preview' | 'generating' | 'complete';
 
+// Helper to extract error message from unknown error
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const response = (error as { response?: { data?: { detail?: string } } }).response;
+    return response?.data?.detail || fallback;
+  }
+  return fallback;
+}
+
 export function QuotationGenerator() {
   const [step, setStep] = useState<Step>('upload');
   const [batchId, setBatchId] = useState<string | null>(null);
@@ -45,8 +54,8 @@ export function QuotationGenerator() {
       setStep('preview');
       toast.success(`${data.total_quotations} devis analysés`);
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Erreur lors de l\'analyse du CSV');
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, 'Erreur lors de l\'analyse du CSV'));
     },
   });
 
@@ -57,8 +66,8 @@ export function QuotationGenerator() {
       setStep('generating');
       toast.success('Génération démarrée');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Erreur lors du démarrage de la génération');
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, 'Erreur lors du démarrage de la génération'));
     },
   });
 
@@ -370,8 +379,8 @@ function PreviewStep({ data, batchId, isGenerating, onGenerate, onReset, onDataU
         quotations: updatedQuotations,
       });
       toast.success('Contact mis à jour');
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de la mise à jour du contact');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Erreur lors de la mise à jour du contact'));
     } finally {
       setUpdatingContact(null);
     }
@@ -852,8 +861,8 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
     try {
       await quotationGeneratorApi.downloadMergedPdfAsFile(batchId);
       toast.success('Téléchargement du PDF fusionné démarré');
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Erreur lors du téléchargement');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Erreur lors du téléchargement'));
     } finally {
       setIsDownloadingMerged(false);
     }
@@ -864,8 +873,8 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
     try {
       await quotationGeneratorApi.downloadZipAsFile(batchId);
       toast.success('Téléchargement du ZIP démarré');
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Erreur lors du téléchargement');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Erreur lors du téléchargement'));
     } finally {
       setIsDownloadingZip(false);
     }
@@ -880,8 +889,8 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
         `devis_${reference}.pdf`
       );
       toast.success(`Téléchargement de ${reference} démarré`);
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Erreur lors du téléchargement');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Erreur lors du téléchargement'));
     } finally {
       setDownloadingRow(null);
     }
