@@ -326,10 +326,13 @@ function UploadStep({
 
       <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex justify-between items-start">
         <p className="text-sm text-blue-700 dark:text-blue-400">
-          <strong>Colonnes requises :</strong> resource_id, resource_name, trigramme,
-          opportunity_id, company_id, company_name, contact_id, contact_name,
-          start_date, end_date, tjm, quantity, sow_reference, object_of_need,
-          c22_domain, c22_activity, complexity, max_price, start_project
+          <strong>Colonnes requises :</strong> ressource_id, ressource_name, ressource_trigramme,
+          opportunity_id, company_id, company_name, company_detail_id, contact_id, contact_name,
+          po_start_date, po_end_date, amount_ht_unit, total_uo, C22_domain, C22_activity, complexity
+          <br />
+          <span className="text-blue-600 dark:text-blue-300">
+            (max_price optionnel pour le domaine 124-Data - auto-calculé depuis la grille tarifaire)
+          </span>
         </p>
         <Button
           variant="outline"
