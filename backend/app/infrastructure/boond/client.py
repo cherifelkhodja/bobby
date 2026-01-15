@@ -470,7 +470,7 @@ class BoondClient:
                             "maxResults": 500,
                             "perimeterManagersType": "main",
                             "perimeterManagers": manager_boond_id,
-                            "opportunitiesStates": state,
+                            "opportunityStates": state,
                         },
                     )
                     response.raise_for_status()
