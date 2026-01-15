@@ -328,6 +328,8 @@ class BoondManagerAdapter(ERPPort):
     async def get_company_contacts(self, company_id: str) -> list[dict]:
         """Get contacts for a company from BoondManager.
 
+        Uses /contacts?keywords=CSOCid_company endpoint.
+
         Args:
             company_id: The company ID.
 
@@ -339,14 +341,15 @@ class BoondManagerAdapter(ERPPort):
         """
         async with self._get_client() as client:
             try:
+                # Search contacts by company ID using CSOC prefix
                 response = await client.get(
-                    f"{self.base_url}/companies/{company_id}/contacts",
+                    f"{self.base_url}/contacts",
                     auth=self._auth,
+                    params={
+                        "keywords": f"CSOC{company_id}",
+                        "maxResults": 500,
+                    },
                 )
-
-                if response.status_code == 404:
-                    logger.warning(f"Company {company_id} not found")
-                    return []
 
                 if response.status_code >= 400:
                     raise BoondManagerAPIError(
