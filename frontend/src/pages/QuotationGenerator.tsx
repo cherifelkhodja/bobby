@@ -537,9 +537,29 @@ function QuotationRow({ quotation, onSelect, onContactChange, isUpdatingContact 
         <div className="text-sm text-gray-900 dark:text-gray-100">
           {quotation.company_name}
         </div>
-        <div className="text-xs text-gray-500 dark:text-gray-400">
-          {quotation.contact_name}
-        </div>
+        {quotation.available_contacts && quotation.available_contacts.length > 1 ? (
+          <select
+            value={quotation.contact_id}
+            onChange={(e) => {
+              const selectedContact = quotation.available_contacts.find(c => c.id === e.target.value);
+              if (selectedContact) {
+                onContactChange(quotation.row_index, selectedContact.id, selectedContact.name);
+              }
+            }}
+            disabled={isUpdatingContact}
+            className="mt-1 text-xs w-full rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 focus:ring-primary focus:border-primary disabled:opacity-50"
+          >
+            {quotation.available_contacts.map((contact) => (
+              <option key={contact.id} value={contact.id}>
+                {contact.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {quotation.contact_name}
+          </div>
+        )}
       </td>
       <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
         {quotation.period_name || `${quotation.period.start} → ${quotation.period.end}`}
