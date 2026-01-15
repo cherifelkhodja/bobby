@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Eye, Sparkles, Check, AlertCircle, Loader2, Filter, TrendingUp } from 'lucide-react';
+import { Search, Sparkles, Check, AlertCircle, Loader2, Filter, TrendingUp } from 'lucide-react';
 
 import {
   getMyBoondOpportunities,
@@ -298,8 +298,6 @@ export function MyBoondOpportunities() {
     );
   }
 
-  const hasActiveFilters = search || stateFilter !== 'all' || clientFilter !== 'all' || managerFilter !== 'all';
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -405,34 +403,29 @@ export function MyBoondOpportunities() {
             Aucune opportunité trouvée
           </h3>
           <p className="text-gray-500 dark:text-gray-400 text-sm">
-            {hasActiveFilters
-              ? "Aucun résultat pour vos critères de recherche."
-              : "Vous n'avez pas d'opportunité en tant que manager principal dans BoondManager."}
+            Aucun résultat pour vos critères de recherche.
           </p>
         </Card>
       ) : (
         <Card className="overflow-hidden !p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-xs">
               <thead className="bg-gray-50 dark:bg-gray-800/50">
                 <tr>
-                  <th className="text-left py-2.5 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     Titre
                   </th>
-                  <th className="text-left py-2.5 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     Référence
                   </th>
-                  <th className="text-left py-2.5 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     Client
                   </th>
-                  <th className="text-left py-2.5 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     État
                   </th>
-                  <th className="text-left py-2.5 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
-                    Date fin
-                  </th>
-                  <th className="text-right py-2.5 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
-                    Actions
+                  <th className="text-right py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
+                    Action
                   </th>
                 </tr>
               </thead>
@@ -442,8 +435,8 @@ export function MyBoondOpportunities() {
                     key={opportunity.id}
                     className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
                   >
-                    <td className="py-2.5 px-4">
-                      <div className="flex items-center gap-2">
+                    <td className="py-2 px-3">
+                      <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => handleOpenDetailModal(opportunity)}
                           className="text-left text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 font-medium"
@@ -451,43 +444,33 @@ export function MyBoondOpportunities() {
                           {opportunity.title}
                         </button>
                         {opportunity.is_published && (
-                          <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                          <span className="px-1 py-0.5 text-[10px] font-medium rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                             Publiée
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="py-2.5 px-4">
-                      <span className="text-gray-500 dark:text-gray-400 font-mono">
+                    <td className="py-2 px-3">
+                      <span className="text-gray-500 dark:text-gray-400 font-mono text-[11px]">
                         {opportunity.reference}
                       </span>
                     </td>
-                    <td className="py-2.5 px-4 text-gray-600 dark:text-gray-400">
+                    <td className="py-2 px-3 text-gray-600 dark:text-gray-400">
                       {opportunity.company_name || '-'}
                     </td>
-                    <td className="py-2.5 px-4">
+                    <td className="py-2 px-3">
                       {getStateBadge(opportunity.state, opportunity.state_name)}
                     </td>
-                    <td className="py-2.5 px-4 text-gray-600 dark:text-gray-400">
-                      {formatDate(opportunity.end_date)}
-                    </td>
-                    <td className="py-2.5 px-4">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleOpenDetailModal(opportunity)}
-                          leftIcon={<Eye className="h-3.5 w-3.5" />}
-                        >
-                          Voir
-                        </Button>
+                    <td className="py-2 px-3">
+                      <div className="flex justify-end">
                         <Button
                           size="sm"
                           onClick={() => handlePropose(opportunity)}
                           disabled={opportunity.is_published}
-                          leftIcon={<Sparkles className="h-3.5 w-3.5" />}
+                          leftIcon={<Sparkles className="h-3 w-3" />}
+                          className="text-xs px-2 py-1"
                         >
-                          {opportunity.is_published ? 'Déjà publiée' : 'Proposer'}
+                          {opportunity.is_published ? 'Publiée' : 'Proposer'}
                         </Button>
                       </div>
                     </td>
@@ -496,10 +479,9 @@ export function MyBoondOpportunities() {
               </tbody>
             </table>
           </div>
-          <div className="px-4 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/30">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {filteredOpportunities.length} opportunité{filteredOpportunities.length > 1 ? 's' : ''} affichée{filteredOpportunities.length > 1 ? 's' : ''}
-              {hasActiveFilters && ` sur ${stats.total}`}
+          <div className="px-3 py-2 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/30">
+            <p className="text-[10px] text-gray-500 dark:text-gray-400">
+              {filteredOpportunities.length} opportunité{filteredOpportunities.length > 1 ? 's' : ''}
             </p>
           </div>
         </Card>
