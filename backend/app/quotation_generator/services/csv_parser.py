@@ -502,6 +502,7 @@ class CSVParserService:
         # Optional fields
         sow_reference = self._get_value(row, "sow_reference") or ""
         object_of_need = self._get_value(row, "object_of_need") or ""
+        # need_title: in sync mode, only from CSV (no enrichment available)
         need_title = self._get_value(row, "need_title") or ""
         region = self._get_value(row, "region")  # Optional, defaults to IDF in pricing grid
         comments = self._get_value(row, "comments")
@@ -661,6 +662,7 @@ class CSVParserService:
             resource_name = enriched.resource_name
             resource_trigramme = enriched.resource_trigramme
             opportunity_id = enriched.opportunity_id
+            opportunity_title = enriched.opportunity_title
             company_id = enriched.company_id
             company_name = enriched.company_name
             company_detail_id = enriched.company_detail_id
@@ -672,6 +674,7 @@ class CSVParserService:
             resource_name = self._require_value(row, "resource_name")
             resource_trigramme = self._require_value(row, "resource_trigramme").upper()
             opportunity_id = self._require_value(row, "opportunity_id")
+            opportunity_title = ""  # Not available in full format, must be in CSV
             company_id = self._require_value(row, "company_id")
             company_name = self._require_value(row, "company_name")
             company_detail_id = self._get_value(row, "company_detail_id") or company_id
@@ -686,7 +689,8 @@ class CSVParserService:
         # Optional fields
         sow_reference = self._get_value(row, "sow_reference") or ""
         object_of_need = self._get_value(row, "object_of_need") or ""
-        need_title = self._get_value(row, "need_title") or ""
+        # need_title: use CSV value if provided, otherwise use opportunity title from enrichment
+        need_title = self._get_value(row, "need_title") or opportunity_title or ""
         region = self._get_value(row, "region")
         comments = self._get_value(row, "comments")
         title = self._get_value(row, "title")

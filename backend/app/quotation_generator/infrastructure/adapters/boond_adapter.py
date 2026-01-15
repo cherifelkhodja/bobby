@@ -156,6 +156,54 @@ class BoondManagerAdapter(ERPPort):
         wait=wait_exponential(multiplier=1, min=1, max=4),
         reraise=True,
     )
+    async def get_opportunity_title(self, opportunity_id: str) -> str:
+        """Get the title of an opportunity from BoondManager.
+
+        Args:
+            opportunity_id: The opportunity ID (with or without AO prefix).
+
+        Returns:
+            The opportunity title (titre du besoin).
+
+        Raises:
+            BoondManagerAPIError: If the API call fails.
+        """
+        # Remove AO prefix if present
+        clean_id = opportunity_id.replace("AO", "")
+
+        async with self._get_client() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/opportunities/{clean_id}",
+                    auth=self._auth,
+                )
+
+                if response.status_code == 404:
+                    logger.warning(f"Opportunity {clean_id} not found")
+                    return ""
+
+                if response.status_code >= 400:
+                    raise BoondManagerAPIError(
+                        status_code=response.status_code,
+                        message=f"Error fetching opportunity: {response.text[:200]}",
+                    )
+
+                data = response.json()
+                title = data.get("data", {}).get("attributes", {}).get("title", "")
+                return title
+
+            except httpx.RequestError as e:
+                logger.error(f"Network error fetching opportunity title: {e}")
+                raise BoondManagerAPIError(
+                    status_code=0,
+                    message=f"Network error: {str(e)}",
+                ) from e
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+        reraise=True,
+    )
     async def validate_resource(self, resource_id: str) -> bool:
         """Validate that a resource exists in BoondManager.
 

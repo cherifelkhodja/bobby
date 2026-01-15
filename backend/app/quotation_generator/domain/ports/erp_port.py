@@ -44,6 +44,21 @@ class ERPPort(ABC):
         ...
 
     @abstractmethod
+    async def get_opportunity_title(self, opportunity_id: str) -> str:
+        """Get the title of an opportunity from the ERP.
+
+        Args:
+            opportunity_id: The opportunity ID.
+
+        Returns:
+            The opportunity title (titre du besoin).
+
+        Raises:
+            BoondManagerAPIError: If the API call fails.
+        """
+        ...
+
+    @abstractmethod
     async def validate_resource(self, resource_id: str) -> bool:
         """Validate that a resource exists in the ERP.
 

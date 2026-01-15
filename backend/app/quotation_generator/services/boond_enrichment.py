@@ -56,6 +56,7 @@ class EnrichedQuotationData:
     resource_name: str
     resource_trigramme: str
     opportunity_id: str
+    opportunity_title: str  # Titre du besoin
     company_id: str
     company_name: str
     company_detail_id: str
@@ -303,6 +304,7 @@ class BoondEnrichmentService:
             resource_name=f"{resource.first_name} {resource.last_name}",
             resource_trigramme=resource.trigramme,
             opportunity_id=project.opportunity_id,
+            opportunity_title=project.opportunity_title,
             company_id=project.company_id,
             company_name=project.company_name,
             company_detail_id=project.company_detail_id,
