@@ -324,13 +324,22 @@ function UploadStep({
         )}
       </div>
 
-      <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+      <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex justify-between items-start">
         <p className="text-sm text-blue-700 dark:text-blue-400">
           <strong>Colonnes requises :</strong> resource_id, resource_name, trigramme,
           opportunity_id, company_id, company_name, contact_id, contact_name,
           start_date, end_date, tjm, quantity, sow_reference, object_of_need,
           c22_domain, c22_activity, complexity, max_price, start_project
         </p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-4 shrink-0"
+          onClick={() => quotationGeneratorApi.downloadExampleCsv()}
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Exemple CSV
+        </Button>
       </div>
     </Card>
   );

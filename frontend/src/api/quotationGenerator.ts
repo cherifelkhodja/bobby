@@ -248,4 +248,22 @@ export const quotationGeneratorApi = {
     );
     return response.data;
   },
+
+  /**
+   * Download example CSV file.
+   */
+  downloadExampleCsv: async (): Promise<void> => {
+    const response = await apiClient.get('/quotation-generator/example-csv', {
+      responseType: 'blob',
+    });
+    const blob = response.data;
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'exemple_devis_thales.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
 };

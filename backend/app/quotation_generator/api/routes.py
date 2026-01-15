@@ -313,3 +313,47 @@ async def upload_template(
     )
 
     return UploadTemplateResponse(**result)
+
+
+# Example CSV endpoint
+
+EXAMPLE_CSV_CONTENT = """resource_id,resource_name,trigramme,opportunity_id,company_id,company_name,contact_id,contact_name,start_date,end_date,tjm,quantity,sow_reference,object_of_need,c22_domain,c22_activity,complexity,max_price,start_project,comments
+12345,Jean DUPONT,JDU,98765,11111,THALES SIX GTS,22222,Marie MARTIN,2025-02-01,2025-04-30,550,60,SOW-2025-001,Développement application web,Informatique,Développement,Senior,650,2025-02-01,Mission de 3 mois
+12346,Pierre DURAND,PDU,98766,11111,THALES SIX GTS,22222,Marie MARTIN,2025-03-01,2025-05-31,600,65,SOW-2025-002,Architecture microservices,Informatique,Architecture,Expert,750,2025-03-01,
+"""
+
+
+@router.get(
+    "/example-csv",
+    responses={
+        200: {
+            "content": {"text/csv": {}},
+            "description": "Example CSV file",
+        },
+    },
+)
+async def download_example_csv(
+    current_user: AdminUser,
+) -> FileResponse:
+    """Download an example CSV file.
+
+    Returns a CSV file with the expected format and example data.
+    """
+    import tempfile
+    import os
+
+    # Create a temporary file
+    fd, path = tempfile.mkstemp(suffix=".csv")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8-sig") as f:
+            f.write(EXAMPLE_CSV_CONTENT.strip())
+
+        return FileResponse(
+            path=path,
+            filename="exemple_devis_thales.csv",
+            media_type="text/csv",
+            background=None,  # Don't delete file before sending
+        )
+    except Exception:
+        os.unlink(path)
+        raise
