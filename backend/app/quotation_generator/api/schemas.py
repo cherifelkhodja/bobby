@@ -7,6 +7,13 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class ContactInfo(BaseModel):
+    """Contact information for selection."""
+
+    id: str
+    name: str
+
+
 class QuotationPreviewItem(BaseModel):
     """Single quotation in preview."""
 
@@ -22,6 +29,8 @@ class QuotationPreviewItem(BaseModel):
     company_detail_id: str
     contact_name: str
     contact_id: str
+    # Available contacts for selection
+    available_contacts: list[ContactInfo] = Field(default_factory=list)
     # Period
     period: dict[str, str]
     period_name: str  # Human-readable period name (e.g., "Janvier 2026")
@@ -196,3 +205,18 @@ class ErrorResponse(BaseModel):
 
     detail: str
     error_code: Optional[str] = None
+
+
+class UpdateContactRequest(BaseModel):
+    """Request to update quotation contact."""
+
+    contact_id: str
+    contact_name: str
+
+
+class UpdateContactResponse(BaseModel):
+    """Response from update contact endpoint."""
+
+    success: bool
+    contact_id: str
+    contact_name: str

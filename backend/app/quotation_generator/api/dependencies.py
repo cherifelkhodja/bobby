@@ -86,9 +86,10 @@ async def get_template_repository(
 async def get_preview_batch_use_case(
     csv_parser: Annotated[CSVParserService, Depends(get_csv_parser)],
     batch_storage: Annotated[RedisStorageAdapter, Depends(get_batch_storage)],
+    boond_adapter: Annotated[BoondManagerAdapter, Depends(get_erp_adapter)],
 ) -> PreviewBatchUseCase:
     """Get preview batch use case."""
-    return PreviewBatchUseCase(csv_parser, batch_storage)
+    return PreviewBatchUseCase(csv_parser, batch_storage, boond_adapter)
 
 
 async def get_generate_batch_use_case(

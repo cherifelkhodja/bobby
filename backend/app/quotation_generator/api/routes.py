@@ -17,7 +17,9 @@ from app.quotation_generator.api.dependencies import (
     get_download_batch_use_case,
     get_upload_template_use_case,
     get_list_templates_use_case,
+    get_batch_storage,
 )
+from app.quotation_generator.infrastructure.adapters import RedisStorageAdapter
 from app.quotation_generator.api.schemas import (
     PreviewBatchResponse,
     StartGenerationRequest,
@@ -29,6 +31,8 @@ from app.quotation_generator.api.schemas import (
     UploadTemplateResponse,
     UserBatchesResponse,
     ErrorResponse,
+    UpdateContactRequest,
+    UpdateContactResponse,
 )
 from app.quotation_generator.application.use_cases import (
     PreviewBatchUseCase,
@@ -360,3 +364,71 @@ async def download_example_csv(
     except Exception:
         os.unlink(path)
         raise
+
+
+@router.patch(
+    "/batches/{batch_id}/quotations/{row_index}/contact",
+    response_model=UpdateContactResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Batch or quotation not found"},
+    },
+)
+async def update_quotation_contact(
+    batch_id: UUID,
+    row_index: int,
+    request: UpdateContactRequest,
+    current_user: AdminUser,
+    batch_storage: RedisStorageAdapter = Depends(get_batch_storage),
+) -> UpdateContactResponse:
+    """Update the contact for a specific quotation in a batch.
+
+    This allows changing the contact before generating quotations.
+    """
+    try:
+        # Get batch from storage
+        batch = await batch_storage.get_batch(batch_id)
+        if not batch:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Batch {batch_id} not found",
+            )
+
+        # Find quotation by row_index
+        quotation = None
+        for q in batch.quotations:
+            if q.row_index == row_index:
+                quotation = q
+                break
+
+        if not quotation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Quotation with row_index {row_index} not found in batch",
+            )
+
+        # Update contact
+        quotation.contact_id = request.contact_id
+        quotation.contact_name = request.contact_name
+
+        # Save batch back to storage
+        await batch_storage.save_batch(batch, ttl_seconds=3600)
+
+        logger.info(
+            f"Updated contact for batch {batch_id}, quotation {row_index}: "
+            f"{request.contact_id} ({request.contact_name})"
+        )
+
+        return UpdateContactResponse(
+            success=True,
+            contact_id=request.contact_id,
+            contact_name=request.contact_name,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating contact: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update contact: {str(e)}",
+        )

@@ -186,20 +186,30 @@ class Quotation:
         self.validation_errors = errors
         return errors
 
-    def to_boond_payload(self, number: str) -> dict:
+    def to_boond_payload(self) -> dict:
         """Convert to BoondManager API payload format.
 
-        Args:
-            number: Quotation number/title.
+        Uses:
+        - date: start_date from period (CSV)
+        - number: need_title (project name from BoondManager)
+        - quotationRecords.description: "Prestation de services, {period_name}"
 
         Returns:
             Dictionary in BoondManager API format.
         """
+        # Build line record with custom description
+        line_record = self.line.to_boond_record()
+        # Override description: "Prestation de services, {periode}"
+        if self.period_name:
+            line_record["description"] = f"Prestation de services, {self.period_name}"
+        else:
+            line_record["description"] = "Prestation de services"
+
         return {
             "data": {
                 "type": "quotation",
                 "attributes": {
-                    "date": date.today().isoformat(),
+                    "date": self.period.start_date.isoformat(),  # Date from CSV
                     "state": 0,  # Draft
                     "currency": 0,  # EUR
                     "exchangeRate": 1,
@@ -207,7 +217,7 @@ class Quotation:
                     "exchangeRateAgency": 1,
                     "turnoverInvoicedExcludingTax": self.total_ht.to_float(),
                     "turnoverInvoicedIncludingTax": self.total_ttc.to_float(),
-                    "number": number,
+                    "number": self.need_title or "Prestation",  # Project name
                     "language": "fr",
                     "paymentTerm": 52,
                     "legals": THALES_LEGALS,
@@ -216,7 +226,7 @@ class Quotation:
                     "startDate": self.period.format_start(),
                     "endDate": self.period.format_end(),
                     "schedules": [],
-                    "quotationRecords": [self.line.to_boond_record()],
+                    "quotationRecords": [line_record],
                     "showCompanyRegistrationNumberOnPDF": False,
                     "showCompanyVATNumberOnPDF": False,
                     "showCompanyNumberOnPDF": False,
@@ -254,6 +264,9 @@ class Quotation:
         Returns:
             Dictionary of template variables.
         """
+        # Date format for template: DD/MM/YYYY
+        date_fmt = "%d/%m/%Y"
+
         return {
             "thales_stakeholder": self.contact_name,
             "procurement_buyer": "M Chérif GUESSOUM",
@@ -263,10 +276,10 @@ class Quotation:
             "reference": boond_reference or self.boond_reference or "",
             "sales_representative": "M Cherif EL KHODJA\n+33 7 57 81 73 83\ncherif.elkhodja@geminiconsulting.fr",
             "renewal": "YES" if self.is_renewal else "NO",
-            "initial_first_starting_date": self.start_project.strftime("%Y-%m-%d"),
+            "initial_first_starting_date": self.start_project.strftime(date_fmt),
             "total_uo": str(self.quantity),
-            "po_start_date": self.period.format_start(),
-            "po_end_date": self.period.format_end(),
+            "po_start_date": self.period.format_start(date_fmt),
+            "po_end_date": self.period.format_end(date_fmt),
             "c22_domain": self.c22_domain,
             "c22_activity": self.c22_activity,
             "activity_country": "France (IDF)",

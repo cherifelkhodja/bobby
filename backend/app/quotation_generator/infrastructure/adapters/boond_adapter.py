@@ -56,13 +56,8 @@ class BoondManagerAdapter(ERPPort):
         """
         async with self._get_client() as client:
             try:
-                # Generate quotation number
-                number = await self.get_next_quotation_number(
-                    quotation.resource_trigramme
-                )
-
-                # Build payload
-                payload = quotation.to_boond_payload(number)
+                # Build payload (uses need_title as number, period.start_date as date)
+                payload = quotation.to_boond_payload()
 
                 logger.info(
                     f"Creating quotation for {quotation.resource_name} "
@@ -91,7 +86,7 @@ class BoondManagerAdapter(ERPPort):
                 data = response.json()
                 quotation_id = str(data.get("data", {}).get("id"))
                 reference = data.get("data", {}).get("attributes", {}).get(
-                    "reference", number
+                    "reference", quotation.need_title
                 )
 
                 logger.info(
@@ -320,6 +315,64 @@ class BoondManagerAdapter(ERPPort):
 
             except httpx.RequestError as e:
                 logger.error(f"Network error validating contact: {e}")
+                raise BoondManagerAPIError(
+                    status_code=0,
+                    message=f"Network error: {str(e)}",
+                ) from e
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+        reraise=True,
+    )
+    async def get_company_contacts(self, company_id: str) -> list[dict]:
+        """Get contacts for a company from BoondManager.
+
+        Args:
+            company_id: The company ID.
+
+        Returns:
+            List of contacts with id and name.
+
+        Raises:
+            BoondManagerAPIError: If the API call fails.
+        """
+        async with self._get_client() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/companies/{company_id}/contacts",
+                    auth=self._auth,
+                )
+
+                if response.status_code == 404:
+                    logger.warning(f"Company {company_id} not found")
+                    return []
+
+                if response.status_code >= 400:
+                    raise BoondManagerAPIError(
+                        status_code=response.status_code,
+                        message=f"Error fetching company contacts: {response.text[:200]}",
+                    )
+
+                data = response.json()
+                contacts = []
+
+                for contact in data.get("data", []):
+                    attrs = contact.get("attributes", {})
+                    first_name = attrs.get("firstName", "")
+                    last_name = attrs.get("lastName", "")
+                    name = f"{first_name} {last_name}".strip()
+
+                    contacts.append({
+                        "id": str(contact.get("id")),
+                        "name": name or f"Contact {contact.get('id')}",
+                    })
+
+                logger.info(f"Found {len(contacts)} contacts for company {company_id}")
+                return contacts
+
+            except httpx.RequestError as e:
+                logger.error(f"Network error fetching company contacts: {e}")
                 raise BoondManagerAPIError(
                     status_code=0,
                     message=f"Network error: {str(e)}",

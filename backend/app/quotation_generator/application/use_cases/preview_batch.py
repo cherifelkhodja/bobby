@@ -2,11 +2,14 @@
 
 import logging
 from dataclasses import dataclass
-from typing import BinaryIO
+from typing import BinaryIO, Optional
 from uuid import UUID
 
 from app.quotation_generator.domain.entities import QuotationBatch
 from app.quotation_generator.domain.ports import BatchStoragePort
+from app.quotation_generator.infrastructure.adapters.boond_adapter import (
+    BoondManagerAdapter,
+)
 from app.quotation_generator.services.csv_parser import CSVParserService
 
 logger = logging.getLogger(__name__)
@@ -30,23 +33,27 @@ class PreviewBatchUseCase:
     This use case:
     1. Parses the uploaded CSV file
     2. Validates all quotations
-    3. Stores the batch in Redis for later confirmation
-    4. Returns preview data for the frontend
+    3. Fetches available contacts for each company
+    4. Stores the batch in Redis for later confirmation
+    5. Returns preview data for the frontend
     """
 
     def __init__(
         self,
         csv_parser: CSVParserService,
         batch_storage: BatchStoragePort,
+        boond_adapter: Optional[BoondManagerAdapter] = None,
     ) -> None:
         """Initialize use case with dependencies.
 
         Args:
             csv_parser: Service for parsing CSV files.
             batch_storage: Storage for batch state.
+            boond_adapter: Optional adapter for fetching contacts.
         """
         self.csv_parser = csv_parser
         self.batch_storage = batch_storage
+        self.boond_adapter = boond_adapter
 
     async def execute(
         self,
@@ -79,6 +86,19 @@ class PreviewBatchUseCase:
         valid_count = sum(1 for q in batch.quotations if q.is_valid)
         invalid_count = batch.total_count - valid_count
 
+        # Fetch available contacts for each company
+        company_contacts: dict[str, list[dict]] = {}
+        if self.boond_adapter:
+            # Get unique company IDs
+            unique_company_ids = {q.company_id for q in batch.quotations}
+            for company_id in unique_company_ids:
+                try:
+                    contacts = await self.boond_adapter.get_company_contacts(company_id)
+                    company_contacts[company_id] = contacts
+                except Exception as e:
+                    logger.warning(f"Failed to fetch contacts for company {company_id}: {e}")
+                    company_contacts[company_id] = []
+
         # Store batch in Redis (1 hour TTL for preview)
         await self.batch_storage.save_batch(batch, ttl_seconds=3600)
 
@@ -87,11 +107,17 @@ class PreviewBatchUseCase:
             f"out of {batch.total_count} quotations"
         )
 
+        # Build quotations list with available_contacts
+        quotations_preview = batch.to_preview_dict()["quotations"]
+        for q in quotations_preview:
+            company_id = q.get("company_id")
+            q["available_contacts"] = company_contacts.get(company_id, [])
+
         return PreviewBatchResult(
             batch_id=batch.id,
             total_quotations=batch.total_count,
             valid_count=valid_count,
             invalid_count=invalid_count,
-            quotations=batch.to_preview_dict()["quotations"],
+            quotations=quotations_preview,
             validation_errors=validation_errors,
         )
