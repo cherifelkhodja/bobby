@@ -25,6 +25,21 @@ from app.application.use_cases.opportunities import (
     ListOpportunitiesUseCase,
     SyncOpportunitiesUseCase,
 )
+from app.application.use_cases.admin import (
+    # Users
+    ListUsersUseCase,
+    GetUserUseCase,
+    UpdateUserUseCase,
+    ChangeUserRoleUseCase,
+    ActivateUserUseCase,
+    DeactivateUserUseCase,
+    DeleteUserUseCase,
+    # Boond
+    GetBoondStatusUseCase,
+    SyncBoondOpportunitiesUseCase,
+    TestBoondConnectionUseCase,
+    GetBoondResourcesUseCase,
+)
 
 __all__ = [
     # Auth
@@ -48,4 +63,17 @@ __all__ = [
     # Opportunities
     "ListOpportunitiesUseCase",
     "SyncOpportunitiesUseCase",
+    # Admin - Users
+    "ListUsersUseCase",
+    "GetUserUseCase",
+    "UpdateUserUseCase",
+    "ChangeUserRoleUseCase",
+    "ActivateUserUseCase",
+    "DeactivateUserUseCase",
+    "DeleteUserUseCase",
+    # Admin - Boond
+    "GetBoondStatusUseCase",
+    "SyncBoondOpportunitiesUseCase",
+    "TestBoondConnectionUseCase",
+    "GetBoondResourcesUseCase",
 ]

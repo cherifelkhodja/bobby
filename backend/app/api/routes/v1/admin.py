@@ -1,563 +1,365 @@
 """Admin endpoints for system management."""
 
-from datetime import datetime
-from typing import Optional
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Header, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.config import settings
+from app.api.dependencies import AdminUser
+from app.api.schemas.admin import (
+    ActivateResponse,
+    BoondResourceResponse,
+    BoondResourcesListResponse,
+    BoondStatusResponse,
+    ChangeRoleRequest,
+    MessageResponse,
+    SyncResponse,
+    TestConnectionResponse,
+    UpdateUserAdminRequest,
+    UserAdminResponse,
+    UsersListResponse,
+)
+from app.application.use_cases.admin import (
+    ActivateUserUseCase,
+    ChangeUserRoleUseCase,
+    DeactivateUserUseCase,
+    DeleteUserUseCase,
+    GetBoondResourcesUseCase,
+    GetBoondStatusUseCase,
+    GetUserUseCase,
+    ListUsersUseCase,
+    SyncBoondOpportunitiesUseCase,
+    TestBoondConnectionUseCase,
+    UpdateUserUseCase,
+)
+from app.application.use_cases.admin.boond import BoondNotConfiguredError
+from app.application.use_cases.admin.users import (
+    CannotModifyOwnAccountError,
+    InvalidRoleError,
+    UpdateUserCommand,
+    UserNotFoundError,
+)
 from app.dependencies import AppSettings, DbSession
-from app.domain.value_objects import UserRole
 from app.infrastructure.boond.client import BoondClient
 from app.infrastructure.cache.redis import CacheService
 from app.infrastructure.database.repositories import OpportunityRepository, UserRepository
-from app.infrastructure.security.jwt import decode_token
-from app.application.use_cases.opportunities import SyncOpportunitiesUseCase
 
 router = APIRouter()
 
 
-class BoondStatusResponse(BaseModel):
-    """BoondManager connection status."""
-
-    connected: bool
-    configured: bool
-    api_url: str
-    last_sync: Optional[datetime] = None
-    opportunities_count: int = 0
-    error: Optional[str] = None
+# =============================================================================
+# Use Case Factory Dependencies
+# =============================================================================
 
 
-class SyncResponse(BaseModel):
-    """Sync operation response."""
-
-    success: bool
-    synced_count: int = 0
-    message: str
+def get_list_users_use_case(db: DbSession) -> ListUsersUseCase:
+    """Factory for ListUsersUseCase."""
+    return ListUsersUseCase(user_repository=UserRepository(db))
 
 
-class TestConnectionResponse(BaseModel):
-    """Test connection response."""
-
-    success: bool
-    status_code: int
-    message: str
-    candidates_count: Optional[int] = None
+def get_get_user_use_case(db: DbSession) -> GetUserUseCase:
+    """Factory for GetUserUseCase."""
+    return GetUserUseCase(user_repository=UserRepository(db))
 
 
-async def require_admin(db: DbSession, authorization: str) -> UUID:
-    """Verify user is admin."""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated")
+def get_update_user_use_case(db: DbSession) -> UpdateUserUseCase:
+    """Factory for UpdateUserUseCase."""
+    return UpdateUserUseCase(user_repository=UserRepository(db))
 
-    token = authorization[7:]
-    payload = decode_token(token, expected_type="access")
-    user_id = UUID(payload.sub)
 
-    user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(user_id)
+def get_change_role_use_case(db: DbSession) -> ChangeUserRoleUseCase:
+    """Factory for ChangeUserRoleUseCase."""
+    return ChangeUserRoleUseCase(user_repository=UserRepository(db))
 
-    if not user or user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
 
-    return user_id
+def get_activate_user_use_case(db: DbSession) -> ActivateUserUseCase:
+    """Factory for ActivateUserUseCase."""
+    return ActivateUserUseCase(user_repository=UserRepository(db))
+
+
+def get_deactivate_user_use_case(db: DbSession) -> DeactivateUserUseCase:
+    """Factory for DeactivateUserUseCase."""
+    return DeactivateUserUseCase(user_repository=UserRepository(db))
+
+
+def get_delete_user_use_case(db: DbSession) -> DeleteUserUseCase:
+    """Factory for DeleteUserUseCase."""
+    return DeleteUserUseCase(user_repository=UserRepository(db))
+
+
+def get_boond_status_use_case(
+    db: DbSession,
+    settings: AppSettings,
+) -> GetBoondStatusUseCase:
+    """Factory for GetBoondStatusUseCase."""
+    return GetBoondStatusUseCase(
+        settings=settings,
+        boond_service=BoondClient(settings),
+        opportunity_repository=OpportunityRepository(db),
+    )
+
+
+def get_sync_boond_use_case(
+    db: DbSession,
+    settings: AppSettings,
+) -> SyncBoondOpportunitiesUseCase:
+    """Factory for SyncBoondOpportunitiesUseCase."""
+    return SyncBoondOpportunitiesUseCase(
+        settings=settings,
+        boond_service=BoondClient(settings),
+        opportunity_repository=OpportunityRepository(db),
+        cache_service=CacheService(settings),
+    )
+
+
+def get_test_boond_use_case(settings: AppSettings) -> TestBoondConnectionUseCase:
+    """Factory for TestBoondConnectionUseCase."""
+    return TestBoondConnectionUseCase(
+        settings=settings,
+        boond_client=BoondClient(settings),
+    )
+
+
+def get_boond_resources_use_case(settings: AppSettings) -> GetBoondResourcesUseCase:
+    """Factory for GetBoondResourcesUseCase."""
+    return GetBoondResourcesUseCase(
+        settings=settings,
+        boond_client=BoondClient(settings),
+    )
+
+
+# Type aliases for use case dependencies
+ListUsersUseCaseDep = Annotated[ListUsersUseCase, Depends(get_list_users_use_case)]
+GetUserUseCaseDep = Annotated[GetUserUseCase, Depends(get_get_user_use_case)]
+UpdateUserUseCaseDep = Annotated[UpdateUserUseCase, Depends(get_update_user_use_case)]
+ChangeRoleUseCaseDep = Annotated[ChangeUserRoleUseCase, Depends(get_change_role_use_case)]
+ActivateUserUseCaseDep = Annotated[ActivateUserUseCase, Depends(get_activate_user_use_case)]
+DeactivateUserUseCaseDep = Annotated[DeactivateUserUseCase, Depends(get_deactivate_user_use_case)]
+DeleteUserUseCaseDep = Annotated[DeleteUserUseCase, Depends(get_delete_user_use_case)]
+BoondStatusUseCaseDep = Annotated[GetBoondStatusUseCase, Depends(get_boond_status_use_case)]
+SyncBoondUseCaseDep = Annotated[SyncBoondOpportunitiesUseCase, Depends(get_sync_boond_use_case)]
+TestBoondUseCaseDep = Annotated[TestBoondConnectionUseCase, Depends(get_test_boond_use_case)]
+BoondResourcesUseCaseDep = Annotated[GetBoondResourcesUseCase, Depends(get_boond_resources_use_case)]
+
+
+# =============================================================================
+# BoondManager Endpoints
+# =============================================================================
 
 
 @router.get("/boond/status", response_model=BoondStatusResponse)
 async def get_boond_status(
-    db: DbSession,
-    authorization: str = Header(default=""),
+    admin_id: AdminUser,
+    use_case: BoondStatusUseCaseDep,
 ):
     """Get BoondManager connection status."""
-    await require_admin(db, authorization)
-
-    configured = bool(settings.BOOND_USERNAME and settings.BOOND_PASSWORD)
-
-    if not configured:
-        return BoondStatusResponse(
-            connected=False,
-            configured=False,
-            api_url=settings.BOOND_API_URL,
-            error="BoondManager credentials not configured",
-        )
-
-    boond_client = BoondClient(settings)
-
-    try:
-        connected = await boond_client.health_check()
-    except Exception as e:
-        return BoondStatusResponse(
-            connected=False,
-            configured=True,
-            api_url=settings.BOOND_API_URL,
-            error=str(e),
-        )
-
-    # Get opportunities count and last sync time
-    opp_repo = OpportunityRepository(db)
-    count = await opp_repo.count_active()
-    last_sync = await opp_repo.get_last_sync_time()
+    result = await use_case.execute()
 
     return BoondStatusResponse(
-        connected=connected,
-        configured=True,
-        api_url=settings.BOOND_API_URL,
-        last_sync=last_sync,
-        opportunities_count=count,
+        connected=result.connected,
+        configured=result.configured,
+        api_url=result.api_url,
+        last_sync=result.last_sync,
+        opportunities_count=result.opportunities_count,
+        error=result.error,
     )
 
 
 @router.post("/boond/sync", response_model=SyncResponse)
 async def trigger_boond_sync(
-    db: DbSession,
-    app_settings: AppSettings,
-    authorization: str = Header(default=""),
+    admin_id: AdminUser,
+    use_case: SyncBoondUseCaseDep,
 ):
     """Trigger synchronization with BoondManager."""
-    await require_admin(db, authorization)
-
-    if not settings.BOOND_USERNAME or not settings.BOOND_PASSWORD:
-        raise HTTPException(
-            status_code=400,
-            detail="BoondManager credentials not configured",
-        )
-
-    boond_client = BoondClient(app_settings)
-    opp_repo = OpportunityRepository(db)
-    cache_service = CacheService(app_settings)
-
-    use_case = SyncOpportunitiesUseCase(
-        boond_client=boond_client,
-        opportunity_repository=opp_repo,
-        cache_service=cache_service,
-    )
-
     try:
-        synced_count = await use_case.execute()
+        result = await use_case.execute()
         return SyncResponse(
-            success=True,
-            synced_count=synced_count,
-            message=f"{synced_count} opportunités synchronisées",
+            success=result.success,
+            synced_count=result.synced_count,
+            message=result.message,
         )
-    except Exception as e:
-        return SyncResponse(
-            success=False,
-            synced_count=0,
-            message=f"Erreur lors de la synchronisation: {str(e)}",
-        )
+    except BoondNotConfiguredError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/boond/test", response_model=TestConnectionResponse)
 async def test_boond_connection(
-    db: DbSession,
-    authorization: str = Header(default=""),
+    admin_id: AdminUser,
+    use_case: TestBoondUseCaseDep,
 ):
     """Test BoondManager connection using GET /candidates."""
-    await require_admin(db, authorization)
-
-    if not settings.BOOND_USERNAME or not settings.BOOND_PASSWORD:
-        return TestConnectionResponse(
-            success=False,
-            status_code=0,
-            message="Identifiants BoondManager non configures (BOOND_USERNAME, BOOND_PASSWORD)",
-        )
-
-    boond_client = BoondClient(settings)
-    result = await boond_client.test_connection()
+    result = await use_case.execute()
 
     return TestConnectionResponse(
-        success=result.get("success", False),
-        status_code=result.get("status_code", 0),
-        message=result.get("message", "Erreur inconnue"),
-        candidates_count=result.get("candidates_count"),
+        success=result.success,
+        status_code=result.status_code,
+        message=result.message,
+        candidates_count=result.candidates_count,
     )
-
-
-class BoondResourceResponse(BaseModel):
-    """BoondManager resource (employee)."""
-
-    id: str
-    first_name: str
-    last_name: str
-    email: str
-    phone: Optional[str] = None
-    manager_id: Optional[str] = None
-    manager_name: Optional[str] = None
-    agency_id: Optional[str] = None
-    agency_name: Optional[str] = None
-    resource_type: Optional[int] = None
-    resource_type_name: Optional[str] = None
-    state: Optional[int] = None
-    state_name: Optional[str] = None
-    suggested_role: str = "user"
-
-
-class BoondResourcesListResponse(BaseModel):
-    """List of resources response."""
-
-    resources: list[BoondResourceResponse]
-    total: int
 
 
 @router.get("/boond/resources", response_model=BoondResourcesListResponse)
 async def get_boond_resources(
-    db: DbSession,
-    authorization: str = Header(default=""),
+    admin_id: AdminUser,
+    use_case: BoondResourcesUseCaseDep,
 ):
-    """Fetch resources (employees) from BoondManager.
-
-    Only returns resources with state 1 or 2 (active employees).
-    """
-    await require_admin(db, authorization)
-
-    if not settings.BOOND_USERNAME or not settings.BOOND_PASSWORD:
-        raise HTTPException(
-            status_code=400,
-            detail="BoondManager credentials not configured",
-        )
-
-    boond_client = BoondClient(settings)
-
+    """Fetch resources (employees) from BoondManager."""
     try:
-        # Fetch resources (includes agency names directly)
-        resources = await boond_client.get_resources()
+        result = await use_case.execute()
 
         return BoondResourcesListResponse(
             resources=[
                 BoondResourceResponse(
-                    id=r["id"],
-                    first_name=r["first_name"],
-                    last_name=r["last_name"],
-                    email=r["email"],
-                    phone=r.get("phone"),
-                    manager_id=r.get("manager_id"),
-                    manager_name=r.get("manager_name"),
-                    agency_id=r.get("agency_id"),
-                    agency_name=r.get("agency_name", ""),
-                    resource_type=r.get("resource_type"),
-                    resource_type_name=r.get("resource_type_name"),
-                    state=r.get("state"),
-                    state_name=r.get("state_name"),
-                    suggested_role=r.get("suggested_role", "user"),
+                    id=r.id,
+                    first_name=r.first_name,
+                    last_name=r.last_name,
+                    email=r.email,
+                    phone=r.phone,
+                    manager_id=r.manager_id,
+                    manager_name=r.manager_name,
+                    agency_id=r.agency_id,
+                    agency_name=r.agency_name or "",
+                    resource_type=r.resource_type,
+                    resource_type_name=r.resource_type_name,
+                    state=r.state,
+                    state_name=r.state_name,
+                    suggested_role=r.suggested_role,
                 )
-                for r in resources
-                if r.get("email")  # Only include resources with emails
+                for r in result.resources
             ],
-            total=len(resources),
+            total=result.total,
         )
+    except BoondNotConfiguredError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch resources: {str(e)}",
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to fetch resources: {str(e)}")
 
 
-# ============================================================================
+# =============================================================================
 # User Management Endpoints
-# ============================================================================
-
-
-class UserAdminResponse(BaseModel):
-    """User response for admin."""
-
-    id: str
-    email: str
-    first_name: str
-    last_name: str
-    full_name: str
-    role: str
-    phone: Optional[str] = None
-    is_verified: bool
-    is_active: bool
-    boond_resource_id: Optional[str] = None
-    manager_boond_id: Optional[str] = None
-    created_at: str
-    updated_at: str
-
-
-class UsersListResponse(BaseModel):
-    """List of users response."""
-
-    users: list[UserAdminResponse]
-    total: int
-
-
-class ChangeRoleRequest(BaseModel):
-    """Request to change user role."""
-
-    role: str  # user, commercial, rh, admin
-
-
-class UpdateUserRequest(BaseModel):
-    """Request to update user."""
-
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    phone: Optional[str] = None
-    is_active: Optional[bool] = None
-    role: Optional[str] = None
-    boond_resource_id: Optional[str] = None
-    manager_boond_id: Optional[str] = None
+# =============================================================================
 
 
 @router.get("/users", response_model=UsersListResponse)
 async def list_users(
-    db: DbSession,
-    authorization: str = Header(default=""),
+    admin_id: AdminUser,
+    use_case: ListUsersUseCaseDep,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
 ):
     """List all users (admin only)."""
-    await require_admin(db, authorization)
-
-    user_repo = UserRepository(db)
-    users = await user_repo.list_all(skip=skip, limit=limit)
-    total = await user_repo.count()
+    result = await use_case.execute(skip=skip, limit=limit)
 
     return UsersListResponse(
-        users=[
-            UserAdminResponse(
-                id=str(user.id),
-                email=str(user.email),
-                first_name=user.first_name,
-                last_name=user.last_name,
-                full_name=user.full_name,
-                role=str(user.role),
-                phone=user.phone,
-                is_verified=user.is_verified,
-                is_active=user.is_active,
-                boond_resource_id=user.boond_resource_id,
-                manager_boond_id=user.manager_boond_id,
-                created_at=user.created_at.isoformat(),
-                updated_at=user.updated_at.isoformat(),
-            )
-            for user in users
-        ],
-        total=total,
+        users=[UserAdminResponse.from_read_model(u) for u in result.users],
+        total=result.total,
     )
 
 
 @router.get("/users/{user_id}", response_model=UserAdminResponse)
 async def get_user(
     user_id: UUID,
-    db: DbSession,
-    authorization: str = Header(default=""),
+    admin_id: AdminUser,
+    use_case: GetUserUseCaseDep,
 ):
     """Get user details (admin only)."""
-    await require_admin(db, authorization)
-
-    user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(user_id)
-
-    if not user:
+    try:
+        result = await use_case.execute(user_id)
+        return UserAdminResponse.from_read_model(result)
+    except UserNotFoundError:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-
-    return UserAdminResponse(
-        id=str(user.id),
-        email=str(user.email),
-        first_name=user.first_name,
-        last_name=user.last_name,
-        full_name=user.full_name,
-        role=str(user.role),
-        phone=user.phone,
-        is_verified=user.is_verified,
-        is_active=user.is_active,
-        boond_resource_id=user.boond_resource_id,
-        manager_boond_id=user.manager_boond_id,
-        created_at=user.created_at.isoformat(),
-        updated_at=user.updated_at.isoformat(),
-    )
 
 
 @router.patch("/users/{user_id}", response_model=UserAdminResponse)
 async def update_user(
     user_id: UUID,
-    request: UpdateUserRequest,
-    db: DbSession,
-    authorization: str = Header(default=""),
+    request: UpdateUserAdminRequest,
+    admin_id: AdminUser,
+    use_case: UpdateUserUseCaseDep,
 ):
     """Update user (admin only)."""
-    admin_id = await require_admin(db, authorization)
-
-    user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(user_id)
-
-    if not user:
-        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-
-    # Prevent admin from changing their own role
-    if user_id == admin_id and request.role and request.role != str(user.role):
-        raise HTTPException(
-            status_code=400,
-            detail="Vous ne pouvez pas modifier votre propre rôle"
+    try:
+        command = UpdateUserCommand(
+            first_name=request.first_name,
+            last_name=request.last_name,
+            phone=request.phone,
+            is_active=request.is_active,
+            role=request.role,
+            boond_resource_id=request.boond_resource_id,
+            manager_boond_id=request.manager_boond_id,
         )
-
-    # Update fields
-    if request.is_active is not None:
-        if request.is_active:
-            user.activate()
-        else:
-            user.deactivate()
-
-    if request.role:
-        if request.role not in ("user", "commercial", "rh", "admin"):
-            raise HTTPException(status_code=400, detail="Rôle invalide")
-        user.change_role(UserRole(request.role))
-
-    if request.boond_resource_id is not None:
-        user.boond_resource_id = request.boond_resource_id or None
-
-    if request.manager_boond_id is not None:
-        user.manager_boond_id = request.manager_boond_id or None
-
-    if request.first_name is not None:
-        user.first_name = request.first_name
-
-    if request.last_name is not None:
-        user.last_name = request.last_name
-
-    if request.phone is not None:
-        user.phone = request.phone or None
-
-    updated_user = await user_repo.save(user)
-
-    return UserAdminResponse(
-        id=str(updated_user.id),
-        email=str(updated_user.email),
-        first_name=updated_user.first_name,
-        last_name=updated_user.last_name,
-        full_name=updated_user.full_name,
-        role=str(updated_user.role),
-        phone=updated_user.phone,
-        is_verified=updated_user.is_verified,
-        is_active=updated_user.is_active,
-        boond_resource_id=updated_user.boond_resource_id,
-        manager_boond_id=updated_user.manager_boond_id,
-        created_at=updated_user.created_at.isoformat(),
-        updated_at=updated_user.updated_at.isoformat(),
-    )
+        result = await use_case.execute(user_id, command, admin_id)
+        return UserAdminResponse.from_read_model(result)
+    except UserNotFoundError:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    except CannotModifyOwnAccountError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except InvalidRoleError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/users/{user_id}/role", response_model=UserAdminResponse)
 async def change_user_role(
     user_id: UUID,
     request: ChangeRoleRequest,
-    db: DbSession,
-    authorization: str = Header(default=""),
+    admin_id: AdminUser,
+    use_case: ChangeRoleUseCaseDep,
 ):
     """Change user role (admin only)."""
-    admin_id = await require_admin(db, authorization)
-
-    if request.role not in ("user", "commercial", "rh", "admin"):
-        raise HTTPException(status_code=400, detail="Rôle invalide")
-
-    user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(user_id)
-
-    if not user:
+    try:
+        result = await use_case.execute(user_id, request.role, admin_id)
+        return UserAdminResponse.from_read_model(result)
+    except UserNotFoundError:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-
-    # Prevent admin from changing their own role
-    if user_id == admin_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Vous ne pouvez pas modifier votre propre rôle"
-        )
-
-    user.change_role(UserRole(request.role))
-    updated_user = await user_repo.save(user)
-
-    return UserAdminResponse(
-        id=str(updated_user.id),
-        email=str(updated_user.email),
-        first_name=updated_user.first_name,
-        last_name=updated_user.last_name,
-        full_name=updated_user.full_name,
-        role=str(updated_user.role),
-        phone=updated_user.phone,
-        is_verified=updated_user.is_verified,
-        is_active=updated_user.is_active,
-        boond_resource_id=updated_user.boond_resource_id,
-        manager_boond_id=updated_user.manager_boond_id,
-        created_at=updated_user.created_at.isoformat(),
-        updated_at=updated_user.updated_at.isoformat(),
-    )
+    except CannotModifyOwnAccountError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except InvalidRoleError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/users/{user_id}/activate")
+@router.post("/users/{user_id}/activate", response_model=ActivateResponse)
 async def activate_user(
     user_id: UUID,
-    db: DbSession,
-    authorization: str = Header(default=""),
+    admin_id: AdminUser,
+    use_case: ActivateUserUseCaseDep,
 ):
     """Activate a user account (admin only)."""
-    await require_admin(db, authorization)
-
-    user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(user_id)
-
-    if not user:
+    try:
+        await use_case.execute(user_id)
+        return ActivateResponse(message="Utilisateur activé", is_active=True)
+    except UserNotFoundError:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
-    user.activate()
-    await user_repo.save(user)
 
-    return {"message": "Utilisateur activé", "is_active": True}
-
-
-@router.post("/users/{user_id}/deactivate")
+@router.post("/users/{user_id}/deactivate", response_model=ActivateResponse)
 async def deactivate_user(
     user_id: UUID,
-    db: DbSession,
-    authorization: str = Header(default=""),
+    admin_id: AdminUser,
+    use_case: DeactivateUserUseCaseDep,
 ):
     """Deactivate a user account (admin only)."""
-    admin_id = await require_admin(db, authorization)
-
-    if user_id == admin_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Vous ne pouvez pas désactiver votre propre compte"
-        )
-
-    user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(user_id)
-
-    if not user:
+    try:
+        await use_case.execute(user_id, admin_id)
+        return ActivateResponse(message="Utilisateur désactivé", is_active=False)
+    except UserNotFoundError:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-
-    user.deactivate()
-    await user_repo.save(user)
-
-    return {"message": "Utilisateur désactivé", "is_active": False}
+    except CannotModifyOwnAccountError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/users/{user_id}")
+@router.delete("/users/{user_id}", response_model=MessageResponse)
 async def delete_user(
     user_id: UUID,
-    db: DbSession,
-    authorization: str = Header(default=""),
+    admin_id: AdminUser,
+    use_case: DeleteUserUseCaseDep,
 ):
     """Delete a user account permanently (admin only)."""
-    admin_id = await require_admin(db, authorization)
-
-    if user_id == admin_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Vous ne pouvez pas supprimer votre propre compte"
-        )
-
-    user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(user_id)
-
-    if not user:
+    try:
+        await use_case.execute(user_id, admin_id)
+        return MessageResponse(message="Utilisateur supprimé")
+    except UserNotFoundError:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-
-    deleted = await user_repo.delete(user_id)
-
-    if not deleted:
-        raise HTTPException(status_code=500, detail="Erreur lors de la suppression")
-
-    return {"message": "Utilisateur supprimé"}
+    except CannotModifyOwnAccountError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
