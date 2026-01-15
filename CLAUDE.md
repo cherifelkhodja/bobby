@@ -428,7 +428,7 @@ Generate quotations for Thales using BoondManager data and Excel templates.
 ### 8. Published Opportunities (Anonymized Boond)
 Allow commercials and admins to publish anonymized opportunities for cooptation.
 
-**Access**: admin, commercial roles only
+**Access**: admin, commercial roles only (for publishing), all authenticated users (for viewing)
 
 **Features**:
 - View Boond opportunities where user is main manager
@@ -437,13 +437,17 @@ Allow commercials and admins to publish anonymized opportunities for cooptation.
 - Skills extraction from job description
 - Anti-duplicate check (boond_opportunity_id unique)
 - Published opportunities visible to all consultants for cooptation
+- **Dedicated detail page** at `/opportunities/:id` with full description
+- **Cooptation support**: Consultants can propose candidates directly from opportunity detail
 
 **Workflow**:
 1. Commercial views their Boond opportunities (filtered by manager principal)
 2. Clicks "Proposer" to anonymize with AI
 3. Reviews/edits the anonymized title and description
 4. Publishes the opportunity (saved in database)
-5. Consultants can see published opportunities and propose candidates
+5. Consultants see published opportunities in `/opportunities` page
+6. Click on opportunity card to view full detail page
+7. Click "Proposer un candidat" to submit cooptation
 
 **Boond Opportunity States** (filtered for publication):
 - 0: Perdue
@@ -452,10 +456,19 @@ Allow commercials and admins to publish anonymized opportunities for cooptation.
 - 7: Abandonnée
 - 10: En attente
 
-**Anonymization Rules**:
+**Anonymization Rules** (Gemini prompt):
 - Client names → Generic descriptions ("BNP Paribas" → "Grande banque française")
 - Internal project names → Generic ("Projet Phoenix" → "Projet de transformation")
 - Preserves: technical skills, methodologies, duration, experience level
+- **Preserves formatting**: Line breaks, bullet points, paragraph structure
+
+**Cooptation Integration**:
+- When creating cooptation for published opportunity, system:
+  1. Checks `opportunities` table first
+  2. If not found, checks `published_opportunities` table
+  3. Converts `PublishedOpportunity` to `Opportunity` entity
+  4. Saves to `opportunities` table (for FK constraint)
+  5. Creates cooptation with reference `PUB-{boond_opportunity_id}`
 
 **Files**:
 - Domain entity: `backend/app/domain/entities/published_opportunity.py`
@@ -464,7 +477,10 @@ Allow commercials and admins to publish anonymized opportunities for cooptation.
 - Anonymizer: `backend/app/infrastructure/anonymizer/gemini_anonymizer.py`
 - Use cases: `backend/app/application/use_cases/published_opportunities.py`
 - API routes: `backend/app/api/routes/v1/published_opportunities.py`
-- Frontend page: `frontend/src/pages/MyBoondOpportunities.tsx`
+- Frontend pages:
+  - `frontend/src/pages/MyBoondOpportunities.tsx` - Commercial view to publish
+  - `frontend/src/pages/Opportunities.tsx` - List published opportunities
+  - `frontend/src/pages/OpportunityDetail.tsx` - Full detail page
 - API client: `frontend/src/api/publishedOpportunities.ts`
 
 **API Endpoints** (`/api/v1/published-opportunities`):
@@ -520,6 +536,36 @@ interface PublishedOpportunity {
 ```
 
 ## Recent Changes Log
+
+### 2026-01-15 (session 3)
+**Published Opportunities - Bug Fixes & Improvements**:
+- Fixed blank page after publishing: added `setTimeout` to defer `invalidateQueries`
+- Fixed HTTP 422 error on publish: `end_date` now sends `null` instead of empty string
+- **Opportunities page rewrite**: Now uses `/published-opportunities` API instead of old `/opportunities`
+- **New OpportunityDetail page** (`frontend/src/pages/OpportunityDetail.tsx`):
+  - Full dedicated page at `/opportunities/:id` instead of modal popup
+  - Back link to opportunities list
+  - Header card with title, status badge, publish date, end date
+  - Description card with `whitespace-pre-wrap` for formatting
+  - Skills card with styled badges
+  - CTA card to propose candidate
+  - Cooptation form modal
+- **Card component update**: Added `onClick` prop with accessibility attributes (role, tabIndex, onKeyDown)
+- **Gemini anonymization prompt improved**: Added rule 5 "PRÉSERVE LA MISE EN FORME" to preserve line breaks, bullet points, and paragraph structure
+- **Cooptation for published opportunities**:
+  - Added `PublishedOpportunityRepository` dependency to `CreateCooptationUseCase`
+  - If opportunity not found in `opportunities` table, checks `published_opportunities`
+  - Converts `PublishedOpportunity` to `Opportunity` entity
+  - Saves to `opportunities` table to satisfy foreign key constraint `fk_cooptations_opportunity`
+
+**Files modified**:
+- `frontend/src/pages/Opportunities.tsx` - Rewrote to use published opportunities
+- `frontend/src/pages/OpportunityDetail.tsx` - New file
+- `frontend/src/App.tsx` - Added route `/opportunities/:id`
+- `frontend/src/components/ui/Card.tsx` - Added onClick support
+- `backend/app/infrastructure/anonymizer/gemini_anonymizer.py` - Improved formatting preservation
+- `backend/app/application/use_cases/cooptations.py` - Support for published opportunities
+- `backend/app/api/routes/v1/cooptations.py` - Added PublishedOpportunityRepository
 
 ### 2026-01-15 (session 2)
 **Published Opportunities Feature**:
