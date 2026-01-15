@@ -153,3 +153,31 @@ class ActivateResponse(BaseModel):
 
     message: str
     is_active: bool
+
+
+# =============================================================================
+# Gemini Settings Schemas
+# =============================================================================
+
+
+class GeminiSettingsResponse(BaseModel):
+    """Gemini settings response."""
+
+    current_model: str
+    available_models: list[str]
+    default_model: str
+
+
+class GeminiSetModelRequest(BaseModel):
+    """Request to set Gemini model."""
+
+    model: str = Field(..., description="Gemini model name")
+
+
+class GeminiTestResponse(BaseModel):
+    """Response from Gemini model test."""
+
+    success: bool
+    model: str
+    response_time_ms: int
+    message: str

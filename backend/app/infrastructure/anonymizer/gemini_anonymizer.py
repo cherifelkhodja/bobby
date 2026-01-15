@@ -74,6 +74,16 @@ Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.
 class GeminiAnonymizer:
     """Client for Google Gemini API to anonymize opportunity descriptions."""
 
+    # Available Gemini models for anonymization
+    AVAILABLE_MODELS = [
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+    ]
+    DEFAULT_MODEL = "gemini-2.5-flash-lite"
+
     def __init__(self, settings: Settings) -> None:
         """Initialize the Gemini anonymizer.
 
@@ -91,16 +101,62 @@ class GeminiAnonymizer:
             genai.configure(api_key=self.settings.GEMINI_API_KEY)
             self._configured = True
 
+    async def test_model(self, model_name: str) -> dict:
+        """Test a Gemini model with a simple prompt.
+
+        Args:
+            model_name: Name of the model to test.
+
+        Returns:
+            Dict with success status and response time.
+
+        Raises:
+            ValueError: If the test fails.
+        """
+        self._configure()
+
+        import time
+        start_time = time.time()
+
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = await asyncio.to_thread(
+                model.generate_content,
+                "Réponds uniquement avec le JSON suivant: {\"status\": \"ok\"}"
+            )
+            elapsed = time.time() - start_time
+
+            if not response.text:
+                raise ValueError("Réponse vide")
+
+            return {
+                "success": True,
+                "model": model_name,
+                "response_time_ms": int(elapsed * 1000),
+                "message": f"Modèle {model_name} fonctionnel",
+            }
+        except Exception as e:
+            elapsed = time.time() - start_time
+            logger.error(f"Model test failed for {model_name}: {e}")
+            return {
+                "success": False,
+                "model": model_name,
+                "response_time_ms": int(elapsed * 1000),
+                "message": f"Erreur: {str(e)}",
+            }
+
     async def anonymize(
         self,
         title: str,
         description: str,
+        model_name: str | None = None,
     ) -> AnonymizedOpportunity:
         """Anonymize an opportunity title and description.
 
         Args:
             title: Original opportunity title.
             description: Original opportunity description.
+            model_name: Gemini model to use (default: DEFAULT_MODEL).
 
         Returns:
             AnonymizedOpportunity with anonymized title, description and extracted skills.
@@ -110,8 +166,11 @@ class GeminiAnonymizer:
         """
         self._configure()
 
+        model_to_use = model_name or self.DEFAULT_MODEL
+        logger.info(f"Using Gemini model: {model_to_use}")
+
         try:
-            model = genai.GenerativeModel("gemini-2.0-flash")
+            model = genai.GenerativeModel(model_to_use)
 
             prompt = ANONYMIZATION_PROMPT.format(
                 title=title,

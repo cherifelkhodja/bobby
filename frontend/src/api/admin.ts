@@ -48,6 +48,19 @@ export interface UpdateUserRequest {
   manager_boond_id?: string | null;
 }
 
+export interface GeminiSettings {
+  current_model: string;
+  available_models: string[];
+  default_model: string;
+}
+
+export interface GeminiTestResponse {
+  success: boolean;
+  model: string;
+  response_time_ms: number;
+  message: string;
+}
+
 export const adminApi = {
   // BoondManager
   getBoondStatus: async (): Promise<BoondStatus> => {
@@ -135,5 +148,21 @@ export const adminApi = {
 
   deleteInvitation: async (invitationId: string): Promise<void> => {
     await apiClient.delete(`/invitations/${invitationId}`);
+  },
+
+  // Gemini settings
+  getGeminiSettings: async (): Promise<GeminiSettings> => {
+    const response = await apiClient.get<GeminiSettings>('/admin/gemini/settings');
+    return response.data;
+  },
+
+  setGeminiModel: async (model: string): Promise<GeminiSettings> => {
+    const response = await apiClient.post<GeminiSettings>('/admin/gemini/settings', { model });
+    return response.data;
+  },
+
+  testGeminiModel: async (model: string): Promise<GeminiTestResponse> => {
+    const response = await apiClient.post<GeminiTestResponse>('/admin/gemini/test', { model });
+    return response.data;
   },
 };

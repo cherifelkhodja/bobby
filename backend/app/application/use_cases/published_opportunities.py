@@ -158,6 +158,7 @@ class AnonymizeOpportunityUseCase:
         title: str,
         description: str,
         boond_opportunity_id: str,
+        model_name: Optional[str] = None,
     ) -> AnonymizedPreviewReadModel:
         """Anonymize opportunity title and description.
 
@@ -165,6 +166,7 @@ class AnonymizeOpportunityUseCase:
             title: Original opportunity title.
             description: Original opportunity description.
             boond_opportunity_id: The Boond opportunity ID.
+            model_name: Gemini model to use (optional, uses configured default).
 
         Returns:
             Preview of anonymized content.
@@ -173,6 +175,7 @@ class AnonymizeOpportunityUseCase:
         anonymized = await self._anonymizer.anonymize(
             title=title,
             description=description or "",
+            model_name=model_name,
         )
 
         return AnonymizedPreviewReadModel(

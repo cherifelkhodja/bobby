@@ -4,7 +4,7 @@
  * Tests for BoondManager and Gemini API connections.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Zap, RefreshCw, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -114,18 +114,41 @@ function GeminiApiCard() {
   const [testResult, setTestResult] = useState<{
     success: boolean;
     message: string;
-    api_key_configured: boolean;
+    response_time_ms?: number;
   } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch current settings
+  const { data: settings, isLoading, refetch } = useQuery({
+    queryKey: ['gemini-settings'],
+    queryFn: adminApi.getGeminiSettings,
+  });
+
+  const [selectedModel, setSelectedModel] = useState<string>('');
+
+  // Update selected model when settings load
+  useEffect(() => {
+    if (settings?.current_model && !selectedModel) {
+      setSelectedModel(settings.current_model);
+    }
+  }, [settings?.current_model]);
 
   const handleTest = async () => {
+    const modelToTest = selectedModel || settings?.current_model || settings?.default_model;
+    if (!modelToTest) return;
+
     setIsTesting(true);
     setTestResult(null);
     try {
-      const result = await cvTransformerApi.testGemini();
-      setTestResult(result);
+      const result = await adminApi.testGeminiModel(modelToTest);
+      setTestResult({
+        success: result.success,
+        message: result.message,
+        response_time_ms: result.response_time_ms,
+      });
       if (result.success) {
-        toast.success('API Gemini fonctionnelle');
+        toast.success(`${modelToTest}: ${result.response_time_ms}ms`);
       } else {
         toast.error(result.message);
       }
@@ -133,7 +156,6 @@ function GeminiApiCard() {
       setTestResult({
         success: false,
         message: error.response?.data?.detail || 'Erreur de connexion',
-        api_key_configured: false,
       });
       toast.error('Erreur lors du test');
     } finally {
@@ -141,14 +163,80 @@ function GeminiApiCard() {
     }
   };
 
+  const handleSave = async () => {
+    if (!selectedModel) return;
+
+    setIsSaving(true);
+    try {
+      await adminApi.setGeminiModel(selectedModel);
+      toast.success(`Modèle ${selectedModel} configuré`);
+      refetch();
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Erreur lors de la sauvegarde');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader
+          title="API Google Gemini"
+          subtitle="Intelligence artificielle pour l'anonymisation"
+        />
+        <div className="flex justify-center py-4">
+          <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+        </div>
+      </Card>
+    );
+  }
+
+  const currentModel = settings?.current_model || settings?.default_model || '';
+  const effectiveSelected = selectedModel || currentModel;
+  const hasChanged = selectedModel && selectedModel !== currentModel;
+
   return (
     <Card>
       <CardHeader
         title="API Google Gemini"
-        subtitle="Intelligence artificielle pour l'extraction des données CV"
+        subtitle="Intelligence artificielle pour l'anonymisation des opportunités"
       />
 
-      <div className="flex items-center justify-between">
+      {/* Model Selector */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Modèle Gemini
+        </label>
+        <div className="flex items-center gap-3">
+          <select
+            value={effectiveSelected}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="flex-1 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          >
+            {settings?.available_models.map((model) => (
+              <option key={model} value={model}>
+                {model} {model === settings?.default_model ? '(par défaut)' : ''}
+              </option>
+            ))}
+          </select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSave}
+            isLoading={isSaving}
+            disabled={!hasChanged}
+          >
+            Enregistrer
+          </Button>
+        </div>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Modèle actuel : <span className="font-medium">{currentModel}</span>
+        </p>
+      </div>
+
+      {/* Test Section */}
+      <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center space-x-4">
           <div className={`p-3 rounded-lg ${
             testResult?.success
@@ -166,18 +254,18 @@ function GeminiApiCard() {
             )}
           </div>
           <div>
-            <p className="font-medium text-gray-900 dark:text-gray-100">Google Gemini AI</p>
+            <p className="font-medium text-gray-900 dark:text-gray-100">Test API</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {testResult
                 ? testResult.message
-                : 'Cliquez sur Tester pour vérifier la connexion'}
+                : 'Cliquez sur Tester pour vérifier le modèle sélectionné'}
             </p>
           </div>
         </div>
         <div className="flex items-center space-x-3">
           {testResult && (
             <Badge variant={testResult.success ? 'success' : 'error'}>
-              {testResult.success ? 'OK' : 'Erreur'}
+              {testResult.success ? `${testResult.response_time_ms}ms` : 'Erreur'}
             </Badge>
           )}
           <Button
@@ -191,14 +279,6 @@ function GeminiApiCard() {
           </Button>
         </div>
       </div>
-
-      {testResult && !testResult.api_key_configured && (
-        <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-          <p className="text-sm text-yellow-700 dark:text-yellow-400">
-            <strong>Configuration requise :</strong> Ajoutez la variable d'environnement GEMINI_API_KEY.
-          </p>
-        </div>
-      )}
     </Card>
   );
 }

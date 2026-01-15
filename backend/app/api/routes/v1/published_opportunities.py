@@ -25,8 +25,9 @@ from app.application.use_cases.published_opportunities import (
     ListPublishedOpportunitiesUseCase,
     PublishOpportunityUseCase,
 )
-from app.dependencies import AppSettings, Boond, DbSession
+from app.dependencies import AppSettings, Boond, DbSession, RedisClient
 from app.infrastructure.anonymizer.gemini_anonymizer import GeminiAnonymizer
+from app.infrastructure.cache.redis import CacheService
 from app.infrastructure.database.repositories import (
     PublishedOpportunityRepository,
     UserRepository,
@@ -112,6 +113,7 @@ async def get_boond_opportunity_detail(
 async def anonymize_opportunity(
     request: AnonymizeRequest,
     settings: AppSettings,
+    redis: RedisClient,
     user_id: AdminOrCommercialUser,
 ):
     """Anonymize an opportunity using AI.
@@ -119,6 +121,10 @@ async def anonymize_opportunity(
     Returns a preview of the anonymized content.
     Requires admin or commercial role.
     """
+    # Get configured model from Redis
+    cache = CacheService(redis)
+    model_name = await cache.get_gemini_model()
+
     anonymizer = GeminiAnonymizer(settings)
 
     use_case = AnonymizeOpportunityUseCase(
@@ -131,6 +137,7 @@ async def anonymize_opportunity(
             title=request.title,
             description=request.description or "",
             boond_opportunity_id=request.boond_opportunity_id,
+            model_name=model_name,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
