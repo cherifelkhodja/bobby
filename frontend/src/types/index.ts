@@ -386,10 +386,15 @@ export interface OpportunityForHR {
   reference: string;
   description: string | null;
   company_name: string | null;
+  client_name: string | null;
   manager_name: string | null;
   state_name: string | null;
+  location: string | null;
+  start_date: string | null;
+  skills: string[];
   job_posting_id: string | null;
   job_posting_status: JobPostingStatus | null;
+  has_job_posting: boolean;
   applications_count: number;
   new_applications_count: number;
 }
@@ -403,16 +408,23 @@ export interface JobPosting {
   id: string;
   opportunity_id: string;
   boond_opportunity_id: string;
+  opportunity_reference: string;
   title: string;
   description: string;
   qualifications: string;
   location_country: string;
   location_region: string | null;
   location_postal_code: string | null;
+  location_city: string | null;
+  client_name: string | null;
   contract_types: string[];
   skills: string[];
   salary_min: number | null;
   salary_max: number | null;
+  salary_min_annual: number | null;
+  salary_max_annual: number | null;
+  salary_min_daily: number | null;
+  salary_max_daily: number | null;
   remote: string | null;
   experience_level: string | null;
   start_date: string | null;
@@ -420,6 +432,7 @@ export interface JobPosting {
   status: JobPostingStatus;
   status_display: string;
   turnoverit_reference: string | null;
+  turnoverit_public_url: string | null;
   application_token: string;
   application_url: string;
   created_by: string | null;
@@ -427,6 +440,8 @@ export interface JobPosting {
   updated_at: string;
   published_at: string | null;
   applications_count: number;
+  applications_total: number;
+  applications_new: number;
   new_applications_count: number;
 }
 
@@ -437,10 +452,13 @@ export interface JobPostingPublic {
   skills: string[];
   location_country: string;
   location_region: string | null;
+  location_city: string | null;
   remote: string | null;
   experience_level: string | null;
   salary_min: number | null;
   salary_max: number | null;
+  salary_min_daily: number | null;
+  salary_max_daily: number | null;
   contract_types: string[];
   start_date: string | null;
   duration_months: number | null;
@@ -454,21 +472,28 @@ export interface JobPostingListResponse {
 }
 
 export interface CreateJobPostingRequest {
-  boond_opportunity_id: string;
+  opportunity_id?: string;
+  boond_opportunity_id?: string;
   title: string;
   description: string;
   qualifications: string;
   location_country: string;
   location_region?: string | null;
   location_postal_code?: string | null;
+  location_city?: string | null;
   contract_types: string[];
   skills?: string[];
   salary_min?: number | null;
   salary_max?: number | null;
+  salary_min_annual?: number | null;
+  salary_max_annual?: number | null;
+  salary_min_daily?: number | null;
+  salary_max_daily?: number | null;
   remote?: string | null;
   experience_level?: string | null;
   start_date?: string | null;
   duration_months?: number | null;
+  employer_overview?: string | null;
 }
 
 export interface UpdateJobPostingRequest {
@@ -504,6 +529,7 @@ export interface JobApplication {
   job_title: string;
   tjm_min: number;
   tjm_max: number;
+  tjm_range: string;
   availability_date: string;
   phone: string;
   email: string;
