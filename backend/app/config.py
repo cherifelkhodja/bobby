@@ -1,9 +1,13 @@
 """Application configuration using Pydantic Settings."""
 
+import logging
+import os
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -17,6 +21,14 @@ class Settings(BaseSettings):
 
     # Environment
     ENV: Literal["dev", "test", "prod"] = "dev"
+
+    # AWS Secrets Manager (optional - set AWS_SECRETS_ENABLED=true to use)
+    AWS_SECRETS_ENABLED: bool = False
+    AWS_SECRETS_NAME: str = "esn-cooptation/prod"
+    AWS_SECRETS_REGION: str = "eu-west-3"
+
+    # Track if secrets were loaded from AWS (set at runtime)
+    _secrets_source: str = "environment"
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://cooptation:cooptation@postgres:5432/cooptation"
@@ -123,9 +135,76 @@ class Settings(BaseSettings):
         return list(set(origins))  # Remove duplicates
 
 
+def _load_aws_secrets() -> dict[str, Any]:
+    """Load secrets from AWS Secrets Manager if enabled.
+
+    Returns:
+        Dictionary of secrets, or empty dict if not enabled or failed.
+    """
+    # Check if AWS Secrets Manager is enabled via environment variable
+    if not os.getenv("AWS_SECRETS_ENABLED", "").lower() in ("true", "1", "yes"):
+        return {}
+
+    try:
+        from app.infrastructure.secrets import load_secrets_from_aws
+
+        secret_name = os.getenv("AWS_SECRETS_NAME", "esn-cooptation/prod")
+        region = os.getenv("AWS_SECRETS_REGION", "eu-west-3")
+
+        # Use S3 credentials for AWS Secrets Manager if available
+        access_key = os.getenv("S3_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID")
+        secret_key = os.getenv("S3_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY")
+
+        secrets = load_secrets_from_aws(
+            region_name=region,
+            secret_name=secret_name,
+            access_key_id=access_key,
+            secret_access_key=secret_key,
+        )
+
+        if secrets:
+            logger.info(f"Loaded {len(secrets)} secrets from AWS Secrets Manager")
+        return secrets
+
+    except ImportError:
+        logger.warning("boto3 not installed, cannot use AWS Secrets Manager")
+        return {}
+    except Exception as e:
+        logger.warning(f"Failed to load AWS secrets: {e}")
+        return {}
+
+
 @lru_cache
 def get_settings() -> Settings:
-    """Get cached settings instance."""
+    """Get cached settings instance with AWS secrets if enabled."""
+    # Load AWS secrets first
+    aws_secrets = _load_aws_secrets()
+
+    if aws_secrets:
+        # Map AWS secret keys to environment variables
+        # AWS Secrets Manager keys should match our env var names
+        secret_mappings = {
+            "GEMINI_API_KEY": "GEMINI_API_KEY",
+            "TURNOVERIT_API_KEY": "TURNOVERIT_API_KEY",
+            "RESEND_API_KEY": "RESEND_API_KEY",
+            "BOOND_USERNAME": "BOOND_USERNAME",
+            "BOOND_PASSWORD": "BOOND_PASSWORD",
+            "S3_ACCESS_KEY": "S3_ACCESS_KEY",
+            "S3_SECRET_KEY": "S3_SECRET_KEY",
+            "JWT_SECRET": "JWT_SECRET",
+        }
+
+        # Set environment variables from AWS secrets (don't override existing)
+        for aws_key, env_key in secret_mappings.items():
+            if aws_key in aws_secrets and not os.getenv(env_key):
+                os.environ[env_key] = str(aws_secrets[aws_key])
+                logger.debug(f"Set {env_key} from AWS Secrets Manager")
+
+        # Create settings with AWS secrets loaded
+        instance = Settings()
+        instance._secrets_source = "aws"
+        return instance
+
     return Settings()
 
 

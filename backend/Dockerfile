@@ -42,7 +42,8 @@ RUN pip install --no-cache-dir \
     "python-docx>=1.1.0" \
     "openpyxl>=3.1.0" \
     "PyPDF2>=3.0.0" \
-    "aioboto3>=12.0.0"
+    "aioboto3>=12.0.0" \
+    "boto3>=1.34.0"
 
 # Copy application code
 COPY . .

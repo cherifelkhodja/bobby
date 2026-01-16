@@ -17,6 +17,7 @@ import {
   Users,
   Mail,
   Briefcase,
+  Shield,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -39,6 +40,8 @@ interface TestResult {
 
 interface ServicesStatusResponse {
   services: ServiceStatus[];
+  secrets_source: 'environment' | 'aws';
+  aws_secrets_enabled: boolean;
 }
 
 const SERVICE_CONFIG: Record<
@@ -257,13 +260,24 @@ export function ApiTab() {
         })}
       </div>
 
-      {/* Info */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <p className="text-sm text-blue-800 dark:text-blue-300">
-          <strong>Note :</strong> Les clés API sont configurées via les variables d'environnement du
-          serveur (TURNOVERIT_API_KEY, S3_ACCESS_KEY, GEMINI_API_KEY, etc.).
-        </p>
-      </div>
+      {/* Secrets Source Info */}
+      {statusData?.secrets_source === 'aws' ? (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-green-600 dark:text-green-400" />
+            <p className="text-sm text-green-800 dark:text-green-300">
+              <strong>AWS Secrets Manager actif</strong> - Les clés API sont chargées depuis AWS Secrets Manager de maniere securisee.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <p className="text-sm text-blue-800 dark:text-blue-300">
+            <strong>Note :</strong> Les clés API sont configurées via les variables d'environnement du
+            serveur. Pour une sécurité renforcée, activez AWS Secrets Manager (AWS_SECRETS_ENABLED=true).
+          </p>
+        </div>
+      )}
     </div>
   );
 }

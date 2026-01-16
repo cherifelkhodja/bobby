@@ -40,6 +40,8 @@ class ServiceStatus(BaseModel):
 class ServicesStatusResponse(BaseModel):
     """Response with all services status."""
     services: list[ServiceStatus]
+    secrets_source: str = "environment"  # "environment" or "aws"
+    aws_secrets_enabled: bool = False
 
 
 def mask_key(key: Optional[str]) -> Optional[str]:
@@ -81,7 +83,16 @@ async def get_services_status(
             masked_key=mask_key(settings.RESEND_API_KEY),
         ),
     ]
-    return ServicesStatusResponse(services=services)
+
+    # Get secrets source info
+    secrets_source = getattr(settings, "_secrets_source", "environment")
+    aws_enabled = settings.AWS_SECRETS_ENABLED
+
+    return ServicesStatusResponse(
+        services=services,
+        secrets_source=secrets_source,
+        aws_secrets_enabled=aws_enabled,
+    )
 
 
 @router.post("/test", response_model=ApiKeyTestResult)
