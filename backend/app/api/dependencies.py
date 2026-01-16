@@ -114,7 +114,46 @@ async def require_admin_or_rh(
     return user_id
 
 
+async def require_admin_or_commercial(
+    db: DbSession,
+    authorization: str = Header(default=""),
+) -> UUID:
+    """Verify user is admin or commercial and return their ID.
+
+    Args:
+        db: Database session.
+        authorization: Authorization header (Bearer token).
+
+    Returns:
+        User's UUID.
+
+    Raises:
+        HTTPException: If not authenticated or not admin/commercial.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    token = authorization[7:]
+    try:
+        payload = decode_token(token, expected_type="access")
+    except InvalidTokenError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+    user_id = UUID(payload.sub)
+    user_repo = UserRepository(db)
+    user = await user_repo.get_by_id(user_id)
+
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    if user.role not in ("admin", "commercial"):
+        raise HTTPException(status_code=403, detail="Admin or Commercial access required")
+
+    return user_id
+
+
 # Type aliases for dependencies
 AdminUser = Annotated[UUID, Depends(require_admin)]
 AdminOrRhUser = Annotated[UUID, Depends(require_admin_or_rh)]
+AdminOrCommercialUser = Annotated[UUID, Depends(require_admin_or_commercial)]
 CurrentUserId = Annotated[UUID, Depends(get_current_user_id)]

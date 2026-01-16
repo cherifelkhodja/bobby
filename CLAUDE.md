@@ -425,84 +425,164 @@ Generate quotations for Thales using BoondManager data and Excel templates.
 - `DELETE /batches/{batch_id}/quotations/{row_index}` - Delete quotation from preview
 - `GET /batches/{batch_id}/download/zip` - Download all PDFs as ZIP
 
-### 8. HR Feature - Job Postings & Applications (Turnover-IT)
-Allow HR users to publish job postings from BoondManager opportunities and manage applications.
+### 8. Published Opportunities (Anonymized Boond)
+Allow commercials and admins to publish anonymized opportunities for cooptation.
 
-**Access**: admin, rh roles only
+**Access**: admin, commercial roles only (for publishing), all authenticated users (for viewing)
 
 **Features**:
-- View all open opportunities from BoondManager
-- Create job posting drafts from opportunities
-- Publish to Turnover-IT (JobConnect API v2)
-- Public application form at `/postuler/{token}` (no auth required)
-- CV upload to S3-compatible storage (Scaleway Object Storage)
-- AI-powered CV matching using Gemini (score 0-100)
-- Application status workflow: nouveau → en_cours → entretien → accepte/refuse
-- Create candidates in BoondManager from applications
+- View Boond opportunities where user is main manager
+- AI-powered anonymization using Gemini (removes client names, internal references)
+- Preview and edit anonymized content before publishing
+- Skills extraction from job description
+- Anti-duplicate check (boond_opportunity_id unique)
+- Published opportunities visible to all consultants for cooptation
+- **Dedicated detail page** at `/opportunities/:id` with full description
+- **Cooptation support**: Consultants can propose candidates directly from opportunity detail
 
-**Application Form Fields** (French):
-- Prénom, NOM (auto-formatted: "Jean DUPONT")
-- Email, Téléphone (+33...)
-- Titre du poste
-- TJM minimum/maximum
-- Date de disponibilité
-- CV upload (PDF/DOCX, max 16 Mo)
+**Workflow**:
+1. Commercial views their Boond opportunities (filtered by manager principal)
+2. Clicks "Proposer" to anonymize with AI
+3. Reviews/edits the anonymized title and description
+4. Publishes the opportunity (saved in database)
+5. Consultants see published opportunities in `/opportunities` page
+6. Click on opportunity card to view full detail page
+7. Click "Proposer un candidat" to submit cooptation
 
-**Matching Score Colors**:
-- ≥80%: green (`bg-green-100 text-green-800`)
-- 50-79%: orange (`bg-orange-100 text-orange-800`)
-- <50%: red (`bg-red-100 text-red-800`)
+**Boond Opportunity States** (filtered for publication):
+- 0: Perdue
+- 5: En cours
+- 6: Signée
+- 7: Abandonnée
+- 10: En attente
 
-**Backend Files**:
-- Domain: `backend/app/domain/entities/job_posting.py`, `job_application.py`
-- Value Objects: `backend/app/domain/value_objects/status.py` (extended)
-- Infrastructure: `backend/app/infrastructure/turnoverit/`, `storage/`, `matching/`
-- Use Cases: `backend/app/application/use_cases/job_postings.py`, `job_applications.py`
-- API: `backend/app/api/routes/v1/hr.py`, `public_applications.py`
-- Migration: `backend/alembic/versions/008_add_hr_feature_tables.py`
+**Anonymization Rules** (Gemini prompt):
+- Client names → Generic descriptions ("BNP Paribas" → "Grande banque française")
+- Internal project names → Generic ("Projet Phoenix" → "Projet de transformation")
+- Preserves: technical skills, methodologies, duration, experience level
+- **Preserves formatting**: Line breaks, bullet points, paragraph structure
 
-**Frontend Files**:
-- Pages: `HRDashboard.tsx`, `CreateJobPosting.tsx`, `JobPostingDetails.tsx`, `PublicApplication.tsx`
-- API: `frontend/src/api/hr.ts`
-- Types: Extended `frontend/src/types/index.ts`
+**Cooptation Integration**:
+- When creating cooptation for published opportunity, system:
+  1. Checks `opportunities` table first
+  2. If not found, checks `published_opportunities` table
+  3. Converts `PublishedOpportunity` to `Opportunity` entity
+  4. Saves to `opportunities` table (for FK constraint)
+  5. Creates cooptation with reference `PUB-{boond_opportunity_id}`
 
-**Database Tables**:
-- `job_postings` - Job posting drafts and published listings
-- `job_applications` - Applications with matching scores and status history
+**Files**:
+- Domain entity: `backend/app/domain/entities/published_opportunity.py`
+- Value object: `backend/app/domain/value_objects/status.py` (OpportunityStatus)
+- Repository: `backend/app/infrastructure/database/repositories.py` (PublishedOpportunityRepository)
+- Anonymizer: `backend/app/infrastructure/anonymizer/gemini_anonymizer.py`
+- Use cases: `backend/app/application/use_cases/published_opportunities.py`
+- API routes: `backend/app/api/routes/v1/published_opportunities.py`
+- Frontend pages:
+  - `frontend/src/pages/MyBoondOpportunities.tsx` - Commercial view to publish
+  - `frontend/src/pages/Opportunities.tsx` - List published opportunities
+  - `frontend/src/pages/OpportunityDetail.tsx` - Full detail page
+- API client: `frontend/src/api/publishedOpportunities.ts`
 
-**Key API Endpoints** (`/api/v1/hr`):
-- `GET /opportunities` - List open opportunities with job posting status
-- `POST /job-postings` - Create job posting draft
-- `GET /job-postings` - List job postings
-- `GET /job-postings/{id}` - Get posting details
-- `POST /job-postings/{id}/publish` - Publish to Turnover-IT
-- `POST /job-postings/{id}/close` - Close posting
-- `GET /job-postings/{id}/applications` - List applications
-- `PATCH /applications/{id}/status` - Change application status
-- `PATCH /applications/{id}/note` - Update notes
-- `GET /applications/{id}/cv` - Get CV download URL (presigned)
-- `POST /applications/{id}/create-in-boond` - Create candidate in BoondManager
+**API Endpoints** (`/api/v1/published-opportunities`):
+- `GET /my-boond` - List Boond opportunities for current manager (admin/commercial)
+- `POST /anonymize` - Anonymize opportunity with AI (admin/commercial)
+- `POST /publish` - Publish anonymized opportunity (admin/commercial)
+- `GET /` - List published opportunities (all authenticated users)
+- `GET /{id}` - Get published opportunity detail (all authenticated users)
+- `PATCH /{id}/close` - Close opportunity (publisher or admin)
 
-**Public Endpoints** (`/api/v1/postuler`):
-- `GET /{token}` - Get job posting info (public)
-- `POST /{token}` - Submit application (multipart form)
+**Database Model** (migration `008_add_published_opportunities.py`):
+```python
+id: UUID (PK)
+boond_opportunity_id: String(50), unique, not null  # Anti-doublon
+title: String(255), not null                        # Anonymisé
+description: Text, not null                         # Anonymisé
+skills: ARRAY(String(100))                          # Extraites par IA
+original_title: String(255)                         # Interne uniquement
+original_data: JSON                                 # Backup Boond
+end_date: Date, nullable
+status: String(20), default='published'             # draft/published/closed
+published_by: UUID, FK(users.id)
+created_at, updated_at: DateTime
+```
 
-**Environment Variables**:
-```env
-# Turnover-IT (JobConnect API v2)
-TURNOVERIT_API_KEY=your-api-key
+**TypeScript Types**:
+```typescript
+type PublishedOpportunityStatus = 'draft' | 'published' | 'closed';
 
-# Scaleway Object Storage (S3-compatible)
-S3_ENDPOINT_URL=https://s3.fr-par.scw.cloud
-S3_BUCKET_NAME=esn-cooptation-cvs
-S3_REGION=fr-par
-S3_ACCESS_KEY=your-access-key
-S3_SECRET_KEY=your-secret-key
+interface BoondOpportunity {
+  id: string;
+  title: string;
+  reference: string;
+  description: string | null;
+  company_name: string | null;
+  state: number | null;
+  state_name: string | null;
+  is_published: boolean;
+}
+
+interface PublishedOpportunity {
+  id: string;
+  boond_opportunity_id: string;
+  title: string;
+  description: string;
+  skills: string[];
+  end_date: string | null;
+  status: PublishedOpportunityStatus;
+  status_display: string;
+  created_at: string;
+  updated_at: string;
+}
 ```
 
 ## Recent Changes Log
 
-### 2026-01-15
+### 2026-01-15 (session 3)
+**Published Opportunities - Bug Fixes & Improvements**:
+- Fixed blank page after publishing: added `setTimeout` to defer `invalidateQueries`
+- Fixed HTTP 422 error on publish: `end_date` now sends `null` instead of empty string
+- **Opportunities page rewrite**: Now uses `/published-opportunities` API instead of old `/opportunities`
+- **New OpportunityDetail page** (`frontend/src/pages/OpportunityDetail.tsx`):
+  - Full dedicated page at `/opportunities/:id` instead of modal popup
+  - Back link to opportunities list
+  - Header card with title, status badge, publish date, end date
+  - Description card with `whitespace-pre-wrap` for formatting
+  - Skills card with styled badges
+  - CTA card to propose candidate
+  - Cooptation form modal
+- **Card component update**: Added `onClick` prop with accessibility attributes (role, tabIndex, onKeyDown)
+- **Gemini anonymization prompt improved**: Added rule 5 "PRÉSERVE LA MISE EN FORME" to preserve line breaks, bullet points, and paragraph structure
+- **Cooptation for published opportunities**:
+  - Added `PublishedOpportunityRepository` dependency to `CreateCooptationUseCase`
+  - If opportunity not found in `opportunities` table, checks `published_opportunities`
+  - Converts `PublishedOpportunity` to `Opportunity` entity
+  - Saves to `opportunities` table to satisfy foreign key constraint `fk_cooptations_opportunity`
+
+**Files modified**:
+- `frontend/src/pages/Opportunities.tsx` - Rewrote to use published opportunities
+- `frontend/src/pages/OpportunityDetail.tsx` - New file
+- `frontend/src/App.tsx` - Added route `/opportunities/:id`
+- `frontend/src/components/ui/Card.tsx` - Added onClick support
+- `backend/app/infrastructure/anonymizer/gemini_anonymizer.py` - Improved formatting preservation
+- `backend/app/application/use_cases/cooptations.py` - Support for published opportunities
+- `backend/app/api/routes/v1/cooptations.py` - Added PublishedOpportunityRepository
+
+### 2026-01-15 (session 2)
+**Published Opportunities Feature**:
+- Created migration `008_add_published_opportunities.py` for published_opportunities table
+- Added `OpportunityStatus` value object (draft/published/closed)
+- Created `PublishedOpportunity` entity with business methods
+- Added `PublishedOpportunityModel` to SQLAlchemy models
+- Created `PublishedOpportunityRepository` with CRUD operations
+- Extended `BoondClient` with `get_manager_opportunities()` method
+- Created `GeminiAnonymizer` for AI-powered opportunity anonymization
+- Created use cases: GetMyBoondOpportunities, Anonymize, Publish, List, Close
+- Added API routes at `/api/v1/published-opportunities`
+- Created `MyBoondOpportunities` page with table, detail modal, anonymization flow
+- Added "Commercial" section in sidebar for admin/commercial roles
+- Added `AdminOrCommercialUser` dependency for route protection
+
+### 2026-01-15 (session 1)
 **Quotation Generator - Major Fixes**:
 - Fixed Redis serialization: added `period_name`, `quotation_date`, `need_title`, `pdf_path`, `merged_pdf_path` to storage
 - Fixed template PDF filename collision: template now uses `_template.pdf` suffix to avoid being deleted

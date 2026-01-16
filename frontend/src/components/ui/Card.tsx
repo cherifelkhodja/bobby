@@ -2,9 +2,10 @@ interface CardProps {
   children: React.ReactNode;
   className?: string;
   padding?: 'none' | 'sm' | 'md' | 'lg';
+  onClick?: () => void;
 }
 
-export function Card({ children, className = '', padding = 'md' }: CardProps) {
+export function Card({ children, className = '', padding = 'md', onClick }: CardProps) {
   const paddingClasses = {
     none: '',
     sm: 'p-4',
@@ -15,6 +16,10 @@ export function Card({ children, className = '', padding = 'md' }: CardProps) {
   return (
     <div
       className={`bg-white dark:bg-gray-800 rounded-xl shadow-soft dark:shadow-none dark:border dark:border-gray-700 ${paddingClasses[padding]} ${className}`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => e.key === 'Enter' && onClick() : undefined}
     >
       {children}
     </div>

@@ -18,6 +18,8 @@ import HRDashboard from './pages/HRDashboard';
 import CreateJobPosting from './pages/CreateJobPosting';
 import JobPostingDetails from './pages/JobPostingDetails';
 import PublicApplication from './pages/PublicApplication';
+import { MyBoondOpportunities } from './pages/MyBoondOpportunities';
+import { OpportunityDetail } from './pages/OpportunityDetail';
 import type { UserRole } from './types';
 
 interface ProtectedRouteProps {
@@ -67,6 +69,7 @@ function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="opportunities" element={<Opportunities />} />
+        <Route path="opportunities/:id" element={<OpportunityDetail />} />
         <Route path="my-cooptations" element={<MyCooptations />} />
         <Route path="profile" element={<Profile />} />
         <Route
@@ -74,6 +77,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin', 'commercial', 'rh']}>
               <CvTransformer />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="my-boond-opportunities"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'commercial']}>
+              <MyBoondOpportunities />
             </ProtectedRoute>
           }
         />

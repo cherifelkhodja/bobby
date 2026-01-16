@@ -79,3 +79,26 @@ class CacheService:
     async def invalidate_opportunities(self) -> bool:
         """Invalidate opportunities cache."""
         return await self.delete(self.OPPORTUNITIES_KEY)
+
+    # App settings helpers (no TTL - persistent)
+    SETTINGS_PREFIX = "app_setting:"
+    GEMINI_MODEL_KEY = "gemini_model"
+    DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+
+    async def get_setting(self, key: str, default: str | None = None) -> str | None:
+        """Get app setting from cache (persistent, no TTL)."""
+        value = await self.redis.get(f"{self.SETTINGS_PREFIX}{key}")
+        return value if value is not None else default
+
+    async def set_setting(self, key: str, value: str) -> bool:
+        """Set app setting in cache (persistent, no TTL)."""
+        await self.redis.set(f"{self.SETTINGS_PREFIX}{key}", value)
+        return True
+
+    async def get_gemini_model(self) -> str:
+        """Get configured Gemini model."""
+        return await self.get_setting(self.GEMINI_MODEL_KEY, self.DEFAULT_GEMINI_MODEL) or self.DEFAULT_GEMINI_MODEL
+
+    async def set_gemini_model(self, model: str) -> bool:
+        """Set Gemini model."""
+        return await self.set_setting(self.GEMINI_MODEL_KEY, model)

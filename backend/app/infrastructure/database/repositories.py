@@ -9,21 +9,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.domain.entities import (
-    ApplicationStatus,
     BusinessLead,
     Candidate,
     Cooptation,
     CvTemplate,
     CvTransformationLog,
     Invitation,
-    JobApplication,
-    JobPosting,
-    JobPostingStatus,
     Opportunity,
+    PublishedOpportunity,
     User,
 )
 from app.domain.entities.business_lead import BusinessLeadStatus
 from app.domain.value_objects import CooptationStatus, Email, Phone, UserRole
+from app.domain.value_objects.status import OpportunityStatus
 from app.infrastructure.database.models import (
     BusinessLeadModel,
     CandidateModel,
@@ -31,9 +29,8 @@ from app.infrastructure.database.models import (
     CvTemplateModel,
     CvTransformationLogModel,
     InvitationModel,
-    JobApplicationModel,
-    JobPostingModel,
     OpportunityModel,
+    PublishedOpportunityModel,
     UserModel,
 )
 
@@ -1296,435 +1293,175 @@ class CvTransformationLogRepository:
         )
 
 
-class JobPostingRepository:
-    """Job posting repository implementation."""
+class PublishedOpportunityRepository:
+    """Published Opportunity repository implementation."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_id(self, posting_id: UUID) -> Optional[JobPosting]:
-        """Get job posting by ID."""
+    async def get_by_id(self, opportunity_id: UUID) -> Optional[PublishedOpportunity]:
+        """Get published opportunity by ID."""
         result = await self.session.execute(
-            select(JobPostingModel).where(JobPostingModel.id == posting_id)
-        )
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
-
-    async def get_by_token(self, token: str) -> Optional[JobPosting]:
-        """Get job posting by application token (for public form)."""
-        result = await self.session.execute(
-            select(JobPostingModel).where(JobPostingModel.application_token == token)
-        )
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
-
-    async def get_by_opportunity_id(self, opportunity_id: UUID) -> Optional[JobPosting]:
-        """Get job posting by opportunity ID."""
-        result = await self.session.execute(
-            select(JobPostingModel).where(JobPostingModel.opportunity_id == opportunity_id)
-        )
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
-
-    async def get_by_turnoverit_reference(self, reference: str) -> Optional[JobPosting]:
-        """Get job posting by Turnover-IT reference."""
-        result = await self.session.execute(
-            select(JobPostingModel).where(JobPostingModel.turnoverit_reference == reference)
-        )
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
-
-    async def save(self, posting: JobPosting) -> JobPosting:
-        """Save job posting (create or update)."""
-        result = await self.session.execute(
-            select(JobPostingModel).where(JobPostingModel.id == posting.id)
-        )
-        model = result.scalar_one_or_none()
-
-        if model:
-            model.opportunity_id = posting.opportunity_id
-            model.title = posting.title
-            model.description = posting.description
-            model.qualifications = posting.qualifications
-            model.location_country = posting.location_country
-            model.location_region = posting.location_region
-            model.location_postal_code = posting.location_postal_code
-            model.location_city = posting.location_city
-            model.contract_types = [str(ct) for ct in posting.contract_types]
-            model.skills = posting.skills
-            model.experience_level = str(posting.experience_level) if posting.experience_level else None
-            model.remote = str(posting.remote) if posting.remote else None
-            model.start_date = posting.start_date
-            model.duration_months = posting.duration_months
-            model.salary_min_annual = posting.salary_min_annual
-            model.salary_max_annual = posting.salary_max_annual
-            model.salary_min_daily = posting.salary_min_daily
-            model.salary_max_daily = posting.salary_max_daily
-            model.employer_overview = posting.employer_overview
-            model.status = str(posting.status)
-            model.turnoverit_reference = posting.turnoverit_reference
-            model.turnoverit_public_url = posting.turnoverit_public_url
-            model.application_token = posting.application_token
-            model.created_by = posting.created_by
-            model.published_at = posting.published_at
-            model.closed_at = posting.closed_at
-            model.updated_at = datetime.utcnow()
-        else:
-            model = JobPostingModel(
-                id=posting.id,
-                opportunity_id=posting.opportunity_id,
-                title=posting.title,
-                description=posting.description,
-                qualifications=posting.qualifications,
-                location_country=posting.location_country,
-                location_region=posting.location_region,
-                location_postal_code=posting.location_postal_code,
-                location_city=posting.location_city,
-                contract_types=[str(ct) for ct in posting.contract_types],
-                skills=posting.skills,
-                experience_level=str(posting.experience_level) if posting.experience_level else None,
-                remote=str(posting.remote) if posting.remote else None,
-                start_date=posting.start_date,
-                duration_months=posting.duration_months,
-                salary_min_annual=posting.salary_min_annual,
-                salary_max_annual=posting.salary_max_annual,
-                salary_min_daily=posting.salary_min_daily,
-                salary_max_daily=posting.salary_max_daily,
-                employer_overview=posting.employer_overview,
-                status=str(posting.status),
-                turnoverit_reference=posting.turnoverit_reference,
-                turnoverit_public_url=posting.turnoverit_public_url,
-                application_token=posting.application_token,
-                created_by=posting.created_by,
-                published_at=posting.published_at,
-                closed_at=posting.closed_at,
-                created_at=posting.created_at,
-                updated_at=posting.updated_at,
+            select(PublishedOpportunityModel).where(
+                PublishedOpportunityModel.id == opportunity_id
             )
-            self.session.add(model)
-
-        await self.session.flush()
-        return self._to_entity(model)
-
-    async def delete(self, posting_id: UUID) -> bool:
-        """Delete job posting by ID."""
-        result = await self.session.execute(
-            select(JobPostingModel).where(JobPostingModel.id == posting_id)
-        )
-        model = result.scalar_one_or_none()
-        if model:
-            await self.session.delete(model)
-            return True
-        return False
-
-    async def list_all(
-        self,
-        skip: int = 0,
-        limit: int = 100,
-        status: Optional[JobPostingStatus] = None,
-    ) -> list[JobPosting]:
-        """List all job postings with optional status filter."""
-        query = select(JobPostingModel)
-
-        if status:
-            query = query.where(JobPostingModel.status == str(status))
-
-        query = query.offset(skip).limit(limit).order_by(JobPostingModel.created_at.desc())
-        result = await self.session.execute(query)
-        return [self._to_entity(m) for m in result.scalars().all()]
-
-    async def list_by_created_by(
-        self,
-        user_id: UUID,
-        skip: int = 0,
-        limit: int = 100,
-    ) -> list[JobPosting]:
-        """List job postings created by a specific user."""
-        query = (
-            select(JobPostingModel)
-            .where(JobPostingModel.created_by == user_id)
-            .offset(skip)
-            .limit(limit)
-            .order_by(JobPostingModel.created_at.desc())
-        )
-        result = await self.session.execute(query)
-        return [self._to_entity(m) for m in result.scalars().all()]
-
-    async def count_all(self, status: Optional[JobPostingStatus] = None) -> int:
-        """Count all job postings with optional status filter."""
-        query = select(func.count(JobPostingModel.id))
-
-        if status:
-            query = query.where(JobPostingModel.status == str(status))
-
-        result = await self.session.execute(query)
-        return result.scalar() or 0
-
-    def _to_entity(self, model: JobPostingModel) -> JobPosting:
-        """Convert model to entity."""
-        from app.domain.entities.job_posting import (
-            ContractType,
-            ExperienceLevel,
-            RemotePolicy,
-        )
-
-        return JobPosting(
-            id=model.id,
-            opportunity_id=model.opportunity_id,
-            title=model.title,
-            description=model.description,
-            qualifications=model.qualifications,
-            location_country=model.location_country,
-            location_region=model.location_region,
-            location_postal_code=model.location_postal_code,
-            location_city=model.location_city,
-            contract_types=[ContractType(ct) for ct in (model.contract_types or [])],
-            skills=model.skills or [],
-            experience_level=ExperienceLevel(model.experience_level) if model.experience_level else None,
-            remote=RemotePolicy(model.remote) if model.remote else None,
-            start_date=model.start_date,
-            duration_months=model.duration_months,
-            salary_min_annual=model.salary_min_annual,
-            salary_max_annual=model.salary_max_annual,
-            salary_min_daily=model.salary_min_daily,
-            salary_max_daily=model.salary_max_daily,
-            employer_overview=model.employer_overview,
-            status=JobPostingStatus(model.status),
-            turnoverit_reference=model.turnoverit_reference,
-            turnoverit_public_url=model.turnoverit_public_url,
-            application_token=model.application_token,
-            created_by=model.created_by,
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-            published_at=model.published_at,
-            closed_at=model.closed_at,
-        )
-
-
-class JobApplicationRepository:
-    """Job application repository implementation."""
-
-    def __init__(self, session: AsyncSession) -> None:
-        self.session = session
-
-    async def get_by_id(self, application_id: UUID) -> Optional[JobApplication]:
-        """Get job application by ID."""
-        result = await self.session.execute(
-            select(JobApplicationModel).where(JobApplicationModel.id == application_id)
         )
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def save(self, application: JobApplication) -> JobApplication:
-        """Save job application (create or update)."""
+    async def get_by_boond_id(self, boond_id: str) -> Optional[PublishedOpportunity]:
+        """Get published opportunity by Boond opportunity ID."""
         result = await self.session.execute(
-            select(JobApplicationModel).where(JobApplicationModel.id == application.id)
+            select(PublishedOpportunityModel).where(
+                PublishedOpportunityModel.boond_opportunity_id == boond_id
+            )
         )
         model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
 
-        # Convert status history to JSON-serializable format
-        status_history = [
-            {
-                "from_status": str(sh.from_status),
-                "to_status": str(sh.to_status),
-                "changed_at": sh.changed_at.isoformat(),
-                "changed_by": str(sh.changed_by) if sh.changed_by else None,
-                "comment": sh.comment,
-            }
-            for sh in application.status_history
-        ]
-
-        # Convert matching details to JSON-serializable format
-        matching_details = None
-        if application.matching_details:
-            matching_details = {
-                "score": application.matching_details.score,
-                "strengths": application.matching_details.strengths,
-                "gaps": application.matching_details.gaps,
-                "summary": application.matching_details.summary,
-            }
-
-        if model:
-            model.job_posting_id = application.job_posting_id
-            model.first_name = application.first_name
-            model.last_name = application.last_name
-            model.email = application.email
-            model.phone = application.phone
-            model.job_title = application.job_title
-            model.tjm_min = application.tjm_min
-            model.tjm_max = application.tjm_max
-            model.availability_date = application.availability_date
-            model.cv_s3_key = application.cv_s3_key
-            model.cv_filename = application.cv_filename
-            model.cv_text = application.cv_text
-            model.matching_score = application.matching_score
-            model.matching_details = matching_details
-            model.status = str(application.status)
-            model.status_history = status_history
-            model.notes = application.notes
-            model.boond_candidate_id = application.boond_candidate_id
-            model.updated_at = datetime.utcnow()
-        else:
-            model = JobApplicationModel(
-                id=application.id,
-                job_posting_id=application.job_posting_id,
-                first_name=application.first_name,
-                last_name=application.last_name,
-                email=application.email,
-                phone=application.phone,
-                job_title=application.job_title,
-                tjm_min=application.tjm_min,
-                tjm_max=application.tjm_max,
-                availability_date=application.availability_date,
-                cv_s3_key=application.cv_s3_key,
-                cv_filename=application.cv_filename,
-                cv_text=application.cv_text,
-                matching_score=application.matching_score,
-                matching_details=matching_details,
-                status=str(application.status),
-                status_history=status_history,
-                notes=application.notes,
-                boond_candidate_id=application.boond_candidate_id,
-                created_at=application.created_at,
-                updated_at=application.updated_at,
-            )
-            self.session.add(model)
-
-        await self.session.flush()
-        return self._to_entity(model)
-
-    async def delete(self, application_id: UUID) -> bool:
-        """Delete job application by ID."""
+    async def exists_by_boond_id(self, boond_id: str) -> bool:
+        """Check if an opportunity with this Boond ID already exists."""
         result = await self.session.execute(
-            select(JobApplicationModel).where(JobApplicationModel.id == application_id)
-        )
-        model = result.scalar_one_or_none()
-        if model:
-            await self.session.delete(model)
-            return True
-        return False
-
-    async def list_by_posting(
-        self,
-        posting_id: UUID,
-        skip: int = 0,
-        limit: int = 100,
-        status: Optional[ApplicationStatus] = None,
-        sort_by_score: bool = True,
-    ) -> list[JobApplication]:
-        """List applications for a specific job posting."""
-        query = select(JobApplicationModel).where(
-            JobApplicationModel.job_posting_id == posting_id
-        )
-
-        if status:
-            query = query.where(JobApplicationModel.status == str(status))
-
-        if sort_by_score:
-            # Sort by matching score descending, nulls last
-            query = query.order_by(
-                JobApplicationModel.matching_score.desc().nulls_last(),
-                JobApplicationModel.created_at.desc(),
-            )
-        else:
-            query = query.order_by(JobApplicationModel.created_at.desc())
-
-        query = query.offset(skip).limit(limit)
-        result = await self.session.execute(query)
-        return [self._to_entity(m) for m in result.scalars().all()]
-
-    async def count_by_posting(
-        self,
-        posting_id: UUID,
-        status: Optional[ApplicationStatus] = None,
-    ) -> int:
-        """Count applications for a specific job posting."""
-        query = select(func.count(JobApplicationModel.id)).where(
-            JobApplicationModel.job_posting_id == posting_id
-        )
-
-        if status:
-            query = query.where(JobApplicationModel.status == str(status))
-
-        result = await self.session.execute(query)
-        return result.scalar() or 0
-
-    async def count_new_by_posting(self, posting_id: UUID) -> int:
-        """Count new (unread) applications for a job posting."""
-        return await self.count_by_posting(posting_id, ApplicationStatus.NOUVEAU)
-
-    async def get_stats_by_posting(self, posting_id: UUID) -> dict[str, int]:
-        """Get application statistics for a job posting."""
-        stats = {"total": 0}
-
-        for status in ApplicationStatus:
-            count = await self.count_by_posting(posting_id, status)
-            stats[str(status)] = count
-            stats["total"] += count
-
-        return stats
-
-    async def exists_by_email_and_posting(
-        self,
-        email: str,
-        posting_id: UUID,
-    ) -> bool:
-        """Check if an application already exists for this email and posting."""
-        result = await self.session.execute(
-            select(func.count(JobApplicationModel.id)).where(
-                JobApplicationModel.email == email.lower(),
-                JobApplicationModel.job_posting_id == posting_id,
+            select(func.count(PublishedOpportunityModel.id)).where(
+                PublishedOpportunityModel.boond_opportunity_id == boond_id
             )
         )
         return (result.scalar() or 0) > 0
 
-    def _to_entity(self, model: JobApplicationModel) -> JobApplication:
-        """Convert model to entity."""
-        from app.domain.entities.job_application import MatchingResult, StatusChange
+    async def save(self, opportunity: PublishedOpportunity) -> PublishedOpportunity:
+        """Save published opportunity (create or update)."""
+        result = await self.session.execute(
+            select(PublishedOpportunityModel).where(
+                PublishedOpportunityModel.id == opportunity.id
+            )
+        )
+        model = result.scalar_one_or_none()
 
-        # Convert status history
-        status_history = []
-        for sh in model.status_history or []:
-            status_history.append(
-                StatusChange(
-                    from_status=ApplicationStatus(sh["from_status"]),
-                    to_status=ApplicationStatus(sh["to_status"]),
-                    changed_at=datetime.fromisoformat(sh["changed_at"]),
-                    changed_by=UUID(sh["changed_by"]) if sh.get("changed_by") else None,
-                    comment=sh.get("comment"),
+        if model:
+            model.boond_opportunity_id = opportunity.boond_opportunity_id
+            model.title = opportunity.title
+            model.description = opportunity.description
+            model.skills = opportunity.skills
+            model.original_title = opportunity.original_title
+            model.original_data = opportunity.original_data
+            model.end_date = opportunity.end_date
+            model.status = str(opportunity.status)
+            model.published_by = opportunity.published_by
+            model.updated_at = datetime.utcnow()
+        else:
+            model = PublishedOpportunityModel(
+                id=opportunity.id,
+                boond_opportunity_id=opportunity.boond_opportunity_id,
+                title=opportunity.title,
+                description=opportunity.description,
+                skills=opportunity.skills,
+                original_title=opportunity.original_title,
+                original_data=opportunity.original_data,
+                end_date=opportunity.end_date,
+                status=str(opportunity.status),
+                published_by=opportunity.published_by,
+                created_at=opportunity.created_at,
+                updated_at=opportunity.updated_at,
+            )
+            self.session.add(model)
+
+        await self.session.flush()
+        return self._to_entity(model)
+
+    async def delete(self, opportunity_id: UUID) -> bool:
+        """Delete published opportunity by ID."""
+        result = await self.session.execute(
+            select(PublishedOpportunityModel).where(
+                PublishedOpportunityModel.id == opportunity_id
+            )
+        )
+        model = result.scalar_one_or_none()
+        if model:
+            await self.session.delete(model)
+            return True
+        return False
+
+    async def list_published(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+    ) -> list[PublishedOpportunity]:
+        """List published opportunities visible to consultants."""
+        query = select(PublishedOpportunityModel).where(
+            PublishedOpportunityModel.status == str(OpportunityStatus.PUBLISHED)
+        )
+
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    PublishedOpportunityModel.title.ilike(search_pattern),
+                    PublishedOpportunityModel.description.ilike(search_pattern),
                 )
             )
 
-        # Convert matching details
-        matching_details = None
-        if model.matching_details:
-            matching_details = MatchingResult(
-                score=model.matching_details.get("score", 0),
-                strengths=model.matching_details.get("strengths", []),
-                gaps=model.matching_details.get("gaps", []),
-                summary=model.matching_details.get("summary", ""),
+        query = query.offset(skip).limit(limit).order_by(
+            PublishedOpportunityModel.created_at.desc()
+        )
+        result = await self.session.execute(query)
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def count_published(self, search: Optional[str] = None) -> int:
+        """Count published opportunities."""
+        query = select(func.count(PublishedOpportunityModel.id)).where(
+            PublishedOpportunityModel.status == str(OpportunityStatus.PUBLISHED)
+        )
+
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    PublishedOpportunityModel.title.ilike(search_pattern),
+                    PublishedOpportunityModel.description.ilike(search_pattern),
+                )
             )
 
-        return JobApplication(
+        result = await self.session.execute(query)
+        return result.scalar() or 0
+
+    async def list_by_publisher(
+        self,
+        publisher_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[PublishedOpportunity]:
+        """List opportunities published by a specific user."""
+        query = (
+            select(PublishedOpportunityModel)
+            .where(PublishedOpportunityModel.published_by == publisher_id)
+            .offset(skip)
+            .limit(limit)
+            .order_by(PublishedOpportunityModel.created_at.desc())
+        )
+        result = await self.session.execute(query)
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def get_published_boond_ids(self) -> set[str]:
+        """Get set of all Boond opportunity IDs that have been published."""
+        result = await self.session.execute(
+            select(PublishedOpportunityModel.boond_opportunity_id)
+        )
+        return {row[0] for row in result.all()}
+
+    def _to_entity(self, model: PublishedOpportunityModel) -> PublishedOpportunity:
+        """Convert model to entity."""
+        return PublishedOpportunity(
             id=model.id,
-            job_posting_id=model.job_posting_id,
-            first_name=model.first_name,
-            last_name=model.last_name,
-            email=model.email,
-            phone=model.phone,
-            job_title=model.job_title,
-            tjm_min=model.tjm_min,
-            tjm_max=model.tjm_max,
-            availability_date=model.availability_date,
-            cv_s3_key=model.cv_s3_key,
-            cv_filename=model.cv_filename,
-            cv_text=model.cv_text,
-            matching_score=model.matching_score,
-            matching_details=matching_details,
-            status=ApplicationStatus(model.status),
-            status_history=status_history,
-            notes=model.notes,
-            boond_candidate_id=model.boond_candidate_id,
+            boond_opportunity_id=model.boond_opportunity_id,
+            title=model.title,
+            description=model.description,
+            skills=model.skills or [],
+            original_title=model.original_title,
+            original_data=model.original_data,
+            end_date=model.end_date,
+            status=OpportunityStatus(model.status),
+            published_by=model.published_by,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )

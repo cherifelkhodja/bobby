@@ -398,3 +398,271 @@ class BoondClient:
                 "status_code": 0,
                 "message": f"Erreur: {str(e)}",
             }
+
+    # Opportunity states - all states from BoondManager
+    OPPORTUNITY_STATE_NAMES = {
+        0: "En cours",
+        1: "Gagné",
+        2: "Perdu",
+        3: "Abandonné",
+        4: "Gagné attente contrat",
+        5: "Piste identifiée",
+        6: "Récurrent",
+        7: "AO ouvert",
+        8: "AO clos",
+        9: "Reporté",
+        10: "Besoin en avant de phase",
+    }
+
+    # Color categories for frontend display
+    OPPORTUNITY_STATE_COLORS = {
+        0: "blue",      # En cours
+        1: "green",     # Gagné
+        2: "red",       # Perdu
+        3: "gray",      # Abandonné
+        4: "green",     # Gagné attente contrat
+        5: "yellow",    # Piste identifiée
+        6: "green",     # Récurrent
+        7: "cyan",      # AO ouvert
+        8: "indigo",    # AO clos
+        9: "pink",      # Reporté
+        10: "blue",     # Besoin en avant de phase
+    }
+
+    # States to include when fetching manager opportunities (open/active states only)
+    # 0: En cours, 5: Piste identifiée, 6: Récurrent, 7: AO ouvert, 10: Besoin en avant de phase
+    ACTIVE_OPPORTUNITY_STATES = [0, 5, 6, 7, 10]
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+    )
+    async def get_manager_opportunities(
+        self,
+        manager_boond_id: Optional[str] = None,
+        states: Optional[list[int]] = None,
+        fetch_all: bool = False,
+    ) -> list[dict]:
+        """Fetch opportunities from BoondManager.
+
+        Args:
+            manager_boond_id: The BoondManager resource ID of the manager.
+                              Required if fetch_all is False.
+            states: List of opportunity states to filter. Defaults to ACTIVE_OPPORTUNITY_STATES.
+            fetch_all: If True, fetch ALL opportunities (for admin view).
+
+        Returns:
+            List of opportunity dicts with id, title, reference, description, etc.
+        """
+        if not fetch_all and not manager_boond_id:
+            raise ValueError("manager_boond_id is required when fetch_all is False")
+
+        if states is None:
+            states = self.ACTIVE_OPPORTUNITY_STATES
+
+        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
+            if fetch_all:
+                logger.info("Fetching ALL opportunities (admin mode)")
+            else:
+                logger.info(f"Fetching opportunities for manager {manager_boond_id}")
+
+            all_opportunities = []
+            companies_map = {}
+            managers_map = {}
+
+            for state in states:
+                page = 1
+                while True:
+                    # Build params
+                    params = {
+                        "page": page,
+                        "maxResults": 500,
+                        "opportunityStates": state,
+                    }
+
+                    # Only filter by manager if not fetching all
+                    if not fetch_all:
+                        params["perimeterManagersType"] = "main"
+                        params["perimeterManagers"] = manager_boond_id
+
+                    response = await client.get(
+                        f"{self.base_url}/opportunities",
+                        auth=self._auth,
+                        params=params,
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+
+                    opportunities_batch = data.get("data", [])
+                    all_opportunities.extend(opportunities_batch)
+
+                    # Extract company and resource (manager) names from included data
+                    for included in data.get("included", []):
+                        inc_type = included.get("type")
+                        inc_id = str(included.get("id"))
+                        inc_attrs = included.get("attributes", {})
+
+                        if inc_type == "company":
+                            companies_map[inc_id] = inc_attrs.get("name", "")
+                        elif inc_type == "resource":
+                            first_name = inc_attrs.get("firstName", "")
+                            last_name = inc_attrs.get("lastName", "")
+                            managers_map[inc_id] = f"{first_name} {last_name}".strip()
+
+                    # Check for more pages
+                    meta = data.get("meta", {})
+                    total_pages = meta.get("totalPages", 1)
+                    if page >= total_pages:
+                        break
+                    page += 1
+
+            opportunities = []
+            for item in all_opportunities:
+                try:
+                    attrs = item.get("attributes", {})
+                    relationships = item.get("relationships", {})
+
+                    # Get company info
+                    company_data = relationships.get("company", {}).get("data")
+                    company_id = str(company_data.get("id")) if company_data else None
+                    company_name = companies_map.get(company_id, "") if company_id else ""
+
+                    # Get main manager info
+                    main_manager_data = relationships.get("mainManager", {}).get("data")
+                    manager_id = str(main_manager_data.get("id")) if main_manager_data else None
+                    manager_name = managers_map.get(manager_id, "") if manager_id else ""
+
+                    # Get state
+                    opp_state = attrs.get("state", None)
+                    opp_state_name = self.OPPORTUNITY_STATE_NAMES.get(opp_state, "") if opp_state is not None else ""
+                    opp_state_color = self.OPPORTUNITY_STATE_COLORS.get(opp_state, "gray") if opp_state is not None else "gray"
+
+                    opportunities.append({
+                        "id": str(item.get("id")),
+                        "title": attrs.get("title", ""),
+                        "reference": attrs.get("reference", ""),
+                        "description": attrs.get("description", ""),
+                        "start_date": attrs.get("startDate"),
+                        "end_date": attrs.get("endDate"),
+                        "company_id": company_id,
+                        "company_name": company_name,
+                        "manager_id": manager_id,
+                        "manager_name": manager_name,
+                        "state": opp_state,
+                        "state_name": opp_state_name,
+                        "state_color": opp_state_color,
+                    })
+                except Exception as e:
+                    logger.warning(f"Failed to parse opportunity {item.get('id')}: {e}")
+
+            logger.info(f"Fetched {len(opportunities)} opportunities")
+            return opportunities
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+    )
+    async def get_opportunity_information(self, opportunity_id: str) -> dict:
+        """Fetch detailed opportunity information from BoondManager.
+
+        Uses the /opportunities/{id}/information endpoint to get full details
+        including description and criteria.
+
+        Args:
+            opportunity_id: The BoondManager opportunity ID.
+
+        Returns:
+            Dict with full opportunity details including description, criteria,
+            company_name, manager_name, etc.
+        """
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+            logger.info(f"Fetching opportunity information for {opportunity_id}")
+
+            response = await client.get(
+                f"{self.base_url}/opportunities/{opportunity_id}/information",
+                auth=self._auth,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            opp_data = data.get("data", {})
+            attrs = opp_data.get("attributes", {})
+            relationships = opp_data.get("relationships", {})
+
+            # Build maps from included data
+            companies_map = {}
+            managers_map = {}
+            contacts_map = {}
+            agencies_map = {}
+
+            for included in data.get("included", []):
+                inc_type = included.get("type")
+                inc_id = str(included.get("id"))
+                inc_attrs = included.get("attributes", {})
+
+                if inc_type == "company":
+                    companies_map[inc_id] = inc_attrs.get("name", "")
+                elif inc_type == "resource":
+                    first_name = inc_attrs.get("firstName", "")
+                    last_name = inc_attrs.get("lastName", "")
+                    managers_map[inc_id] = f"{first_name} {last_name}".strip()
+                elif inc_type == "contact":
+                    first_name = inc_attrs.get("firstName", "")
+                    last_name = inc_attrs.get("lastName", "")
+                    contacts_map[inc_id] = f"{first_name} {last_name}".strip()
+                elif inc_type == "agency":
+                    agencies_map[inc_id] = inc_attrs.get("name", "")
+
+            # Get company info
+            company_data = relationships.get("company", {}).get("data")
+            company_id = str(company_data.get("id")) if company_data else None
+            company_name = companies_map.get(company_id, "") if company_id else ""
+
+            # Get main manager info
+            main_manager_data = relationships.get("mainManager", {}).get("data")
+            manager_id = str(main_manager_data.get("id")) if main_manager_data else None
+            manager_name = managers_map.get(manager_id, "") if manager_id else ""
+
+            # Get contact info
+            contact_data = relationships.get("contact", {}).get("data")
+            contact_id = str(contact_data.get("id")) if contact_data else None
+            contact_name = contacts_map.get(contact_id, "") if contact_id else ""
+
+            # Get agency info
+            agency_data = relationships.get("agency", {}).get("data")
+            agency_id = str(agency_data.get("id")) if agency_data else None
+            agency_name = agencies_map.get(agency_id, "") if agency_id else ""
+
+            # Get state
+            opp_state = attrs.get("state", None)
+            opp_state_name = self.OPPORTUNITY_STATE_NAMES.get(opp_state, "") if opp_state is not None else ""
+            opp_state_color = self.OPPORTUNITY_STATE_COLORS.get(opp_state, "gray") if opp_state is not None else "gray"
+
+            result = {
+                "id": str(opp_data.get("id")),
+                "title": attrs.get("title", ""),
+                "reference": attrs.get("reference", ""),
+                "description": attrs.get("description", ""),
+                "criteria": attrs.get("criteria", ""),
+                "expertise_area": attrs.get("expertiseArea", ""),
+                "place": attrs.get("place", ""),
+                "duration": attrs.get("duration"),
+                "start_date": attrs.get("startDate"),
+                "end_date": attrs.get("closingDate"),  # Use closingDate as end_date
+                "closing_date": attrs.get("closingDate"),
+                "answer_date": attrs.get("answerDate"),
+                "company_id": company_id,
+                "company_name": company_name,
+                "manager_id": manager_id,
+                "manager_name": manager_name,
+                "contact_id": contact_id,
+                "contact_name": contact_name,
+                "agency_id": agency_id,
+                "agency_name": agency_name,
+                "state": opp_state,
+                "state_name": opp_state_name,
+                "state_color": opp_state_color,
+            }
+
+            logger.info(f"Fetched opportunity information: {result['title']}")
+            return result

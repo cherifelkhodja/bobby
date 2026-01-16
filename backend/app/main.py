@@ -18,6 +18,7 @@ from app.api.routes.v1 import (
     invitations_router,
     opportunities_router,
     public_applications_router,
+    published_opportunities_router,
     settings_router,
     users_router,
 )
@@ -74,6 +75,7 @@ app.include_router(opportunities_router, prefix="/api/v1/opportunities", tags=["
 app.include_router(cooptations_router, prefix="/api/v1/cooptations", tags=["Cooptations"])
 app.include_router(invitations_router, prefix="/api/v1/invitations", tags=["Invitations"])
 app.include_router(cv_transformer_router, prefix="/api/v1/cv-transformer", tags=["CV Transformer"])
+app.include_router(published_opportunities_router, prefix="/api/v1/published-opportunities", tags=["Published Opportunities"])
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(hr_router, prefix="/api/v1/hr", tags=["HR"])
 app.include_router(public_applications_router, prefix="/api/v1/postuler", tags=["Public Applications"])

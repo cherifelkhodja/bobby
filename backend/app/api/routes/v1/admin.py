@@ -12,6 +12,9 @@ from app.api.schemas.admin import (
     BoondResourcesListResponse,
     BoondStatusResponse,
     ChangeRoleRequest,
+    GeminiSetModelRequest,
+    GeminiSettingsResponse,
+    GeminiTestResponse,
     MessageResponse,
     SyncResponse,
     TestConnectionResponse,
@@ -39,7 +42,8 @@ from app.application.use_cases.admin.users import (
     UpdateUserCommand,
     UserNotFoundError,
 )
-from app.dependencies import AppSettings, DbSession
+from app.dependencies import AppSettings, DbSession, RedisClient
+from app.infrastructure.anonymizer.gemini_anonymizer import GeminiAnonymizer
 from app.infrastructure.boond.client import BoondClient
 from app.infrastructure.cache.redis import CacheService
 from app.infrastructure.database.repositories import OpportunityRepository, UserRepository
@@ -363,3 +367,65 @@ async def delete_user(
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# Gemini Settings Endpoints
+# =============================================================================
+
+
+@router.get("/gemini/settings", response_model=GeminiSettingsResponse)
+async def get_gemini_settings(
+    admin_id: AdminUser,
+    redis: RedisClient,
+):
+    """Get Gemini model settings (admin only)."""
+    cache = CacheService(redis)
+    current_model = await cache.get_gemini_model()
+
+    return GeminiSettingsResponse(
+        current_model=current_model,
+        available_models=GeminiAnonymizer.AVAILABLE_MODELS,
+        default_model=GeminiAnonymizer.DEFAULT_MODEL,
+    )
+
+
+@router.post("/gemini/settings", response_model=GeminiSettingsResponse)
+async def set_gemini_model(
+    request: GeminiSetModelRequest,
+    admin_id: AdminUser,
+    redis: RedisClient,
+):
+    """Set Gemini model (admin only)."""
+    if request.model not in GeminiAnonymizer.AVAILABLE_MODELS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Modèle invalide. Modèles disponibles: {', '.join(GeminiAnonymizer.AVAILABLE_MODELS)}",
+        )
+
+    cache = CacheService(redis)
+    await cache.set_gemini_model(request.model)
+
+    return GeminiSettingsResponse(
+        current_model=request.model,
+        available_models=GeminiAnonymizer.AVAILABLE_MODELS,
+        default_model=GeminiAnonymizer.DEFAULT_MODEL,
+    )
+
+
+@router.post("/gemini/test", response_model=GeminiTestResponse)
+async def test_gemini_model(
+    request: GeminiSetModelRequest,
+    admin_id: AdminUser,
+    settings: AppSettings,
+):
+    """Test a Gemini model (admin only)."""
+    anonymizer = GeminiAnonymizer(settings)
+    result = await anonymizer.test_model(request.model)
+
+    return GeminiTestResponse(
+        success=result["success"],
+        model=result["model"],
+        response_time_ms=result["response_time_ms"],
+        message=result["message"],
+    )

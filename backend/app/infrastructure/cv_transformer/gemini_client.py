@@ -5,12 +5,15 @@ Implements CvDataExtractorPort for dependency inversion.
 
 import asyncio
 import json
+import logging
 from typing import Any
 
 import google.generativeai as genai
 
 from app.config import Settings
 
+
+logger = logging.getLogger(__name__)
 
 # Structured CV data type
 CvData = dict[str, Any]
@@ -112,18 +115,25 @@ class GeminiClient:
         self._configure()
 
         try:
-            model = genai.GenerativeModel("gemini-2.5-flash-lite")
+            model = genai.GenerativeModel(
+                "gemini-2.0-flash",
+                generation_config=genai.GenerationConfig(
+                    response_mime_type="application/json",
+                ),
+            )
 
             prompt = CV_EXTRACTION_PROMPT + cv_text
 
             # Use asyncio.to_thread to avoid blocking the event loop
             response = await asyncio.to_thread(model.generate_content, prompt)
 
-            if not response.text:
+            # Extract text with fallback methods
+            response_text = self._extract_response_text(response)
+            if not response_text:
                 raise ValueError("La réponse de Gemini est vide")
 
             # Clean and extract JSON from response
-            json_text = self._nettoyer_reponse_json(response.text)
+            json_text = self._nettoyer_reponse_json(response_text)
 
             # Parse JSON
             cv_data = json.loads(json_text)
@@ -139,6 +149,61 @@ class GeminiClient:
             if "API key" in str(e).lower() or "GEMINI" in str(e):
                 raise
             raise ValueError(f"Erreur lors de l'extraction des données: {str(e)}")
+
+    def _extract_response_text(self, response: Any) -> str | None:
+        """Extract text from Gemini response with multiple fallback methods.
+
+        Args:
+            response: The GenerateContentResponse from Gemini.
+
+        Returns:
+            Extracted text or None if extraction fails.
+        """
+        # Method 1: Try standard .text property
+        try:
+            if hasattr(response, 'text'):
+                text = response.text
+                if text:
+                    return text
+        except (KeyError, ValueError, AttributeError) as e:
+            logger.warning(f"Standard response.text failed: {type(e).__name__}: {e}")
+
+        # Method 2: Try accessing candidates directly
+        try:
+            if hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                if hasattr(candidate, 'content') and candidate.content:
+                    if hasattr(candidate.content, 'parts') and candidate.content.parts:
+                        part = candidate.content.parts[0]
+                        if hasattr(part, 'text') and part.text:
+                            return part.text
+        except (KeyError, IndexError, AttributeError) as e:
+            logger.warning(f"Candidate access failed: {type(e).__name__}: {e}")
+
+        # Method 3: Try accessing parts directly from response
+        try:
+            if hasattr(response, 'parts') and response.parts:
+                part = response.parts[0]
+                if hasattr(part, 'text') and part.text:
+                    return part.text
+        except (KeyError, IndexError, AttributeError) as e:
+            logger.warning(f"Parts access failed: {type(e).__name__}: {e}")
+
+        # Method 4: Try to convert response to string and extract JSON
+        try:
+            response_str = str(response)
+            if '{' in response_str and '}' in response_str:
+                start = response_str.find('{')
+                end = response_str.rfind('}')
+                if start != -1 and end > start:
+                    potential_json = response_str[start:end + 1]
+                    json.loads(potential_json)
+                    return potential_json
+        except Exception as e:
+            logger.warning(f"String extraction failed: {type(e).__name__}: {e}")
+
+        logger.error(f"Failed to extract text. Response type: {type(response)}")
+        return None
 
     def _validate_cv_data(self, data: CvData) -> None:
         """Validate the extracted CV data has required structure.
