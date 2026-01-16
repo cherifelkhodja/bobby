@@ -351,6 +351,17 @@ async def _test_resend(api_key: Optional[str]) -> ApiKeyTestResult:
                     details={"domain_count": domain_count},
                 )
             elif response.status_code == 401:
+                # Check if it's a restricted (send-only) key - this is valid
+                try:
+                    data = response.json()
+                    if data.get("name") == "restricted_api_key":
+                        return ApiKeyTestResult(
+                            success=True,
+                            message="Connexion Resend réussie (clé send-only)",
+                            details={"type": "restricted"},
+                        )
+                except Exception:
+                    pass
                 return ApiKeyTestResult(
                     success=False,
                     message="Clé API Resend invalide",
