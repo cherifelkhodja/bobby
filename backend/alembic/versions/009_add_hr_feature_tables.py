@@ -1,7 +1,7 @@
 """Add HR feature tables (job_postings, job_applications).
 
-Revision ID: 008_add_hr_feature_tables
-Revises: 007_add_quotation_templates
+Revision ID: 009_add_hr_feature_tables
+Revises: 008_add_published_opportunities
 Create Date: 2026-01-15
 """
 
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID, JSON
 
 # revision identifiers, used by Alembic.
-revision = "008_add_hr_feature_tables"
-down_revision = "007_add_quotation_templates"
+revision = "009_add_hr_feature_tables"
+down_revision = "008_add_published_opportunities"
 branch_labels = None
 depends_on = None
 
