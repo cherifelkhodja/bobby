@@ -21,7 +21,7 @@ import {
 import { toast } from 'sonner';
 
 import { apiClient } from '../../api/client';
-import { Card, CardHeader } from '../../components/ui/Card';
+import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 
