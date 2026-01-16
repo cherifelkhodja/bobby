@@ -1,7 +1,7 @@
 [project]
-name = "gemini-cooptation"
+name = "bobby"
 version = "0.1.0"
-description = "Application de cooptation pour ESN Gemini"
+description = "Application Bobby - Plateforme de cooptation ESN"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.109.0",

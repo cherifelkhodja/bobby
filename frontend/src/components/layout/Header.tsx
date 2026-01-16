@@ -31,7 +31,7 @@ export function Header() {
       <div className="px-8 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <h1 className="text-xl font-bold text-primary-600 dark:text-primary-400">
-            Gemini Cooptation
+            Bobby
           </h1>
         </div>
 

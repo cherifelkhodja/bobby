@@ -100,7 +100,7 @@ class EmailService:
 
     async def send_verification_email(self, to: str, token: str, name: str) -> bool:
         """Send email verification link."""
-        subject = "Vérifiez votre adresse email - Gemini Cooptation"
+        subject = "Vérifiez votre adresse email - Bobby"
         verification_url = f"{self.frontend_url}/verify-email?token={token}"
 
         html_body = f"""
@@ -111,7 +111,7 @@ class EmailService:
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h1 style="color: #0ea5e9;">Bienvenue sur Gemini Cooptation</h1>
+                <h1 style="color: #0ea5e9;">Bienvenue sur Bobby</h1>
                 <p>Bonjour {name},</p>
                 <p>Merci de vous être inscrit. Pour activer votre compte, veuillez cliquer sur le bouton ci-dessous :</p>
                 <p style="text-align: center; margin: 30px 0;">
@@ -126,7 +126,7 @@ class EmailService:
                 <p>Ce lien expire dans 7 jours.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
                 <p style="color: #666; font-size: 12px;">
-                    Cet email a été envoyé par Gemini Cooptation.
+                    Cet email a été envoyé par Bobby.
                     Si vous n'avez pas créé de compte, ignorez cet email.
                 </p>
             </div>
@@ -138,7 +138,7 @@ class EmailService:
 
     async def send_password_reset_email(self, to: str, token: str, name: str) -> bool:
         """Send password reset link."""
-        subject = "Réinitialisation de votre mot de passe - Gemini Cooptation"
+        subject = "Réinitialisation de votre mot de passe - Bobby"
         reset_url = f"{self.frontend_url}/reset-password?token={token}"
 
         html_body = f"""
@@ -167,7 +167,7 @@ class EmailService:
                    Votre mot de passe restera inchangé.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
                 <p style="color: #666; font-size: 12px;">
-                    Cet email a été envoyé par Gemini Cooptation.
+                    Cet email a été envoyé par Bobby.
                 </p>
             </div>
         </body>
@@ -178,7 +178,7 @@ class EmailService:
 
     async def send_magic_link_email(self, to: str, token: str, name: str) -> bool:
         """Send magic link for passwordless login."""
-        subject = "Votre lien de connexion - Gemini Cooptation"
+        subject = "Votre lien de connexion - Bobby"
         magic_url = f"{self.frontend_url}/auth/magic-link?token={token}"
 
         html_body = f"""
@@ -189,7 +189,7 @@ class EmailService:
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h1 style="color: #0ea5e9;">Connexion à Gemini Cooptation</h1>
+                <h1 style="color: #0ea5e9;">Connexion à Bobby</h1>
                 <p>Bonjour {name},</p>
                 <p>Cliquez sur le bouton ci-dessous pour vous connecter :</p>
                 <p style="text-align: center; margin: 30px 0;">
@@ -219,7 +219,7 @@ class EmailService:
         opportunity_title: str,
     ) -> bool:
         """Send cooptation submission confirmation."""
-        subject = "Confirmation de votre cooptation - Gemini Cooptation"
+        subject = "Confirmation de votre cooptation - Bobby"
 
         html_body = f"""
         <!DOCTYPE html>
@@ -240,7 +240,7 @@ class EmailService:
                 <p>Merci pour votre contribution !</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
                 <p style="color: #666; font-size: 12px;">
-                    Cet email a été envoyé par Gemini Cooptation.
+                    Cet email a été envoyé par Bobby.
                 </p>
             </div>
         </body>
@@ -298,7 +298,7 @@ class EmailService:
                 <p>Connectez-vous à votre espace pour plus de détails.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
                 <p style="color: #666; font-size: 12px;">
-                    Cet email a été envoyé par Gemini Cooptation.
+                    Cet email a été envoyé par Bobby.
                 </p>
             </div>
         </body>
@@ -322,7 +322,7 @@ class EmailService:
         }
         role_label = role_labels.get(role, role)
 
-        subject = "Invitation à rejoindre Gemini Cooptation"
+        subject = "Invitation à rejoindre Bobby"
         invitation_url = f"{self.frontend_url}/accept-invitation?token={token}"
 
         html_body = f"""
@@ -335,7 +335,7 @@ class EmailService:
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
                 <h1 style="color: #0ea5e9;">Vous êtes invité(e) !</h1>
                 <p>Bonjour,</p>
-                <p>Vous avez été invité(e) à rejoindre la plateforme <strong>Gemini Cooptation</strong>
+                <p>Vous avez été invité(e) à rejoindre la plateforme <strong>Bobby</strong>
                    en tant que <strong style="color: #0ea5e9;">{role_label}</strong>.</p>
                 <p>Cette plateforme vous permettra de proposer des candidats pour les opportunités
                    de notre entreprise et de suivre vos cooptations.</p>
@@ -351,7 +351,7 @@ class EmailService:
                 <p><strong>Ce lien expire dans 48 heures.</strong></p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
                 <p style="color: #666; font-size: 12px;">
-                    Cet email a été envoyé par Gemini Cooptation.
+                    Cet email a été envoyé par Bobby.
                     Si vous n'attendiez pas cette invitation, ignorez cet email.
                 </p>
             </div>

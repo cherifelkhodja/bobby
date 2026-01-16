@@ -46,8 +46,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(
-    title="Gemini Cooptation API",
-    description="API pour l'application de cooptation ESN Gemini",
+    title="Bobby API",
+    description="API pour l'application Bobby",
     version="0.1.0",
     lifespan=lifespan,
     docs_url="/api/docs" if not settings.is_production else None,

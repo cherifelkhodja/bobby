@@ -1,4 +1,4 @@
-# MEMORY - Gemini Cooptation
+# MEMORY - Bobby
 
 > Fichier de suivi des iterations. Mis a jour a chaque session.
 

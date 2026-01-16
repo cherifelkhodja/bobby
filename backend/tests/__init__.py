@@ -1,1 +1,1 @@
-"""Test suite for Gemini Cooptation."""
+"""Test suite for Bobby."""

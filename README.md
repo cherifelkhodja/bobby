@@ -1,6 +1,6 @@
-# Gemini Cooptation
+# Bobby
 
-Application web de cooptation permettant aux collaborateurs de l'ESN Gemini de proposer des profils candidats sur les opportunites/besoins en cours.
+Application web de cooptation permettant aux collaborateurs de l'ESN de proposer des profils candidats sur les opportunites/besoins en cours.
 
 ## Stack Technique
 
@@ -35,7 +35,7 @@ Application web de cooptation permettant aux collaborateurs de l'ESN Gemini de p
 1. Cloner le repository
 ```bash
 git clone <repository-url>
-cd gemini-cooptation
+cd bobby
 ```
 
 2. Copier le fichier d'environnement
@@ -83,7 +83,7 @@ make fresh          # Reinstallation complete
 ## Structure du Projet
 
 ```
-gemini-cooptation/
+bobby/
 ├── backend/
 │   ├── app/
 │   │   ├── domain/          # Logique metier
@@ -147,4 +147,4 @@ make test-frontend
 
 ## License
 
-Proprietary - Gemini Consulting
+Proprietary - Bobby Consulting
