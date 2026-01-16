@@ -352,3 +352,188 @@ export interface PublishedOpportunityListResponse {
   page: number;
   page_size: number;
 }
+
+// HR Feature - Job Postings & Applications
+export type JobPostingStatus = 'draft' | 'published' | 'closed';
+export type ApplicationStatus = 'nouveau' | 'en_cours' | 'entretien' | 'accepte' | 'refuse';
+
+export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
+  nouveau: 'Nouveau',
+  en_cours: 'En cours',
+  entretien: 'Entretien',
+  accepte: 'Accepté',
+  refuse: 'Refusé',
+};
+
+export const APPLICATION_STATUS_COLORS: Record<ApplicationStatus, string> = {
+  nouveau: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  en_cours: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+  entretien: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  accepte: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  refuse: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+};
+
+export function getMatchingScoreColor(score: number): string {
+  if (score >= 80) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+  if (score >= 50) return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
+  return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+}
+
+export interface OpportunityForHR {
+  id: string;
+  boond_id: string;
+  title: string;
+  reference: string;
+  description: string | null;
+  company_name: string | null;
+  manager_name: string | null;
+  state_name: string | null;
+  job_posting_id: string | null;
+  job_posting_status: JobPostingStatus | null;
+  applications_count: number;
+  new_applications_count: number;
+}
+
+export interface OpportunityForHRListResponse {
+  items: OpportunityForHR[];
+  total: number;
+}
+
+export interface JobPosting {
+  id: string;
+  opportunity_id: string;
+  boond_opportunity_id: string;
+  title: string;
+  description: string;
+  qualifications: string;
+  location_country: string;
+  location_region: string | null;
+  location_postal_code: string | null;
+  contract_types: string[];
+  skills: string[];
+  salary_min: number | null;
+  salary_max: number | null;
+  remote: string | null;
+  experience_level: string | null;
+  start_date: string | null;
+  duration_months: number | null;
+  status: JobPostingStatus;
+  status_display: string;
+  turnoverit_reference: string | null;
+  application_token: string;
+  application_url: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+  applications_count: number;
+  new_applications_count: number;
+}
+
+export interface JobPostingPublic {
+  title: string;
+  description: string;
+  qualifications: string;
+  skills: string[];
+  location_country: string;
+  location_region: string | null;
+  remote: string | null;
+  experience_level: string | null;
+  salary_min: number | null;
+  salary_max: number | null;
+  contract_types: string[];
+  start_date: string | null;
+  duration_months: number | null;
+}
+
+export interface JobPostingListResponse {
+  items: JobPosting[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface CreateJobPostingRequest {
+  boond_opportunity_id: string;
+  title: string;
+  description: string;
+  qualifications: string;
+  location_country: string;
+  location_region?: string | null;
+  location_postal_code?: string | null;
+  contract_types: string[];
+  skills?: string[];
+  salary_min?: number | null;
+  salary_max?: number | null;
+  remote?: string | null;
+  experience_level?: string | null;
+  start_date?: string | null;
+  duration_months?: number | null;
+}
+
+export interface UpdateJobPostingRequest {
+  title?: string;
+  description?: string;
+  qualifications?: string;
+  location_country?: string;
+  location_region?: string | null;
+  location_postal_code?: string | null;
+  contract_types?: string[];
+  skills?: string[];
+  salary_min?: number | null;
+  salary_max?: number | null;
+  remote?: string | null;
+  experience_level?: string | null;
+  start_date?: string | null;
+  duration_months?: number | null;
+}
+
+export interface MatchingDetails {
+  score: number;
+  strengths: string[];
+  gaps: string[];
+  summary: string;
+}
+
+export interface JobApplication {
+  id: string;
+  job_posting_id: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  job_title: string;
+  tjm_min: number;
+  tjm_max: number;
+  availability_date: string;
+  phone: string;
+  email: string;
+  cv_filename: string;
+  matching_score: number | null;
+  matching_details: MatchingDetails | null;
+  status: ApplicationStatus;
+  status_display: string;
+  notes: string | null;
+  boond_candidate_id: string | null;
+  status_history: StatusChange[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobApplicationListResponse {
+  items: JobApplication[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface ApplicationSubmissionResult {
+  success: boolean;
+  message: string;
+  application_id?: string;
+}
+
+export interface CvDownloadUrlResponse {
+  url: string;
+  filename: string;
+  expires_in: number;
+}
