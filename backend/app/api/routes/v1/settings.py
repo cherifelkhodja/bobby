@@ -1,12 +1,11 @@
 """Settings API routes for managing external service configurations."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from typing import Optional
 import httpx
 
-from app.api.deps import get_current_admin_user
-from app.domain.entities import User
+from app.api.dependencies import AdminUser
 from app.config import settings
 
 router = APIRouter()
@@ -52,7 +51,7 @@ def mask_key(key: Optional[str]) -> Optional[str]:
 
 @router.get("/status", response_model=ServicesStatusResponse)
 async def get_services_status(
-    current_user: User = Depends(get_current_admin_user),
+    current_user_id: AdminUser,
 ) -> ServicesStatusResponse:
     """Get status of all configured external services."""
     services = [
@@ -88,7 +87,7 @@ async def get_services_status(
 @router.post("/test", response_model=ApiKeyTestResult)
 async def test_api_key(
     request: ApiKeyTest,
-    current_user: User = Depends(get_current_admin_user),
+    current_user_id: AdminUser,
 ) -> ApiKeyTestResult:
     """Test an API key for a specific service."""
 
