@@ -146,12 +146,11 @@ async def _test_turnoverit(api_key: Optional[str]) -> ApiKeyTestResult:
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                "https://api.turnover-it.com/v2/jobs",
+                "https://api.turnover-it.com/jobconnect/v2/jobs/list",
                 headers={
                     "Authorization": f"Bearer {api_key}",
-                    "Accept": "application/json",
+                    "Accept": "application/ld+json",
                 },
-                params={"limit": 1},
             )
 
             if response.status_code == 200:
