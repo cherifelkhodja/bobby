@@ -231,7 +231,7 @@ async def _test_gemini(api_key: Optional[str]) -> ApiKeyTestResult:
         import google.generativeai as genai
 
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
         # Simple test prompt
         response = model.generate_content("Réponds uniquement 'OK'")
@@ -240,7 +240,7 @@ async def _test_gemini(api_key: Optional[str]) -> ApiKeyTestResult:
             return ApiKeyTestResult(
                 success=True,
                 message="Connexion Gemini réussie",
-                details={"model": "gemini-1.5-flash"},
+                details={"model": "gemini-2.5-flash-lite"},
             )
         else:
             return ApiKeyTestResult(

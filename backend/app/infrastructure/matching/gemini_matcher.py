@@ -125,7 +125,7 @@ class GeminiMatchingService:
             )
 
             # Use flash model for faster response
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
             # Run synchronous API in thread pool
             response = await asyncio.to_thread(
@@ -210,7 +210,7 @@ class GeminiMatchingService:
         try:
             self._configure()
             # Simple test to verify API key is valid
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            model = genai.GenerativeModel("gemini-2.5-flash-lite")
             await asyncio.to_thread(
                 model.count_tokens,
                 "test",
