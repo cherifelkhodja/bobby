@@ -187,7 +187,8 @@ async def _test_s3(
     region: Optional[str],
 ) -> ApiKeyTestResult:
     """Test S3 storage connection."""
-    if not all([endpoint_url, access_key, secret_key, bucket_name]):
+    # endpoint_url is optional (empty for native AWS S3)
+    if not all([access_key, secret_key, bucket_name]):
         return ApiKeyTestResult(
             success=False,
             message="Configuration S3 incomplète",
@@ -197,20 +198,25 @@ async def _test_s3(
         import aioboto3
 
         session = aioboto3.Session()
-        async with session.client(
-            "s3",
-            endpoint_url=endpoint_url,
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-            region_name=region or "fr-par",
-        ) as s3:
+
+        # Build client kwargs - endpoint_url only for non-AWS S3 (Scaleway, MinIO)
+        client_kwargs = {
+            "aws_access_key_id": access_key,
+            "aws_secret_access_key": secret_key,
+            "region_name": region or "eu-north-1",
+        }
+        if endpoint_url:
+            client_kwargs["endpoint_url"] = endpoint_url
+
+        async with session.client("s3", **client_kwargs) as s3:
             # Test listing bucket
             await s3.head_bucket(Bucket=bucket_name)
 
+            provider = "Scaleway" if endpoint_url else "AWS"
             return ApiKeyTestResult(
                 success=True,
-                message=f"Connexion S3 réussie (bucket: {bucket_name})",
-                details={"bucket": bucket_name, "endpoint": endpoint_url},
+                message=f"Connexion S3 réussie ({provider}, bucket: {bucket_name})",
+                details={"bucket": bucket_name, "endpoint": endpoint_url or "AWS S3", "region": region},
             )
     except Exception as e:
         error_msg = str(e)
