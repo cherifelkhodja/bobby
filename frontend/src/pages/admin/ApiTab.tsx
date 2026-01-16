@@ -46,38 +46,41 @@ interface ServicesStatusResponse {
 
 const SERVICE_CONFIG: Record<
   string,
-  { name: string; description: string; icon: typeof Key }
+  { name: string; icon: typeof Key }
 > = {
   turnoverit: {
     name: 'Turnover-IT',
-    description: 'Publication des annonces de recrutement',
     icon: Briefcase,
   },
   s3: {
-    name: 'S3 Storage (Scaleway)',
-    description: 'Stockage des CV candidats',
+    name: 'S3 Storage (AWS)',
     icon: Cloud,
   },
   gemini: {
     name: 'Google Gemini',
-    description: 'IA pour le matching CV et la transformation',
     icon: Sparkles,
   },
   boond: {
     name: 'BoondManager',
-    description: 'Synchronisation des opportunités et ressources',
     icon: Users,
   },
   resend: {
     name: 'Resend',
-    description: "Envoi d'emails (invitations, notifications)",
     icon: Mail,
   },
 };
 
+const GEMINI_MODELS = [
+  { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (Recommandé)' },
+  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+  { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+];
+
 export function ApiTab() {
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [testingService, setTestingService] = useState<string | null>(null);
+  const [geminiModel, setGeminiModel] = useState('gemini-2.5-flash-lite');
 
   // Fetch services status
   const {
@@ -96,7 +99,11 @@ export function ApiTab() {
   const testMutation = useMutation({
     mutationFn: async (service: string) => {
       setTestingService(service);
-      const response = await apiClient.post<TestResult>('/settings/test', { service });
+      const payload: { service: string; model?: string } = { service };
+      if (service === 'gemini') {
+        payload.model = geminiModel;
+      }
+      const response = await apiClient.post<TestResult>('/settings/test', payload);
       return { service, result: response.data };
     },
     onSuccess: ({ service, result }) => {
@@ -202,9 +209,6 @@ export function ApiTab() {
                     <h3 className="font-medium text-gray-900 dark:text-white">
                       {config?.name || service.service}
                     </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {config?.description || 'Service externe'}
-                    </p>
                     {service.masked_key && (
                       <div className="mt-1 flex items-center gap-1">
                         <Key className="h-3 w-3 text-gray-400" />
@@ -222,6 +226,26 @@ export function ApiTab() {
                   </Badge>
                 </div>
               </div>
+
+              {/* Gemini Model Selector */}
+              {service.service === 'gemini' && (
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Modèle
+                  </label>
+                  <select
+                    value={geminiModel}
+                    onChange={(e) => setGeminiModel(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {GEMINI_MODELS.map((model) => (
+                      <option key={model.value} value={model.value}>
+                        {model.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Test Result */}
               {testResult && (

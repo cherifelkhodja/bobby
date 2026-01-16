@@ -21,6 +21,8 @@ class ApiKeyTest(BaseModel):
     secret_key: Optional[str] = None
     bucket_name: Optional[str] = None
     region: Optional[str] = None
+    # Gemini specific
+    model: Optional[str] = None
 
 
 class ApiKeyTestResult(BaseModel):
@@ -115,7 +117,10 @@ async def test_api_key(
         )
 
     elif request.service == "gemini":
-        return await _test_gemini(request.api_key or settings.GEMINI_API_KEY)
+        return await _test_gemini(
+            api_key=request.api_key or settings.GEMINI_API_KEY,
+            model=request.model or "gemini-2.5-flash-lite",
+        )
 
     elif request.service == "boond":
         return await _test_boond()
@@ -236,7 +241,7 @@ async def _test_s3(
         )
 
 
-async def _test_gemini(api_key: Optional[str]) -> ApiKeyTestResult:
+async def _test_gemini(api_key: Optional[str], model: str = "gemini-2.5-flash-lite") -> ApiKeyTestResult:
     """Test Google Gemini API connection."""
     if not api_key:
         return ApiKeyTestResult(
@@ -248,16 +253,16 @@ async def _test_gemini(api_key: Optional[str]) -> ApiKeyTestResult:
         import google.generativeai as genai
 
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash-lite")
+        gemini_model = genai.GenerativeModel(model)
 
         # Simple test prompt
-        response = model.generate_content("Réponds uniquement 'OK'")
+        response = gemini_model.generate_content("Réponds uniquement 'OK'")
 
         if response and response.text:
             return ApiKeyTestResult(
                 success=True,
-                message="Connexion Gemini réussie",
-                details={"model": "gemini-2.5-flash-lite"},
+                message=f"Connexion Gemini réussie ({model})",
+                details={"model": model},
             )
         else:
             return ApiKeyTestResult(
