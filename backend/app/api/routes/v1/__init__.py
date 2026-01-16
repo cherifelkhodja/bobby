@@ -9,6 +9,7 @@ from app.api.routes.v1.hr import router as hr_router
 from app.api.routes.v1.invitations import router as invitations_router
 from app.api.routes.v1.opportunities import router as opportunities_router
 from app.api.routes.v1.public_applications import router as public_applications_router
+from app.api.routes.v1.settings import router as settings_router
 from app.api.routes.v1.users import router as users_router
 
 __all__ = [
@@ -21,5 +22,6 @@ __all__ = [
     "invitations_router",
     "opportunities_router",
     "public_applications_router",
+    "settings_router",
     "users_router",
 ]

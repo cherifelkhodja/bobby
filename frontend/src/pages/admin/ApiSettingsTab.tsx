@@ -1,29 +1,21 @@
 /**
- * API connections test tab component.
- *
- * Tests for all external API connections: BoondManager, Gemini, Turnover-IT, S3, Resend.
+ * ApiSettingsTab - Manage and test external API connections.
  */
 
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  RefreshCw,
   CheckCircle,
   XCircle,
   Loader2,
+  RefreshCw,
   Key,
   Cloud,
   Sparkles,
   Users,
   Mail,
-  Briefcase,
 } from 'lucide-react';
-import { toast } from 'sonner';
-
 import { apiClient } from '../../api/client';
-import { Card, CardHeader } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
 
 interface ServiceStatus {
   service: string;
@@ -37,10 +29,6 @@ interface TestResult {
   details?: Record<string, unknown>;
 }
 
-interface ServicesStatusResponse {
-  services: ServiceStatus[];
-}
-
 const SERVICE_CONFIG: Record<
   string,
   { name: string; description: string; icon: typeof Key }
@@ -48,11 +36,11 @@ const SERVICE_CONFIG: Record<
   turnoverit: {
     name: 'Turnover-IT',
     description: 'Publication des annonces de recrutement',
-    icon: Briefcase,
+    icon: Users,
   },
   s3: {
-    name: 'S3 Storage (Scaleway)',
-    description: 'Stockage des CV candidats',
+    name: 'S3 Storage',
+    description: 'Stockage des CV candidats (Scaleway)',
     icon: Cloud,
   },
   gemini: {
@@ -72,19 +60,15 @@ const SERVICE_CONFIG: Record<
   },
 };
 
-export function ApiTab() {
-  const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
+export function ApiSettingsTab() {
   const [testingService, setTestingService] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
 
   // Fetch services status
-  const {
-    data: statusData,
-    isLoading,
-    refetch,
-  } = useQuery({
+  const { data: statusData, isLoading, refetch } = useQuery({
     queryKey: ['settings-status'],
     queryFn: async () => {
-      const response = await apiClient.get<ServicesStatusResponse>('/settings/status');
+      const response = await apiClient.get<{ services: ServiceStatus[] }>('/settings/status');
       return response.data;
     },
   });
@@ -99,20 +83,16 @@ export function ApiTab() {
     onSuccess: ({ service, result }) => {
       setTestResults((prev) => ({ ...prev, [service]: result }));
       setTestingService(null);
-      if (result.success) {
-        toast.success(result.message);
-      } else {
-        toast.error(result.message);
-      }
     },
-    onError: (error: Error, service: string) => {
-      const errorResult = {
-        success: false,
-        message: error.message || 'Erreur inconnue',
-      };
-      setTestResults((prev) => ({ ...prev, [service]: errorResult }));
+    onError: (error, service) => {
+      setTestResults((prev) => ({
+        ...prev,
+        [service]: {
+          success: false,
+          message: error instanceof Error ? error.message : 'Erreur inconnue',
+        },
+      }));
       setTestingService(null);
-      toast.error(errorResult.message);
     },
   });
 
@@ -123,7 +103,7 @@ export function ApiTab() {
   const handleTestAll = () => {
     statusData?.services.forEach((s) => {
       if (s.configured) {
-        setTimeout(() => testMutation.mutate(s.service), 0);
+        testMutation.mutate(s.service);
       }
     });
   };
@@ -141,27 +121,33 @@ export function ApiTab() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Configuration des API
+          </h2>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Statut et test des connexions aux services externes
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()} leftIcon={<RefreshCw className="h-4 w-4" />}>
+          <button
+            onClick={() => refetch()}
+            className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors inline-flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
             Rafraîchir
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
+          </button>
+          <button
             onClick={handleTestAll}
             disabled={testingService !== null}
+            className="px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-lg transition-colors inline-flex items-center gap-2"
           >
             Tester tout
-          </Button>
+          </button>
         </div>
       </div>
 
-      {/* Services Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Services Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {statusData?.services.map((service) => {
           const config = SERVICE_CONFIG[service.service];
           const Icon = config?.icon || Key;
@@ -169,28 +155,23 @@ export function ApiTab() {
           const isTesting = testingService === service.service;
 
           return (
-            <Card key={service.service}>
+            <div
+              key={service.service}
+              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4"
+            >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
                   <div
-                    className={`p-3 rounded-lg ${
+                    className={`p-2 rounded-lg ${
                       service.configured
-                        ? testResult?.success
-                          ? 'bg-green-100 dark:bg-green-900/30'
-                          : testResult && !testResult.success
-                            ? 'bg-red-100 dark:bg-red-900/30'
-                            : 'bg-blue-100 dark:bg-blue-900/30'
+                        ? 'bg-green-100 dark:bg-green-900/30'
                         : 'bg-gray-100 dark:bg-gray-700'
                     }`}
                   >
                     <Icon
-                      className={`h-6 w-6 ${
+                      className={`h-5 w-5 ${
                         service.configured
-                          ? testResult?.success
-                            ? 'text-green-600 dark:text-green-400'
-                            : testResult && !testResult.success
-                              ? 'text-red-600 dark:text-red-400'
-                              : 'text-blue-600 dark:text-blue-400'
+                          ? 'text-green-600 dark:text-green-400'
                           : 'text-gray-400 dark:text-gray-500'
                       }`}
                     />
@@ -202,57 +183,75 @@ export function ApiTab() {
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {config?.description || 'Service externe'}
                     </p>
-                    {service.masked_key && (
-                      <div className="mt-1 flex items-center gap-1">
-                        <Key className="h-3 w-3 text-gray-400" />
-                        <code className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                          {service.masked_key}
-                        </code>
-                      </div>
-                    )}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Badge variant={service.configured ? 'success' : 'warning'}>
-                    {service.configured ? 'Configuré' : 'Non configuré'}
-                  </Badge>
+                  {service.configured ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 rounded-full">
+                      <CheckCircle className="h-3 w-3" />
+                      Configuré
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 rounded-full">
+                      <XCircle className="h-3 w-3" />
+                      Non configuré
+                    </span>
+                  )}
                 </div>
               </div>
+
+              {/* API Key (masked) */}
+              {service.masked_key && (
+                <div className="mt-3 flex items-center gap-2">
+                  <Key className="h-4 w-4 text-gray-400" />
+                  <code className="text-sm text-gray-600 dark:text-gray-400 font-mono">
+                    {service.masked_key}
+                  </code>
+                </div>
+              )}
 
               {/* Test Result */}
               {testResult && (
                 <div
-                  className={`mt-4 p-3 rounded-lg text-sm flex items-center gap-2 ${
+                  className={`mt-3 p-2 rounded-lg text-sm ${
                     testResult.success
                       ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300'
                       : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300'
                   }`}
                 >
-                  {testResult.success ? (
-                    <CheckCircle className="h-4 w-4 flex-shrink-0" />
-                  ) : (
-                    <XCircle className="h-4 w-4 flex-shrink-0" />
-                  )}
-                  <span>{testResult.message}</span>
+                  <div className="flex items-center gap-2">
+                    {testResult.success ? (
+                      <CheckCircle className="h-4 w-4" />
+                    ) : (
+                      <XCircle className="h-4 w-4" />
+                    )}
+                    {testResult.message}
+                  </div>
                 </div>
               )}
 
               {/* Test Button */}
-              <div className="mt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
+              <div className="mt-3">
+                <button
                   onClick={() => handleTest(service.service)}
                   disabled={!service.configured || isTesting}
-                  isLoading={isTesting}
-                  leftIcon={isTesting ? undefined : <RefreshCw className="h-4 w-4" />}
-                  className="w-full"
+                  className="w-full px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors inline-flex items-center justify-center gap-2"
                 >
-                  {isTesting ? 'Test en cours...' : 'Tester la connexion'}
-                </Button>
+                  {isTesting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Test en cours...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4" />
+                      Tester la connexion
+                    </>
+                  )}
+                </button>
               </div>
-            </Card>
+            </div>
           );
         })}
       </div>
@@ -261,7 +260,7 @@ export function ApiTab() {
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
         <p className="text-sm text-blue-800 dark:text-blue-300">
           <strong>Note :</strong> Les clés API sont configurées via les variables d'environnement du
-          serveur (TURNOVERIT_API_KEY, S3_ACCESS_KEY, GEMINI_API_KEY, etc.).
+          serveur. Contactez l'administrateur système pour modifier les valeurs.
         </p>
       </div>
     </div>
