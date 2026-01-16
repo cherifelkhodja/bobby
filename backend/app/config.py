@@ -142,8 +142,12 @@ def _load_aws_secrets() -> dict[str, Any]:
         Dictionary of secrets, or empty dict if not enabled or failed.
     """
     # Check if AWS Secrets Manager is enabled via environment variable
-    if not os.getenv("AWS_SECRETS_ENABLED", "").lower() in ("true", "1", "yes"):
+    aws_enabled = os.getenv("AWS_SECRETS_ENABLED", "").lower()
+    if aws_enabled not in ("true", "1", "yes"):
+        print(f"[CONFIG] AWS Secrets Manager disabled (AWS_SECRETS_ENABLED={aws_enabled!r})")
         return {}
+
+    print("[CONFIG] AWS Secrets Manager enabled, loading secrets...")
 
     try:
         from app.infrastructure.secrets import load_secrets_from_aws
@@ -151,9 +155,12 @@ def _load_aws_secrets() -> dict[str, Any]:
         secret_name = os.getenv("AWS_SECRETS_NAME", "esn-cooptation/prod")
         region = os.getenv("AWS_SECRETS_REGION", "eu-west-3")
 
-        # Use S3 credentials for AWS Secrets Manager if available
-        access_key = os.getenv("S3_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID")
-        secret_key = os.getenv("S3_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY")
+        # Use AWS credentials (prefer AWS_ACCESS_KEY_ID over S3_ACCESS_KEY)
+        access_key = os.getenv("AWS_ACCESS_KEY_ID") or os.getenv("S3_ACCESS_KEY")
+        secret_key = os.getenv("AWS_SECRET_ACCESS_KEY") or os.getenv("S3_SECRET_KEY")
+
+        print(f"[CONFIG] Loading from AWS Secrets Manager: {secret_name} in {region}")
+        print(f"[CONFIG] Using access key: {access_key[:8]}..." if access_key else "[CONFIG] No access key!")
 
         secrets = load_secrets_from_aws(
             region_name=region,
@@ -163,13 +170,18 @@ def _load_aws_secrets() -> dict[str, Any]:
         )
 
         if secrets:
+            print(f"[CONFIG] Loaded {len(secrets)} secrets from AWS Secrets Manager")
             logger.info(f"Loaded {len(secrets)} secrets from AWS Secrets Manager")
+        else:
+            print("[CONFIG] No secrets loaded from AWS Secrets Manager")
         return secrets
 
-    except ImportError:
+    except ImportError as e:
+        print(f"[CONFIG] boto3 not installed: {e}")
         logger.warning("boto3 not installed, cannot use AWS Secrets Manager")
         return {}
     except Exception as e:
+        print(f"[CONFIG] Failed to load AWS secrets: {e}")
         logger.warning(f"Failed to load AWS secrets: {e}")
         return {}
 
@@ -192,6 +204,9 @@ def get_settings() -> Settings:
             "S3_ACCESS_KEY": "S3_ACCESS_KEY",
             "S3_SECRET_KEY": "S3_SECRET_KEY",
             "JWT_SECRET": "JWT_SECRET",
+            "ADMIN_PASSWORD": "ADMIN_PASSWORD",
+            "SMTP_USER": "SMTP_USER",
+            "SMTP_PASSWORD": "SMTP_PASSWORD",
         }
 
         # Set environment variables from AWS secrets (don't override existing)
