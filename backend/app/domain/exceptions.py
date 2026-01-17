@@ -107,6 +107,14 @@ class JobPostingNotFoundError(DomainError):
         super().__init__(message)
 
 
+class InvalidJobPostingError(DomainError):
+    """Raised when job posting data is invalid."""
+
+    def __init__(self, message: str = "") -> None:
+        error_msg = message if message else "Données d'offre d'emploi invalides"
+        super().__init__(error_msg)
+
+
 class JobPostingAlreadyPublishedError(DomainError):
     """Raised when trying to publish an already published job posting."""
 
@@ -141,6 +149,14 @@ class JobApplicationNotFoundError(DomainError):
             else "Candidature non trouvée"
         )
         super().__init__(message)
+
+
+class InvalidJobApplicationError(DomainError):
+    """Raised when job application data is invalid."""
+
+    def __init__(self, message: str = "") -> None:
+        error_msg = message if message else "Données de candidature invalides"
+        super().__init__(error_msg)
 
 
 class InvalidStatusTransitionError(DomainError):

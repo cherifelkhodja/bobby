@@ -5,8 +5,9 @@ from uuid import uuid4
 
 import pytest
 
-from app.domain.entities import JobPosting, JobApplication
-from app.domain.value_objects import (
+from app.domain.entities import (
+    JobPosting,
+    JobApplication,
     ApplicationStatus,
     JobPostingStatus,
     ContractType,
