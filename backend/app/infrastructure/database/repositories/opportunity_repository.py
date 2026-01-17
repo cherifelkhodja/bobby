@@ -219,6 +219,15 @@ class OpportunityRepository:
         result = await self.session.execute(query)
         return [self._to_entity(m) for m in result.scalars().all()]
 
+    async def count_by_owner(self, owner_id: UUID) -> int:
+        """Count opportunities owned by a specific user."""
+        result = await self.session.execute(
+            select(func.count(OpportunityModel.id)).where(
+                OpportunityModel.owner_id == owner_id
+            )
+        )
+        return result.scalar() or 0
+
     async def list_by_manager_boond_id(
         self,
         manager_boond_id: str,

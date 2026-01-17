@@ -130,10 +130,11 @@ async def list_my_opportunities(
     opportunities = await opportunity_repo.list_by_owner(
         owner_id=user.id, skip=skip, limit=page_size
     )
+    total = await opportunity_repo.count_by_owner(owner_id=user.id)
 
     return OpportunityListResponse(
         items=[_opportunity_to_response(opp) for opp in opportunities],
-        total=len(opportunities),  # TODO: add proper count
+        total=total,
         page=page,
         page_size=page_size,
     )

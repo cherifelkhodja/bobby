@@ -4,7 +4,7 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, validate_email
 
 from app.application.read_models.hr import (
     ApplicationSubmissionResultReadModel,
@@ -100,7 +100,6 @@ async def submit_application(
     """
     # Validate email format
     try:
-        from pydantic import validate_email
         validate_email(email)
     except Exception:
         raise HTTPException(status_code=400, detail="Adresse email invalide")
