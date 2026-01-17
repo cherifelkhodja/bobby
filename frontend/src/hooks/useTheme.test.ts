@@ -6,12 +6,31 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useTheme } from './useTheme';
 
+// Helper to create matchMedia mock
+const createMatchMediaMock = (prefersDark: boolean = false) => {
+  return vi.fn().mockImplementation((query: string) => ({
+    matches: prefersDark && query === '(prefers-color-scheme: dark)',
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+};
+
 describe('useTheme', () => {
   beforeEach(() => {
     // Clear localStorage before each test
     localStorage.clear();
     // Reset document classList
     document.documentElement.classList.remove('dark');
+    // Set up matchMedia mock (prefer light by default)
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: createMatchMediaMock(false),
+    });
   });
 
   afterEach(() => {
@@ -35,16 +54,10 @@ describe('useTheme', () => {
 
     it('should resolve system theme based on media query', () => {
       // Mock matchMedia to prefer dark
-      vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
-        matches: query === '(prefers-color-scheme: dark)',
-        media: query,
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      }));
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        value: createMatchMediaMock(true),
+      });
 
       const { result } = renderHook(() => useTheme());
 
