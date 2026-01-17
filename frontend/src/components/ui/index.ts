@@ -7,7 +7,7 @@
 // Base components
 export { Button } from './Button';
 export { Badge } from './Badge';
-export { Card, CardHeader, CardFooter } from './Card';
+export { Card, CardHeader } from './Card';
 export { Modal } from './Modal';
 export { Spinner, PageSpinner } from './Spinner';
 
