@@ -431,7 +431,7 @@ Full HR recruitment feature for publishing job postings on Turnover-IT and manag
 **Access**: admin, rh roles only (HR routes), public (application form)
 
 **Features**:
-- View all open opportunities with job posting status
+- View opportunities from BoondManager where user is HR manager
 - Create draft job postings from opportunities
 - Publish job postings to Turnover-IT
 - Receive applications via public form (no auth required)
@@ -441,8 +441,26 @@ Full HR recruitment feature for publishing job postings on Turnover-IT and manag
 - Create candidates in BoondManager from applications
 - CV storage on S3/Scaleway Object Storage
 
+**Opportunity Listing (BoondManager Integration)**:
+- **Admin users**: See ALL open opportunities from BoondManager
+- **RH users**: See only opportunities where they are HR manager (`perimeterManagersType: "hr"`)
+- Uses same opportunity states as commercial module: `[0, 5, 6, 7, 10]`
+- Displays Boond state with colored badge (blue, green, yellow, red, etc.)
+- Real-time search filtering by title, reference, or client name
+- Shows job posting status for each opportunity
+
+**Boond Opportunity States (for HR)**:
+```python
+ACTIVE_OPPORTUNITY_STATES = [0, 5, 6, 7, 10]
+# 0: Piste identifiée
+# 5: En cours
+# 6: Récurrent
+# 7: AO ouvert
+# 10: Besoin en avant de phase
+```
+
 **Workflow**:
-1. RH views open opportunities in `/rh` dashboard
+1. RH views open opportunities in `/rh` dashboard (fetched from BoondManager)
 2. Clicks "Créer annonce" to create a draft posting
 3. Fills posting details (title, description, qualifications, skills, etc.)
 4. Publishes to Turnover-IT (generates public URL)
@@ -516,6 +534,22 @@ S3_SECRET_KEY=...
 ```typescript
 type JobPostingStatus = 'draft' | 'published' | 'closed';
 type ApplicationStatus = 'nouveau' | 'en_cours' | 'entretien' | 'accepte' | 'refuse';
+
+interface OpportunityForHR {
+  id: string;                              // Boond opportunity ID
+  title: string;
+  reference: string;
+  client_name: string | null;
+  state: number | null;                    // Boond state code
+  state_name: string | null;               // Human-readable state
+  state_color: string | null;              // Badge color (blue, green, etc.)
+  hr_manager_name: string | null;
+  has_job_posting: boolean;
+  job_posting_id: string | null;
+  job_posting_status: JobPostingStatus | null;
+  applications_count: number;
+  new_applications_count: number;
+}
 
 interface JobPosting {
   id: string;
@@ -672,6 +706,29 @@ interface PublishedOpportunity {
 ```
 
 ## Recent Changes Log
+
+### 2026-01-17 (session 2)
+**HR Opportunities from BoondManager**:
+- Changed HR opportunity listing to fetch from BoondManager API instead of local database
+- **Admin users**: See ALL open opportunities from BoondManager
+- **RH users**: See only opportunities where they are HR manager (uses `perimeterManagersType: "hr"`)
+- Added Boond state display with colored badges
+- Uses same opportunity states as commercial module: `[0, 5, 6, 7, 10]`
+- Added efficient batch lookup for job posting status
+- Updated frontend with client-side instant search filtering
+
+**Files modified**:
+- `backend/app/infrastructure/boond/client.py` - Added `get_hr_manager_opportunities()` method
+- `backend/app/application/use_cases/job_postings.py` - Changed to use BoondClient
+- `backend/app/application/read_models/hr.py` - Added Boond-specific fields
+- `backend/app/api/routes/v1/hr.py` - Updated to pass user's boond_resource_id
+- `backend/app/infrastructure/database/repositories/job_posting_repository.py` - Added batch lookup
+- `frontend/src/types/index.ts` - Updated OpportunityForHR interface
+- `frontend/src/pages/HRDashboard.tsx` - Updated to display Boond state
+- `frontend/src/pages/CreateJobPosting.tsx` - Updated for new data structure
+- `frontend/src/api/hr.ts` - Removed pagination params
+- `backend/tests/unit/use_cases/test_hr_use_cases.py` - Updated tests
+- `frontend/src/api/hr.test.ts` - Updated tests
 
 ### 2026-01-17
 **HR Feature Review & Quality Improvements**:
