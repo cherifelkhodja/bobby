@@ -562,6 +562,129 @@ class BoondClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=4),
     )
+    async def get_hr_manager_opportunities(
+        self,
+        hr_manager_boond_id: str,
+        states: Optional[list[int]] = None,
+    ) -> list[dict]:
+        """Fetch opportunities from BoondManager where user is HR manager.
+
+        Args:
+            hr_manager_boond_id: The BoondManager resource ID of the HR manager.
+            states: List of opportunity states to filter. Defaults to ACTIVE_OPPORTUNITY_STATES.
+
+        Returns:
+            List of opportunity dicts with id, title, reference, description, etc.
+        """
+        if not hr_manager_boond_id:
+            raise ValueError("hr_manager_boond_id is required")
+
+        if states is None:
+            states = self.ACTIVE_OPPORTUNITY_STATES
+
+        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
+            logger.info(f"Fetching opportunities for HR manager {hr_manager_boond_id}")
+
+            all_opportunities = []
+            companies_map = {}
+            managers_map = {}
+
+            for state in states:
+                page = 1
+                while True:
+                    # Build params - use perimeterManagersType: "hr" for HR manager filtering
+                    params = {
+                        "page": page,
+                        "maxResults": 500,
+                        "opportunityStates": state,
+                        "perimeterManagersType": "hr",
+                        "perimeterManagers": hr_manager_boond_id,
+                    }
+
+                    response = await client.get(
+                        f"{self.base_url}/opportunities",
+                        auth=self._auth,
+                        params=params,
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+
+                    opportunities_batch = data.get("data", [])
+                    all_opportunities.extend(opportunities_batch)
+
+                    # Extract company and resource (manager) names from included data
+                    for included in data.get("included", []):
+                        inc_type = included.get("type")
+                        inc_id = str(included.get("id"))
+                        inc_attrs = included.get("attributes", {})
+
+                        if inc_type == "company":
+                            companies_map[inc_id] = inc_attrs.get("name", "")
+                        elif inc_type == "resource":
+                            first_name = inc_attrs.get("firstName", "")
+                            last_name = inc_attrs.get("lastName", "")
+                            managers_map[inc_id] = f"{first_name} {last_name}".strip()
+
+                    # Check for more pages
+                    meta = data.get("meta", {})
+                    total_pages = meta.get("totalPages", 1)
+                    if page >= total_pages:
+                        break
+                    page += 1
+
+            opportunities = []
+            for item in all_opportunities:
+                try:
+                    attrs = item.get("attributes", {})
+                    relationships = item.get("relationships", {})
+
+                    # Get company info
+                    company_data = relationships.get("company", {}).get("data")
+                    company_id = str(company_data.get("id")) if company_data else None
+                    company_name = companies_map.get(company_id, "") if company_id else ""
+
+                    # Get main manager info
+                    main_manager_data = relationships.get("mainManager", {}).get("data")
+                    manager_id = str(main_manager_data.get("id")) if main_manager_data else None
+                    manager_name = managers_map.get(manager_id, "") if manager_id else ""
+
+                    # Get HR manager info
+                    hr_manager_data = relationships.get("hrManager", {}).get("data")
+                    hr_manager_id = str(hr_manager_data.get("id")) if hr_manager_data else None
+                    hr_manager_name = managers_map.get(hr_manager_id, "") if hr_manager_id else ""
+
+                    # Get state
+                    opp_state = attrs.get("state", None)
+                    opp_state_name = self.OPPORTUNITY_STATE_NAMES.get(opp_state, "") if opp_state is not None else ""
+                    opp_state_color = self.OPPORTUNITY_STATE_COLORS.get(opp_state, "gray") if opp_state is not None else "gray"
+
+                    opportunities.append({
+                        "id": str(item.get("id")),
+                        "title": attrs.get("title", ""),
+                        "reference": attrs.get("reference", ""),
+                        "description": attrs.get("description", ""),
+                        "start_date": attrs.get("startDate"),
+                        "end_date": attrs.get("endDate"),
+                        "company_id": company_id,
+                        "company_name": company_name,
+                        "manager_id": manager_id,
+                        "manager_name": manager_name,
+                        "hr_manager_id": hr_manager_id,
+                        "hr_manager_name": hr_manager_name,
+                        "state": opp_state,
+                        "state_name": opp_state_name,
+                        "state_color": opp_state_color,
+                    })
+                except Exception as e:
+                    logger.warning(f"Failed to parse opportunity {item.get('id')}: {e}")
+
+            logger.info(f"Fetched {len(opportunities)} opportunities for HR manager")
+            return opportunities
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+    )
     async def get_opportunity_information(self, opportunity_id: str) -> dict:
         """Fetch detailed opportunity information from BoondManager.
 

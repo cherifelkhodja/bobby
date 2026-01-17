@@ -22,13 +22,26 @@ describe('hrApi', () => {
   });
 
   describe('getOpportunities', () => {
-    it('should fetch opportunities with default params', async () => {
+    it('should fetch opportunities from BoondManager', async () => {
       const mockResponse = {
         data: {
-          items: [],
-          total: 0,
+          items: [
+            {
+              id: 'BOOND-123',
+              title: 'Dev Python',
+              reference: 'REF-001',
+              client_name: 'Client A',
+              state_name: 'En cours',
+              state_color: 'blue',
+              has_job_posting: false,
+              job_posting_id: null,
+              applications_count: 0,
+              new_applications_count: 0,
+            },
+          ],
+          total: 1,
           page: 1,
-          page_size: 20,
+          page_size: 1,
         },
       };
       vi.mocked(apiClient.get).mockResolvedValue(mockResponse);
@@ -38,17 +51,19 @@ describe('hrApi', () => {
       expect(apiClient.get).toHaveBeenCalledWith('/hr/opportunities', {
         params: undefined,
       });
-      expect(result).toEqual(mockResponse.data);
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].id).toBe('BOOND-123');
+      expect(result.items[0].state_name).toBe('En cours');
     });
 
-    it('should fetch opportunities with custom params', async () => {
-      const mockResponse = { data: { items: [], total: 0, page: 2, page_size: 10 } };
+    it('should filter opportunities with search param', async () => {
+      const mockResponse = { data: { items: [], total: 0, page: 1, page_size: 0 } };
       vi.mocked(apiClient.get).mockResolvedValue(mockResponse);
 
-      await hrApi.getOpportunities({ page: 2, page_size: 10, search: 'Python' });
+      await hrApi.getOpportunities({ search: 'Python' });
 
       expect(apiClient.get).toHaveBeenCalledWith('/hr/opportunities', {
-        params: { page: 2, page_size: 10, search: 'Python' },
+        params: { search: 'Python' },
       });
     });
   });

@@ -159,6 +159,30 @@ async def get_current_user(
     return user_id, user.role
 
 
+async def get_current_user_full(
+    db: DbSession,
+    authorization: str,
+) -> tuple[UUID, UserRole, Optional[str]]:
+    """Verify user authentication and return user ID, role, and boond_resource_id."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Non authentifié")
+
+    token = authorization[7:]
+    payload = decode_token(token, expected_type="access")
+    user_id = UUID(payload.sub)
+
+    user_repo = UserRepository(db)
+    user = await user_repo.get_by_id(user_id)
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Utilisateur non trouvé")
+
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Compte désactivé")
+
+    return user_id, user.role, user.boond_resource_id
+
+
 async def require_hr_access(
     db: DbSession,
     authorization: str,
@@ -181,33 +205,45 @@ async def require_hr_access(
 @router.get("/opportunities", response_model=OpportunityListForHRReadModel)
 async def list_opportunities_for_hr(
     db: DbSession,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    boond_client: Boond,
     search: Optional[str] = Query(None, max_length=100),
     authorization: str = Header(default=""),
 ):
-    """List all open opportunities with job posting status.
+    """List opportunities from BoondManager where user is HR manager.
 
-    Returns opportunities from BoondManager with information about
-    whether a job posting exists and application counts.
+    Returns opportunities from BoondManager API filtered by hrManager,
+    enriched with job posting status and application counts.
+
+    - For admin users: Returns ALL opportunities (admin view)
+    - For RH users: Returns only opportunities where they are HR manager
     """
-    await require_hr_access(db, authorization)
+    user_id, role, boond_resource_id = await get_current_user_full(db, authorization)
 
-    opportunity_repo = OpportunityRepository(db)
+    if role not in HR_ROLES:
+        raise HTTPException(
+            status_code=403,
+            detail="Accès réservé aux RH et administrateurs",
+        )
+
+    is_admin = role == UserRole.ADMIN
+
     job_posting_repo = JobPostingRepository(db)
     job_application_repo = JobApplicationRepository(db)
 
     use_case = ListOpenOpportunitiesForHRUseCase(
-        opportunity_repository=opportunity_repo,
+        boond_client=boond_client,
         job_posting_repository=job_posting_repo,
         job_application_repository=job_application_repo,
     )
 
-    return await use_case.execute(
-        page=page,
-        page_size=page_size,
-        search=search,
-    )
+    try:
+        return await use_case.execute(
+            hr_manager_boond_id=boond_resource_id,
+            is_admin=is_admin,
+            search=search,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # --- Job Postings Endpoints ---

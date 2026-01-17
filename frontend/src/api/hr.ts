@@ -22,11 +22,14 @@ export const hrApi = {
   // ========== Opportunities ==========
 
   /**
-   * Get list of open opportunities with job posting status
+   * Get list of opportunities from BoondManager where user is HR manager.
+   *
+   * For admin users: Returns ALL opportunities
+   * For RH users: Returns only opportunities where they are HR manager
+   *
+   * Note: No pagination - all opportunities are returned from BoondManager API
    */
   getOpportunities: async (params?: {
-    page?: number;
-    page_size?: number;
     search?: string;
   }): Promise<OpportunityForHRListResponse> => {
     const response = await apiClient.get<OpportunityForHRListResponse>('/hr/opportunities', {

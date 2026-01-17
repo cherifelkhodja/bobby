@@ -42,91 +42,149 @@ from app.domain.value_objects import UserRole
 
 
 class TestListOpenOpportunitiesForHRUseCase:
-    """Tests for listing opportunities for HR dashboard."""
+    """Tests for listing opportunities from BoondManager for HR dashboard."""
 
     @pytest.fixture
-    def mock_repos(self):
+    def mock_deps(self):
         return {
-            "opportunity_repo": AsyncMock(),
+            "boond_client": AsyncMock(),
             "job_posting_repo": AsyncMock(),
             "job_application_repo": AsyncMock(),
         }
 
     @pytest.fixture
-    def use_case(self, mock_repos):
+    def use_case(self, mock_deps):
         return ListOpenOpportunitiesForHRUseCase(
-            opportunity_repository=mock_repos["opportunity_repo"],
-            job_posting_repository=mock_repos["job_posting_repo"],
-            job_application_repository=mock_repos["job_application_repo"],
+            boond_client=mock_deps["boond_client"],
+            job_posting_repository=mock_deps["job_posting_repo"],
+            job_application_repository=mock_deps["job_application_repo"],
         )
 
     @pytest.mark.asyncio
-    async def test_list_opportunities_with_posting_status(self, use_case, mock_repos):
-        """Should return opportunities with job posting status."""
-        opp_id = uuid4()
+    async def test_list_opportunities_for_hr_manager(self, use_case, mock_deps):
+        """Should return opportunities from BoondManager where user is HR manager."""
         posting_id = uuid4()
 
-        opportunity = MagicMock(
-            id=opp_id,
-            external_id="BOOND-123",
-            title="Dev Python",
-            reference="REF-001",
-            client_name="Client A",
-            description="Description",
-            skills=["Python"],
-            location="Paris",
-            budget="500€/j",
-            start_date=date.today(),
-            end_date=None,
-            manager_name="Manager",
-            synced_at=datetime.utcnow(),
-        )
+        # Mock BoondManager opportunity data
+        boond_opp = {
+            "id": "BOOND-123",
+            "title": "Dev Python",
+            "reference": "REF-001",
+            "company_name": "Client A",
+            "description": "Description",
+            "start_date": "2024-03-01",
+            "end_date": None,
+            "manager_name": "Manager Principal",
+            "hr_manager_name": "HR Manager",
+            "state": 0,
+            "state_name": "En cours",
+            "state_color": "blue",
+        }
 
         posting = MagicMock(id=posting_id, status=JobPostingStatus.PUBLISHED)
 
-        mock_repos["opportunity_repo"].list_active.return_value = [opportunity]
-        mock_repos["opportunity_repo"].count_active.return_value = 1
-        mock_repos["job_posting_repo"].get_by_opportunity_id.return_value = posting
-        mock_repos["job_application_repo"].count_by_posting.return_value = 5
-        mock_repos["job_application_repo"].count_new_by_posting.return_value = 2
+        mock_deps["boond_client"].get_hr_manager_opportunities.return_value = [boond_opp]
+        mock_deps["job_posting_repo"].get_all_by_boond_opportunity_ids.return_value = {
+            "BOOND-123": posting
+        }
+        mock_deps["job_application_repo"].count_by_posting.return_value = 5
+        mock_deps["job_application_repo"].count_new_by_posting.return_value = 2
 
-        result = await use_case.execute(page=1, page_size=20)
+        result = await use_case.execute(hr_manager_boond_id="12345")
 
         assert result.total == 1
         assert len(result.items) == 1
+        assert result.items[0].id == "BOOND-123"
+        assert result.items[0].title == "Dev Python"
+        assert result.items[0].state_name == "En cours"
         assert result.items[0].has_job_posting is True
         assert result.items[0].job_posting_id == str(posting_id)
         assert result.items[0].applications_count == 5
         assert result.items[0].new_applications_count == 2
 
-    @pytest.mark.asyncio
-    async def test_list_opportunities_without_posting(self, use_case, mock_repos):
-        """Should handle opportunities without job posting."""
-        opportunity = MagicMock(
-            id=uuid4(),
-            external_id="BOOND-456",
-            title="Dev Java",
-            reference="REF-002",
-            client_name="Client B",
-            description="Description",
-            skills=["Java"],
-            location="Lyon",
-            budget=None,
-            start_date=None,
-            end_date=None,
-            manager_name=None,
-            synced_at=datetime.utcnow(),
+        mock_deps["boond_client"].get_hr_manager_opportunities.assert_called_once_with(
+            hr_manager_boond_id="12345"
         )
 
-        mock_repos["opportunity_repo"].list_active.return_value = [opportunity]
-        mock_repos["opportunity_repo"].count_active.return_value = 1
-        mock_repos["job_posting_repo"].get_by_opportunity_id.return_value = None
+    @pytest.mark.asyncio
+    async def test_list_opportunities_admin_sees_all(self, use_case, mock_deps):
+        """Should return all opportunities for admin users."""
+        boond_opp = {
+            "id": "BOOND-456",
+            "title": "Dev Java",
+            "reference": "REF-002",
+            "company_name": "Client B",
+            "description": "Description",
+            "start_date": None,
+            "end_date": None,
+            "manager_name": None,
+            "hr_manager_name": None,
+            "state": 5,
+            "state_name": "Piste identifiée",
+            "state_color": "yellow",
+        }
 
-        result = await use_case.execute()
+        mock_deps["boond_client"].get_manager_opportunities.return_value = [boond_opp]
+        mock_deps["job_posting_repo"].get_all_by_boond_opportunity_ids.return_value = {}
 
+        result = await use_case.execute(is_admin=True)
+
+        assert result.total == 1
         assert result.items[0].has_job_posting is False
         assert result.items[0].job_posting_id is None
         assert result.items[0].applications_count == 0
+
+        mock_deps["boond_client"].get_manager_opportunities.assert_called_once_with(
+            fetch_all=True
+        )
+
+    @pytest.mark.asyncio
+    async def test_list_opportunities_requires_boond_id_for_non_admin(self, use_case, mock_deps):
+        """Should raise error if non-admin user has no boond_resource_id."""
+        with pytest.raises(ValueError, match="BoondManager"):
+            await use_case.execute(hr_manager_boond_id=None, is_admin=False)
+
+    @pytest.mark.asyncio
+    async def test_list_opportunities_with_search(self, use_case, mock_deps):
+        """Should filter opportunities by search term."""
+        boond_opps = [
+            {
+                "id": "BOOND-123",
+                "title": "Dev Python",
+                "reference": "REF-001",
+                "company_name": "Client A",
+                "description": None,
+                "start_date": None,
+                "end_date": None,
+                "manager_name": None,
+                "hr_manager_name": None,
+                "state": 0,
+                "state_name": "En cours",
+                "state_color": "blue",
+            },
+            {
+                "id": "BOOND-456",
+                "title": "Dev Java",
+                "reference": "REF-002",
+                "company_name": "Client B",
+                "description": None,
+                "start_date": None,
+                "end_date": None,
+                "manager_name": None,
+                "hr_manager_name": None,
+                "state": 0,
+                "state_name": "En cours",
+                "state_color": "blue",
+            },
+        ]
+
+        mock_deps["boond_client"].get_hr_manager_opportunities.return_value = boond_opps
+        mock_deps["job_posting_repo"].get_all_by_boond_opportunity_ids.return_value = {}
+
+        result = await use_case.execute(hr_manager_boond_id="12345", search="Python")
+
+        assert result.total == 1
+        assert result.items[0].title == "Dev Python"
 
 
 class TestCreateJobPostingUseCase:

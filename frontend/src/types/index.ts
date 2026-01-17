@@ -380,21 +380,25 @@ export function getMatchingScoreColor(score: number): string {
 }
 
 export interface OpportunityForHR {
-  id: string;
-  boond_id: string;
+  id: string; // Boond opportunity ID
   title: string;
   reference: string;
-  description: string | null;
-  company_name: string | null;
   client_name: string | null;
-  manager_name: string | null;
-  state_name: string | null;
-  location: string | null;
+  description: string | null;
   start_date: string | null;
-  skills: string[];
+  end_date: string | null;
+  // Manager info
+  manager_name: string | null;
+  hr_manager_name: string | null;
+  // State info from Boond
+  state: number | null;
+  state_name: string | null;
+  state_color: string | null;
+  // Job posting info
+  has_job_posting: boolean;
   job_posting_id: string | null;
   job_posting_status: JobPostingStatus | null;
-  has_job_posting: boolean;
+  job_posting_status_display: string | null;
   applications_count: number;
   new_applications_count: number;
 }
@@ -402,6 +406,8 @@ export interface OpportunityForHR {
 export interface OpportunityForHRListResponse {
   items: OpportunityForHR[];
   total: number;
+  page: number;
+  page_size: number;
 }
 
 export interface JobPosting {

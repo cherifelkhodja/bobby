@@ -1,8 +1,12 @@
 /**
- * HR Dashboard page - List open opportunities with job posting status.
+ * HR Dashboard page - List opportunities from BoondManager where user is HR manager.
+ *
+ * Fetches opportunities directly from BoondManager API:
+ * - For admin users: Shows ALL opportunities
+ * - For RH users: Shows only opportunities where they are HR manager
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -11,8 +15,6 @@ import {
   Plus,
   Eye,
   Search,
-  ChevronLeft,
-  ChevronRight,
   ExternalLink,
 } from 'lucide-react';
 import { hrApi } from '../api/hr';
@@ -33,23 +35,40 @@ const JOB_POSTING_STATUS_BADGES: Record<JobPostingStatus, { label: string; color
   },
 };
 
+// State color mapping for Boond opportunity states
+const STATE_COLOR_CLASSES: Record<string, string> = {
+  blue: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  green: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  yellow: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+  red: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  gray: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+  cyan: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+  indigo: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+  pink: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300',
+};
+
 export default function HRDashboard() {
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const pageSize = 20;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['hr-opportunities', page, search],
-    queryFn: () => hrApi.getOpportunities({ page, page_size: pageSize, search: search || undefined }),
+    queryKey: ['hr-opportunities'],
+    queryFn: () => hrApi.getOpportunities(),
   });
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSearch(searchInput);
-    setPage(1);
-  };
+  // Client-side filtering for instant search feedback
+  const filteredItems = useMemo(() => {
+    if (!data?.items) return [];
+    if (!searchInput) return data.items;
+
+    const searchLower = searchInput.toLowerCase();
+    return data.items.filter(
+      (opp) =>
+        opp.title.toLowerCase().includes(searchLower) ||
+        opp.reference.toLowerCase().includes(searchLower) ||
+        (opp.client_name?.toLowerCase().includes(searchLower) ?? false)
+    );
+  }, [data?.items, searchInput]);
 
   const handleCreatePosting = (opportunity: OpportunityForHR) => {
     navigate(`/rh/annonces/nouvelle/${opportunity.id}`);
@@ -61,12 +80,21 @@ export default function HRDashboard() {
     }
   };
 
+  const getStateColorClass = (color: string | null): string => {
+    if (!color) return STATE_COLOR_CLASSES.gray;
+    return STATE_COLOR_CLASSES[color] || STATE_COLOR_CLASSES.gray;
+  };
+
   if (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <p className="text-red-800 dark:text-red-200">
-            Erreur lors du chargement des opportunités. Veuillez réessayer.
+            Erreur lors du chargement des opportunités: {errorMessage}
+          </p>
+          <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+            Vérifiez que votre identifiant BoondManager est configuré dans votre profil.
           </p>
         </div>
       </div>
@@ -81,7 +109,7 @@ export default function HRDashboard() {
           Gestion des annonces
         </h1>
         <p className="mt-1 text-gray-600 dark:text-gray-400">
-          Publiez des annonces sur Turnover-IT et gérez les candidatures
+          Opportunités BoondManager où vous êtes responsable RH
         </p>
       </div>
 
@@ -94,7 +122,7 @@ export default function HRDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Opportunités ouvertes
+                Opportunités
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {data?.total ?? '-'}
@@ -137,42 +165,39 @@ export default function HRDashboard() {
       </div>
 
       {/* Search */}
-      <form onSubmit={handleSearch} className="mb-6">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Rechercher par titre, référence ou client..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Rechercher
-          </button>
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Rechercher par titre, référence ou client..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
         </div>
-      </form>
+      </div>
 
       {/* Opportunities Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center">
             <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">Chargement...</p>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">Chargement des opportunités BoondManager...</p>
           </div>
-        ) : data?.items.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div className="p-8 text-center">
             <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600 dark:text-gray-400">
-              {search
+              {searchInput
                 ? 'Aucune opportunité trouvée pour cette recherche.'
-                : 'Aucune opportunité ouverte.'}
+                : 'Aucune opportunité disponible.'}
             </p>
+            {!searchInput && (
+              <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+                Vous devez être responsable RH d'une opportunité dans BoondManager pour la voir ici.
+              </p>
+            )}
           </div>
         ) : (
           <>
@@ -187,7 +212,10 @@ export default function HRDashboard() {
                       Client
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Statut annonce
+                      État Boond
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Annonce
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Candidatures
@@ -198,7 +226,7 @@ export default function HRDashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {data?.items.map((opportunity) => (
+                  {filteredItems.map((opportunity) => (
                     <tr
                       key={opportunity.id}
                       className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
@@ -217,6 +245,19 @@ export default function HRDashboard() {
                         <p className="text-gray-900 dark:text-white">
                           {opportunity.client_name || '-'}
                         </p>
+                      </td>
+                      <td className="px-6 py-4">
+                        {opportunity.state_name ? (
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStateColorClass(
+                              opportunity.state_color
+                            )}`}
+                          >
+                            {opportunity.state_name}
+                          </span>
+                        ) : (
+                          <span className="text-gray-500 dark:text-gray-400 text-sm">-</span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         {opportunity.has_job_posting && opportunity.job_posting_status ? (
@@ -275,30 +316,14 @@ export default function HRDashboard() {
               </table>
             </div>
 
-            {/* Pagination */}
-            {data && data.total > pageSize && (
-              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Page {page} sur {Math.ceil(data.total / pageSize)} ({data.total} résultats)
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={() => setPage((p) => p + 1)}
-                    disabled={page >= Math.ceil(data.total / pageSize)}
-                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Results count */}
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                {filteredItems.length === data?.items.length
+                  ? `${data.total} opportunité${data.total > 1 ? 's' : ''}`
+                  : `${filteredItems.length} résultat${filteredItems.length > 1 ? 's' : ''} sur ${data?.total ?? 0}`}
+              </p>
+            </div>
           </>
         )}
       </div>

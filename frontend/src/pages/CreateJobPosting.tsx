@@ -84,10 +84,10 @@ export default function CreateJobPosting() {
   const [skillInput, setSkillInput] = useState('');
   const [selectedContractTypes, setSelectedContractTypes] = useState<string[]>(['FREELANCE']);
 
-  // Fetch opportunities to find the current one
+  // Fetch opportunities to find the current one (from BoondManager)
   const { data: opportunitiesData, isLoading: loadingOpps } = useQuery({
     queryKey: ['hr-opportunities'],
-    queryFn: () => hrApi.getOpportunities({ page_size: 1000 }),
+    queryFn: () => hrApi.getOpportunities(),
     enabled: !!oppId,
   });
 
@@ -185,10 +185,8 @@ export default function CreateJobPosting() {
     );
   };
 
-  // Initialize skills from opportunity when data loads
-  if (opportunity?.skills && selectedSkills.length === 0 && opportunity.skills.length > 0) {
-    setSelectedSkills([...opportunity.skills]);
-  }
+  // Note: Skills are not available from BoondManager opportunity listing
+  // User must manually add skills for the job posting
 
   if (loadingOpps) {
     return (
@@ -265,13 +263,13 @@ export default function CreateJobPosting() {
               </div>
             </div>
           )}
-          {opportunity.location && (
+          {opportunity.state_name && (
             <div className="flex items-start gap-3">
               <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm text-blue-600 dark:text-blue-400">Localisation</p>
+                <p className="text-sm text-blue-600 dark:text-blue-400">État</p>
                 <p className="font-medium text-blue-900 dark:text-blue-100">
-                  {opportunity.location}
+                  {opportunity.state_name}
                 </p>
               </div>
             </div>

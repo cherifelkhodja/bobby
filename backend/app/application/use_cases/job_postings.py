@@ -20,6 +20,7 @@ from app.domain.exceptions import (
     OpportunityNotFoundError,
     TurnoverITError,
 )
+from app.infrastructure.boond.client import BoondClient
 from app.infrastructure.database.repositories import (
     JobApplicationRepository,
     JobPostingRepository,
@@ -30,37 +31,78 @@ from app.infrastructure.turnoverit.client import TurnoverITClient
 
 
 class ListOpenOpportunitiesForHRUseCase:
-    """List all open opportunities with job posting status for HR dashboard."""
+    """List opportunities from BoondManager where user is HR manager.
+
+    Fetches opportunities directly from BoondManager API filtered by hrManager,
+    then enriches with local job posting status.
+    """
 
     def __init__(
         self,
-        opportunity_repository: OpportunityRepository,
+        boond_client: BoondClient,
         job_posting_repository: JobPostingRepository,
         job_application_repository: JobApplicationRepository,
     ) -> None:
-        self.opportunity_repository = opportunity_repository
+        self.boond_client = boond_client
         self.job_posting_repository = job_posting_repository
         self.job_application_repository = job_application_repository
 
     async def execute(
         self,
-        page: int = 1,
-        page_size: int = 20,
+        hr_manager_boond_id: Optional[str] = None,
+        is_admin: bool = False,
         search: Optional[str] = None,
     ) -> OpportunityListForHRReadModel:
-        """List all open opportunities with their job posting status."""
-        skip = (page - 1) * page_size
+        """List opportunities from BoondManager where user is HR manager.
 
-        opportunities = await self.opportunity_repository.list_active(
-            skip=skip,
-            limit=page_size,
-            search=search,
+        Args:
+            hr_manager_boond_id: The user's BoondManager resource ID.
+                Required unless is_admin is True.
+            is_admin: If True, fetch ALL opportunities (admin view).
+            search: Optional search term to filter opportunities.
+
+        Returns:
+            Paginated list of opportunities with job posting status.
+
+        Raises:
+            ValueError: If hr_manager_boond_id is not set and user is not admin.
+        """
+        if not is_admin and not hr_manager_boond_id:
+            raise ValueError("L'utilisateur n'a pas d'identifiant BoondManager configuré")
+
+        # Fetch opportunities from BoondManager
+        if is_admin:
+            # Admin can see all opportunities (use main manager filter with fetch_all)
+            boond_opportunities = await self.boond_client.get_manager_opportunities(
+                fetch_all=True,
+            )
+        else:
+            # HR users see only opportunities where they are HR manager
+            boond_opportunities = await self.boond_client.get_hr_manager_opportunities(
+                hr_manager_boond_id=hr_manager_boond_id,
+            )
+
+        # Filter by search term if provided
+        if search:
+            search_lower = search.lower()
+            boond_opportunities = [
+                opp for opp in boond_opportunities
+                if search_lower in opp.get("title", "").lower()
+                or search_lower in opp.get("reference", "").lower()
+                or search_lower in opp.get("company_name", "").lower()
+            ]
+
+        # Batch lookup job postings by boond opportunity IDs
+        boond_ids = [opp["id"] for opp in boond_opportunities]
+        job_postings_map = await self.job_posting_repository.get_all_by_boond_opportunity_ids(
+            boond_ids
         )
-        total = await self.opportunity_repository.count_active(search=search)
 
+        # Build items with job posting info
         items = []
-        for opp in opportunities:
-            job_posting = await self.job_posting_repository.get_by_opportunity_id(opp.id)
+        for opp in boond_opportunities:
+            boond_id = opp["id"]
+            job_posting = job_postings_map.get(boond_id)
 
             applications_count = 0
             new_applications_count = 0
@@ -72,24 +114,38 @@ class ListOpenOpportunitiesForHRUseCase:
                     job_posting.id
                 )
 
+            # Parse dates if they exist
+            start_date = None
+            end_date = None
+            if opp.get("start_date"):
+                try:
+                    start_date = date.fromisoformat(opp["start_date"])
+                except (ValueError, TypeError):
+                    pass
+            if opp.get("end_date"):
+                try:
+                    end_date = date.fromisoformat(opp["end_date"])
+                except (ValueError, TypeError):
+                    pass
+
             items.append(
                 OpportunityForHRReadModel(
-                    id=str(opp.id),
-                    external_id=opp.external_id,
-                    title=opp.title,
-                    reference=opp.reference,
-                    client_name=opp.client_name,
-                    description=opp.description,
-                    skills=opp.skills or [],
-                    location=opp.location,
-                    budget=opp.budget,
-                    start_date=opp.start_date,
-                    end_date=opp.end_date,
-                    manager_name=opp.manager_name,
-                    synced_at=opp.synced_at,
+                    id=boond_id,
+                    title=opp.get("title", ""),
+                    reference=opp.get("reference", ""),
+                    client_name=opp.get("company_name"),
+                    description=opp.get("description"),
+                    start_date=start_date,
+                    end_date=end_date,
+                    manager_name=opp.get("manager_name"),
+                    hr_manager_name=opp.get("hr_manager_name"),
+                    state=opp.get("state"),
+                    state_name=opp.get("state_name"),
+                    state_color=opp.get("state_color"),
                     has_job_posting=job_posting is not None,
                     job_posting_id=str(job_posting.id) if job_posting else None,
                     job_posting_status=str(job_posting.status) if job_posting else None,
+                    job_posting_status_display=job_posting.status.display_name if job_posting else None,
                     applications_count=applications_count,
                     new_applications_count=new_applications_count,
                 )
@@ -97,9 +153,9 @@ class ListOpenOpportunitiesForHRUseCase:
 
         return OpportunityListForHRReadModel(
             items=items,
-            total=total,
-            page=page,
-            page_size=page_size,
+            total=len(items),
+            page=1,  # No pagination for BoondManager API
+            page_size=len(items),
         )
 
 

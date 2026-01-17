@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities import JobPosting, JobPostingStatus
-from app.infrastructure.database.models import JobPostingModel
+from app.infrastructure.database.models import JobPostingModel, OpportunityModel
 
 
 class JobPostingRepository:
@@ -40,6 +40,46 @@ class JobPostingRepository:
         )
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
+
+    async def get_by_boond_opportunity_id(
+        self, boond_opportunity_id: str
+    ) -> Optional[JobPosting]:
+        """Get job posting by BoondManager opportunity external ID.
+
+        Joins with opportunities table to find by external_id.
+        """
+        result = await self.session.execute(
+            select(JobPostingModel)
+            .join(OpportunityModel, JobPostingModel.opportunity_id == OpportunityModel.id)
+            .where(OpportunityModel.external_id == boond_opportunity_id)
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def get_all_by_boond_opportunity_ids(
+        self, boond_opportunity_ids: list[str]
+    ) -> dict[str, JobPosting]:
+        """Get all job postings by BoondManager opportunity external IDs.
+
+        Efficient batch lookup for multiple opportunities.
+
+        Returns:
+            Dict mapping boond_opportunity_id -> JobPosting
+        """
+        if not boond_opportunity_ids:
+            return {}
+
+        result = await self.session.execute(
+            select(JobPostingModel, OpportunityModel.external_id)
+            .join(OpportunityModel, JobPostingModel.opportunity_id == OpportunityModel.id)
+            .where(OpportunityModel.external_id.in_(boond_opportunity_ids))
+        )
+        postings_map = {}
+        for row in result.all():
+            posting_model = row[0]
+            external_id = row[1]
+            postings_map[external_id] = self._to_entity(posting_model)
+        return postings_map
 
     async def get_by_turnoverit_reference(self, reference: str) -> Optional[JobPosting]:
         """Get job posting by Turnover-IT reference."""

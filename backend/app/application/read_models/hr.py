@@ -7,27 +7,32 @@ from pydantic import BaseModel, ConfigDict
 
 
 class OpportunityForHRReadModel(BaseModel):
-    """Opportunity read model for HR dashboard (with job posting status)."""
+    """Opportunity read model for HR dashboard (with job posting status).
+
+    Now fetched directly from BoondManager API where user is HR manager.
+    """
 
     model_config = ConfigDict(frozen=True)
 
-    id: str
-    external_id: str
+    id: str  # Boond opportunity ID
     title: str
     reference: str
     client_name: Optional[str] = None
     description: Optional[str] = None
-    skills: list[str] = []
-    location: Optional[str] = None
-    budget: Optional[float] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    # Manager info
     manager_name: Optional[str] = None
-    synced_at: datetime
-    # Job posting info
+    hr_manager_name: Optional[str] = None
+    # State info from Boond
+    state: Optional[int] = None
+    state_name: Optional[str] = None
+    state_color: Optional[str] = None
+    # Job posting info (from local database)
     has_job_posting: bool = False
     job_posting_id: Optional[str] = None
     job_posting_status: Optional[str] = None
+    job_posting_status_display: Optional[str] = None
     applications_count: int = 0
     new_applications_count: int = 0
 
