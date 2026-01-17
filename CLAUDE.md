@@ -425,6 +425,142 @@ Generate quotations for Thales using BoondManager data and Excel templates.
 - `DELETE /batches/{batch_id}/quotations/{row_index}` - Delete quotation from preview
 - `GET /batches/{batch_id}/download/zip` - Download all PDFs as ZIP
 
+### 9. HR Recruitment (Turnover-IT Integration)
+Full HR recruitment feature for publishing job postings on Turnover-IT and managing applications.
+
+**Access**: admin, rh roles only (HR routes), public (application form)
+
+**Features**:
+- View all open opportunities with job posting status
+- Create draft job postings from opportunities
+- Publish job postings to Turnover-IT
+- Receive applications via public form (no auth required)
+- AI-powered CV matching using Gemini
+- Application status management with history
+- Notes on applications
+- Create candidates in BoondManager from applications
+- CV storage on S3/Scaleway Object Storage
+
+**Workflow**:
+1. RH views open opportunities in `/rh` dashboard
+2. Clicks "Créer annonce" to create a draft posting
+3. Fills posting details (title, description, qualifications, skills, etc.)
+4. Publishes to Turnover-IT (generates public URL)
+5. Candidates apply via `/postuler/{token}` (public form)
+6. System uploads CV to S3 and calculates matching score with Gemini
+7. RH reviews applications sorted by matching score
+8. RH changes status (nouveau → en_cours → entretien → accepté/refusé)
+9. RH can create candidate in BoondManager
+
+**Application Status Flow**:
+```
+nouveau → en_cours → entretien → accepté
+   ↓         ↓           ↓
+ refusé   refusé      refusé
+```
+
+**Matching Score Colors**:
+- ≥80%: Green (excellent match)
+- 50-79%: Orange (potential match)
+- <50%: Red (low match)
+
+**Database Tables** (migration `009_add_hr_feature_tables.py`):
+- `job_postings` - Job posting details, status, Turnover-IT reference
+- `job_applications` - Candidate applications with CV, matching score, status
+
+**Files**:
+- Domain entities: `backend/app/domain/entities/job_posting.py`, `job_application.py`
+- Repositories: `backend/app/infrastructure/database/repositories.py`
+- Turnover-IT client: `backend/app/infrastructure/turnoverit/client.py`
+- S3 client: `backend/app/infrastructure/storage/s3_client.py`
+- Gemini matcher: `backend/app/infrastructure/matching/gemini_matcher.py`
+- Use cases: `backend/app/application/use_cases/job_postings.py`, `job_applications.py`
+- API routes: `backend/app/api/routes/v1/hr.py`, `public_applications.py`
+- Frontend pages:
+  - `frontend/src/pages/HRDashboard.tsx` - Opportunities list with posting status
+  - `frontend/src/pages/CreateJobPosting.tsx` - Create/edit job posting form
+  - `frontend/src/pages/JobPostingDetails.tsx` - Posting details + applications list
+  - `frontend/src/pages/PublicApplication.tsx` - Public application form
+- API client: `frontend/src/api/hr.ts`
+
+**API Endpoints** (`/api/v1/hr`):
+- `GET /opportunities` - List open opportunities with posting status (rh/admin)
+- `POST /job-postings` - Create draft posting (rh/admin)
+- `GET /job-postings` - List all postings (rh/admin)
+- `GET /job-postings/{id}` - Get posting details (rh/admin)
+- `PATCH /job-postings/{id}` - Update draft posting (rh/admin)
+- `POST /job-postings/{id}/publish` - Publish to Turnover-IT (rh/admin)
+- `POST /job-postings/{id}/close` - Close posting (rh/admin)
+- `GET /job-postings/{id}/applications` - List applications (rh/admin)
+- `GET /applications/{id}` - Get application details (rh/admin)
+- `PATCH /applications/{id}/status` - Update status (rh/admin)
+- `PATCH /applications/{id}/note` - Update notes (rh/admin)
+- `GET /applications/{id}/cv` - Get CV download URL (rh/admin)
+- `POST /applications/{id}/create-in-boond` - Create candidate in Boond (rh/admin)
+
+**Public API Endpoints** (`/api/v1/postuler`):
+- `GET /{token}` - Get public job posting info
+- `POST /{token}` - Submit application (multipart/form-data with CV)
+
+**Environment Variables**:
+```
+TURNOVERIT_API_KEY=...        # Turnover-IT API key
+S3_ENDPOINT_URL=...           # e.g., https://s3.fr-par.scw.cloud
+S3_BUCKET_NAME=esn-cooptation-cvs
+S3_REGION=fr-par
+S3_ACCESS_KEY=...
+S3_SECRET_KEY=...
+```
+
+**TypeScript Types**:
+```typescript
+type JobPostingStatus = 'draft' | 'published' | 'closed';
+type ApplicationStatus = 'nouveau' | 'en_cours' | 'entretien' | 'accepte' | 'refuse';
+
+interface JobPosting {
+  id: string;
+  opportunity_id: string;
+  title: string;
+  description: string;
+  qualifications: string;
+  location_country: string;
+  contract_types: string[];
+  skills: string[];
+  status: JobPostingStatus;
+  application_token: string;
+  application_url: string;
+  turnoverit_reference?: string;
+  applications_total: number;
+  applications_new: number;
+}
+
+interface JobApplication {
+  id: string;
+  job_posting_id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  job_title: string;
+  tjm_range: string;
+  availability_date: string;
+  cv_filename: string;
+  cv_download_url?: string;
+  matching_score?: number;
+  matching_details?: MatchingDetails;
+  status: ApplicationStatus;
+  status_display: string;
+  notes?: string;
+  boond_candidate_id?: string;
+}
+
+interface MatchingDetails {
+  score: number;
+  strengths: string[];
+  gaps: string[];
+  summary: string;
+}
+```
+
 ### 8. Published Opportunities (Anonymized Boond)
 Allow commercials and admins to publish anonymized opportunities for cooptation.
 
@@ -536,6 +672,30 @@ interface PublishedOpportunity {
 ```
 
 ## Recent Changes Log
+
+### 2026-01-17
+**HR Feature Review & Quality Improvements**:
+- Verified complete implementation of HR Recruitment feature (Turnover-IT integration)
+- Added comprehensive backend tests:
+  - `tests/unit/use_cases/test_hr_use_cases.py` - Use case tests for job postings and applications
+  - `tests/integration/api/test_hr.py` - API integration tests
+- Added frontend tests:
+  - `src/api/hr.test.ts` - HR API client tests
+- Added E2E tests:
+  - `e2e/hr.spec.ts` - Full HR workflow tests (access control, forms, applications)
+- Updated dependencies to latest stable versions:
+  - Backend: FastAPI 0.115+, SQLAlchemy 2.0.36+, Pydantic 2.10+, etc.
+  - Frontend: React 18.3+, React Query 5.62+, Vite 6+, TypeScript 5.7+, etc.
+- Updated CLAUDE.md with HR feature documentation
+
+**Files created/modified**:
+- `backend/tests/unit/use_cases/test_hr_use_cases.py` - New
+- `backend/tests/integration/api/test_hr.py` - New
+- `frontend/src/api/hr.test.ts` - New
+- `frontend/e2e/hr.spec.ts` - New
+- `backend/pyproject.toml` - Updated dependencies
+- `frontend/package.json` - Updated dependencies
+- `CLAUDE.md` - Added HR feature documentation
 
 ### 2026-01-15 (session 3)
 **Published Opportunities - Bug Fixes & Improvements**:
