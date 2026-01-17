@@ -529,7 +529,7 @@ export default function JobPostingDetails() {
                     <h4 className="font-medium text-gray-900 dark:text-white">Analyse du profil</h4>
                     <span
                       className={`ml-auto px-2.5 py-0.5 rounded-full text-sm font-medium ${getMatchingScoreColor(
-                        selectedApplication.matching_score
+                        selectedApplication.matching_score ?? 0
                       )}`}
                     >
                       {selectedApplication.matching_score}%
