@@ -32,12 +32,12 @@ def upgrade() -> None:
     # Enable RLS on cooptations table
     op.execute("ALTER TABLE cooptations ENABLE ROW LEVEL SECURITY;")
 
-    # Policy: Users can see their own cooptations (submitted_by_id = current user)
+    # Policy: Users can see their own cooptations (submitter_id = current user)
     op.execute("""
         CREATE POLICY cooptations_own_select ON cooptations
             FOR SELECT
             USING (
-                submitted_by_id::text = current_setting('app.user_id', true)
+                submitter_id::text = current_setting('app.user_id', true)
             );
     """)
 
@@ -46,7 +46,7 @@ def upgrade() -> None:
         CREATE POLICY cooptations_own_insert ON cooptations
             FOR INSERT
             WITH CHECK (
-                submitted_by_id::text = current_setting('app.user_id', true)
+                submitter_id::text = current_setting('app.user_id', true)
             );
     """)
 
@@ -55,20 +55,18 @@ def upgrade() -> None:
         CREATE POLICY cooptations_own_update ON cooptations
             FOR UPDATE
             USING (
-                submitted_by_id::text = current_setting('app.user_id', true)
+                submitter_id::text = current_setting('app.user_id', true)
             );
     """)
 
-    # Policy: Commercials can see cooptations linked to their opportunities
+    # Policy: Commercials can see all cooptations (they manage opportunities)
+    # Note: We allow all cooptations for commercials since opportunity ownership
+    # is managed at the application level via BoondManager
     op.execute("""
         CREATE POLICY cooptations_commercial_select ON cooptations
             FOR SELECT
             USING (
                 current_setting('app.user_role', true) = 'commercial'
-                AND opportunity_id IN (
-                    SELECT id FROM opportunities
-                    WHERE manager_id::text = current_setting('app.user_id', true)
-                )
             );
     """)
 
