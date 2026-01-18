@@ -32,6 +32,13 @@ def upgrade() -> None:
     # Enable RLS on cooptations table
     op.execute("ALTER TABLE cooptations ENABLE ROW LEVEL SECURITY;")
 
+    # Drop existing policies first (idempotent)
+    op.execute("DROP POLICY IF EXISTS cooptations_own_select ON cooptations;")
+    op.execute("DROP POLICY IF EXISTS cooptations_own_insert ON cooptations;")
+    op.execute("DROP POLICY IF EXISTS cooptations_own_update ON cooptations;")
+    op.execute("DROP POLICY IF EXISTS cooptations_commercial_select ON cooptations;")
+    op.execute("DROP POLICY IF EXISTS cooptations_admin_rh_all ON cooptations;")
+
     # Policy: Users can see their own cooptations (submitter_id = current user)
     op.execute("""
         CREATE POLICY cooptations_own_select ON cooptations
@@ -86,6 +93,10 @@ def upgrade() -> None:
     # Enable RLS on job_applications table
     op.execute("ALTER TABLE job_applications ENABLE ROW LEVEL SECURITY;")
 
+    # Drop existing policies first (idempotent)
+    op.execute("DROP POLICY IF EXISTS job_applications_admin_rh_all ON job_applications;")
+    op.execute("DROP POLICY IF EXISTS job_applications_public_insert ON job_applications;")
+
     # Policy: Admin and RH can see all applications
     op.execute("""
         CREATE POLICY job_applications_admin_rh_all ON job_applications
@@ -109,6 +120,11 @@ def upgrade() -> None:
 
     # Enable RLS on cv_transformation_logs table
     op.execute("ALTER TABLE cv_transformation_logs ENABLE ROW LEVEL SECURITY;")
+
+    # Drop existing policies first (idempotent)
+    op.execute("DROP POLICY IF EXISTS cv_logs_own_select ON cv_transformation_logs;")
+    op.execute("DROP POLICY IF EXISTS cv_logs_own_insert ON cv_transformation_logs;")
+    op.execute("DROP POLICY IF EXISTS cv_logs_admin_all ON cv_transformation_logs;")
 
     # Policy: Users can see their own transformation logs
     op.execute("""

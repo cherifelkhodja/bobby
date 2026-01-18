@@ -112,7 +112,6 @@ export default function CreateJobPosting() {
     handleSubmit,
     formState: { errors },
     watch,
-    setValue,
     reset,
   } = useForm<CreateJobPostingFormData>({
     resolver: zodResolver(createJobPostingSchema),
