@@ -75,10 +75,18 @@ PROFIL RECHERCHÉ (MINIMUM 150 caractères - OBLIGATOIRE) :
 
 4. SÉLECTION DES COMPÉTENCES (ANALYSE APPROFONDIE) :
 Tu dois sélectionner UNIQUEMENT 3 à 6 compétences techniques parmi la liste fournie.
-Critères de sélection :
-- Pertinence : La compétence doit être DIRECTEMENT mentionnée ou CLAIREMENT requise dans le poste
-- Importance : Privilégie les compétences PRINCIPALES, pas les secondaires
-- Ne PAS inventer de compétences non mentionnées dans le poste original
+
+RÈGLES DE SÉLECTION STRICTES :
+- Sélectionne UNIQUEMENT les technologies EXPLICITEMENT mentionnées dans le titre ou la description
+- Exemple: Si le poste mentionne ".NET" et "Angular", cherche les slugs correspondants comme "dotnet", "asp-net-core", "angular"
+- Ne sélectionne PAS de compétences qui ne correspondent pas aux technologies mentionnées
+- Vérifie que chaque skill sélectionné correspond à une technologie RÉELLEMENT présente dans le poste
+
+ATTENTION aux erreurs courantes :
+- "c-1" n'est PAS du C# ou .NET
+- Pour .NET, cherche "dotnet", "asp-net", "asp-net-core", "c-sharp"
+- Pour Angular, cherche "angular"
+- Pour les bases de données, cherche "sql", "sql-server", "postgresql", etc.
 
 Liste des compétences Turnover-IT disponibles :
 {available_skills}
