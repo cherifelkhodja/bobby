@@ -332,9 +332,10 @@ class JobPostingAnonymizer:
         turnoverit_skills = await self.get_cached_skills()
 
         # Format skills list for the prompt (name: slug format for clarity)
+        # Send ALL skills to Gemini - modern models have large context windows
         skills_list_str = "\n".join(
             f"- {s['name']} (slug: {s['slug']})"
-            for s in turnoverit_skills[:200]  # Limit to avoid token overflow
+            for s in turnoverit_skills
         )
 
         model_to_use = model_name or self.DEFAULT_MODEL
