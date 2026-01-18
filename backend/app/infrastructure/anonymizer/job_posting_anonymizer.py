@@ -10,7 +10,7 @@ import json
 import logging
 import traceback
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from typing import Optional
 
@@ -58,7 +58,7 @@ RÈGLES IMPORTANTES :
 
 3. STRUCTURE TURNOVER-IT à respecter :
 
-TITRE : Format "{Métier} (H/F)" - court et efficace
+TITRE : Format "{{Métier}} (H/F)" - court et efficace
 Exemples : "Développeur Java Senior (H/F)", "DevOps AWS (H/F)", "Chef de Projet Digital (H/F)"
 
 DESCRIPTION DU POSTE :
@@ -147,7 +147,7 @@ class JobPostingAnonymizer:
                 needs_sync = True
             elif not metadata.last_synced_at:
                 needs_sync = True
-            elif datetime.utcnow() - metadata.last_synced_at > SKILLS_SYNC_INTERVAL:
+            elif datetime.now(timezone.utc) - metadata.last_synced_at > SKILLS_SYNC_INTERVAL:
                 needs_sync = True
             elif metadata.total_skills == 0:
                 needs_sync = True
@@ -191,12 +191,12 @@ class JobPostingAnonymizer:
         metadata = result.scalar_one_or_none()
 
         if metadata:
-            metadata.last_synced_at = datetime.utcnow()
+            metadata.last_synced_at = datetime.now(timezone.utc)
             metadata.total_skills = len(skills)
         else:
             metadata = TurnoverITSkillsMetadataModel(
                 id=1,
-                last_synced_at=datetime.utcnow(),
+                last_synced_at=datetime.now(timezone.utc),
                 total_skills=len(skills),
             )
             self.db_session.add(metadata)
