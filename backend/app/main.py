@@ -3,11 +3,15 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.api.middleware.correlation import CorrelationIdMiddleware
 from app.api.middleware.error_handler import error_handler_middleware
+from app.api.middleware.rate_limiter import limiter, rate_limit_exceeded_handler
+from app.api.middleware.security_headers import SecurityHeadersMiddleware
 from app.api.routes.v1 import (
     admin_router,
     auth_router,
@@ -55,16 +59,25 @@ app = FastAPI(
     openapi_url="/api/openapi.json" if not settings.is_production else None,
 )
 
-# Middleware (order matters - CORS must be outermost to handle OPTIONS preflight)
+# Add rate limiter state and exception handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
+# Middleware (order matters - outermost runs first)
+# 1. CORS must be outermost to handle OPTIONS preflight
+# 2. Security headers added to all responses
+# 3. Correlation ID for request tracing
+# 4. Error handler for consistent error responses
 app.middleware("http")(error_handler_middleware)
 app.add_middleware(CorrelationIdMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
+    expose_headers=["*", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 )
 
 # API v1 routes

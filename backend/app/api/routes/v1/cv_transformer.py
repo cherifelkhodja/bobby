@@ -3,11 +3,12 @@
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import io
 
+from app.api.middleware.rate_limiter import limiter
 from app.application.use_cases.cv_transformer import (
     GetTemplatesUseCase,
     GetTransformationStatsUseCase,
@@ -17,6 +18,7 @@ from app.application.use_cases.cv_transformer import (
 from app.config import settings
 from app.dependencies import AppSettings, DbSession
 from app.domain.value_objects import UserRole
+from app.infrastructure.audit import audit_logger
 from app.infrastructure.cv_transformer import (
     DocxGenerator,
     DocxTextExtractor,
@@ -176,7 +178,9 @@ async def list_templates(
 
 
 @router.post("/transform")
+@limiter.limit("10/hour")
 async def transform_cv(
+    http_request: Request,
     db: DbSession,
     app_settings: AppSettings,
     file: UploadFile = File(...),
@@ -186,11 +190,13 @@ async def transform_cv(
     """Transform a CV file into a standardized Word document.
 
     Upload a PDF or DOCX file and receive a formatted Word document back.
+    Rate limited to 10 transformations per hour (expensive operation).
     """
     import sys
     print(f"[CV Transform] Request received: template={template_name}, filename={file.filename}", flush=True)
 
     user_id = await require_transformer_access(db, authorization)
+    ip_address = http_request.client.host if http_request.client else None
     print(f"[CV Transform] User authenticated: {user_id}", flush=True)
 
     # Validate file type
@@ -251,6 +257,15 @@ async def transform_cv(
         )
         print(f"[CV Transform] Success: generated {len(output_content)} bytes", flush=True)
 
+        # Audit log successful transformation
+        audit_logger.log_cv_transform(
+            user_id=user_id,
+            filename=file.filename,
+            template=template_name,
+            success=True,
+            ip_address=ip_address,
+        )
+
         # Generate output filename
         original_name = file.filename.rsplit(".", 1)[0]
         output_filename = f"{original_name}_formatted.docx"
@@ -266,9 +281,25 @@ async def transform_cv(
 
     except ValueError as e:
         print(f"[CV Transform] ValueError: {str(e)}", flush=True)
+        audit_logger.log_cv_transform(
+            user_id=user_id,
+            filename=file.filename,
+            template=template_name,
+            success=False,
+            ip_address=ip_address,
+            error_message=str(e),
+        )
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         print(f"[CV Transform] Exception: {type(e).__name__}: {str(e)}", flush=True)
+        audit_logger.log_cv_transform(
+            user_id=user_id,
+            filename=file.filename,
+            template=template_name,
+            success=False,
+            ip_address=ip_address,
+            error_message=str(e),
+        )
         raise HTTPException(
             status_code=500,
             detail=f"Erreur lors de la transformation: {str(e)}",

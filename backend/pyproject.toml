@@ -28,6 +28,9 @@ dependencies = [
     "PyPDF2>=3.0.1",
     "aioboto3>=13.2.0",
     "boto3>=1.35.0",
+    # Security
+    "slowapi>=0.1.9",
+    "secure>=0.3.0",
 ]
 
 [project.optional-dependencies]

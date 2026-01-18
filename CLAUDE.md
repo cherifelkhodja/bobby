@@ -350,6 +350,94 @@ interface InvitationValidation {
 }
 ```
 
+## Security
+
+### Rate Limiting
+Rate limiting protects against brute force and abuse, using Redis as backend.
+
+**Configuration**: `backend/app/api/middleware/rate_limiter.py`
+
+| Endpoint | Limit | Purpose |
+|----------|-------|---------|
+| `/auth/login` | 5/minute | Brute force protection |
+| `/auth/register` | 3/minute | Spam prevention |
+| `/auth/forgot-password` | 3/minute | Abuse prevention |
+| `/cv-transformer/transform` | 10/hour | Expensive operation (Gemini API) |
+| Standard API | 100/minute | General protection |
+
+**Response Headers**:
+- `X-RateLimit-Limit`: Maximum requests allowed
+- `X-RateLimit-Remaining`: Requests remaining
+- `X-RateLimit-Reset`: Time until limit resets
+- `Retry-After`: Seconds to wait (on 429 error)
+
+### Security Headers
+Security headers middleware adds protection against common web vulnerabilities.
+
+**Configuration**: `backend/app/api/middleware/security_headers.py`
+
+| Header | Value | Purpose |
+|--------|-------|---------|
+| `Strict-Transport-Security` | max-age=31536000 | Enforce HTTPS (prod only) |
+| `X-Frame-Options` | DENY | Prevent clickjacking |
+| `X-Content-Type-Options` | nosniff | Prevent MIME sniffing |
+| `Referrer-Policy` | strict-origin-when-cross-origin | Control referrer info |
+| `X-XSS-Protection` | 1; mode=block | XSS protection (legacy) |
+| `Content-Security-Policy` | default-src 'self' | XSS/injection protection (prod) |
+| `Permissions-Policy` | camera=(), microphone=() | Restrict browser features |
+
+### Row Level Security (RLS)
+PostgreSQL RLS provides database-level access control as defense-in-depth.
+
+**Migration**: `backend/alembic/versions/010_add_row_level_security.py`
+
+**Protected Tables**:
+- `cooptations` - Users see own, commercials see their opportunities', admin/rh see all
+- `job_applications` - Admin/rh see all, public can insert
+- `cv_transformation_logs` - Users see own, admin sees all
+
+**Context Functions**:
+```sql
+-- Set context before queries
+SELECT set_app_context('user-uuid', 'user-role');
+
+-- Clear context after request
+SELECT clear_app_context();
+```
+
+**RLS Context Middleware**: `backend/app/api/middleware/rls_context.py`
+
+### Audit Logging
+Structured audit logging for security-sensitive operations.
+
+**Module**: `backend/app/infrastructure/audit/logger.py`
+
+**Logged Events**:
+- Authentication: login success/failure, password reset
+- User management: create, update, delete, role change
+- CV transformations: success/failure with file info
+- Security events: rate limit exceeded, unauthorized access
+
+**Usage**:
+```python
+from app.infrastructure.audit import audit_logger, AuditAction, AuditResource
+
+audit_logger.log(
+    AuditAction.LOGIN_SUCCESS,
+    AuditResource.SESSION,
+    user_id=user.id,
+    ip_address=request.client.host,
+    details={"email": user.email},
+)
+```
+
+### Security Dependencies
+```toml
+# backend/pyproject.toml
+slowapi>=0.1.9    # Rate limiting
+secure>=0.3.0     # Security headers
+```
+
 ## Common Commands
 
 ```bash
@@ -706,6 +794,38 @@ interface PublishedOpportunity {
 ```
 
 ## Recent Changes Log
+
+### 2026-01-18
+**Security Hardening Implementation**:
+- Added rate limiting with slowapi and Redis backend
+  - `/auth/login`: 5/minute (brute force protection)
+  - `/auth/register`: 3/minute (spam prevention)
+  - `/auth/forgot-password`: 3/minute (abuse prevention)
+  - `/cv-transformer/transform`: 10/hour (expensive operation)
+- Added security headers middleware (HSTS, CSP, X-Frame-Options, etc.)
+- Implemented Row Level Security (RLS) on PostgreSQL tables:
+  - `cooptations`: Users see own, commercials see their opportunities', admin/rh see all
+  - `job_applications`: Admin/rh see all, public can insert
+  - `cv_transformation_logs`: Users see own, admin sees all
+- Added structured audit logging for security events:
+  - Login success/failure tracking
+  - Role changes
+  - CV transformations
+  - Unauthorized access attempts
+
+**Files created**:
+- `backend/app/api/middleware/rate_limiter.py` - Rate limiting configuration
+- `backend/app/api/middleware/security_headers.py` - Security headers middleware
+- `backend/app/api/middleware/rls_context.py` - RLS context management
+- `backend/app/infrastructure/audit/logger.py` - Audit logging module
+- `backend/alembic/versions/010_add_row_level_security.py` - RLS migration
+
+**Files modified**:
+- `backend/pyproject.toml` - Added slowapi, secure dependencies
+- `backend/app/main.py` - Integrated rate limiter and security headers
+- `backend/app/api/routes/v1/auth.py` - Added rate limits and audit logging
+- `backend/app/api/routes/v1/cv_transformer.py` - Added rate limits and audit logging
+- `backend/app/api/middleware/__init__.py` - Exported new middleware
 
 ### 2026-01-17 (session 2)
 **HR Opportunities from BoondManager**:
