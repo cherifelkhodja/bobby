@@ -61,19 +61,27 @@ RÈGLES IMPORTANTES :
 TITRE : Format "{{Métier}} (H/F)" - court et efficace
 Exemples : "Développeur Java Senior (H/F)", "DevOps AWS (H/F)", "Chef de Projet Digital (H/F)"
 
-DESCRIPTION DU POSTE :
-- Contexte de la mission (anonymisé)
-- Missions principales
-- Responsabilités
+DESCRIPTION DU POSTE (MINIMUM 500 caractères - OBLIGATOIRE) :
+- Réécrire de façon détaillée le contexte de la mission (anonymisé)
+- Décrire les missions principales de façon exhaustive
+- Détailler les responsabilités
+- Ne RIEN inventer, uniquement réécrire et reformuler le contenu original
+- Utiliser des paragraphes et des listes pour une bonne lisibilité
 
-PROFIL RECHERCHÉ :
+PROFIL RECHERCHÉ (MINIMUM 150 caractères - OBLIGATOIRE) :
 - Expérience attendue
-- Compétences requises
-- Qualités souhaitées
+- Compétences techniques requises
+- Qualités et soft skills souhaités
 
-4. EXTRACTION DES COMPÉTENCES TECHNIQUES :
-Extrais TOUTES les technologies et outils mentionnés ou sous-entendus.
-Utilise les noms standards (pas d'abréviations personnalisées).
+4. SÉLECTION DES COMPÉTENCES (ANALYSE APPROFONDIE) :
+Tu dois sélectionner UNIQUEMENT 3 à 6 compétences techniques parmi la liste fournie.
+Critères de sélection :
+- Pertinence : La compétence doit être DIRECTEMENT mentionnée ou CLAIREMENT requise dans le poste
+- Importance : Privilégie les compétences PRINCIPALES, pas les secondaires
+- Ne PAS inventer de compétences non mentionnées dans le poste original
+
+Liste des compétences Turnover-IT disponibles :
+{available_skills}
 
 5. MISE EN FORME :
 - Utilise des sauts de ligne (\\n) pour structurer
@@ -83,10 +91,15 @@ Utilise les noms standards (pas d'abréviations personnalisées).
 FORMAT DE SORTIE (JSON strict) :
 {{
   "title": "Titre du poste (H/F)",
-  "description": "Description complète du poste avec contexte et missions",
-  "qualifications": "Profil recherché avec expérience et compétences",
-  "skills": ["Skill1", "Skill2", "Skill3", "..."]
+  "description": "Description complète du poste (minimum 500 caractères) avec contexte détaillé et missions",
+  "qualifications": "Profil recherché (minimum 150 caractères) avec expérience et compétences",
+  "skills": ["skill-slug-1", "skill-slug-2", "skill-slug-3"]
 }}
+
+IMPORTANT pour les skills :
+- Utilise les SLUGS exactement comme fournis dans la liste (ex: "java", "python", "aws")
+- Sélectionne entre 3 et 6 skills maximum
+- Ne mets QUE des skills présents dans la liste fournie
 
 ENTRÉE À TRAITER :
 Titre original: {title}
@@ -307,8 +320,18 @@ class JobPostingAnonymizer:
         # Ensure skills are synced
         await self.ensure_skills_synced()
 
+        # Get cached skills for the prompt
+        turnoverit_skills = await self.get_cached_skills()
+
+        # Format skills list for the prompt (name: slug format for clarity)
+        skills_list_str = "\n".join(
+            f"- {s['name']} (slug: {s['slug']})"
+            for s in turnoverit_skills[:200]  # Limit to avoid token overflow
+        )
+
         model_to_use = model_name or self.DEFAULT_MODEL
         logger.info(f"Anonymizing job posting with model: {model_to_use}")
+        logger.info(f"Available skills for matching: {len(turnoverit_skills)}")
 
         try:
             model = genai.GenerativeModel(
@@ -322,6 +345,7 @@ class JobPostingAnonymizer:
                 title=title,
                 client_name=client_name or "Non spécifié",
                 description=description or "Pas de description disponible",
+                available_skills=skills_list_str or "Aucune liste de compétences disponible",
             )
 
             response = await asyncio.to_thread(model.generate_content, prompt)
@@ -342,27 +366,48 @@ class JobPostingAnonymizer:
             anonymized_title = data.get("title") or f"{title} (H/F)"
             anonymized_description = data.get("description") or description
             qualifications = data.get("qualifications") or ""
-            extracted_skills = data.get("skills", [])
+            selected_skills = data.get("skills", [])
 
-            if not isinstance(extracted_skills, list):
-                extracted_skills = []
+            if not isinstance(selected_skills, list):
+                selected_skills = []
 
-            # Match skills to Turnover-IT nomenclature
-            turnoverit_skills = await self.get_cached_skills()
-            matched_skills = self.match_skills_to_nomenclature(
-                extracted_skills, turnoverit_skills
-            )
+            # Validate description length (minimum 500 characters)
+            if len(anonymized_description) < 500:
+                logger.warning(
+                    f"Description too short ({len(anonymized_description)} chars), "
+                    f"minimum is 500 characters"
+                )
+
+            # Validate skills are from Turnover-IT nomenclature (use slugs directly)
+            valid_slugs = {s["slug"] for s in turnoverit_skills}
+            validated_skills = [
+                skill for skill in selected_skills
+                if skill in valid_slugs
+            ]
+
+            # Limit to 6 skills maximum
+            validated_skills = validated_skills[:6]
+
+            # If no valid skills found, try fuzzy matching as fallback
+            if not validated_skills and selected_skills:
+                logger.warning(
+                    f"No exact slug matches found, trying fuzzy matching for: {selected_skills}"
+                )
+                validated_skills = self.match_skills_to_nomenclature(
+                    selected_skills, turnoverit_skills
+                )[:6]
 
             logger.info(
-                f"Anonymized job posting: {len(extracted_skills)} skills extracted, "
-                f"{len(matched_skills)} matched to Turnover-IT"
+                f"Anonymized job posting: description={len(anonymized_description)} chars, "
+                f"{len(selected_skills)} skills selected by Gemini, "
+                f"{len(validated_skills)} validated against Turnover-IT"
             )
 
             return AnonymizedJobPosting(
                 title=anonymized_title,
                 description=anonymized_description,
                 qualifications=qualifications,
-                skills=matched_skills,
+                skills=validated_skills,
             )
 
         except json.JSONDecodeError as e:
