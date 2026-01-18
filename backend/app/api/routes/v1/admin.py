@@ -42,11 +42,12 @@ from app.application.use_cases.admin.users import (
     UpdateUserCommand,
     UserNotFoundError,
 )
-from app.dependencies import AppSettings, DbSession, RedisClient
+from app.dependencies import AppSettings, AppSettingsSvc, DbSession, RedisClient
 from app.infrastructure.anonymizer.gemini_anonymizer import GeminiAnonymizer
 from app.infrastructure.boond.client import BoondClient
 from app.infrastructure.cache.redis import CacheService
 from app.infrastructure.database.repositories import OpportunityRepository, UserRepository
+from app.infrastructure.settings import AVAILABLE_GEMINI_MODELS
 
 router = APIRouter()
 
@@ -377,15 +378,15 @@ async def delete_user(
 @router.get("/gemini/settings", response_model=GeminiSettingsResponse)
 async def get_gemini_settings(
     admin_id: AdminUser,
-    redis: RedisClient,
+    settings_svc: AppSettingsSvc,
 ):
     """Get Gemini model settings (admin only)."""
-    cache = CacheService(redis)
-    current_model = await cache.get_gemini_model()
+    current_model = await settings_svc.get_gemini_model()
+    available_models = [m["id"] for m in AVAILABLE_GEMINI_MODELS]
 
     return GeminiSettingsResponse(
         current_model=current_model,
-        available_models=GeminiAnonymizer.AVAILABLE_MODELS,
+        available_models=available_models,
         default_model=GeminiAnonymizer.DEFAULT_MODEL,
     )
 
@@ -394,21 +395,21 @@ async def get_gemini_settings(
 async def set_gemini_model(
     request: GeminiSetModelRequest,
     admin_id: AdminUser,
-    redis: RedisClient,
+    settings_svc: AppSettingsSvc,
 ):
     """Set Gemini model (admin only)."""
-    if request.model not in GeminiAnonymizer.AVAILABLE_MODELS:
+    available_models = [m["id"] for m in AVAILABLE_GEMINI_MODELS]
+    if request.model not in available_models:
         raise HTTPException(
             status_code=400,
-            detail=f"Modèle invalide. Modèles disponibles: {', '.join(GeminiAnonymizer.AVAILABLE_MODELS)}",
+            detail=f"Modèle invalide. Modèles disponibles: {', '.join(available_models)}",
         )
 
-    cache = CacheService(redis)
-    await cache.set_gemini_model(request.model)
+    await settings_svc.set("gemini_model", request.model, admin_id)
 
     return GeminiSettingsResponse(
         current_model=request.model,
-        available_models=GeminiAnonymizer.AVAILABLE_MODELS,
+        available_models=available_models,
         default_model=GeminiAnonymizer.DEFAULT_MODEL,
     )
 

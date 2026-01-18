@@ -11,6 +11,7 @@ from app.infrastructure.cache.redis import get_redis_client
 from app.infrastructure.database.connection import get_async_session
 from app.infrastructure.boond.client import BoondClient
 from app.infrastructure.service_factory import ServiceFactory
+from app.infrastructure.settings import AppSettingsService
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -48,9 +49,17 @@ def get_service_factory(
     return ServiceFactory(db=db, settings=settings)
 
 
+def get_app_settings_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> AppSettingsService:
+    """Get AppSettingsService dependency for runtime settings."""
+    return AppSettingsService(db)
+
+
 # Type aliases for dependencies
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 RedisClient = Annotated[Redis, Depends(get_redis)]
 AppSettings = Annotated[Settings, Depends(get_settings)]
 Boond = Annotated[BoondClient, Depends(get_boond_client)]
 Services = Annotated[ServiceFactory, Depends(get_service_factory)]
+AppSettingsSvc = Annotated[AppSettingsService, Depends(get_app_settings_service)]

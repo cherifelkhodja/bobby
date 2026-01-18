@@ -42,6 +42,7 @@ class TransformCvUseCase:
         template_name: str,
         file_content: bytes,
         filename: str,
+        gemini_model: Optional[str] = None,
     ) -> bytes:
         """Transform a CV file into a standardized Word document.
 
@@ -50,6 +51,7 @@ class TransformCvUseCase:
             template_name: Name of the template to use.
             file_content: Binary content of the uploaded CV file.
             filename: Original filename (used to determine file type).
+            gemini_model: Optional Gemini model to use (uses default if not set).
 
         Returns:
             Generated Word document as bytes.
@@ -72,7 +74,7 @@ class TransformCvUseCase:
             cv_text = self._extract_text(file_content, filename)
 
             # Extract structured data using AI
-            cv_data = await self._data_extractor.extract_cv_data(cv_text)
+            cv_data = await self._data_extractor.extract_cv_data(cv_text, gemini_model)
 
             # Generate the output document
             output_content = self._document_generator.generate(

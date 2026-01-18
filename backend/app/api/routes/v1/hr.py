@@ -35,7 +35,7 @@ from app.application.use_cases.job_postings import (
     UpdateJobPostingUseCase,
 )
 from app.config import settings
-from app.dependencies import AppSettings, Boond, DbSession
+from app.dependencies import AppSettings, AppSettingsSvc, Boond, DbSession
 from app.domain.entities import ApplicationStatus, JobPostingStatus
 from app.domain.exceptions import (
     InvalidStatusTransitionError,
@@ -258,6 +258,7 @@ async def require_hr_access(
 async def anonymize_job_posting(
     db: DbSession,
     app_settings: AppSettings,
+    app_settings_svc: AppSettingsSvc,
     request: AnonymizeJobPostingRequest,
     authorization: str = Header(default=""),
 ):
@@ -272,6 +273,9 @@ async def anonymize_job_posting(
     """
     await require_hr_access(db, authorization)
 
+    # Get configured Gemini model from database settings
+    model_name = await app_settings_svc.get_gemini_model()
+
     turnoverit_client = TurnoverITClient(app_settings)
     anonymizer = JobPostingAnonymizer(
         settings=app_settings,
@@ -284,6 +288,7 @@ async def anonymize_job_posting(
             title=request.title,
             description=request.description,
             client_name=request.client_name,
+            model_name=model_name,
         )
         return AnonymizedJobPostingResponse(
             title=result.title,

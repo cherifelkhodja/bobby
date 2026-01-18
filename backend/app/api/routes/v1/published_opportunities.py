@@ -25,9 +25,8 @@ from app.application.use_cases.published_opportunities import (
     ListPublishedOpportunitiesUseCase,
     PublishOpportunityUseCase,
 )
-from app.dependencies import AppSettings, Boond, DbSession, RedisClient
+from app.dependencies import AppSettings, AppSettingsSvc, Boond, DbSession
 from app.infrastructure.anonymizer.gemini_anonymizer import GeminiAnonymizer
-from app.infrastructure.cache.redis import CacheService
 from app.infrastructure.database.repositories import (
     PublishedOpportunityRepository,
     UserRepository,
@@ -113,7 +112,7 @@ async def get_boond_opportunity_detail(
 async def anonymize_opportunity(
     request: AnonymizeRequest,
     settings: AppSettings,
-    redis: RedisClient,
+    app_settings_svc: AppSettingsSvc,
     user_id: AdminOrCommercialUser,
 ):
     """Anonymize an opportunity using AI.
@@ -121,9 +120,8 @@ async def anonymize_opportunity(
     Returns a preview of the anonymized content.
     Requires admin or commercial role.
     """
-    # Get configured model from Redis
-    cache = CacheService(redis)
-    model_name = await cache.get_gemini_model()
+    # Get configured model from database settings
+    model_name = await app_settings_svc.get_gemini_model()
 
     anonymizer = GeminiAnonymizer(settings)
 

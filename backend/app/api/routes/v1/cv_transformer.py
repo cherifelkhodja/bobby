@@ -16,7 +16,7 @@ from app.application.use_cases.cv_transformer import (
     UploadTemplateUseCase,
 )
 from app.config import settings
-from app.dependencies import AppSettings, DbSession
+from app.dependencies import AppSettings, AppSettingsSvc, DbSession
 from app.domain.value_objects import UserRole
 from app.infrastructure.audit import audit_logger
 from app.infrastructure.cv_transformer import (
@@ -183,6 +183,7 @@ async def transform_cv(
     request: Request,
     db: DbSession,
     app_settings: AppSettings,
+    app_settings_svc: AppSettingsSvc,
     file: UploadFile = File(...),
     template_name: str = Form(...),
     authorization: str = Header(default=""),
@@ -198,6 +199,10 @@ async def transform_cv(
     user_id = await require_transformer_access(db, authorization)
     ip_address = request.client.host if request.client else None
     print(f"[CV Transform] User authenticated: {user_id}", flush=True)
+
+    # Get configured Gemini model from database settings
+    gemini_model = await app_settings_svc.get_gemini_model_cv()
+    print(f"[CV Transform] Using Gemini model: {gemini_model}", flush=True)
 
     # Validate file type
     if not file.filename:
@@ -254,6 +259,7 @@ async def transform_cv(
             template_name=template_name,
             file_content=content,
             filename=file.filename,
+            gemini_model=gemini_model,
         )
         print(f"[CV Transform] Success: generated {len(output_content)} bytes", flush=True)
 

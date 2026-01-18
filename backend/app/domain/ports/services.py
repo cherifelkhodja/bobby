@@ -124,11 +124,16 @@ class CvTextExtractorPort(Protocol):
 class CvDataExtractorPort(Protocol):
     """Port for extracting structured data from CV text using AI."""
 
-    async def extract_cv_data(self, cv_text: str) -> dict[str, Any]:
+    async def extract_cv_data(
+        self,
+        cv_text: str,
+        model_name: Optional[str] = None,
+    ) -> dict[str, Any]:
         """Extract structured CV data from text.
 
         Args:
             cv_text: Raw text extracted from CV.
+            model_name: AI model to use (optional, uses default if not set).
 
         Returns:
             Structured CV data dictionary.

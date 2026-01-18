@@ -83,6 +83,8 @@ TEXTE DU CV À ANALYSER :
 class GeminiClient:
     """Client for Google Gemini API to extract structured CV data."""
 
+    DEFAULT_MODEL = "gemini-2.0-flash"
+
     def __init__(self, settings: Settings) -> None:
         """Initialize the Gemini client.
 
@@ -100,11 +102,16 @@ class GeminiClient:
             genai.configure(api_key=self.settings.GEMINI_API_KEY)
             self._configured = True
 
-    async def extract_cv_data(self, cv_text: str) -> CvData:
+    async def extract_cv_data(
+        self,
+        cv_text: str,
+        model_name: str | None = None,
+    ) -> CvData:
         """Extract structured data from CV text using Gemini.
 
         Args:
             cv_text: Raw text extracted from the CV document.
+            model_name: Gemini model to use (optional, uses DEFAULT_MODEL if not set).
 
         Returns:
             Structured CV data as a dictionary.
@@ -114,9 +121,12 @@ class GeminiClient:
         """
         self._configure()
 
+        model_to_use = model_name or self.DEFAULT_MODEL
+        logger.info(f"Using Gemini model for CV extraction: {model_to_use}")
+
         try:
             model = genai.GenerativeModel(
-                "gemini-2.0-flash",
+                model_to_use,
                 generation_config=genai.GenerationConfig(
                     response_mime_type="application/json",
                 ),
