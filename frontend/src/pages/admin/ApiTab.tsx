@@ -25,11 +25,10 @@ import {
 import { toast } from 'sonner';
 
 import { apiClient } from '../../api/client';
-import { adminApi, TurnoverITSkillsResponse } from '../../api/admin';
+import { adminApi } from '../../api/admin';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { Input } from '../../components/ui/Input';
 
 interface ServiceStatus {
   service: string;
@@ -150,7 +149,6 @@ export function ApiTab() {
   const {
     data: skillsData,
     isLoading: isLoadingSkills,
-    refetch: refetchSkills,
   } = useQuery({
     queryKey: ['turnoverit-skills', skillsSearch],
     queryFn: () => adminApi.getTurnoverITSkills(skillsSearch || undefined),
