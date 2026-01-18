@@ -28,6 +28,7 @@ const STATE_CONFIG: Record<number, { name: string; color: string; bgClass: strin
 };
 
 export function MyBoondOpportunities() {
+  const [searchInput, setSearchInput] = useState('');
   const [stateFilter, setStateFilter] = useState<number | 'all'>('all');
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [managerFilter, setManagerFilter] = useState<string>('all');
@@ -134,9 +135,19 @@ export function MyBoondOpportunities() {
     },
   });
 
-  // Filter opportunities by state, client and manager
+  // Filter opportunities by search, state, client and manager
   const filteredOpportunities = useMemo(() => {
     return data?.items.filter((opp) => {
+      // Search filter
+      if (searchInput) {
+        const searchLower = searchInput.toLowerCase();
+        const matchesSearch =
+          opp.title.toLowerCase().includes(searchLower) ||
+          opp.reference.toLowerCase().includes(searchLower) ||
+          (opp.company_name?.toLowerCase().includes(searchLower) ?? false);
+        if (!matchesSearch) return false;
+      }
+
       // State filter
       if (stateFilter !== 'all' && opp.state !== stateFilter) return false;
 
@@ -154,7 +165,7 @@ export function MyBoondOpportunities() {
 
       return true;
     }) || [];
-  }, [data?.items, stateFilter, clientFilter, managerFilter]);
+  }, [data?.items, searchInput, stateFilter, clientFilter, managerFilter]);
 
   const handlePropose = async (opportunity: BoondOpportunity) => {
     setSelectedOpportunity(opportunity);
@@ -336,10 +347,23 @@ export function MyBoondOpportunities() {
       <Card className="!p-3">
         <div className="flex items-center gap-3 flex-wrap">
           <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
+
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Rechercher..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+
           <select
             value={stateFilter}
             onChange={(e) => setStateFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-            className="min-w-[160px] px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="min-w-[160px] px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           >
             <option value="all">Tous les états ({stats.total})</option>
             {availableStates.map(({ state, count }) => (
@@ -351,7 +375,7 @@ export function MyBoondOpportunities() {
           <select
             value={clientFilter}
             onChange={(e) => setClientFilter(e.target.value)}
-            className="min-w-[160px] px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="min-w-[160px] px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           >
             <option value="all">Tous les clients ({availableClients.length})</option>
             {availableClients.map(({ name, count }) => (
@@ -364,7 +388,7 @@ export function MyBoondOpportunities() {
             <select
               value={managerFilter}
               onChange={(e) => setManagerFilter(e.target.value)}
-              className="min-w-[160px] px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="min-w-[160px] px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
               <option value="all">Tous les managers ({availableManagers.length})</option>
               {availableManagers.map(({ name, count }) => (
@@ -387,7 +411,9 @@ export function MyBoondOpportunities() {
             Aucune opportunité trouvée
           </h3>
           <p className="text-gray-500 dark:text-gray-400 text-sm">
-            Aucun résultat pour vos critères de recherche.
+            {searchInput
+              ? 'Aucun résultat pour vos critères de recherche.'
+              : 'Aucune opportunité disponible.'}
           </p>
         </Card>
       ) : (
