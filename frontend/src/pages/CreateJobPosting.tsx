@@ -1,10 +1,17 @@
 /**
  * CreateJobPosting - Page to create a job posting from an opportunity.
+ *
+ * Flow:
+ * 1. Load opportunity detail from BoondManager
+ * 2. User clicks "Anonymiser avec l'IA"
+ * 3. AI anonymizes content and extracts skills
+ * 4. User reviews/edits the anonymized content
+ * 5. User saves as draft
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,8 +25,16 @@ import {
   Calendar,
   Plus,
   X,
+  Sparkles,
+  RefreshCw,
+  FileText,
 } from 'lucide-react';
-import { hrApi } from '../api/hr';
+import {
+  hrApi,
+  type OpportunityDetailResponse,
+  type AnonymizedJobPostingResponse,
+} from '../api/hr';
+import { getErrorMessage } from '../api/client';
 import type { CreateJobPostingRequest } from '../types';
 
 // Validation schema
@@ -53,6 +68,8 @@ const createJobPostingSchema = z.object({
 
 type CreateJobPostingFormData = z.infer<typeof createJobPostingSchema>;
 
+type ViewStep = 'loading' | 'ready' | 'anonymizing' | 'form' | 'saving' | 'error';
+
 const CONTRACT_TYPES = [
   { value: 'CDI', label: 'CDI' },
   { value: 'CDD', label: 'CDD' },
@@ -80,18 +97,14 @@ export default function CreateJobPosting() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const [step, setStep] = useState<ViewStep>('loading');
+  const [opportunity, setOpportunity] = useState<OpportunityDetailResponse | null>(null);
+  const [anonymizedData, setAnonymizedData] = useState<AnonymizedJobPostingResponse | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [skillInput, setSkillInput] = useState('');
   const [selectedContractTypes, setSelectedContractTypes] = useState<string[]>(['FREELANCE']);
-
-  // Fetch opportunities to find the current one (from BoondManager)
-  const { data: opportunitiesData, isLoading: loadingOpps } = useQuery({
-    queryKey: ['hr-opportunities'],
-    queryFn: () => hrApi.getOpportunities(),
-    enabled: !!oppId,
-  });
-
-  const opportunity = opportunitiesData?.items.find((o) => o.id === oppId);
 
   // Form setup
   const {
@@ -99,6 +112,8 @@ export default function CreateJobPosting() {
     handleSubmit,
     formState: { errors },
     watch,
+    setValue,
+    reset,
   } = useForm<CreateJobPostingFormData>({
     resolver: zodResolver(createJobPostingSchema),
     defaultValues: {
@@ -116,9 +131,69 @@ export default function CreateJobPosting() {
   const descriptionWatch = watch('description');
   const qualificationsWatch = watch('qualifications');
 
-  // Initialize form with opportunity data when loaded
-  // Note: We use defaultValues but they don't update after mount
-  // So we'll display opportunity info separately
+  // Load opportunity detail on mount
+  useEffect(() => {
+    if (!oppId) {
+      setErrorMessage('ID opportunité manquant');
+      setStep('error');
+      return;
+    }
+
+    const loadOpportunity = async () => {
+      try {
+        const detail = await hrApi.getOpportunityDetail(oppId);
+        setOpportunity(detail);
+        setStep('ready');
+      } catch (error) {
+        setErrorMessage(getErrorMessage(error));
+        setStep('error');
+      }
+    };
+
+    loadOpportunity();
+  }, [oppId]);
+
+  // Anonymize mutation
+  const anonymizeMutation = useMutation({
+    mutationFn: async () => {
+      if (!opportunity) throw new Error('Opportunité non chargée');
+
+      // Build full description from description + criteria
+      const fullDescription = [opportunity.description, opportunity.criteria]
+        .filter(Boolean)
+        .join('\n\nCritères:\n');
+
+      return hrApi.anonymizeJobPosting({
+        opportunity_id: opportunity.id,
+        title: opportunity.title,
+        description: fullDescription,
+        client_name: opportunity.company_name,
+      });
+    },
+    onSuccess: (result) => {
+      setAnonymizedData(result);
+
+      // Pre-fill form with anonymized data
+      reset({
+        title: result.title,
+        description: result.description,
+        qualifications: result.qualifications,
+        location_country: 'France',
+        location_region: opportunity?.place || '',
+        location_city: '',
+        employer_overview: '',
+      });
+
+      // Set skills
+      setSelectedSkills(result.skills);
+
+      setStep('form');
+    },
+    onError: (error) => {
+      setErrorMessage(getErrorMessage(error));
+      setStep('error');
+    },
+  });
 
   // Create mutation
   const createMutation = useMutation({
@@ -159,11 +234,24 @@ export default function CreateJobPosting() {
     onSuccess: (posting) => {
       queryClient.invalidateQueries({ queryKey: ['hr-opportunities'] });
       queryClient.invalidateQueries({ queryKey: ['hr-job-postings'] });
-      navigate(`/rh?posting=${posting.id}`);
+      navigate(`/rh/annonces/${posting.id}`);
     },
   });
 
+  const handleAnonymize = () => {
+    setStep('anonymizing');
+    setErrorMessage(null);
+    anonymizeMutation.mutate();
+  };
+
+  const handleRegenerate = () => {
+    setStep('anonymizing');
+    setErrorMessage(null);
+    anonymizeMutation.mutate();
+  };
+
   const onSubmit = (data: CreateJobPostingFormData) => {
+    setStep('saving');
     createMutation.mutate(data);
   };
 
@@ -185,19 +273,20 @@ export default function CreateJobPosting() {
     );
   };
 
-  // Note: Skills are not available from BoondManager opportunity listing
-  // User must manually add skills for the job posting
-
-  if (loadingOpps) {
+  // Loading state
+  if (step === 'loading') {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-        <p className="ml-2 text-gray-600 dark:text-gray-400">Chargement...</p>
+        <p className="ml-2 text-gray-600 dark:text-gray-400">
+          Chargement de l'opportunité...
+        </p>
       </div>
     );
   }
 
-  if (!opportunity) {
+  // Error state
+  if (step === 'error') {
     return (
       <div className="space-y-6">
         <Link
@@ -213,15 +302,162 @@ export default function CreateJobPosting() {
             <div>
               <h3 className="font-semibold text-red-800 dark:text-red-300">Erreur</h3>
               <p className="text-red-700 dark:text-red-400">
-                Opportunité non trouvée. Veuillez réessayer.
+                {errorMessage || 'Une erreur est survenue'}
               </p>
             </div>
+          </div>
+          <div className="mt-4 flex gap-3">
+            <Link
+              to="/rh"
+              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
+            >
+              Retour aux opportunités
+            </Link>
+            {opportunity && (
+              <button
+                onClick={handleRegenerate}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors inline-flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Réessayer
+              </button>
+            )}
           </div>
         </div>
       </div>
     );
   }
 
+  // Ready state - show opportunity info and anonymize button
+  if (step === 'ready' && opportunity) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <Link
+            to="/rh"
+            className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline mb-4"
+          >
+            <ChevronLeft className="h-5 w-5" />
+            Retour aux opportunités
+          </Link>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Créer une annonce</h1>
+          <p className="mt-1 text-gray-600 dark:text-gray-400">
+            L'IA va anonymiser et structurer le contenu pour Turnover-IT
+          </p>
+        </div>
+
+        {/* Opportunity Info Card */}
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+          <h2 className="font-semibold text-blue-900 dark:text-blue-100 mb-4">
+            Opportunité source
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="flex items-start gap-3">
+              <Briefcase className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-blue-600 dark:text-blue-400">Titre</p>
+                <p className="font-medium text-blue-900 dark:text-blue-100">{opportunity.title}</p>
+              </div>
+            </div>
+            {opportunity.company_name && (
+              <div className="flex items-start gap-3">
+                <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-blue-600 dark:text-blue-400">Client</p>
+                  <p className="font-medium text-blue-900 dark:text-blue-100">
+                    {opportunity.company_name}
+                  </p>
+                </div>
+              </div>
+            )}
+            {opportunity.state_name && (
+              <div className="flex items-start gap-3">
+                <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-blue-600 dark:text-blue-400">État</p>
+                  <p className="font-medium text-blue-900 dark:text-blue-100">
+                    {opportunity.state_name}
+                  </p>
+                </div>
+              </div>
+            )}
+            {opportunity.start_date && (
+              <div className="flex items-start gap-3">
+                <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-blue-600 dark:text-blue-400">Date début</p>
+                  <p className="font-medium text-blue-900 dark:text-blue-100">
+                    {new Date(opportunity.start_date).toLocaleDateString('fr-FR')}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Original content preview */}
+          {(opportunity.description || opportunity.criteria) && (
+            <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-700">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                  Contenu original (sera anonymisé)
+                </p>
+              </div>
+              <div className="max-h-48 overflow-y-auto text-sm text-blue-800 dark:text-blue-200 bg-blue-100/50 dark:bg-blue-900/50 p-3 rounded-md whitespace-pre-wrap">
+                {opportunity.description}
+                {opportunity.criteria && (
+                  <>
+                    {'\n\n'}
+                    <strong>Critères:</strong>
+                    {'\n'}
+                    {opportunity.criteria}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={handleAnonymize}
+            className="flex-1 px-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-3 shadow-lg hover:shadow-xl"
+          >
+            <Sparkles className="h-5 w-5" />
+            Anonymiser avec l'IA
+          </button>
+          <Link
+            to="/rh"
+            className="px-6 py-4 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-lg transition-colors text-center"
+          >
+            Annuler
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Anonymizing state
+  if (step === 'anonymizing') {
+    return (
+      <div className="flex flex-col items-center justify-center h-96">
+        <div className="relative">
+          <Loader2 className="h-16 w-16 animate-spin text-purple-500" />
+          <Sparkles className="h-6 w-6 text-yellow-500 absolute -top-1 -right-1 animate-pulse" />
+        </div>
+        <p className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
+          L'IA anonymise l'opportunité...
+        </p>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
+          Structuration selon le format Turnover-IT
+        </p>
+      </div>
+    );
+  }
+
+  // Form state (after anonymization)
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -233,59 +469,27 @@ export default function CreateJobPosting() {
           <ChevronLeft className="h-5 w-5" />
           Retour aux opportunités
         </Link>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Créer une annonce</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Prévisualisation</h1>
+          <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-sm rounded-full">
+            Anonymisé
+          </span>
+        </div>
         <p className="mt-1 text-gray-600 dark:text-gray-400">
-          Remplissez les détails pour publier cette opportunité sur Turnover-IT
+          Vérifiez et ajustez le contenu avant de créer le brouillon
         </p>
       </div>
 
-      {/* Opportunity Info Card */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-        <h2 className="font-semibold text-blue-900 dark:text-blue-100 mb-4">
-          Opportunité source
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="flex items-start gap-3">
-            <Briefcase className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm text-blue-600 dark:text-blue-400">Titre</p>
-              <p className="font-medium text-blue-900 dark:text-blue-100">{opportunity.title}</p>
-            </div>
-          </div>
-          {opportunity.client_name && (
-            <div className="flex items-start gap-3">
-              <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm text-blue-600 dark:text-blue-400">Client</p>
-                <p className="font-medium text-blue-900 dark:text-blue-100">
-                  {opportunity.client_name}
-                </p>
-              </div>
-            </div>
-          )}
-          {opportunity.state_name && (
-            <div className="flex items-start gap-3">
-              <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm text-blue-600 dark:text-blue-400">État</p>
-                <p className="font-medium text-blue-900 dark:text-blue-100">
-                  {opportunity.state_name}
-                </p>
-              </div>
-            </div>
-          )}
-          {opportunity.start_date && (
-            <div className="flex items-start gap-3">
-              <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm text-blue-600 dark:text-blue-400">Date début</p>
-                <p className="font-medium text-blue-900 dark:text-blue-100">
-                  {new Date(opportunity.start_date).toLocaleDateString('fr-FR')}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+      {/* Regenerate button */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleRegenerate}
+          disabled={anonymizeMutation.isPending}
+          className="px-4 py-2 bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-400 rounded-lg transition-colors inline-flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${anonymizeMutation.isPending ? 'animate-spin' : ''}`} />
+          Régénérer
+        </button>
       </div>
 
       {/* Form */}
@@ -304,7 +508,7 @@ export default function CreateJobPosting() {
             <input
               type="text"
               {...register('title')}
-              placeholder="Ex: Développeur Senior React/Node.js"
+              placeholder="Ex: Développeur Senior React/Node.js (H/F)"
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <div className="mt-2 flex justify-between">
@@ -325,7 +529,7 @@ export default function CreateJobPosting() {
             <textarea
               {...register('description')}
               placeholder="Décrivez les missions, responsabilités et contexte du poste..."
-              rows={8}
+              rows={10}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <div className="mt-2 flex justify-between">
@@ -362,6 +566,64 @@ export default function CreateJobPosting() {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Skills - Pre-filled from AI */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
+          <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-3">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Compétences techniques
+            </h3>
+            {anonymizedData && anonymizedData.skills.length > 0 && (
+              <span className="text-sm text-green-600 dark:text-green-400">
+                {anonymizedData.skills.length} extraites par l'IA
+              </span>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={skillInput}
+              onChange={(e) => setSkillInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addSkill();
+                }
+              }}
+              placeholder="Ajouter une compétence (React, Java, AWS...)"
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <button
+              type="button"
+              onClick={addSkill}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors inline-flex items-center gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              Ajouter
+            </button>
+          </div>
+
+          {selectedSkills.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-2">
+              {selectedSkills.map((skill) => (
+                <span
+                  key={skill}
+                  className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-sm flex items-center gap-2"
+                >
+                  {skill}
+                  <button
+                    type="button"
+                    onClick={() => removeSkill(skill)}
+                    className="hover:text-blue-600 dark:hover:text-blue-400"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Location */}
@@ -492,57 +754,6 @@ export default function CreateJobPosting() {
           </div>
         </div>
 
-        {/* Skills */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-3">
-            Compétences techniques
-          </h3>
-
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={skillInput}
-              onChange={(e) => setSkillInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addSkill();
-                }
-              }}
-              placeholder="Ajouter une compétence (React, Java, AWS...)"
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <button
-              type="button"
-              onClick={addSkill}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors inline-flex items-center gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              Ajouter
-            </button>
-          </div>
-
-          {selectedSkills.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-2">
-              {selectedSkills.map((skill) => (
-                <span
-                  key={skill}
-                  className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-sm flex items-center gap-2"
-                >
-                  {skill}
-                  <button
-                    type="button"
-                    onClick={() => removeSkill(skill)}
-                    className="hover:text-blue-600 dark:hover:text-blue-400"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Dates & Duration */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-3">
@@ -589,7 +800,7 @@ export default function CreateJobPosting() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Salaire minimum annuel (€)
+                Salaire minimum annuel (EUR)
               </label>
               <input
                 type="number"
@@ -602,7 +813,7 @@ export default function CreateJobPosting() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Salaire maximum annuel (€)
+                Salaire maximum annuel (EUR)
               </label>
               <input
                 type="number"
@@ -615,7 +826,7 @@ export default function CreateJobPosting() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                TJM minimum (€/jour)
+                TJM minimum (EUR/jour)
               </label>
               <input
                 type="number"
@@ -628,7 +839,7 @@ export default function CreateJobPosting() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                TJM maximum (€/jour)
+                TJM maximum (EUR/jour)
               </label>
               <input
                 type="number"
@@ -675,7 +886,7 @@ export default function CreateJobPosting() {
             disabled={createMutation.isPending || selectedContractTypes.length === 0}
             className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
           >
-            {createMutation.isPending ? (
+            {createMutation.isPending || step === 'saving' ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
                 Création en cours...

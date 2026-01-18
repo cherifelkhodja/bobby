@@ -18,7 +18,79 @@ import type {
   ApplicationSubmissionResult,
 } from '../types';
 
+// Types for anonymization
+export interface AnonymizeJobPostingRequest {
+  opportunity_id: string;
+  title: string;
+  description: string;
+  client_name?: string | null;
+}
+
+export interface AnonymizedJobPostingResponse {
+  title: string;
+  description: string;
+  qualifications: string;
+  skills: string[]; // Turnover-IT skill slugs
+}
+
+export interface SyncSkillsResponse {
+  synced_count: number;
+  message: string;
+}
+
+export interface OpportunityDetailResponse {
+  id: string;
+  title: string;
+  reference: string;
+  description?: string | null;
+  criteria?: string | null;
+  expertise_area?: string | null;
+  place?: string | null;
+  duration?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  company_id?: string | null;
+  company_name?: string | null;
+  manager_id?: string | null;
+  manager_name?: string | null;
+  contact_id?: string | null;
+  contact_name?: string | null;
+  agency_id?: string | null;
+  agency_name?: string | null;
+  state?: number | null;
+  state_name?: string | null;
+  state_color?: string | null;
+}
+
 export const hrApi = {
+  // ========== Anonymization ==========
+
+  /**
+   * Anonymize opportunity content for a job posting.
+   *
+   * Uses Gemini AI to:
+   * - Anonymize client names and internal references
+   * - Structure content for Turnover-IT (title, description, qualifications)
+   * - Extract and match skills to Turnover-IT nomenclature
+   */
+  anonymizeJobPosting: async (
+    data: AnonymizeJobPostingRequest
+  ): Promise<AnonymizedJobPostingResponse> => {
+    const response = await apiClient.post<AnonymizedJobPostingResponse>(
+      '/hr/anonymize-job-posting',
+      data
+    );
+    return response.data;
+  },
+
+  /**
+   * Manually sync Turnover-IT skills (admin only)
+   */
+  syncSkills: async (): Promise<SyncSkillsResponse> => {
+    const response = await apiClient.post<SyncSkillsResponse>('/hr/sync-skills');
+    return response.data;
+  },
+
   // ========== Opportunities ==========
 
   /**
@@ -35,6 +107,16 @@ export const hrApi = {
     const response = await apiClient.get<OpportunityForHRListResponse>('/hr/opportunities', {
       params,
     });
+    return response.data;
+  },
+
+  /**
+   * Get detailed opportunity information from BoondManager.
+   */
+  getOpportunityDetail: async (opportunityId: string): Promise<OpportunityDetailResponse> => {
+    const response = await apiClient.get<OpportunityDetailResponse>(
+      `/hr/opportunities/${opportunityId}`
+    );
     return response.data;
   },
 

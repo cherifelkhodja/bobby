@@ -50,6 +50,7 @@ from app.infrastructure.database.repositories import (
     OpportunityRepository,
     UserRepository,
 )
+from app.infrastructure.anonymizer.job_posting_anonymizer import JobPostingAnonymizer
 from app.infrastructure.matching.gemini_matcher import GeminiMatchingService
 from app.infrastructure.security.jwt import decode_token
 from app.infrastructure.storage.s3_client import S3StorageClient
@@ -132,6 +133,57 @@ class CvDownloadUrlResponse(BaseModel):
     expires_in: int
 
 
+class AnonymizeJobPostingRequest(BaseModel):
+    """Request body for anonymizing a job posting."""
+
+    opportunity_id: str
+    title: str
+    description: str
+    client_name: Optional[str] = None
+
+
+class AnonymizedJobPostingResponse(BaseModel):
+    """Response with anonymized job posting content."""
+
+    title: str
+    description: str
+    qualifications: str
+    skills: list[str]  # Turnover-IT skill slugs
+
+
+class SyncSkillsResponse(BaseModel):
+    """Response for skills sync operation."""
+
+    synced_count: int
+    message: str
+
+
+class OpportunityDetailResponse(BaseModel):
+    """Response with full opportunity details from BoondManager."""
+
+    id: str
+    title: str
+    reference: str
+    description: Optional[str] = None
+    criteria: Optional[str] = None
+    expertise_area: Optional[str] = None
+    place: Optional[str] = None
+    duration: Optional[int] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    company_id: Optional[str] = None
+    company_name: Optional[str] = None
+    manager_id: Optional[str] = None
+    manager_name: Optional[str] = None
+    contact_id: Optional[str] = None
+    contact_name: Optional[str] = None
+    agency_id: Optional[str] = None
+    agency_name: Optional[str] = None
+    state: Optional[int] = None
+    state_name: Optional[str] = None
+    state_color: Optional[str] = None
+
+
 # --- Auth Helpers ---
 
 
@@ -199,6 +251,94 @@ async def require_hr_access(
     return user_id
 
 
+# --- Anonymization Endpoints ---
+
+
+@router.post("/anonymize-job-posting", response_model=AnonymizedJobPostingResponse)
+async def anonymize_job_posting(
+    db: DbSession,
+    app_settings: AppSettings,
+    request: AnonymizeJobPostingRequest,
+    authorization: str = Header(default=""),
+):
+    """Anonymize opportunity content for a job posting.
+
+    Uses Gemini AI to:
+    - Anonymize client names and internal references
+    - Structure content for Turnover-IT (title, description, qualifications)
+    - Extract and match skills to Turnover-IT nomenclature
+
+    Returns anonymized content that can be edited before creating the posting.
+    """
+    await require_hr_access(db, authorization)
+
+    turnoverit_client = TurnoverITClient(app_settings)
+    anonymizer = JobPostingAnonymizer(
+        settings=app_settings,
+        db_session=db,
+        turnoverit_client=turnoverit_client,
+    )
+
+    try:
+        result = await anonymizer.anonymize(
+            title=request.title,
+            description=request.description,
+            client_name=request.client_name,
+        )
+        return AnonymizedJobPostingResponse(
+            title=result.title,
+            description=result.description,
+            qualifications=result.qualifications,
+            skills=result.skills,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de l'anonymisation: {str(e)}",
+        )
+
+
+@router.post("/sync-skills", response_model=SyncSkillsResponse)
+async def sync_turnoverit_skills(
+    db: DbSession,
+    app_settings: AppSettings,
+    authorization: str = Header(default=""),
+):
+    """Manually sync Turnover-IT skills to the database.
+
+    This fetches all skills from the Turnover-IT API and stores them
+    in the local database for faster matching during anonymization.
+    """
+    # Only admin can force sync
+    user_id, role = await get_current_user(db, authorization)
+    if role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Seuls les administrateurs peuvent synchroniser les skills",
+        )
+
+    turnoverit_client = TurnoverITClient(app_settings)
+    anonymizer = JobPostingAnonymizer(
+        settings=app_settings,
+        db_session=db,
+        turnoverit_client=turnoverit_client,
+    )
+
+    try:
+        count = await anonymizer.sync_skills()
+        return SyncSkillsResponse(
+            synced_count=count,
+            message=f"{count} compétences synchronisées depuis Turnover-IT",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la synchronisation: {str(e)}",
+        )
+
+
 # --- Opportunities Endpoints ---
 
 
@@ -244,6 +384,30 @@ async def list_opportunities_for_hr(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/opportunities/{opportunity_id}", response_model=OpportunityDetailResponse)
+async def get_opportunity_detail(
+    opportunity_id: str,
+    db: DbSession,
+    boond_client: Boond,
+    authorization: str = Header(default=""),
+):
+    """Get detailed opportunity information from BoondManager.
+
+    Returns full opportunity details including description, criteria,
+    company name, manager name, etc.
+    """
+    await require_hr_access(db, authorization)
+
+    try:
+        detail = await boond_client.get_opportunity_information(opportunity_id)
+        return OpportunityDetailResponse(**detail)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la récupération de l'opportunité: {str(e)}",
+        )
 
 
 # --- Job Postings Endpoints ---

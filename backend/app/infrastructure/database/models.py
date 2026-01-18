@@ -410,3 +410,27 @@ class JobApplicationModel(Base):
         Index("ix_job_applications_email_posting", "email", "job_posting_id"),
         Index("ix_job_applications_status", "status"),
     )
+
+
+class TurnoverITSkillModel(Base):
+    """Cached Turnover-IT skill model."""
+
+    __tablename__ = "turnoverit_skills"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class TurnoverITSkillsMetadataModel(Base):
+    """Metadata for Turnover-IT skills sync."""
+
+    __tablename__ = "turnoverit_skills_metadata"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    total_skills: Mapped[int] = mapped_column(Integer, default=0)

@@ -238,6 +238,61 @@ class TurnoverITClient:
             logger.warning(f"Failed to fetch skills: {e}")
             return []
 
+    async def fetch_all_skills(self) -> list[dict[str, str]]:
+        """Fetch all skills from Turnover-IT with pagination.
+
+        Iterates through all pages to get the complete list of skills.
+
+        Returns:
+            Complete list of skills with name and slug.
+        """
+        if not self._is_configured():
+            logger.warning("Turnover-IT API key not configured - cannot fetch skills")
+            return []
+
+        all_skills: list[dict[str, str]] = []
+        page = 1
+        max_pages = 50  # Safety limit
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                while page <= max_pages:
+                    response = await client.get(
+                        f"{self.base_url.replace('/v2', '')}/skills",
+                        headers=self._get_headers(),
+                        params={"page": page},
+                    )
+
+                    if response.status_code != 200:
+                        logger.warning(f"Failed to fetch skills page {page}: {response.status_code}")
+                        break
+
+                    data = response.json()
+                    members = data.get("hydra:member", [])
+
+                    if not members:
+                        break
+
+                    for skill in members:
+                        all_skills.append({
+                            "name": skill.get("name", ""),
+                            "slug": skill.get("slug", ""),
+                        })
+
+                    # Check if there's a next page
+                    view = data.get("hydra:view", {})
+                    if "hydra:next" not in view:
+                        break
+
+                    page += 1
+
+            logger.info(f"Fetched {len(all_skills)} skills from Turnover-IT ({page} pages)")
+            return all_skills
+
+        except Exception as e:
+            logger.error(f"Failed to fetch all skills: {e}")
+            return all_skills if all_skills else []
+
     async def health_check(self) -> bool:
         """Check Turnover-IT API availability.
 
