@@ -42,8 +42,8 @@ router = APIRouter()
 @router.post("/register", response_model=UserResponse, status_code=201)
 @limiter.limit("3/minute")
 async def register(
-    request: RegisterRequest,
-    http_request: Request,
+    request: Request,
+    body: RegisterRequest,
     db: DbSession,
     settings: AppSettings,
 ):
@@ -53,11 +53,11 @@ async def register(
 
     use_case = RegisterUserUseCase(user_repo, email_service)
     command = RegisterCommand(
-        email=request.email,
-        password=request.password,
-        first_name=request.first_name,
-        last_name=request.last_name,
-        boond_resource_id=request.boond_resource_id,
+        email=body.email,
+        password=body.password,
+        first_name=body.first_name,
+        last_name=body.last_name,
+        boond_resource_id=body.boond_resource_id,
     )
 
     result = await use_case.execute(command)
@@ -67,7 +67,7 @@ async def register(
         AuditAction.USER_CREATE,
         AuditResource.USER,
         user_id=result.id,
-        ip_address=http_request.client.host if http_request.client else None,
+        ip_address=request.client.host if request.client else None,
         details={"email": result.email},
     )
 
@@ -77,17 +77,17 @@ async def register(
 @router.post("/login", response_model=LoginResponse)
 @limiter.limit("5/minute")
 async def login(
-    request: LoginRequest,
-    http_request: Request,
+    request: Request,
+    body: LoginRequest,
     db: DbSession,
 ):
     """Authenticate user and return tokens."""
     user_repo = UserRepository(db)
-    ip_address = http_request.client.host if http_request.client else None
-    user_agent = http_request.headers.get("User-Agent")
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
 
     use_case = LoginUseCase(user_repo)
-    command = LoginCommand(email=request.email, password=request.password)
+    command = LoginCommand(email=body.email, password=body.password)
 
     try:
         tokens, user = await use_case.execute(command)
@@ -109,7 +109,7 @@ async def login(
     except HTTPException as e:
         # Audit failed login
         audit_logger.log_login_failure(
-            email=request.email,
+            email=body.email,
             reason=str(e.detail),
             ip_address=ip_address,
             user_agent=user_agent,
@@ -152,8 +152,8 @@ async def verify_email(
 @router.post("/forgot-password")
 @limiter.limit("3/minute")
 async def forgot_password(
-    request: ForgotPasswordRequest,
-    http_request: Request,
+    request: Request,
+    body: ForgotPasswordRequest,
     db: DbSession,
     settings: AppSettings,
 ):
@@ -162,14 +162,14 @@ async def forgot_password(
     email_service = EmailService(settings)
 
     use_case = ForgotPasswordUseCase(user_repo, email_service)
-    await use_case.execute(request.email)
+    await use_case.execute(body.email)
 
     # Audit log (always log, even if email doesn't exist - for security monitoring)
     audit_logger.log(
         AuditAction.PASSWORD_RESET_REQUEST,
         AuditResource.USER,
-        ip_address=http_request.client.host if http_request.client else None,
-        details={"email": request.email},
+        ip_address=request.client.host if request.client else None,
+        details={"email": body.email},
     )
 
     # Always return success to not reveal if email exists

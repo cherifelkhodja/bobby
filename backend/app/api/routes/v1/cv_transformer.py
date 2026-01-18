@@ -180,7 +180,7 @@ async def list_templates(
 @router.post("/transform")
 @limiter.limit("10/hour")
 async def transform_cv(
-    http_request: Request,
+    request: Request,
     db: DbSession,
     app_settings: AppSettings,
     file: UploadFile = File(...),
@@ -196,7 +196,7 @@ async def transform_cv(
     print(f"[CV Transform] Request received: template={template_name}, filename={file.filename}", flush=True)
 
     user_id = await require_transformer_access(db, authorization)
-    ip_address = http_request.client.host if http_request.client else None
+    ip_address = request.client.host if request.client else None
     print(f"[CV Transform] User authenticated: {user_id}", flush=True)
 
     # Validate file type
