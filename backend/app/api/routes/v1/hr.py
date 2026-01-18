@@ -158,6 +158,20 @@ class SyncSkillsResponse(BaseModel):
     message: str
 
 
+class TurnoverITSkillItem(BaseModel):
+    """A single Turnover-IT skill."""
+
+    name: str
+    slug: str
+
+
+class TurnoverITSkillsListResponse(BaseModel):
+    """Response with list of Turnover-IT skills."""
+
+    skills: list[TurnoverITSkillItem]
+    total: int
+
+
 class OpportunityDetailResponse(BaseModel):
     """Response with full opportunity details from BoondManager."""
 
@@ -342,6 +356,57 @@ async def sync_turnoverit_skills(
             status_code=500,
             detail=f"Erreur lors de la synchronisation: {str(e)}",
         )
+
+
+@router.get("/skills", response_model=TurnoverITSkillsListResponse)
+async def get_turnoverit_skills(
+    db: DbSession,
+    search: Optional[str] = Query(None, max_length=100),
+    authorization: str = Header(default=""),
+):
+    """Get Turnover-IT skills from the database cache.
+
+    Returns the list of skills from the local database cache.
+    Skills are synced periodically from Turnover-IT API.
+
+    - search: Optional search term to filter skills by name
+    """
+    await require_hr_access(db, authorization)
+
+    from sqlalchemy import text
+
+    # Check if table exists (might not in some environments)
+    check_query = text("""
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables
+            WHERE table_name = 'turnoverit_skills'
+        )
+    """)
+    result = await db.execute(check_query)
+    table_exists = result.scalar()
+
+    if not table_exists:
+        return TurnoverITSkillsListResponse(skills=[], total=0)
+
+    # Build query with optional search filter
+    if search:
+        query = text("""
+            SELECT name, slug FROM turnoverit_skills
+            WHERE LOWER(name) LIKE LOWER(:search)
+            ORDER BY name ASC
+        """)
+        result = await db.execute(query, {"search": f"%{search}%"})
+    else:
+        query = text("""
+            SELECT name, slug FROM turnoverit_skills
+            ORDER BY name ASC
+        """)
+        result = await db.execute(query)
+
+    rows = result.fetchall()
+    skills = [TurnoverITSkillItem(name=row[0], slug=row[1]) for row in rows]
+
+    return TurnoverITSkillsListResponse(skills=skills, total=len(skills))
 
 
 # --- Opportunities Endpoints ---

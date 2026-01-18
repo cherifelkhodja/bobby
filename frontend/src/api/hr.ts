@@ -38,6 +38,16 @@ export interface SyncSkillsResponse {
   message: string;
 }
 
+export interface TurnoverITSkill {
+  name: string;
+  slug: string;
+}
+
+export interface TurnoverITSkillsResponse {
+  skills: TurnoverITSkill[];
+  total: number;
+}
+
 export interface OpportunityDetailResponse {
   id: string;
   title: string;
@@ -88,6 +98,17 @@ export const hrApi = {
    */
   syncSkills: async (): Promise<SyncSkillsResponse> => {
     const response = await apiClient.post<SyncSkillsResponse>('/hr/sync-skills');
+    return response.data;
+  },
+
+  /**
+   * Get Turnover-IT skills from the database cache.
+   * Used for skill autocomplete in job posting form.
+   */
+  getSkills: async (search?: string): Promise<TurnoverITSkillsResponse> => {
+    const response = await apiClient.get<TurnoverITSkillsResponse>('/hr/skills', {
+      params: search ? { search } : undefined,
+    });
     return response.data;
   },
 
