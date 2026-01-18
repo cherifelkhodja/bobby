@@ -83,10 +83,26 @@ Critères de sélection :
 Liste des compétences Turnover-IT disponibles :
 {available_skills}
 
-5. MISE EN FORME :
-- Utilise des sauts de ligne (\\n) pour structurer
-- Utilise des tirets (-) pour les listes
-- Sépare clairement les sections
+5. MISE EN FORME IMPORTANTE :
+- Utilise des DOUBLES sauts de ligne (\\n\\n) entre les paragraphes et sections
+- Utilise des tirets (-) pour les listes à puces
+- Utilise un saut de ligne simple (\\n) entre les items d'une même liste
+- Structure claire avec des sections visibles :
+
+  EXEMPLE DE FORMAT POUR LA DESCRIPTION :
+  ```
+  Contexte de la mission :\\n\\n
+  Paragraphe décrivant le contexte...\\n\\n
+
+  Vos missions principales :\\n\\n
+  - Mission 1\\n
+  - Mission 2\\n
+  - Mission 3\\n\\n
+
+  Vos responsabilités :\\n\\n
+  - Responsabilité 1\\n
+  - Responsabilité 2
+  ```
 
 FORMAT DE SORTIE (JSON strict) :
 {{
