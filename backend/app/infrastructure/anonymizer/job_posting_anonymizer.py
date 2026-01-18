@@ -83,35 +83,16 @@ Critères de sélection :
 Liste des compétences Turnover-IT disponibles :
 {available_skills}
 
-5. MISE EN FORME IMPORTANTE :
-- Utilise des DOUBLES sauts de ligne (\\n\\n) entre les paragraphes et sections
-- Utilise des tirets (-) pour les listes à puces
-- Inclure des TITRES DE SECTIONS en MAJUSCULES suivis de " :"
-- Structure claire avec des sections visibles
-
-FORMAT EXACT ATTENDU POUR LA DESCRIPTION :
-```
-CONTEXTE DE LA MISSION :\\n\\n[Paragraphe décrivant le contexte anonymisé]\\n\\n
-
-MISSIONS PRINCIPALES :\\n\\n- Mission 1\\n- Mission 2\\n- Mission 3\\n\\n
-
-RESPONSABILITÉS :\\n\\n- Responsabilité 1\\n- Responsabilité 2\\n- Responsabilité 3
-```
-
-FORMAT EXACT ATTENDU POUR LE PROFIL RECHERCHÉ :
-```
-EXPÉRIENCE ATTENDUE :\\n\\n[Description de l'expérience requise]\\n\\n
-
-COMPÉTENCES REQUISES :\\n\\n- Compétence 1\\n- Compétence 2\\n- Compétence 3\\n\\n
-
-QUALITÉS SOUHAITÉES :\\n\\n- Qualité 1\\n- Qualité 2
-```
+5. MISE EN FORME :
+- Utilise des sauts de ligne (\\n) pour structurer
+- Utilise des tirets (-) pour les listes
+- Sépare clairement les sections
 
 FORMAT DE SORTIE (JSON strict) :
 {{
   "title": "Titre du poste (H/F)",
-  "description": "CONTEXTE DE LA MISSION :\\n\\n...\\n\\nMISSIONS PRINCIPALES :\\n\\n...\\n\\nRESPONSABILITÉS :\\n\\n...",
-  "qualifications": "EXPÉRIENCE ATTENDUE :\\n\\n...\\n\\nCOMPÉTENCES REQUISES :\\n\\n...\\n\\nQUALITÉS SOUHAITÉES :\\n\\n...",
+  "description": "Description complète du poste avec contexte détaillé et missions",
+  "qualifications": "Profil recherché avec expérience et compétences",
   "skills": ["skill-slug-1", "skill-slug-2", "skill-slug-3"]
 }}
 
