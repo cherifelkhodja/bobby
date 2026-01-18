@@ -39,11 +39,13 @@ def get_user_identifier(request: Request) -> str:
 
 
 # Create limiter with Redis backend
+# Note: headers_enabled=False because enabling it requires adding Response parameter
+# to every rate-limited endpoint, which is more invasive
 limiter = Limiter(
     key_func=get_user_identifier,
     storage_uri=settings.REDIS_URL,
     strategy="fixed-window",
-    headers_enabled=True,  # Add X-RateLimit-* headers
+    headers_enabled=False,
 )
 
 
