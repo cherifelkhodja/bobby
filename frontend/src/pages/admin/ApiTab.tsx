@@ -2,10 +2,11 @@
  * API connections test tab component.
  *
  * Tests for all external API connections: BoondManager, Gemini, Turnover-IT, S3, Resend.
+ * Also manages Turnover-IT skills synchronization.
  */
 
 import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   RefreshCw,
   CheckCircle,
@@ -18,13 +19,17 @@ import {
   Mail,
   Briefcase,
   Shield,
+  Search,
+  Tag,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { apiClient } from '../../api/client';
+import { adminApi, TurnoverITSkillsResponse } from '../../api/admin';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Input } from '../../components/ui/Input';
 
 interface ServiceStatus {
   service: string;
@@ -81,6 +86,9 @@ export function ApiTab() {
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [testingService, setTestingService] = useState<string | null>(null);
   const [geminiModel, setGeminiModel] = useState('gemini-2.5-flash-lite');
+  const [showSkillsModal, setShowSkillsModal] = useState(false);
+  const [skillsSearch, setSkillsSearch] = useState('');
+  const queryClient = useQueryClient();
 
   // Fetch services status
   const {
@@ -137,6 +145,32 @@ export function ApiTab() {
       }
     });
   };
+
+  // Turnover-IT Skills
+  const {
+    data: skillsData,
+    isLoading: isLoadingSkills,
+    refetch: refetchSkills,
+  } = useQuery({
+    queryKey: ['turnoverit-skills', skillsSearch],
+    queryFn: () => adminApi.getTurnoverITSkills(skillsSearch || undefined),
+    enabled: showSkillsModal,
+  });
+
+  const syncSkillsMutation = useMutation({
+    mutationFn: adminApi.syncTurnoverITSkills,
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success(result.message);
+        queryClient.invalidateQueries({ queryKey: ['turnoverit-skills'] });
+      } else {
+        toast.error(result.message);
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erreur lors de la synchronisation');
+    },
+  });
 
   if (isLoading) {
     return (
@@ -266,7 +300,7 @@ export function ApiTab() {
               )}
 
               {/* Test Button */}
-              <div className="mt-4">
+              <div className="mt-4 flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -274,10 +308,21 @@ export function ApiTab() {
                   disabled={!service.configured || isTesting}
                   isLoading={isTesting}
                   leftIcon={isTesting ? undefined : <RefreshCw className="h-4 w-4" />}
-                  className="w-full"
+                  className="flex-1"
                 >
-                  {isTesting ? 'Test en cours...' : 'Tester la connexion'}
+                  {isTesting ? 'Test en cours...' : 'Tester'}
                 </Button>
+                {/* Skills button for Turnover-IT */}
+                {service.service === 'turnoverit' && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setShowSkillsModal(true)}
+                    leftIcon={<Tag className="h-4 w-4" />}
+                  >
+                    Skills
+                  </Button>
+                )}
               </div>
             </Card>
           );
@@ -300,6 +345,110 @@ export function ApiTab() {
             <strong>Note :</strong> Les clés API sont configurées via les variables d'environnement du
             serveur. Pour une sécurité renforcée, activez AWS Secrets Manager (AWS_SECRETS_ENABLED=true).
           </p>
+        </div>
+      )}
+
+      {/* Turnover-IT Skills Modal */}
+      {showSkillsModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setShowSkillsModal(false)} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+              {/* Modal Header */}
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Skills Turnover-IT
+                  </h3>
+                  <button
+                    onClick={() => setShowSkillsModal(false)}
+                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                  >
+                    <XCircle className="h-6 w-6" />
+                  </button>
+                </div>
+
+                {/* Metadata */}
+                <div className="mt-2 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                  <span>
+                    <strong>{skillsData?.total || 0}</strong> skills
+                  </span>
+                  {skillsData?.last_synced_at && (
+                    <span>
+                      Dernière sync: {new Date(skillsData.last_synced_at).toLocaleDateString('fr-FR')}
+                    </span>
+                  )}
+                  <span>Intervalle: {skillsData?.sync_interval_days || 30} jours</span>
+                </div>
+
+                {/* Search and Sync */}
+                <div className="mt-4 flex gap-2">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Rechercher un skill..."
+                      value={skillsSearch}
+                      onChange={(e) => setSkillsSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => syncSkillsMutation.mutate()}
+                    isLoading={syncSkillsMutation.isPending}
+                    leftIcon={syncSkillsMutation.isPending ? undefined : <RefreshCw className="h-4 w-4" />}
+                  >
+                    Synchroniser
+                  </Button>
+                </div>
+              </div>
+
+              {/* Modal Body - Skills List */}
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                {isLoadingSkills ? (
+                  <div className="flex items-center justify-center h-32">
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                  </div>
+                ) : skillsData?.skills.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    {skillsSearch ? (
+                      <p>Aucun skill trouvé pour "{skillsSearch}"</p>
+                    ) : (
+                      <div>
+                        <p className="mb-2">Aucun skill synchronisé</p>
+                        <p className="text-sm">Cliquez sur "Synchroniser" pour récupérer les skills depuis Turnover-IT</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {skillsData?.skills.map((skill) => (
+                      <span
+                        key={skill.slug}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
+                        title={`Slug: ${skill.slug}`}
+                      >
+                        {skill.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowSkillsModal(false)}
+                  className="w-full"
+                >
+                  Fermer
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -61,6 +61,24 @@ export interface GeminiTestResponse {
   message: string;
 }
 
+export interface TurnoverITSkill {
+  name: string;
+  slug: string;
+}
+
+export interface TurnoverITSkillsResponse {
+  skills: TurnoverITSkill[];
+  total: number;
+  last_synced_at: string | null;
+  sync_interval_days: number;
+}
+
+export interface TurnoverITSyncResponse {
+  success: boolean;
+  synced_count: number;
+  message: string;
+}
+
 export const adminApi = {
   // BoondManager
   getBoondStatus: async (): Promise<BoondStatus> => {
@@ -163,6 +181,19 @@ export const adminApi = {
 
   testGeminiModel: async (model: string): Promise<GeminiTestResponse> => {
     const response = await apiClient.post<GeminiTestResponse>('/admin/gemini/test', { model });
+    return response.data;
+  },
+
+  // Turnover-IT skills
+  getTurnoverITSkills: async (search?: string): Promise<TurnoverITSkillsResponse> => {
+    const response = await apiClient.get<TurnoverITSkillsResponse>('/admin/turnoverit/skills', {
+      params: search ? { search } : undefined,
+    });
+    return response.data;
+  },
+
+  syncTurnoverITSkills: async (): Promise<TurnoverITSyncResponse> => {
+    const response = await apiClient.post<TurnoverITSyncResponse>('/admin/turnoverit/skills/sync');
     return response.data;
   },
 };
