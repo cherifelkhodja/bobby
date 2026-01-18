@@ -8,6 +8,7 @@ Turnover-IT nomenclature.
 import asyncio
 import json
 import logging
+import traceback
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from difflib import SequenceMatcher
@@ -132,25 +133,30 @@ class JobPostingAnonymizer:
         """Ensure skills are synced from Turnover-IT to database.
 
         Checks if sync is needed based on last sync time.
+        Gracefully handles missing tables (migration not yet run).
         """
-        # Check last sync time
-        result = await self.db_session.execute(
-            select(TurnoverITSkillsMetadataModel).where(TurnoverITSkillsMetadataModel.id == 1)
-        )
-        metadata = result.scalar_one_or_none()
+        try:
+            # Check last sync time
+            result = await self.db_session.execute(
+                select(TurnoverITSkillsMetadataModel).where(TurnoverITSkillsMetadataModel.id == 1)
+            )
+            metadata = result.scalar_one_or_none()
 
-        needs_sync = False
-        if not metadata:
-            needs_sync = True
-        elif not metadata.last_synced_at:
-            needs_sync = True
-        elif datetime.utcnow() - metadata.last_synced_at > SKILLS_SYNC_INTERVAL:
-            needs_sync = True
-        elif metadata.total_skills == 0:
-            needs_sync = True
+            needs_sync = False
+            if not metadata:
+                needs_sync = True
+            elif not metadata.last_synced_at:
+                needs_sync = True
+            elif datetime.utcnow() - metadata.last_synced_at > SKILLS_SYNC_INTERVAL:
+                needs_sync = True
+            elif metadata.total_skills == 0:
+                needs_sync = True
 
-        if needs_sync:
-            await self.sync_skills()
+            if needs_sync:
+                await self.sync_skills()
+        except Exception as e:
+            # Table might not exist yet (migration not run) - log and continue
+            logger.warning(f"Could not check skills sync status: {e}. Continuing without skills.")
 
     async def sync_skills(self) -> int:
         """Sync all skills from Turnover-IT API to database.
@@ -207,17 +213,22 @@ class JobPostingAnonymizer:
         """Get skills from database cache.
 
         Returns:
-            List of skills with name and slug.
+            List of skills with name and slug. Empty list if table doesn't exist.
         """
         if self._skills_cache is not None:
             return self._skills_cache
 
-        result = await self.db_session.execute(
-            select(TurnoverITSkillModel).order_by(TurnoverITSkillModel.name)
-        )
-        skills = result.scalars().all()
+        try:
+            result = await self.db_session.execute(
+                select(TurnoverITSkillModel).order_by(TurnoverITSkillModel.name)
+            )
+            skills = result.scalars().all()
+            self._skills_cache = [{"name": s.name, "slug": s.slug} for s in skills]
+        except Exception as e:
+            # Table might not exist yet (migration not run) - return empty list
+            logger.warning(f"Could not fetch skills from database: {e}. Using empty skills list.")
+            self._skills_cache = []
 
-        self._skills_cache = [{"name": s.name, "slug": s.slug} for s in skills]
         return self._skills_cache
 
     def match_skills_to_nomenclature(
@@ -360,8 +371,12 @@ class JobPostingAnonymizer:
         except ValueError:
             raise
         except Exception as e:
-            logger.error(f"Unexpected error during anonymization: {type(e).__name__}: {e}")
-            raise ValueError("Erreur inattendue lors de l'anonymisation. Veuillez réessayer.")
+            logger.error(
+                f"Unexpected error during anonymization: {type(e).__name__}: {e}\n"
+                f"Traceback: {traceback.format_exc()}"
+            )
+            # Include error type in message for debugging
+            raise ValueError(f"Erreur lors de l'anonymisation ({type(e).__name__}). Veuillez réessayer.")
 
     def _extract_response_text(self, response) -> Optional[str]:
         """Extract text from Gemini response with fallback methods."""
