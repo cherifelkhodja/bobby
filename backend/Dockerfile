@@ -18,7 +18,8 @@ COPY pyproject.toml ./
 
 # Install dependencies directly (simpler and more reliable)
 # v4: Added PyPDF2 for PDF merging in quotation generator
-# v5: Added slowapi for rate limiting and secure for security headers
+# v5: Added slowapi for rate limiting
+# v6: Removed secure library (unstable API), security headers set manually
 RUN pip install --no-cache-dir \
     "fastapi>=0.109.0" \
     "uvicorn[standard]>=0.27.0" \
@@ -45,8 +46,7 @@ RUN pip install --no-cache-dir \
     "PyPDF2>=3.0.0" \
     "aioboto3>=12.0.0" \
     "boto3>=1.34.0" \
-    "slowapi>=0.1.9" \
-    "secure>=0.3.0"
+    "slowapi>=0.1.9"
 
 # Copy application code
 COPY . .

@@ -435,7 +435,7 @@ audit_logger.log(
 ```toml
 # backend/pyproject.toml
 slowapi>=0.1.9    # Rate limiting
-secure>=0.3.0     # Security headers
+# Note: Security headers are set manually in security_headers.py (no external lib)
 ```
 
 ## Common Commands

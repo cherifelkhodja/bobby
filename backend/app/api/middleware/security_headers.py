@@ -1,55 +1,13 @@
-"""Security headers middleware using secure library."""
+"""Security headers middleware.
+
+Adds security headers to all responses to protect against common web vulnerabilities.
+Does not rely on external libraries to avoid API compatibility issues.
+"""
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-import secure
 
 from app.config import settings
-
-
-# Configure security headers
-# See: https://github.com/TypeError/secure
-secure_headers = secure.Secure(
-    # Strict-Transport-Security: enforce HTTPS
-    hsts=secure.StrictTransportSecurity()
-    .max_age(31536000)  # 1 year
-    .include_subdomains()
-    .preload() if settings.is_production else None,
-
-    # X-Frame-Options: prevent clickjacking
-    frame=secure.XFrameOptions().deny(),
-
-    # X-Content-Type-Options: prevent MIME sniffing
-    content=secure.XContentTypeOptions(),
-
-    # Referrer-Policy: control referrer information
-    referrer=secure.ReferrerPolicy().strict_origin_when_cross_origin(),
-
-    # X-XSS-Protection: legacy XSS protection (for older browsers)
-    xss=secure.XXSSProtection().set("1; mode=block"),
-
-    # Content-Security-Policy
-    csp=secure.ContentSecurityPolicy()
-    .default_src("'self'")
-    .script_src("'self'")
-    .style_src("'self'", "'unsafe-inline'")  # Allow inline styles for UI frameworks
-    .img_src("'self'", "data:", "https:")
-    .font_src("'self'", "https:", "data:")
-    .connect_src("'self'", settings.FRONTEND_URL)
-    .frame_ancestors("'none'")
-    .base_uri("'self'")
-    .form_action("'self'") if settings.is_production else None,
-
-    # Cache-Control for sensitive responses
-    cache=secure.CacheControl().no_store() if settings.is_production else None,
-
-    # Permissions-Policy: restrict browser features
-    permissions=secure.PermissionsPolicy()
-    .geolocation("self")
-    .microphone()  # Deny
-    .camera()  # Deny
-    .payment()  # Deny
-)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -60,11 +18,47 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         response = await call_next(request)
 
-        # Set security headers
-        secure_headers.framework.fastapi(response)
+        # X-Frame-Options: prevent clickjacking
+        response.headers["X-Frame-Options"] = "DENY"
 
-        # Additional headers
+        # X-Content-Type-Options: prevent MIME sniffing
+        response.headers["X-Content-Type-Options"] = "nosniff"
+
+        # Referrer-Policy: control referrer information
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+        # X-Permitted-Cross-Domain-Policies
         response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+
+        # Production-only headers
+        if settings.is_production:
+            # Strict-Transport-Security: enforce HTTPS (1 year)
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains; preload"
+            )
+
+            # Content-Security-Policy
+            frontend_url = settings.FRONTEND_URL or "'self'"
+            csp_directives = [
+                "default-src 'self'",
+                "script-src 'self'",
+                "style-src 'self' 'unsafe-inline'",  # Allow inline styles for UI frameworks
+                "img-src 'self' data: https:",
+                "font-src 'self' https: data:",
+                f"connect-src 'self' {frontend_url}",
+                "frame-ancestors 'none'",
+                "base-uri 'self'",
+                "form-action 'self'",
+            ]
+            response.headers["Content-Security-Policy"] = "; ".join(csp_directives)
+
+            # Cache-Control for sensitive responses
+            response.headers["Cache-Control"] = "no-store"
+
+        # Permissions-Policy: restrict browser features
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(self), microphone=(), camera=(), payment=()"
+        )
 
         # Remove server header if present (information disclosure)
         if "server" in response.headers:
@@ -73,5 +67,5 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
-# Export configured secure headers for direct use if needed
-__all__ = ["SecurityHeadersMiddleware", "secure_headers"]
+# Export for use in main.py
+__all__ = ["SecurityHeadersMiddleware"]
