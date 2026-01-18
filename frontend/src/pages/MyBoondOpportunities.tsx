@@ -334,46 +334,46 @@ export function MyBoondOpportunities() {
 
       {/* Filters */}
       <Card className="!p-3">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
           <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <select
+            value={stateFilter}
+            onChange={(e) => setStateFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+            className="min-w-[160px] px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          >
+            <option value="all">Tous les états ({stats.total})</option>
+            {availableStates.map(({ state, count }) => (
+              <option key={state} value={state}>
+                {STATE_CONFIG[state]?.name || `État ${state}`} ({count})
+              </option>
+            ))}
+          </select>
+          <select
+            value={clientFilter}
+            onChange={(e) => setClientFilter(e.target.value)}
+            className="min-w-[160px] px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          >
+            <option value="all">Tous les clients ({availableClients.length})</option>
+            {availableClients.map(({ name, count }) => (
+              <option key={name} value={name}>
+                {name} ({count})
+              </option>
+            ))}
+          </select>
+          {availableManagers.length > 1 && (
             <select
-              value={stateFilter}
-              onChange={(e) => setStateFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-              className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              value={managerFilter}
+              onChange={(e) => setManagerFilter(e.target.value)}
+              className="min-w-[160px] px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
-              <option value="all">Tous les états ({stats.total})</option>
-              {availableStates.map(({ state, count }) => (
-                <option key={state} value={state}>
-                  {STATE_CONFIG[state]?.name || `État ${state}`} ({count})
-                </option>
-              ))}
-            </select>
-            <select
-              value={clientFilter}
-              onChange={(e) => setClientFilter(e.target.value)}
-              className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="all">Tous les clients ({availableClients.length})</option>
-              {availableClients.map(({ name, count }) => (
+              <option value="all">Tous les managers ({availableManagers.length})</option>
+              {availableManagers.map(({ name, count }) => (
                 <option key={name} value={name}>
                   {name} ({count})
                 </option>
               ))}
             </select>
-            {availableManagers.length > 1 && (
-              <select
-                value={managerFilter}
-                onChange={(e) => setManagerFilter(e.target.value)}
-                className="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="all">Tous les managers ({availableManagers.length})</option>
-                {availableManagers.map(({ name, count }) => (
-                  <option key={name} value={name}>
-                    {name} ({count})
-                  </option>
-                ))}
-              </select>
-            )}
+          )}
         </div>
       </Card>
 
