@@ -181,3 +181,32 @@ class GeminiTestResponse(BaseModel):
     model: str
     response_time_ms: int
     message: str
+
+
+# =============================================================================
+# Turnover-IT Skills Schemas
+# =============================================================================
+
+
+class TurnoverITSkillResponse(BaseModel):
+    """Single Turnover-IT skill."""
+
+    name: str
+    slug: str
+
+
+class TurnoverITSkillsResponse(BaseModel):
+    """Turnover-IT skills list with metadata."""
+
+    skills: list[TurnoverITSkillResponse]
+    total: int
+    last_synced_at: Optional[datetime] = None
+    sync_interval_days: int = 30
+
+
+class TurnoverITSyncResponse(BaseModel):
+    """Response from skills sync operation."""
+
+    success: bool
+    synced_count: int
+    message: str

@@ -18,6 +18,9 @@ from app.api.schemas.admin import (
     MessageResponse,
     SyncResponse,
     TestConnectionResponse,
+    TurnoverITSkillResponse,
+    TurnoverITSkillsResponse,
+    TurnoverITSyncResponse,
     UpdateUserAdminRequest,
     UserAdminResponse,
     UsersListResponse,
@@ -44,10 +47,14 @@ from app.application.use_cases.admin.users import (
 )
 from app.dependencies import AppSettings, AppSettingsSvc, DbSession, RedisClient
 from app.infrastructure.anonymizer.gemini_anonymizer import GeminiAnonymizer
+from app.infrastructure.anonymizer.job_posting_anonymizer import SKILLS_SYNC_INTERVAL
 from app.infrastructure.boond.client import BoondClient
 from app.infrastructure.cache.redis import CacheService
+from app.infrastructure.database.models import TurnoverITSkillModel, TurnoverITSkillsMetadataModel
 from app.infrastructure.database.repositories import OpportunityRepository, UserRepository
 from app.infrastructure.settings import AVAILABLE_GEMINI_MODELS
+from app.infrastructure.turnoverit.client import TurnoverITClient
+from sqlalchemy import select, delete
 
 router = APIRouter()
 
@@ -430,3 +437,121 @@ async def test_gemini_model(
         response_time_ms=result["response_time_ms"],
         message=result["message"],
     )
+
+
+# =============================================================================
+# Turnover-IT Skills Endpoints
+# =============================================================================
+
+
+@router.get("/turnoverit/skills", response_model=TurnoverITSkillsResponse)
+async def get_turnoverit_skills(
+    admin_id: AdminUser,
+    db: DbSession,
+    search: str = Query(None, description="Search skills by name"),
+):
+    """Get cached Turnover-IT skills (admin only).
+
+    Returns the list of skills cached from Turnover-IT API.
+    Skills are synced automatically every 30 days.
+    """
+    try:
+        # Get metadata
+        result = await db.execute(
+            select(TurnoverITSkillsMetadataModel).where(TurnoverITSkillsMetadataModel.id == 1)
+        )
+        metadata = result.scalar_one_or_none()
+
+        # Get skills
+        query = select(TurnoverITSkillModel).order_by(TurnoverITSkillModel.name)
+        if search:
+            query = query.where(TurnoverITSkillModel.name.ilike(f"%{search}%"))
+
+        result = await db.execute(query)
+        skills = result.scalars().all()
+
+        return TurnoverITSkillsResponse(
+            skills=[TurnoverITSkillResponse(name=s.name, slug=s.slug) for s in skills],
+            total=len(skills),
+            last_synced_at=metadata.last_synced_at if metadata else None,
+            sync_interval_days=SKILLS_SYNC_INTERVAL.days,
+        )
+    except Exception as e:
+        # Table might not exist yet
+        return TurnoverITSkillsResponse(
+            skills=[],
+            total=0,
+            last_synced_at=None,
+            sync_interval_days=SKILLS_SYNC_INTERVAL.days,
+        )
+
+
+@router.post("/turnoverit/skills/sync", response_model=TurnoverITSyncResponse)
+async def sync_turnoverit_skills(
+    admin_id: AdminUser,
+    db: DbSession,
+    settings: AppSettings,
+):
+    """Force sync Turnover-IT skills from API (admin only).
+
+    Fetches all skills from Turnover-IT API and stores them in the database.
+    This is normally done automatically every 30 days.
+    """
+    client = TurnoverITClient(settings)
+
+    try:
+        # Fetch all skills from API
+        skills = await client.fetch_all_skills()
+
+        if not skills:
+            return TurnoverITSyncResponse(
+                success=False,
+                synced_count=0,
+                message="Aucun skill récupéré depuis Turnover-IT. Vérifiez la clé API.",
+            )
+
+        # Clear existing skills
+        await db.execute(delete(TurnoverITSkillModel))
+
+        # Insert new skills
+        from datetime import datetime, timezone
+
+        for skill in skills:
+            skill_model = TurnoverITSkillModel(
+                name=skill["name"],
+                slug=skill["slug"],
+            )
+            db.add(skill_model)
+
+        # Update metadata
+        result = await db.execute(
+            select(TurnoverITSkillsMetadataModel).where(TurnoverITSkillsMetadataModel.id == 1)
+        )
+        metadata = result.scalar_one_or_none()
+
+        if metadata:
+            metadata.last_synced_at = datetime.now(timezone.utc)
+            metadata.total_skills = len(skills)
+        else:
+            metadata = TurnoverITSkillsMetadataModel(
+                id=1,
+                last_synced_at=datetime.now(timezone.utc),
+                total_skills=len(skills),
+            )
+            db.add(metadata)
+
+        await db.commit()
+
+        return TurnoverITSyncResponse(
+            success=True,
+            synced_count=len(skills),
+            message=f"{len(skills)} skills synchronisés depuis Turnover-IT",
+        )
+
+    except Exception as e:
+        await db.rollback()
+        return TurnoverITSyncResponse(
+            success=False,
+            synced_count=0,
+            message=f"Erreur lors de la synchronisation: {str(e)}",
+        )

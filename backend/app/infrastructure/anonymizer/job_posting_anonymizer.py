@@ -36,8 +36,8 @@ class AnonymizedJobPosting:
     skills: list[str]  # Matched Turnover-IT skill slugs
 
 
-# Skills sync interval (24 hours)
-SKILLS_SYNC_INTERVAL = timedelta(hours=24)
+# Skills sync interval (30 days = 1 month)
+SKILLS_SYNC_INTERVAL = timedelta(days=30)
 
 
 JOB_POSTING_ANONYMIZATION_PROMPT = """Tu es un expert en recrutement IT. Ta mission est de réécrire des fiches de poste pour qu'elles soient publiables sur un job board (Turnover-IT) sans révéler d'informations confidentielles.
