@@ -72,14 +72,14 @@ type CreateJobPostingFormData = z.infer<typeof createJobPostingSchema>;
 type ViewStep = 'loading' | 'ready' | 'anonymizing' | 'form' | 'saving' | 'error';
 
 const CONTRACT_TYPES = [
-  { value: 'CDI', label: 'CDI' },
-  { value: 'CDD', label: 'CDD' },
+  { value: 'PERMANENT', label: 'CDI' },
+  { value: 'TEMPORARY', label: 'CDD' },
   { value: 'FREELANCE', label: 'Freelance' },
   { value: 'INTERCONTRACT', label: 'Sous-traitance' },
 ];
 
 // Contract types that enable salary fields (annual)
-const SALARY_CONTRACT_TYPES = ['CDI', 'CDD'];
+const SALARY_CONTRACT_TYPES = ['PERMANENT', 'TEMPORARY'];
 // Contract types that enable TJM fields (daily rate)
 const TJM_CONTRACT_TYPES = ['FREELANCE', 'INTERCONTRACT'];
 

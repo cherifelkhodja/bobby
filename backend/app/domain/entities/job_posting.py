@@ -40,6 +40,7 @@ class ContractType(str, Enum):
     PERMANENT = "PERMANENT"  # CDI
     TEMPORARY = "TEMPORARY"  # CDD
     FREELANCE = "FREELANCE"
+    INTERCONTRACT = "INTERCONTRACT"  # Sous-traitance
     INTERNSHIP = "INTERNSHIP"
     APPRENTICESHIP = "APPRENTICESHIP"
 
@@ -50,6 +51,7 @@ class ContractType(str, Enum):
             ContractType.PERMANENT: "CDI",
             ContractType.TEMPORARY: "CDD",
             ContractType.FREELANCE: "Freelance",
+            ContractType.INTERCONTRACT: "Sous-traitance",
             ContractType.INTERNSHIP: "Stage",
             ContractType.APPRENTICESHIP: "Alternance",
         }
@@ -312,6 +314,8 @@ class JobPosting:
             payload["location"]["region"] = self.location_region
         if self.location_postal_code:
             payload["location"]["postalCode"] = self.location_postal_code
+        if self.location_city:
+            payload["location"]["locality"] = self.location_city
 
         # Optional job details
         if self.skills:
