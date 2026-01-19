@@ -301,6 +301,7 @@ class JobPosting:
                 "country": self.location_country,
             },
             "status": "PUBLISHED",
+            "pushToTop": True,
             "application": {
                 "url": f"{application_base_url}{self.application_url_path}",
             },

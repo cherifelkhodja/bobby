@@ -87,6 +87,7 @@ class CreateJobPostingRequest(BaseModel):
     salary_min_daily: Optional[float] = Field(None, ge=0)
     salary_max_daily: Optional[float] = Field(None, ge=0)
     employer_overview: Optional[str] = Field(None, max_length=3000)
+    pushToTop: Optional[bool] = Field(default=True)
 
 
 class UpdateJobPostingRequest(BaseModel):

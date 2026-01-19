@@ -67,6 +67,7 @@ class TurnoverITClient:
 
         reference = job_payload.get("reference", "unknown")
         logger.info(f"Creating job on Turnover-IT: {reference}")
+        logger.info(f"Turnover-IT request payload: {job_payload}")
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -74,6 +75,12 @@ class TurnoverITClient:
                     f"{self.base_url}/jobs",
                     headers=self._get_headers(),
                     json=job_payload,
+                )
+
+                # Log full response for debugging
+                logger.info(
+                    f"Turnover-IT response for {reference}: "
+                    f"status={response.status_code}, body={response.text[:1000]}"
                 )
 
                 if response.status_code == 201:
