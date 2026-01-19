@@ -173,6 +173,24 @@ class TurnoverITSkillsListResponse(BaseModel):
     total: int
 
 
+class TurnoverITPlaceItem(BaseModel):
+    """A single Turnover-IT place."""
+
+    locality: str
+    region: str
+    county: str
+    country: str
+    postalCode: str
+    display: str
+
+
+class TurnoverITPlacesListResponse(BaseModel):
+    """Response with list of Turnover-IT places."""
+
+    places: list[TurnoverITPlaceItem]
+    total: int
+
+
 class OpportunityDetailResponse(BaseModel):
     """Response with full opportunity details from BoondManager."""
 
@@ -408,6 +426,29 @@ async def get_turnoverit_skills(
     skills = [TurnoverITSkillItem(name=row[0], slug=row[1]) for row in rows]
 
     return TurnoverITSkillsListResponse(skills=skills, total=len(skills))
+
+
+@router.get("/places", response_model=TurnoverITPlacesListResponse)
+async def get_turnoverit_places(
+    db: DbSession,
+    turnoverit_client: TurnoverIT,
+    q: str = Query(..., min_length=2, max_length=100),
+    authorization: str = Header(default=""),
+):
+    """Get place suggestions from Turnover-IT.
+
+    Search for cities, regions, or postal codes to use for job locations.
+
+    - q: Search query (min 2 characters)
+    """
+    await require_hr_access(db, authorization)
+
+    places = await turnoverit_client.get_places(q)
+
+    return TurnoverITPlacesListResponse(
+        places=[TurnoverITPlaceItem(**place) for place in places],
+        total=len(places),
+    )
 
 
 # --- Opportunities Endpoints ---

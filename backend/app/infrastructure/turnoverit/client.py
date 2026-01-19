@@ -210,6 +210,63 @@ class TurnoverITClient:
             logger.error(f"Request error closing job {reference}: {e}")
             raise TurnoverITError(f"Erreur de connexion: {str(e)}")
 
+    async def get_places(self, search: str) -> list[dict[str, Any]]:
+        """Get place suggestions from Turnover-IT.
+
+        Args:
+            search: Search query (city, postal code, region).
+
+        Returns:
+            List of places with locality, region, country, etc.
+        """
+        if not self._is_configured():
+            return []
+
+        if not search or len(search) < 2:
+            return []
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(
+                    f"{self.base_url}/places",
+                    headers=self._get_headers(),
+                    params={"q": search},
+                )
+
+                logger.info(f"Turnover-IT places response: status={response.status_code}")
+
+                if response.status_code == 200:
+                    data = response.json()
+                    members = data.get("hydra:member", [])
+                    return [
+                        {
+                            "locality": place.get("locality", ""),
+                            "region": place.get("region", ""),
+                            "county": place.get("county", ""),
+                            "country": place.get("country", ""),
+                            "postalCode": place.get("postalCode", ""),
+                            "display": self._format_place_display(place),
+                        }
+                        for place in members
+                    ]
+
+                return []
+
+        except Exception as e:
+            logger.warning(f"Failed to fetch places: {e}")
+            return []
+
+    def _format_place_display(self, place: dict[str, Any]) -> str:
+        """Format place for display in autocomplete."""
+        parts = []
+        if place.get("locality"):
+            parts.append(place["locality"])
+        if place.get("region"):
+            parts.append(place["region"])
+        if place.get("country") and place.get("country") != "France":
+            parts.append(place["country"])
+        return ", ".join(parts) if parts else place.get("postalCode", "")
+
     async def get_skills(self, search: Optional[str] = None) -> list[dict[str, str]]:
         """Get available skills from Turnover-IT.
 
