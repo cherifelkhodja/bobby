@@ -1,6 +1,6 @@
 """Add location_key column to job_postings table.
 
-Revision ID: 014_add_location_key_to_job_postings
+Revision ID: 014_add_location_key
 Revises: 013_add_turnoverit_skills_table
 Create Date: 2026-01-19
 
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers
-revision = "014_add_location_key_to_job_postings"
+revision = "014_add_location_key"
 down_revision = "013_add_turnoverit_skills_table"
 branch_labels = None
 depends_on = None
