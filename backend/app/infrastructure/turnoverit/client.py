@@ -226,14 +226,16 @@ class TurnoverITClient:
             return []
 
         try:
+            # Places endpoint is outside /v2 path (same as skills)
+            places_url = f"{self.base_url.replace('/v2', '')}/places"
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
-                    f"{self.base_url}/places",
+                    places_url,
                     headers=self._get_headers(),
                     params={"q": search},
                 )
 
-                logger.info(f"Turnover-IT places response: status={response.status_code}")
+                logger.info(f"Turnover-IT places response: url={places_url}, status={response.status_code}, body={response.text[:500]}")
 
                 if response.status_code == 200:
                     data = response.json()
