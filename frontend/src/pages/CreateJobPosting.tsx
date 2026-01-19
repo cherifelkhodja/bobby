@@ -76,9 +76,13 @@ const CONTRACT_TYPES = [
   { value: 'CDD', label: 'CDD' },
   { value: 'FREELANCE', label: 'Freelance' },
   { value: 'INTERIM', label: 'Intérim' },
-  { value: 'STAGE', label: 'Stage' },
-  { value: 'ALTERNANCE', label: 'Alternance' },
+  { value: 'INTERCONTRACT', label: 'Sous-traitance' },
 ];
+
+// Contract types that enable salary fields (annual)
+const SALARY_CONTRACT_TYPES = ['CDI', 'CDD', 'INTERIM'];
+// Contract types that enable TJM fields (daily rate)
+const TJM_CONTRACT_TYPES = ['FREELANCE', 'INTERCONTRACT'];
 
 const REMOTE_POLICIES = [
   { value: 'NONE', label: 'Pas de télétravail' },
@@ -107,8 +111,20 @@ export default function CreateJobPosting() {
   const [skillSearch, setSkillSearch] = useState('');
   const [showSkillDropdown, setShowSkillDropdown] = useState(false);
   const [selectedContractTypes, setSelectedContractTypes] = useState<string[]>(['FREELANCE']);
+  const [isAsap, setIsAsap] = useState(false);
+  const [durationUnit, setDurationUnit] = useState<'months' | 'years'>('months');
+  const [durationValue, setDurationValue] = useState<number | ''>('');
   const skillInputRef = useRef<HTMLInputElement>(null);
   const skillDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Check if salary fields should be enabled (CDI, CDD, Intérim selected)
+  const hasSalaryContractType = selectedContractTypes.some((type) =>
+    SALARY_CONTRACT_TYPES.includes(type)
+  );
+  // Check if TJM fields should be enabled (Freelance, Sous-traitance selected)
+  const hasTjmContractType = selectedContractTypes.some((type) =>
+    TJM_CONTRACT_TYPES.includes(type)
+  );
 
   // Form setup
   const {
@@ -236,6 +252,36 @@ export default function CreateJobPosting() {
         throw new Error('Sélectionnez au moins un type de contrat');
       }
 
+      // Calculate start date: today if ASAP, otherwise form value
+      let startDate: string | undefined;
+      if (isAsap) {
+        startDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      } else {
+        startDate = data.start_date || undefined;
+      }
+
+      // Calculate duration in months (convert from years if needed)
+      let durationMonths: number | undefined;
+      if (typeof durationValue === 'number' && durationValue > 0) {
+        durationMonths = durationUnit === 'years' ? durationValue * 12 : durationValue;
+      }
+
+      // Only include salary fields if salary contract types are selected
+      const salaryMinAnnual = hasSalaryContractType && typeof data.salary_min_annual === 'number'
+        ? data.salary_min_annual
+        : undefined;
+      const salaryMaxAnnual = hasSalaryContractType && typeof data.salary_max_annual === 'number'
+        ? data.salary_max_annual
+        : undefined;
+
+      // Only include TJM fields if TJM contract types are selected
+      const salaryMinDaily = hasTjmContractType && typeof data.salary_min_daily === 'number'
+        ? data.salary_min_daily
+        : undefined;
+      const salaryMaxDaily = hasTjmContractType && typeof data.salary_max_daily === 'number'
+        ? data.salary_max_daily
+        : undefined;
+
       const request: CreateJobPostingRequest = {
         opportunity_id: oppId,
         title: data.title,
@@ -249,16 +295,12 @@ export default function CreateJobPosting() {
         skills: selectedSkills,
         experience_level: data.experience_level || undefined,
         remote: data.remote || undefined,
-        start_date: data.start_date || undefined,
-        duration_months: typeof data.duration_months === 'number' ? data.duration_months : undefined,
-        salary_min_annual:
-          typeof data.salary_min_annual === 'number' ? data.salary_min_annual : undefined,
-        salary_max_annual:
-          typeof data.salary_max_annual === 'number' ? data.salary_max_annual : undefined,
-        salary_min_daily:
-          typeof data.salary_min_daily === 'number' ? data.salary_min_daily : undefined,
-        salary_max_daily:
-          typeof data.salary_max_daily === 'number' ? data.salary_max_daily : undefined,
+        start_date: startDate,
+        duration_months: durationMonths,
+        salary_min_annual: salaryMinAnnual,
+        salary_max_annual: salaryMaxAnnual,
+        salary_min_daily: salaryMinDaily,
+        salary_max_daily: salaryMaxDaily,
         employer_overview: data.employer_overview || undefined,
       };
 
@@ -825,24 +867,54 @@ export default function CreateJobPosting() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Date de début souhaitée
               </label>
-              <input
-                type="date"
-                {...register('start_date')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isAsap}
+                    onChange={(e) => setIsAsap(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">ASAP (dès que possible)</span>
+                </label>
+                <input
+                  type="date"
+                  {...register('start_date')}
+                  disabled={isAsap}
+                  className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    isAsap ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                />
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Durée (mois)
+                Durée
               </label>
-              <input
-                type="number"
-                {...register('duration_months')}
-                placeholder="6"
-                min={1}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={durationValue}
+                  onChange={(e) => setDurationValue(e.target.value ? parseInt(e.target.value, 10) : '')}
+                  placeholder="6"
+                  min={1}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <select
+                  value={durationUnit}
+                  onChange={(e) => setDurationUnit(e.target.value as 'months' | 'years')}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="months">Mois</option>
+                  <option value="years">Années</option>
+                </select>
+              </div>
+              {typeof durationValue === 'number' && durationUnit === 'years' && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  = {durationValue * 12} mois
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -854,60 +926,98 @@ export default function CreateJobPosting() {
           </h3>
 
           <p className="text-sm text-gray-600 dark:text-gray-400 -mt-2">
-            Renseignez les salaires annuels (CDI/CDD) et/ou les TJM (freelance)
+            Les champs sont activés selon les types de contrat sélectionnés
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Salaire minimum annuel (EUR)
-              </label>
-              <input
-                type="number"
-                {...register('salary_min_annual')}
-                placeholder="35000"
-                min={0}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+          {/* Salary fields (CDI, CDD, Intérim) */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Salaire annuel (CDI, CDD, Intérim)
+              </h4>
+              {!hasSalaryContractType && (
+                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
+                  Désactivé
+                </span>
+              )}
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Salaire maximum annuel (EUR)
-              </label>
-              <input
-                type="number"
-                {...register('salary_max_annual')}
-                placeholder="50000"
-                min={0}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Minimum annuel (EUR)
+                </label>
+                <input
+                  type="number"
+                  {...register('salary_min_annual')}
+                  placeholder="35000"
+                  min={0}
+                  disabled={!hasSalaryContractType}
+                  className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    !hasSalaryContractType ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Maximum annuel (EUR)
+                </label>
+                <input
+                  type="number"
+                  {...register('salary_max_annual')}
+                  placeholder="50000"
+                  min={0}
+                  disabled={!hasSalaryContractType}
+                  className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    !hasSalaryContractType ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                />
+              </div>
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                TJM minimum (EUR/jour)
-              </label>
-              <input
-                type="number"
-                {...register('salary_min_daily')}
-                placeholder="400"
-                min={0}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+          {/* TJM fields (Freelance, Sous-traitance) */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                TJM (Freelance, Sous-traitance)
+              </h4>
+              {!hasTjmContractType && (
+                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
+                  Désactivé
+                </span>
+              )}
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                TJM maximum (EUR/jour)
-              </label>
-              <input
-                type="number"
-                {...register('salary_max_daily')}
-                placeholder="550"
-                min={0}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  TJM minimum (EUR/jour)
+                </label>
+                <input
+                  type="number"
+                  {...register('salary_min_daily')}
+                  placeholder="400"
+                  min={0}
+                  disabled={!hasTjmContractType}
+                  className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    !hasTjmContractType ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  TJM maximum (EUR/jour)
+                </label>
+                <input
+                  type="number"
+                  {...register('salary_max_daily')}
+                  placeholder="550"
+                  min={0}
+                  disabled={!hasTjmContractType}
+                  className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    !hasTjmContractType ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                />
+              </div>
             </div>
           </div>
 
