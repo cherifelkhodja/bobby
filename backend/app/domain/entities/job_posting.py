@@ -301,10 +301,6 @@ class JobPosting:
             "description": self.description,
             "qualifications": self.qualifications,
             "status": "PUBLISHED",
-            "pushToTop": True,
-            "application": {
-                "url": f"{application_base_url}{self.application_url_path}",
-            },
         }
 
         # Location: use key if available (preferred), otherwise use individual fields
@@ -323,28 +319,24 @@ class JobPosting:
 
         # Optional job details
         if self.skills:
-            payload["skills"] = self.skills
+            # Skills should be lowercase slugs for Turnover-IT
+            payload["skills"] = [s.lower().replace(" ", "-") for s in self.skills]
         if self.experience_level:
             payload["experienceLevel"] = self.experience_level
         if self.remote:
             payload["remote"] = self.remote
-        if self.start_date:
-            payload["startDate"] = self.start_date.isoformat()
         if self.duration_months:
             payload["durationInMonths"] = self.duration_months
         if self.employer_overview:
             payload["employerOverview"] = self.employer_overview
 
-        # Salary information
-        if self.salary_min_annual or self.salary_max_annual or self.salary_min_daily or self.salary_max_daily:
-            payload["salary"] = {"currency": "EUR"}
-            if self.salary_min_annual:
-                payload["salary"]["minAnnual"] = int(self.salary_min_annual)
-            if self.salary_max_annual:
-                payload["salary"]["maxAnnual"] = int(self.salary_max_annual)
-            if self.salary_min_daily:
-                payload["salary"]["minDaily"] = int(self.salary_min_daily)
-            if self.salary_max_daily:
-                payload["salary"]["maxDaily"] = int(self.salary_max_daily)
+        # Salary information - always include with explicit nulls
+        payload["salary"] = {
+            "minAnnual": int(self.salary_min_annual) if self.salary_min_annual else None,
+            "maxAnnual": int(self.salary_max_annual) if self.salary_max_annual else None,
+            "minDaily": int(self.salary_min_daily) if self.salary_min_daily else None,
+            "maxDaily": int(self.salary_max_daily) if self.salary_max_daily else None,
+            "currency": "EUR",
+        }
 
         return payload
