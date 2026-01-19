@@ -77,8 +77,8 @@ interface CachedAnonymization {
   timestamp: number;
 }
 
-// Cache expires after 24 hours
-const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
+// Cache expires after 48 hours
+const CACHE_EXPIRY_MS = 48 * 60 * 60 * 1000;
 
 function getCachedAnonymization(oppId: string): AnonymizedJobPostingResponse | null {
   try {

@@ -431,7 +431,7 @@ async def get_turnoverit_skills(
 @router.get("/places", response_model=TurnoverITPlacesListResponse)
 async def get_turnoverit_places(
     db: DbSession,
-    turnoverit_client: TurnoverIT,
+    app_settings: AppSettingsSvc,
     q: str = Query(..., min_length=2, max_length=100),
     authorization: str = Header(default=""),
 ):
@@ -443,6 +443,7 @@ async def get_turnoverit_places(
     """
     await require_hr_access(db, authorization)
 
+    turnoverit_client = TurnoverITClient(app_settings)
     places = await turnoverit_client.get_places(q)
 
     return TurnoverITPlacesListResponse(
