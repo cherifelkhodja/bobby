@@ -318,6 +318,7 @@ export default function CreateJobPosting() {
         salary_min_daily: salaryMinDaily,
         salary_max_daily: salaryMaxDaily,
         employer_overview: data.employer_overview || undefined,
+        pushToTop: true,
       };
 
       return hrApi.createJobPosting(request);

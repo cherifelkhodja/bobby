@@ -500,6 +500,7 @@ export interface CreateJobPostingRequest {
   start_date?: string | null;
   duration_months?: number | null;
   employer_overview?: string | null;
+  pushToTop?: boolean;
 }
 
 export interface UpdateJobPostingRequest {
