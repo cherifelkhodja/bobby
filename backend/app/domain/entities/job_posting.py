@@ -300,9 +300,6 @@ class JobPosting:
             "title": self.title,
             "description": self.description,
             "qualifications": self.qualifications,
-            "location": {
-                "country": self.location_country,
-            },
             "status": "PUBLISHED",
             "pushToTop": True,
             "application": {
@@ -310,15 +307,19 @@ class JobPosting:
             },
         }
 
-        # Optional location fields
+        # Location: use key if available (preferred), otherwise use individual fields
         if self.location_key:
-            payload["location"]["key"] = self.location_key
-        if self.location_region:
-            payload["location"]["region"] = self.location_region
-        if self.location_postal_code:
-            payload["location"]["postalCode"] = self.location_postal_code
-        if self.location_city:
-            payload["location"]["locality"] = self.location_city
+            # When key is provided, it's the complete location identifier
+            payload["location"] = {"key": self.location_key}
+        else:
+            # Fallback to individual fields
+            payload["location"] = {"country": self.location_country}
+            if self.location_region:
+                payload["location"]["region"] = self.location_region
+            if self.location_postal_code:
+                payload["location"]["postalCode"] = self.location_postal_code
+            if self.location_city:
+                payload["location"]["locality"] = self.location_city
 
         # Optional job details
         if self.skills:

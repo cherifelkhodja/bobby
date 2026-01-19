@@ -1,5 +1,6 @@
 """Turnover-IT API client for job posting management."""
 
+import json
 import logging
 from typing import Any, Optional
 
@@ -66,22 +67,27 @@ class TurnoverITClient:
             raise TurnoverITError("API key not configured")
 
         reference = job_payload.get("reference", "unknown")
-        logger.info(f"Creating job on Turnover-IT: {reference}")
-        logger.info(f"Turnover-IT request payload: {job_payload}")
+        url = f"{self.base_url}/jobs"
+        headers = self._get_headers()
+
+        # Log full request details
+        logger.info(f"=== Turnover-IT CREATE JOB REQUEST ===")
+        logger.info(f"URL: POST {url}")
+        logger.info(f"Headers: {json.dumps({k: v if k != 'Authorization' else 'Bearer ***' for k, v in headers.items()}, indent=2)}")
+        logger.info(f"Payload:\n{json.dumps(job_payload, indent=2, ensure_ascii=False)}")
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
-                    f"{self.base_url}/jobs",
-                    headers=self._get_headers(),
+                    url,
+                    headers=headers,
                     json=job_payload,
                 )
 
                 # Log full response for debugging
-                logger.info(
-                    f"Turnover-IT response for {reference}: "
-                    f"status={response.status_code}, body={response.text[:1000]}"
-                )
+                logger.info(f"=== Turnover-IT RESPONSE ===")
+                logger.info(f"Status: {response.status_code}")
+                logger.info(f"Body: {response.text}")
 
                 if response.status_code == 201:
                     logger.info(f"Successfully created job: {reference}")
@@ -220,6 +226,7 @@ class TurnoverITClient:
             List of places with key, label, locality, region, country, etc.
         """
         if not self._is_configured():
+            logger.warning("Turnover-IT API key not configured")
             return []
 
         if not search or len(search) < 2:
@@ -228,16 +235,27 @@ class TurnoverITClient:
         try:
             # Locations autocomplete endpoint: https://app.turnover-it.com/api/locations/autocomplete
             locations_url = "https://app.turnover-it.com/api/locations/autocomplete"
+            # Use simpler headers for this endpoint (no ld+json)
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Accept": "application/json",
+            }
+
+            logger.info(
+                f"Turnover-IT locations request: url={locations_url}, "
+                f"search={search}, headers={headers}"
+            )
+
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
                     locations_url,
-                    headers=self._get_headers(),
+                    headers=headers,
                     params={"search": search},
                 )
 
                 logger.info(
-                    f"Turnover-IT locations response: url={locations_url}, "
-                    f"status={response.status_code}, body={response.text[:500]}"
+                    f"Turnover-IT locations response: "
+                    f"status={response.status_code}, body={response.text[:1000]}"
                 )
 
                 if response.status_code == 200:
@@ -258,10 +276,15 @@ class TurnoverITClient:
                             for place in places
                         ]
 
+                # Log error response
+                logger.error(
+                    f"Turnover-IT locations error: status={response.status_code}, "
+                    f"body={response.text}"
+                )
                 return []
 
         except Exception as e:
-            logger.warning(f"Failed to fetch places: {e}")
+            logger.error(f"Failed to fetch places: {e}")
             return []
 
     async def get_skills(self, search: Optional[str] = None) -> list[dict[str, str]]:
