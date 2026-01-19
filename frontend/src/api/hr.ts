@@ -48,6 +48,20 @@ export interface TurnoverITSkillsResponse {
   total: number;
 }
 
+export interface TurnoverITPlace {
+  locality: string;
+  region: string;
+  county: string;
+  country: string;
+  postalCode: string;
+  display: string;
+}
+
+export interface TurnoverITPlacesResponse {
+  places: TurnoverITPlace[];
+  total: number;
+}
+
 export interface OpportunityDetailResponse {
   id: string;
   title: string;
@@ -108,6 +122,17 @@ export const hrApi = {
   getSkills: async (search?: string): Promise<TurnoverITSkillsResponse> => {
     const response = await apiClient.get<TurnoverITSkillsResponse>('/hr/skills', {
       params: search ? { search } : undefined,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get Turnover-IT places for location autocomplete.
+   * Search by city, postal code, or region.
+   */
+  getPlaces: async (query: string): Promise<TurnoverITPlacesResponse> => {
+    const response = await apiClient.get<TurnoverITPlacesResponse>('/hr/places', {
+      params: { q: query },
     });
     return response.data;
   },

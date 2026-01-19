@@ -34,6 +34,7 @@ import {
   type OpportunityDetailResponse,
   type AnonymizedJobPostingResponse,
   type TurnoverITSkill,
+  type TurnoverITPlace,
 } from '../api/hr';
 import { getErrorMessage } from '../api/client';
 import type { CreateJobPostingRequest } from '../types';
@@ -52,10 +53,6 @@ const createJobPostingSchema = z.object({
     .string()
     .min(150, 'Les qualifications doivent contenir au moins 150 caractères')
     .max(3000, 'Les qualifications ne peuvent pas dépasser 3000 caractères'),
-  location_country: z.string().min(1, 'Le pays est requis'),
-  location_region: z.string().optional(),
-  location_postal_code: z.string().optional(),
-  location_city: z.string().optional(),
   experience_level: z.string().optional(),
   remote: z.string().optional(),
   start_date: z.string().optional(),
@@ -114,8 +111,13 @@ export default function CreateJobPosting() {
   const [durationUnit, setDurationUnit] = useState<'months' | 'years'>('months');
   const [durationValue, setDurationValue] = useState<number | ''>('');
   const [isSalaryByProfile, setIsSalaryByProfile] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<TurnoverITPlace | null>(null);
+  const [placeSearch, setPlaceSearch] = useState('');
+  const [showPlaceDropdown, setShowPlaceDropdown] = useState(false);
   const skillInputRef = useRef<HTMLInputElement>(null);
   const skillDropdownRef = useRef<HTMLDivElement>(null);
+  const placeInputRef = useRef<HTMLInputElement>(null);
+  const placeDropdownRef = useRef<HTMLDivElement>(null);
 
   // Check if salary fields should be enabled (CDI, CDD, Intérim selected)
   const hasSalaryContractType = selectedContractTypes.some((type) =>
@@ -139,9 +141,6 @@ export default function CreateJobPosting() {
       title: '',
       description: '',
       qualifications: '',
-      location_country: 'France',
-      location_region: '',
-      location_city: '',
       employer_overview: '',
     },
   });
@@ -163,7 +162,15 @@ export default function CreateJobPosting() {
     (skill) => !selectedSkills.includes(skill.slug)
   ) ?? [];
 
-  // Handle click outside to close dropdown
+  // Fetch Turnover-IT places for location autocomplete
+  const { data: placesData } = useQuery({
+    queryKey: ['turnoverit-places', placeSearch],
+    queryFn: () => hrApi.getPlaces(placeSearch),
+    enabled: showPlaceDropdown && placeSearch.length >= 2,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Handle click outside to close dropdowns
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -173,6 +180,14 @@ export default function CreateJobPosting() {
         !skillInputRef.current.contains(event.target as Node)
       ) {
         setShowSkillDropdown(false);
+      }
+      if (
+        placeDropdownRef.current &&
+        !placeDropdownRef.current.contains(event.target as Node) &&
+        placeInputRef.current &&
+        !placeInputRef.current.contains(event.target as Node)
+      ) {
+        setShowPlaceDropdown(false);
       }
     };
 
@@ -227,14 +242,16 @@ export default function CreateJobPosting() {
         title: result.title,
         description: result.description,
         qualifications: result.qualifications,
-        location_country: 'France',
-        location_region: opportunity?.place || '',
-        location_city: '',
         employer_overview: '',
       });
 
       // Set skills
       setSelectedSkills(result.skills);
+
+      // Pre-fill place search with opportunity location if available
+      if (opportunity?.place) {
+        setPlaceSearch(opportunity.place);
+      }
 
       setStep('form');
     },
@@ -250,6 +267,9 @@ export default function CreateJobPosting() {
       if (!oppId) throw new Error('ID opportunité manquant');
       if (selectedContractTypes.length === 0) {
         throw new Error('Sélectionnez au moins un type de contrat');
+      }
+      if (!selectedPlace) {
+        throw new Error('Sélectionnez un lieu d\'exécution');
       }
 
       // Calculate start date: null if ASAP, otherwise form value
@@ -303,10 +323,10 @@ export default function CreateJobPosting() {
         title: data.title,
         description: data.description,
         qualifications: data.qualifications,
-        location_country: data.location_country,
-        location_region: data.location_region || undefined,
-        location_postal_code: data.location_postal_code || undefined,
-        location_city: data.location_city || undefined,
+        location_country: 'France',
+        location_region: selectedPlace.region || undefined,
+        location_postal_code: selectedPlace.postalCode || undefined,
+        location_city: selectedPlace.locality || undefined,
         contract_types: selectedContractTypes,
         skills: selectedSkills,
         experience_level: data.experience_level || undefined,
@@ -364,6 +384,18 @@ export default function CreateJobPosting() {
     setSelectedContractTypes((prev) =>
       prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
     );
+  };
+
+  const selectPlace = useCallback((place: TurnoverITPlace) => {
+    setSelectedPlace(place);
+    setPlaceSearch(place.display);
+    setShowPlaceDropdown(false);
+  }, []);
+
+  const clearPlace = () => {
+    setSelectedPlace(null);
+    setPlaceSearch('');
+    placeInputRef.current?.focus();
   };
 
   // Loading state
@@ -750,55 +782,88 @@ export default function CreateJobPosting() {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-3">
             Localisation
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Pays *
-              </label>
+
+          {/* Place autocomplete */}
+          <div className="relative">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Lieu d'exécution *
+            </label>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
+                ref={placeInputRef}
                 type="text"
-                {...register('location_country')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={placeSearch}
+                onChange={(e) => {
+                  setPlaceSearch(e.target.value);
+                  setShowPlaceDropdown(true);
+                  if (selectedPlace && e.target.value !== selectedPlace.display) {
+                    setSelectedPlace(null);
+                  }
+                }}
+                onFocus={() => setShowPlaceDropdown(true)}
+                placeholder="Code postal / Ville / Département / Région"
+                className={`w-full pl-10 pr-10 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  selectedPlace
+                    ? 'border-green-500 dark:border-green-500'
+                    : 'border-gray-300 dark:border-gray-600'
+                }`}
               />
-              {errors.location_country && (
-                <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                  {errors.location_country.message}
-                </p>
+              {selectedPlace && (
+                <button
+                  type="button"
+                  onClick={clearPlace}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               )}
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Région/Département
-              </label>
-              <input
-                type="text"
-                {...register('location_region')}
-                placeholder="Île-de-France, Provence..."
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Ville
-              </label>
-              <input
-                type="text"
-                {...register('location_city')}
-                placeholder="Paris, Lyon..."
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Code postal
-              </label>
-              <input
-                type="text"
-                {...register('location_postal_code')}
-                placeholder="75001"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
+
+            {/* Dropdown */}
+            {showPlaceDropdown && placeSearch.length >= 2 && (
+              <div
+                ref={placeDropdownRef}
+                className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+              >
+                {!placesData?.places.length ? (
+                  <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                    {placeSearch.length < 2
+                      ? 'Tapez au moins 2 caractères'
+                      : 'Aucun lieu trouvé'}
+                  </div>
+                ) : (
+                  placesData.places.map((place, index) => (
+                    <button
+                      key={`${place.locality}-${place.region}-${index}`}
+                      type="button"
+                      onClick={() => selectPlace(place)}
+                      className="w-full px-4 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-900/30 text-gray-900 dark:text-white text-sm transition-colors"
+                    >
+                      {place.display}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              France uniquement. Recherchez par ville, code postal ou région.
+            </p>
+
+            {/* Show selected place details */}
+            {selectedPlace && (
+              <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <p className="text-sm text-green-800 dark:text-green-300">
+                  <span className="font-medium">Lieu sélectionné :</span> {selectedPlace.display}
+                </p>
+                {selectedPlace.postalCode && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    Code postal : {selectedPlace.postalCode}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
