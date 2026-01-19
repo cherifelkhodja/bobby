@@ -1,38 +1,94 @@
-# ESN Cooptation - Project Memory
+# ESN Cooptation (Bobby) - Project Memory
 
 ## Project Overview
 Application de cooptation pour ESN (Entreprise de Services du Numérique) avec intégration BoondManager.
 
+**Nom de l'application**: Bobby
+
 ## Tech Stack
-- **Backend**: FastAPI, SQLAlchemy, Alembic, PostgreSQL
-- **Frontend**: React, TypeScript, Vite, TailwindCSS, React Query
-- **Authentication**: JWT (access + refresh tokens)
-- **Email**: Resend API
-- **Deployment**: Railway (Docker)
+
+### Backend
+- **Framework**: FastAPI 0.115+
+- **ORM**: SQLAlchemy 2.0.36+ (async)
+- **Database**: PostgreSQL (asyncpg)
+- **Migrations**: Alembic
+- **Cache/Rate Limiting**: Redis
+- **Email**: Resend API ou SMTP (MailHog dev, OVH/Gmail prod)
+- **AI**: Google Gemini (google-generativeai)
+- **Storage**: S3/Scaleway Object Storage
+- **Security**: JWT, bcrypt, slowapi (rate limiting)
+
+### Frontend
+- **Framework**: React 18.3+
+- **Build**: Vite 6+
+- **Language**: TypeScript 5.7+
+- **Styling**: TailwindCSS 3.4+
+- **State**: Zustand (auth), React Query 5.62+ (server)
+- **Forms**: React Hook Form + Zod
+- **UI**: Headless UI, Lucide React (icons)
+- **HTTP**: Axios
+
+### Deployment
+- **Platform**: Railway (Docker)
+- **CI/CD**: Automatic migrations on startup
 
 ## Architecture
+
 ```
 backend/
 ├── app/
-│   ├── api/routes/v1/      # API endpoints
-│   ├── application/        # Use cases
-│   ├── domain/             # Entities, value objects
-│   ├── infrastructure/     # External services (Boond, DB, cache, email)
-│   └── config.py           # Settings
-├── alembic/                # Database migrations
+│   ├── api/
+│   │   ├── routes/v1/           # API endpoints par domaine
+│   │   ├── middleware/          # Rate limiter, security headers, RLS
+│   │   ├── schemas/             # Pydantic request/response models
+│   │   └── dependencies.py      # Injection de dépendances
+│   ├── application/
+│   │   ├── use_cases/           # Logique métier (CQRS-like)
+│   │   └── read_models/         # DTOs pour les lectures
+│   ├── domain/
+│   │   ├── entities/            # Entités métier riches
+│   │   └── value_objects/       # Enums, types valeur
+│   ├── infrastructure/
+│   │   ├── boond/               # Client API BoondManager
+│   │   ├── turnoverit/          # Client API Turnover-IT
+│   │   ├── cv_transformer/      # Extracteurs PDF/DOCX, Gemini, DOCX generator
+│   │   ├── anonymizer/          # Anonymisation Gemini
+│   │   ├── matching/            # Matching CV/offre Gemini
+│   │   ├── storage/             # Client S3
+│   │   ├── database/            # Models SQLAlchemy, repositories
+│   │   ├── email/               # Service email (Resend/SMTP)
+│   │   ├── security/            # JWT, password hashing
+│   │   ├── cache/               # Client Redis
+│   │   ├── audit/               # Logging audit structuré
+│   │   └── observability/       # Health checks, metrics
+│   ├── quotation_generator/     # Module devis Thales (architecture parallèle)
+│   ├── config.py                # Pydantic Settings
+│   ├── dependencies.py          # DI globales
+│   └── main.py                  # Application FastAPI
+├── alembic/                     # Migrations
+├── tests/                       # Unit, integration, e2e tests
+├── pyproject.toml
 └── Dockerfile
 
 frontend/
 ├── src/
-│   ├── api/                # API client functions
-│   ├── components/         # React components
-│   │   ├── layout/         # Header, Footer, Layout
-│   │   ├── ui/             # Reusable UI components
-│   │   └── ThemeProvider.tsx
-│   ├── contexts/           # Auth context
-│   ├── hooks/              # Custom hooks (useTheme)
-│   ├── pages/              # Page components
-│   └── types/              # TypeScript interfaces
+│   ├── api/                     # Clients API (axios)
+│   ├── components/
+│   │   ├── layout/              # Header, Sidebar, Layout
+│   │   ├── ui/                  # Composants réutilisables
+│   │   ├── cooptations/         # Formulaires cooptation
+│   │   ├── ThemeProvider.tsx
+│   │   ├── ErrorBoundary.tsx
+│   │   └── QueryErrorBoundary.tsx
+│   ├── hooks/                   # Hooks personnalisés
+│   ├── pages/                   # Pages (routes)
+│   │   └── admin/               # Sous-pages admin
+│   ├── stores/                  # Zustand stores
+│   ├── types/                   # TypeScript interfaces
+│   ├── App.tsx                  # Routes + protection
+│   └── main.tsx                 # Entry point
+├── e2e/                         # Tests Playwright
+├── package.json
 └── Dockerfile
 ```
 
@@ -40,10 +96,10 @@ frontend/
 
 | Role | Description | Permissions |
 |------|-------------|-------------|
-| `user` | Consultant | Submit cooptations |
-| `commercial` | Commercial | Manage opportunities, view associated cooptations |
-| `rh` | RH | Manage users, view all cooptations, change cooptation status |
-| `admin` | Administrator | Full access to all features |
+| `user` | Consultant | Soumettre cooptations, voir opportunités publiées |
+| `commercial` | Commercial | Publier opportunités, gérer ses opportunités Boond |
+| `rh` | RH | Créer annonces, gérer candidatures, voir toutes cooptations |
+| `admin` | Administrateur | Accès complet à toutes les fonctionnalités |
 
 **Backend enum**: `backend/app/domain/value_objects/status.py`
 ```python
@@ -58,75 +114,77 @@ class UserRole(str, Enum):
 
 ### 1. BoondManager Integration
 - **Client**: `backend/app/infrastructure/boond/client.py`
-- Fetches opportunities, resources (employees), agencies
-- Resource filtering by state (1=actif, 2=mission)
+- Fetch opportunities, resources (employees), agencies
+- Resource filtering by state (0=Sortie, 1=En cours, 2=Intercontrat, 3=Arrivée prochaine, 7=Sortie prochaine)
 - Resource type to role mapping:
   - Types 0, 1, 10 → `user` (Consultant)
   - Type 2 → `commercial`
   - Types 5, 6 → `rh` (RH, Direction RH)
+- Retry logic (3 attempts, exponential backoff)
+- Basic auth, timeout 5s
+
+**Methods**:
+- `get_opportunities()` - Fetch all opportunities
+- `get_opportunity(external_id)` - Get single opportunity
+- `get_resources()` - Fetch employees (pagination 500 max)
+- `get_manager_opportunities(manager_id)` - For commercials
+- `get_hr_manager_opportunities(manager_id)` - For HR recruitment
+- `create_candidate(candidate)` - Create candidate
+- `create_positioning(candidate_id, opportunity_id)` - Create positioning
+- `health_check()` - Simple GET /candidates ping
 
 ### 2. Invitation System
-- Admin can invite users from BoondManager resources list
-- Stores `boond_resource_id`, `manager_boond_id`, `phone`, `first_name`, `last_name` with invitations
-- Email sent via Resend API with registration link
-- **Role selector**: Admin can change the suggested role before sending invitation
-- **Filters**: Filter resources by Agency, Type, and State (default: "En cours")
-- **Pre-fill**: Registration form pre-filled with BoondManager data (name, phone)
-- **Migrations**: `003_add_inv_boond_ids.py`, `006_add_names_to_invitations.py`
+- Admin invites users from BoondManager resources list
+- Stores `boond_resource_id`, `manager_boond_id`, `phone`, `first_name`, `last_name`
+- Email sent via Resend/SMTP with registration link
+- **Role selector**: Admin can change suggested role before invitation
+- **Filters**: Agency, Type, State (default: "En cours")
+- **Pre-fill**: Registration form pre-filled with BoondManager data
 
-### 3. Admin Panel (`frontend/src/pages/Admin.tsx`)
-- **BoondTab**: Connection status, sync button, test connection
-- **InvitationsTab**: Table of BoondManager resources with:
-  - Consultant name, agency, type, state, suggested role
-  - Role selector dropdown to change role before invitation
-  - Agency, Type and State filters (default state: "En cours")
-  - Resource details modal (click on name)
-  - "Inviter" button (disabled if already registered or pending invitation)
-- **UsersTab**: User management with:
-  - Role and Status filters
-  - User details modal (click on name to edit)
-  - Activate/deactivate, change role, delete user
-  - Centered action buttons
+### 3. Admin Panel (`frontend/src/pages/admin/`)
+- **UsersTab**: User management (CRUD, roles, activation)
+- **InvitationsTab**: BoondManager resources table with invitation flow
+- **BoondTab**: Connection status, sync, test
+- **TemplatesTab**: CV templates upload/management
+- **StatsTab**: CV transformation statistics
+- **ApiTab**: Test API connections (Boond, Gemini, Turnover-IT)
 
 ### 4. Authentication
-- JWT with access (15min) and refresh (7d) tokens
+- JWT with access (30min) and refresh (7d) tokens
+- Auto token refresh on 401
 - Password reset via email
 - Email verification
+- Magic link support (feature flag)
 
 ### 5. Dark Mode Support
-- **Tailwind config**: `darkMode: 'class'` for manual control
+- **Tailwind config**: `darkMode: 'class'`
 - **Theme hook**: `frontend/src/hooks/useTheme.ts`
-  - Manages theme state: `system` | `light` | `dark`
-  - Persists preference in localStorage
-  - Cycles through modes: Auto → Clair → Sombre
-- **ThemeProvider**: `frontend/src/components/ThemeProvider.tsx`
-  - Initializes theme on app load
-  - Listens for system preference changes
-- **Toggle button**: In Header component (Sun/Moon/Monitor icons)
-- All UI components styled with `dark:` variants
+  - States: `system` | `light` | `dark`
+  - Persists in localStorage
+  - Cycles: Auto → Clair → Sombre
+- **ThemeProvider**: Initializes on app load
+- **Toggle**: In Header (Sun/Moon/Monitor icons)
 
 ### 6. CV Transformer
 Transform CVs (PDF/DOCX) into standardized Word documents using Google Gemini AI.
 
-**Access**: admin, commercial, rh roles only
+**Access**: admin, commercial, rh
 
 **Features**:
 - Upload CV (PDF or DOCX, max 16 Mo)
-- Select template (Gemini, Craftmania)
+- Select template (configurable)
 - Extract text from document
 - Parse CV data using Gemini AI
 - Generate formatted Word document using docxtpl
 - Direct download of result
-- Stats tracking per user (admin only)
+- Stats tracking per user
 - Template management in Admin panel
+- Rate limit: 10/hour
 
 **Data Processing** (`docx_generator.py`):
-- `_nettoyer_formations()`: Cleans None/null values from diplomes and certifications
-- Each formation has a `display` field for pre-formatted output:
-  - With year: `"2015: Master Informatique"`
-  - Without year: `"Master Informatique"` (no "none:" prefix)
-- `_formater_langues()`: Formats languages with bold name (e.g., **Français** : Natif)
-- `_preparer_experiences_avec_sauts_de_page()`: Adds page breaks between experiences
+- `_nettoyer_formations()`: Cleans None/null values
+- `_formater_langues()`: Bold language names
+- `_preparer_experiences_avec_sauts_de_page()`: Page breaks
 
 **Template Variables**:
 ```jinja2
@@ -136,7 +194,7 @@ Transform CVs (PDF/DOCX) into standardized Word documents using Google Gemini AI
   {{ t.categorie }}: {{ t.valeurs }}
 {% endfor %}
 {% for d in formations.diplomes %}
-  {{ d.display }}  {# or {{ d.annee }}: {{ d.libelle }} #}
+  {{ d.display }}
 {% endfor %}
 {% for c in formations.certifications %}
   {{ c.display }}
@@ -149,99 +207,423 @@ Transform CVs (PDF/DOCX) into standardized Word documents using Google Gemini AI
 {% endfor %}
 ```
 
-**Dependencies**:
-- `google-generativeai` - Gemini API client
-- `docxtpl` - Word template engine (Jinja2)
-- `pypdf` - PDF text extraction
-- `python-docx` - DOCX text extraction
+### 7. Published Opportunities (Anonymized Boond)
+Allow commercials and admins to publish anonymized opportunities for cooptation.
 
-**Database tables** (migration `004_add_cv_transformer_tables.py`):
-- `cv_templates` - Word templates stored as BYTEA
-- `cv_transformation_logs` - Usage tracking
+**Access**: admin, commercial (publishing), all authenticated (viewing)
 
-**Files**:
-- Backend: `backend/app/infrastructure/cv_transformer/`
-- Use cases: `backend/app/application/use_cases/cv_transformer.py`
-- API: `backend/app/api/routes/v1/cv_transformer.py`
-- Frontend: `frontend/src/pages/CvTransformer.tsx`
-- API client: `frontend/src/api/cvTransformer.ts`
+**Features**:
+- View Boond opportunities where user is main manager
+- AI-powered anonymization using Gemini
+- Preview and edit anonymized content
+- Skills extraction
+- Anti-duplicate check (boond_opportunity_id unique)
+- Dedicated detail page at `/opportunities/:id`
+- Cooptation support from detail page
+
+**Workflow**:
+1. Commercial views Boond opportunities
+2. Clicks "Proposer" to anonymize with AI
+3. Reviews/edits anonymized content
+4. Publishes (saved in database)
+5. Consultants see in `/opportunities`
+6. Click to view detail page
+7. Click "Proposer un candidat" to submit cooptation
+
+**Anonymization Rules** (Gemini):
+- Client names → Generic descriptions
+- Internal project names → Generic
+- Preserves: technical skills, methodologies, duration, experience level
+- Preserves formatting: line breaks, bullets, paragraphs
+
+### 8. Quotation Generator (Thales PSTF)
+Generate quotations for Thales using BoondManager data and Excel templates.
+
+**Access**: admin only
+
+**Features**:
+- Upload CSV with consultant/period data
+- Auto-enrichment from BoondManager
+- Auto-fill max_price from pricing grid (124-Data domain)
+- Preview with validation
+- Async background generation
+- Create quotation in BoondManager API
+- Download BoondManager PDF
+- Fill Excel PSTF template
+- Merge PDFs
+- Download as ZIP
+
+**CSV Columns** (simplified):
+- `firstName`, `lastName` - Consultant name
+- `po_start_date`, `po_end_date` - Period dates
+- `periode` - Human-readable period
+- `date` - Quotation date
+- `amount_ht_unit` - TJM
+- `total_uo` - Number of days
+- `C22_domain`, `C22_activity`, `complexity` - Thales classification
+- `max_price` - Optional, auto-filled for 124-Data
+- `sow_reference`, `object_of_need` - SOW info
+
+### 9. HR Recruitment (Turnover-IT Integration)
+Full HR recruitment feature for publishing job postings and managing applications.
+
+**Access**: admin, rh (HR routes), public (application form)
+
+**Features**:
+- View opportunities from BoondManager (admin: all, rh: HR manager filtered)
+- Create draft job postings from opportunities
+- Publish to Turnover-IT
+- Public application form (no auth)
+- AI-powered CV matching using Gemini
+- Application status management with history
+- Notes on applications
+- Create candidates in BoondManager
+- CV storage on S3/Scaleway
+
+**Opportunity Listing**:
+- Admin: ALL open opportunities from BoondManager
+- RH: Only where user is HR manager (`perimeterManagersType: "hr"`)
+- States: `[0, 5, 6, 7, 10]`
+- Colored badges for state
+
+**Workflow**:
+1. RH views opportunities in `/rh` dashboard
+2. Clicks "Créer annonce" to create draft
+3. Fills details (title, description, skills, location, salary...)
+4. Publishes to Turnover-IT
+5. Candidates apply via `/postuler/{token}`
+6. System uploads CV to S3, calculates matching score
+7. RH reviews applications sorted by score
+8. RH changes status (nouveau → en_cours → entretien → accepté/refusé)
+9. RH can create candidate in BoondManager
+
+**Application Status Flow**:
+```
+nouveau → en_cours → entretien → accepté
+   ↓         ↓           ↓
+ refusé   refusé      refusé
+```
+
+**Matching Score Colors**:
+- ≥80%: Green (excellent)
+- 50-79%: Orange (potential)
+- <50%: Red (low)
 
 ## API Endpoints
 
+### Health & Monitoring (`/api/v1/health`)
+- `GET /live` - Liveness probe
+- `GET /ready` - Readiness probe (DB, Redis, Boond checks)
+- `GET /metrics` - Prometheus format
+- `GET /metrics/json` - JSON format
+
+### Authentication (`/api/v1/auth`)
+- `POST /register` - Create account (3/min rate limit)
+- `POST /login` - Authenticate (5/min rate limit)
+- `POST /refresh` - Refresh token
+- `POST /verify-email` - Verify email
+- `POST /forgot-password` - Request reset (3/min rate limit)
+- `POST /reset-password` - Reset password
+- `POST /magic-link` - Passwordless login (feature flag)
+
+### Users (`/api/v1/users`)
+- `GET /me` - Current user profile
+- `PATCH /me` - Update profile
+- `POST /me/password` - Change password
+
 ### Admin (`/api/v1/admin`)
-- `GET /boond/status` - BoondManager connection status
+
+**BoondManager:**
+- `GET /boond/status` - Connection status
 - `POST /boond/sync` - Sync opportunities
 - `POST /boond/test` - Test connection
-- `GET /boond/resources` - List BoondManager employees (with phone, manager_name, state)
-- `GET /users` - List all users
+- `GET /boond/resources` - List employees (with filters)
+
+**User Management:**
+- `GET /users` - List all users (paginated)
+- `GET /users/{id}` - Get user
 - `PATCH /users/{id}` - Update user
 - `POST /users/{id}/role` - Change role
-- `POST /users/{id}/activate` - Activate user
-- `POST /users/{id}/deactivate` - Deactivate user
-- `DELETE /users/{id}` - Delete user permanently (admin only)
+- `POST /users/{id}/activate` - Activate
+- `POST /users/{id}/deactivate` - Deactivate
+- `DELETE /users/{id}` - Delete permanently
+
+**Gemini Settings:**
+- `GET /gemini/settings` - Get current model config
+- `POST /gemini/settings` - Set model
+- `POST /gemini/test` - Test connectivity
+
+**Turnover-IT:**
+- `GET /turnoverit/skills` - Get cached skills
+- `POST /turnoverit/skills/sync` - Force sync
 
 ### Invitations (`/api/v1/invitations`)
-- `POST /` - Create invitation (accepts `boond_resource_id`, `manager_boond_id`)
-- `GET /` - List invitations
+- `POST /` - Create invitation
+- `GET /` - List pending
+- `GET /validate/{token}` - Validate token (public)
+- `POST /accept` - Accept invitation (public)
+- `POST /{id}/resend` - Resend email
 - `DELETE /{id}` - Cancel invitation
 
+### Opportunities (`/api/v1/opportunities`)
+- `GET /` - List all opportunities
+- `GET /my` - List commercial's opportunities
+- `GET /{id}` - Get opportunity
+- `POST /{id}/share` - Share for cooptation
+- `POST /{id}/unshare` - Remove from cooptation
+- `POST /{id}/assign` - Assign owner
+- `POST /sync` - Sync from BoondManager
+
+### Cooptations (`/api/v1/cooptations`)
+- `POST /` - Create cooptation
+- `GET /` - List all (admin)
+- `GET /me` - List user's cooptations
+- `GET /{id}` - Get details
+- `GET /me/stats` - User stats
+- `GET /stats` - Overall stats
+- `PATCH /{id}/status` - Update status
+
 ### CV Transformer (`/api/v1/cv-transformer`)
-- `GET /templates` - List available templates (admin/commercial/rh)
-- `POST /transform` - Transform CV file (multipart form: file + template_name)
-- `POST /templates/{name}` - Upload/update template (admin only)
-- `GET /stats` - Get transformation stats (admin only)
+- `GET /templates` - List templates (10/hour rate limit)
+- `POST /transform` - Transform CV (10/hour rate limit)
+- `POST /templates/{name}` - Upload template (admin)
+- `GET /stats` - Statistics (admin)
+- `GET /test-gemini` - Test Gemini (admin)
+
+### Published Opportunities (`/api/v1/published-opportunities`)
+- `GET /my-boond` - List Boond opportunities (admin/commercial)
+- `GET /my-boond/{id}` - Get Boond opportunity detail
+- `POST /anonymize` - Anonymize with AI
+- `POST /publish` - Publish anonymized
+- `GET /` - List published
+- `GET /{id}` - Get published opportunity
+- `PATCH /{id}/close` - Close opportunity
+
+### HR (`/api/v1/hr`)
+
+**Opportunities:**
+- `GET /opportunities` - List open opportunities from Boond
+
+**Job Postings:**
+- `POST /job-postings` - Create draft
+- `GET /job-postings` - List postings
+- `GET /job-postings/{id}` - Get posting
+- `PATCH /job-postings/{id}` - Update draft
+- `POST /job-postings/{id}/publish` - Publish to Turnover-IT
+- `POST /job-postings/{id}/close` - Close posting
+- `GET /job-postings/{id}/applications` - List applications
+
+**Applications:**
+- `GET /applications/{id}` - Get application
+- `PATCH /applications/{id}/status` - Update status
+- `PATCH /applications/{id}/note` - Update notes
+- `GET /applications/{id}/cv` - Get CV download URL
+- `POST /applications/{id}/create-in-boond` - Create candidate in Boond
+
+### Public Applications (`/api/v1/postuler`)
+- `GET /{token}` - Get job posting info (public)
+- `POST /{token}` - Submit application (public)
+
+### Settings (`/api/v1/settings`)
+- `GET /{key}` - Get setting (admin)
+- `POST /{key}` - Set setting (admin)
+
+### Quotation Generator (`/api/v1/quotation-generator`)
+- `POST /preview` - Parse CSV and preview
+- `POST /batches/{id}/generate` - Start generation
+- `GET /batches/{id}/progress` - Get progress
+- `GET /batches/{id}/details` - Get full details
+- `PATCH /batches/{id}/quotations/{row}/contact` - Update contact
+- `DELETE /batches/{id}/quotations/{row}` - Delete quotation
+- `GET /batches/{id}/download/zip` - Download ZIP
 
 ## Database Models
 
-### Invitation
+### users
 ```python
-id: UUID
-email: str
-role: str
-token: str
-boond_resource_id: str | None  # Added in migration 003
-manager_boond_id: str | None   # Added in migration 003
-phone: str | None              # Added in migration 005
-first_name: str | None         # Added in migration 006 (pre-fill from Boond)
-last_name: str | None          # Added in migration 006 (pre-fill from Boond)
-expires_at: datetime
-created_at: datetime
-```
-
-### User
-```python
-id: UUID
-email: str
+id: UUID (PK)
+email: str (unique)
+hashed_password: str
 first_name: str
 last_name: str
-hashed_password: str
 role: str  # user, commercial, rh, admin
 is_verified: bool
 is_active: bool
+phone: str | None
 boond_resource_id: str | None
 manager_boond_id: str | None
+verification_token: str | None
+reset_token: str | None
+reset_token_expires: datetime | None
 created_at: datetime
 updated_at: datetime
 ```
 
-### CvTemplate
+### invitations
 ```python
-id: UUID
-name: str  # unique identifier (gemini, craftmania)
+id: UUID (PK)
+email: str
+role: str
+token: str (unique)
+invited_by: UUID (FK users.id)
+expires_at: datetime
+accepted_at: datetime | None
+boond_resource_id: str | None
+manager_boond_id: str | None
+phone: str | None
+first_name: str | None
+last_name: str | None
+created_at: datetime
+```
+
+### candidates
+```python
+id: UUID (PK)
+email: str
+first_name: str
+last_name: str
+civility: str | None
+phone: str | None
+daily_rate: float | None
+cv_filename: str | None
+cv_path: str | None
+note: str | None
+external_id: str | None  # BoondManager
+created_at: datetime
+updated_at: datetime
+```
+
+### opportunities
+```python
+id: UUID (PK)
+external_id: str (unique)  # Boond ID
+title: str
+reference: str | None
+start_date: date | None
+end_date: date | None
+response_deadline: date | None
+budget: float | None
+manager_name: str | None
+manager_email: str | None
+manager_boond_id: str | None
+client_name: str | None
+description: str | None
+skills: JSON | None
+location: str | None
+is_active: bool
+is_shared: bool  # For cooptation
+owner_id: UUID (FK users.id) | None  # Commercial owner
+synced_at: datetime | None
+created_at: datetime
+updated_at: datetime
+```
+
+### cooptations
+```python
+id: UUID (PK)
+candidate_id: UUID (FK candidates.id)
+opportunity_id: UUID (FK opportunities.id)
+submitter_id: UUID (FK users.id)
+status: str  # pending, in_review, interview, accepted, rejected
+external_positioning_id: str | None  # Boond
+status_history: JSON
+rejection_reason: str | None
+submitted_at: datetime
+updated_at: datetime
+```
+
+### published_opportunities
+```python
+id: UUID (PK)
+boond_opportunity_id: str (unique)  # Anti-doublon
+title: str  # Anonymisé
+description: text  # Anonymisé
+skills: ARRAY(str)  # Extraites par IA
+original_title: str | None  # Interne
+original_data: JSON | None  # Backup Boond
+end_date: date | None
+status: str  # draft, published, closed
+published_by: UUID (FK users.id)
+created_at: datetime
+updated_at: datetime
+```
+
+### job_postings
+```python
+id: UUID (PK)
+opportunity_id: str (FK)
+title: str
+description: text
+qualifications: text
+location_country: str
+location_region: str | None
+location_city: str | None
+location_postal_code: str | None
+contract_types: JSON  # Array
+skills: JSON  # Array
+experience_level: str | None
+remote: str | None  # full, partial, none
+start_date: date | None
+duration_months: int | None
+salary_min_annual: int | None
+salary_max_annual: int | None
+salary_min_daily: int | None
+salary_max_daily: int | None
+employer_overview: text | None
+status: str  # draft, published, closed
+turnoverit_reference: str | None
+turnoverit_public_url: str | None
+application_token: str (unique)
+created_by: UUID (FK users.id)
+created_at: datetime
+updated_at: datetime
+published_at: datetime | None
+closed_at: datetime | None
+```
+
+### job_applications
+```python
+id: UUID (PK)
+job_posting_id: UUID (FK job_postings.id)
+first_name: str
+last_name: str
+email: str
+phone: str
+job_title: str | None
+tjm_min: int | None
+tjm_max: int | None
+availability_date: date | None
+cv_s3_key: str
+cv_filename: str
+cv_text: text | None
+matching_score: int | None
+matching_details: JSON | None
+status: str  # nouveau, en_cours, entretien, accepte, refuse
+status_history: JSON
+notes: text | None
+boond_candidate_id: str | None
+created_at: datetime
+updated_at: datetime
+```
+
+### cv_templates
+```python
+id: UUID (PK)
+name: str (unique)  # gemini, craftmania
 display_name: str
 description: str | None
-file_content: bytes  # BYTEA
+file_content: BYTEA
 file_name: str
 is_active: bool
 created_at: datetime
 updated_at: datetime
 ```
 
-### CvTransformationLog
+### cv_transformation_logs
 ```python
-id: UUID
-user_id: UUID  # FK to users
-template_id: UUID | None  # FK to cv_templates
+id: UUID (PK)
+user_id: UUID (FK users.id)
+template_id: UUID (FK cv_templates.id) | None
 template_name: str
 original_filename: str
 success: bool
@@ -249,112 +631,105 @@ error_message: str | None
 created_at: datetime
 ```
 
+### turnoverit_skills
+```python
+id: UUID (PK)
+name: str
+slug: str (unique)
+```
+
+### turnoverit_skills_metadata
+```python
+id: int (PK)
+last_synced_at: datetime
+total_skills: int
+```
+
+### app_settings
+```python
+id: UUID (PK)
+key: str
+value: JSON
+created_by: UUID (FK users.id)
+created_at: datetime
+updated_at: datetime
+```
+
+## Database Migrations
+
+| Migration | Purpose |
+|-----------|---------|
+| 001_initial_schema.py | Core tables (users, candidates, opportunities, cooptations) |
+| 002_add_roles_invites.py | Invitations table with roles |
+| 003_add_inv_boond_ids.py | BoondManager IDs on invitations |
+| 004_add_cv_transformer_tables.py | cv_templates, cv_transformation_logs |
+| 005_add_phone_to_users_invitations.py | Phone field |
+| 006_add_names_to_invitations.py | first_name, last_name for pre-fill |
+| 007_add_quotation_templates_table.py | Quotation templates |
+| 008_add_published_opportunities.py | published_opportunities table |
+| 009_add_hr_feature_tables.py | job_postings, job_applications |
+| 010_add_row_level_security.py | PostgreSQL RLS policies |
+| 011_add_turnoverit_skills_table.py | turnoverit_skills, metadata |
+| 012_add_app_settings_table.py | app_settings table |
+| 013_add_turnoverit_skills_table.py | Update turnoverit_skills |
+
 ## Environment Variables
 
 ### Backend
-```
-DATABASE_URL=postgresql://...
-REDIS_URL=redis://...
-JWT_SECRET=...
+```bash
+# Core
+ENV=prod  # dev, test, prod
+DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/db
+REDIS_URL=redis://host:6379/0
+JWT_SECRET=your-secret-key
+FRONTEND_URL=https://your-frontend.com
+
+# BoondManager
 BOOND_API_URL=https://ui.boondmanager.com/api
-BOOND_USERNAME=...
-BOOND_PASSWORD=...
-RESEND_API_KEY=...
-FRONTEND_URL=https://...
-GEMINI_API_KEY=...  # Google Gemini API key for CV transformation
+BOOND_USERNAME=username
+BOOND_PASSWORD=password
+
+# Email (Resend ou SMTP)
+RESEND_API_KEY=re_xxx  # Si Resend
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=user
+SMTP_PASSWORD=password
+SMTP_FROM=noreply@example.com
+
+# Google Gemini AI
+GEMINI_API_KEY=your-gemini-key
+
+# Turnover-IT
+TURNOVERIT_API_KEY=your-turnoverit-key
+TURNOVERIT_API_URL=https://api.turnover-it.com/jobconnect/v2
+
+# S3 Storage (Scaleway ou AWS)
+S3_ENDPOINT_URL=https://s3.fr-par.scw.cloud  # Vide pour AWS
+S3_BUCKET_NAME=esn-cooptation-cvs
+S3_REGION=fr-par
+S3_ACCESS_KEY=your-access-key
+S3_SECRET_KEY=your-secret-key
+
+# AWS Secrets Manager (optionnel)
+AWS_SECRETS_ENABLED=false
+AWS_SECRETS_NAME=esn-cooptation/prod
+AWS_SECRETS_REGION=eu-west-3
+
+# Feature flags
+FEATURE_MAGIC_LINK=false
+FEATURE_EMAIL_NOTIFICATIONS=true
+FEATURE_BOOND_SYNC=true
 ```
 
 ### Frontend
-```
-VITE_API_URL=https://.../api/v1
-```
-
-## Deployment Notes
-
-### Railway
-- Backend and Frontend deployed as separate services
-- **Dockerfile CMD**: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2`
-- Migrations run automatically on startup
-
-### CORS
-- Configured in `backend/app/main.py`
-- Allows frontend URL origin
-
-## Performance Optimizations
-
-### BoondManager API Calls (2025-01-13)
-- Removed separate `get_resource_types()` call - uses hardcoded mapping
-- Removed separate `get_agencies()` call - extracts from `included` section
-- **Resource type names hardcoded** (types 0, 1, 10 are all Consultant):
-  ```python
-  RESOURCE_TYPE_NAMES = {
-      0: "Consultant",
-      1: "Consultant",
-      2: "Commercial",
-      5: "RH",
-      6: "Direction RH",
-      10: "Consultant",
-  }
-  ```
-- **Agency IDs**:
-  ```python
-  AGENCY_NAMES = {
-      1: "Gemini",
-      5: "Craftmania",
-  }
-  ```
-- **Resource state names**:
-  ```python
-  RESOURCE_STATE_NAMES = {
-      0: "Sortie",
-      1: "En cours",
-      2: "Intercontrat",
-      3: "Arrivée prochaine",
-      7: "Sortie prochaine",
-  }
-  ```
-- Reduced API calls from 4 to 2 for fetching resources
-
-## TypeScript Interfaces
-
-### BoondResource
-```typescript
-interface BoondResource {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone?: string | null;
-  manager_id: string | null;
-  manager_name: string | null;  // Resolved from included data
-  agency_id: string | null;
-  agency_name: string | null;
-  resource_type: number | null;
-  resource_type_name: string | null;
-  state: number | null;
-  state_name: string | null;
-  suggested_role: UserRole;
-}
-```
-
-### InvitationValidation
-```typescript
-interface InvitationValidation {
-  email: string;
-  role: string;
-  phone?: string | null;
-  first_name?: string | null;  // Pre-fill from Boond
-  last_name?: string | null;   // Pre-fill from Boond
-  is_valid: boolean;
-  hours_until_expiry: number;
-}
+```bash
+VITE_API_URL=https://your-backend.com/api/v1
 ```
 
 ## Security
 
 ### Rate Limiting
-Rate limiting protects against brute force and abuse, using Redis as backend.
-
 **Configuration**: `backend/app/api/middleware/rate_limiter.py`
 
 | Endpoint | Limit | Purpose |
@@ -362,34 +737,30 @@ Rate limiting protects against brute force and abuse, using Redis as backend.
 | `/auth/login` | 5/minute | Brute force protection |
 | `/auth/register` | 3/minute | Spam prevention |
 | `/auth/forgot-password` | 3/minute | Abuse prevention |
-| `/cv-transformer/transform` | 10/hour | Expensive operation (Gemini API) |
+| `/cv-transformer/transform` | 10/hour | Expensive operation |
 | Standard API | 100/minute | General protection |
 
 **Response Headers**:
-- `X-RateLimit-Limit`: Maximum requests allowed
-- `X-RateLimit-Remaining`: Requests remaining
-- `X-RateLimit-Reset`: Time until limit resets
-- `Retry-After`: Seconds to wait (on 429 error)
+- `X-RateLimit-Limit`: Maximum requests
+- `X-RateLimit-Remaining`: Remaining requests
+- `X-RateLimit-Reset`: Reset time
+- `Retry-After`: Wait time (on 429)
 
 ### Security Headers
-Security headers middleware adds protection against common web vulnerabilities.
-
 **Configuration**: `backend/app/api/middleware/security_headers.py`
 
 | Header | Value | Purpose |
 |--------|-------|---------|
-| `Strict-Transport-Security` | max-age=31536000 | Enforce HTTPS (prod only) |
-| `X-Frame-Options` | DENY | Prevent clickjacking |
-| `X-Content-Type-Options` | nosniff | Prevent MIME sniffing |
-| `Referrer-Policy` | strict-origin-when-cross-origin | Control referrer info |
-| `X-XSS-Protection` | 1; mode=block | XSS protection (legacy) |
-| `Content-Security-Policy` | default-src 'self' | XSS/injection protection (prod) |
-| `Permissions-Policy` | camera=(), microphone=() | Restrict browser features |
+| `Strict-Transport-Security` | max-age=31536000 | HTTPS (prod) |
+| `X-Frame-Options` | DENY | Clickjacking |
+| `X-Content-Type-Options` | nosniff | MIME sniffing |
+| `Referrer-Policy` | strict-origin-when-cross-origin | Referrer control |
+| `X-XSS-Protection` | 1; mode=block | XSS (legacy) |
+| `Content-Security-Policy` | default-src 'self' | XSS/injection (prod) |
+| `Permissions-Policy` | camera=(), microphone=() | Browser features |
 
 ### Row Level Security (RLS)
-PostgreSQL RLS provides database-level access control as defense-in-depth.
-
-**Migration**: `backend/alembic/versions/010_add_row_level_security.py`
+**Migration**: `010_add_row_level_security.py`
 
 **Protected Tables**:
 - `cooptations` - Users see own, commercials see their opportunities', admin/rh see all
@@ -398,24 +769,20 @@ PostgreSQL RLS provides database-level access control as defense-in-depth.
 
 **Context Functions**:
 ```sql
--- Set context before queries
 SELECT set_app_context('user-uuid', 'user-role');
-
--- Clear context after request
 SELECT clear_app_context();
 ```
 
-**RLS Context Middleware**: `backend/app/api/middleware/rls_context.py`
-
 ### Audit Logging
-Structured audit logging for security-sensitive operations.
-
 **Module**: `backend/app/infrastructure/audit/logger.py`
 
 **Logged Events**:
 - Authentication: login success/failure, password reset
 - User management: create, update, delete, role change
-- CV transformations: success/failure with file info
+- Invitations: create, accept, delete
+- Cooptations: create, update, status change
+- CV transformations: success/failure
+- HR operations: posting publish, application status
 - Security events: rate limit exceeded, unauthorized access
 
 **Usage**:
@@ -431,206 +798,86 @@ audit_logger.log(
 )
 ```
 
-### Security Dependencies
-```toml
-# backend/pyproject.toml
-slowapi>=0.1.9    # Rate limiting
-# Note: Security headers are set manually in security_headers.py (no external lib)
+## Frontend Routes
+
+### Public Routes
+- `/login` - Login page
+- `/register` - Registration
+- `/forgot-password` - Password reset request
+- `/reset-password` - Reset with token
+- `/accept-invitation` - Accept invitation
+- `/postuler/:token` - Public job application
+
+### Protected Routes (all authenticated)
+- `/dashboard` - User dashboard with stats
+- `/opportunities` - List published opportunities
+- `/opportunities/:id` - Opportunity detail
+- `/my-cooptations` - User's cooptations
+- `/profile` - Profile management
+
+### Commercial/Admin Routes
+- `/my-boond-opportunities` - Publish from BoondManager
+- `/cv-transformer` - CV transformation tool
+
+### HR Routes
+- `/rh` - HR dashboard (opportunities + postings)
+- `/rh/annonces/nouvelle/:oppId` - Create job posting
+- `/rh/annonces/:postingId` - Posting details + applications
+
+### Admin Routes
+- `/admin` - Admin panel (tabs)
+- `/quotation-generator` - Thales quotations
+
+## TypeScript Interfaces
+
+### User Types
+```typescript
+type UserRole = 'user' | 'commercial' | 'rh' | 'admin';
+
+interface User {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: UserRole;
+  is_verified: boolean;
+  is_active: boolean;
+  phone?: string | null;
+  boond_resource_id?: string | null;
+  manager_boond_id?: string | null;
+  created_at: string;
+}
 ```
 
-## Common Commands
+### Cooptation Types
+```typescript
+type CooptationStatus = 'pending' | 'in_review' | 'interview' | 'accepted' | 'rejected';
 
-```bash
-# Backend
-cd backend
-alembic upgrade head          # Run migrations
-alembic revision -m "desc"    # Create migration
-uvicorn app.main:app --reload # Dev server
-
-# Frontend
-cd frontend
-npm run dev                   # Dev server
-npm run build                 # Build
-npm run lint                  # Lint
+interface Cooptation {
+  id: string;
+  candidate: Candidate;
+  opportunity: Opportunity;
+  submitter: User;
+  status: CooptationStatus;
+  status_history: StatusChange[];
+  rejection_reason?: string;
+  submitted_at: string;
+}
 ```
 
-## Technical Debt / Future Migrations
-
-### Google Gemini SDK Migration
-- **Current**: `google-generativeai` (deprecated)
-- **Target**: `google-genai`
-- **File**: `backend/app/infrastructure/cv_transformer/gemini_client.py`
-- **Priority**: Medium (package still works but no longer receives updates)
-- **Reference**: https://github.com/google-gemini/deprecated-generative-ai-python
-
-### 7. Quotation Generator (Thales PSTF)
-Generate quotations for Thales using BoondManager data and Excel templates.
-
-**Access**: admin role only
-
-**Features**:
-- Upload CSV with consultant/period data (simplified or full format)
-- Auto-enrichment from BoondManager (resource, opportunity, company, contacts)
-- Auto-fill max_price from pricing grid (124-Data domain)
-- Preview with validation before generation
-- Async background generation
-- For each quotation:
-  - Create quotation in BoondManager API
-  - Download BoondManager PDF
-  - Fill Excel PSTF template
-  - Merge both PDFs
-- Download results as ZIP
-- Delete rows from preview before generation
-- Change contact per quotation
-
-**CSV Columns** (simplified format):
-- `firstName`, `lastName` - Consultant name (enriched from BoondManager)
-- `po_start_date`, `po_end_date` - Period dates
-- `periode` - Human-readable period (e.g., "Q1 2026")
-- `date` - Quotation date
-- `amount_ht_unit` - TJM (daily rate)
-- `total_uo` - Number of days (quantity)
-- `C22_domain`, `C22_activity`, `complexity` - Thales classification
-- `max_price` - Optional, auto-filled from pricing grid for 124-Data
-- `sow_reference`, `object_of_need` - SOW info
-
-**Pricing Grid**:
-- Auto-fills `max_price` for domain `124-Data` based on activity/complexity/region
-- For unsupported domains: sets `max_price=0` with comment "Pas de grille pour ce périmètre"
-
-**Files**:
-- Backend: `backend/app/quotation_generator/`
-- API: `backend/app/quotation_generator/api/routes.py`
-- Frontend: `frontend/src/pages/QuotationGenerator.tsx`
-- API client: `frontend/src/api/quotationGenerator.ts`
-
-**Key API Endpoints** (`/api/v1/quotation-generator`):
-- `POST /preview` - Parse CSV and return preview
-- `POST /batches/{batch_id}/generate` - Start async generation
-- `GET /batches/{batch_id}/progress` - Get generation progress
-- `GET /batches/{batch_id}/details` - Get full batch details
-- `PATCH /batches/{batch_id}/quotations/{row_index}/contact` - Update contact
-- `DELETE /batches/{batch_id}/quotations/{row_index}` - Delete quotation from preview
-- `GET /batches/{batch_id}/download/zip` - Download all PDFs as ZIP
-
-### 9. HR Recruitment (Turnover-IT Integration)
-Full HR recruitment feature for publishing job postings on Turnover-IT and managing applications.
-
-**Access**: admin, rh roles only (HR routes), public (application form)
-
-**Features**:
-- View opportunities from BoondManager where user is HR manager
-- Create draft job postings from opportunities
-- Publish job postings to Turnover-IT
-- Receive applications via public form (no auth required)
-- AI-powered CV matching using Gemini
-- Application status management with history
-- Notes on applications
-- Create candidates in BoondManager from applications
-- CV storage on S3/Scaleway Object Storage
-
-**Opportunity Listing (BoondManager Integration)**:
-- **Admin users**: See ALL open opportunities from BoondManager
-- **RH users**: See only opportunities where they are HR manager (`perimeterManagersType: "hr"`)
-- Uses same opportunity states as commercial module: `[0, 5, 6, 7, 10]`
-- Displays Boond state with colored badge (blue, green, yellow, red, etc.)
-- Real-time search filtering by title, reference, or client name
-- Shows job posting status for each opportunity
-
-**Boond Opportunity States (for HR)**:
-```python
-ACTIVE_OPPORTUNITY_STATES = [0, 5, 6, 7, 10]
-# 0: Piste identifiée
-# 5: En cours
-# 6: Récurrent
-# 7: AO ouvert
-# 10: Besoin en avant de phase
-```
-
-**Workflow**:
-1. RH views open opportunities in `/rh` dashboard (fetched from BoondManager)
-2. Clicks "Créer annonce" to create a draft posting
-3. Fills posting details (title, description, qualifications, skills, etc.)
-4. Publishes to Turnover-IT (generates public URL)
-5. Candidates apply via `/postuler/{token}` (public form)
-6. System uploads CV to S3 and calculates matching score with Gemini
-7. RH reviews applications sorted by matching score
-8. RH changes status (nouveau → en_cours → entretien → accepté/refusé)
-9. RH can create candidate in BoondManager
-
-**Application Status Flow**:
-```
-nouveau → en_cours → entretien → accepté
-   ↓         ↓           ↓
- refusé   refusé      refusé
-```
-
-**Matching Score Colors**:
-- ≥80%: Green (excellent match)
-- 50-79%: Orange (potential match)
-- <50%: Red (low match)
-
-**Database Tables** (migration `009_add_hr_feature_tables.py`):
-- `job_postings` - Job posting details, status, Turnover-IT reference
-- `job_applications` - Candidate applications with CV, matching score, status
-
-**Files**:
-- Domain entities: `backend/app/domain/entities/job_posting.py`, `job_application.py`
-- Repositories: `backend/app/infrastructure/database/repositories.py`
-- Turnover-IT client: `backend/app/infrastructure/turnoverit/client.py`
-- S3 client: `backend/app/infrastructure/storage/s3_client.py`
-- Gemini matcher: `backend/app/infrastructure/matching/gemini_matcher.py`
-- Use cases: `backend/app/application/use_cases/job_postings.py`, `job_applications.py`
-- API routes: `backend/app/api/routes/v1/hr.py`, `public_applications.py`
-- Frontend pages:
-  - `frontend/src/pages/HRDashboard.tsx` - Opportunities list with posting status
-  - `frontend/src/pages/CreateJobPosting.tsx` - Create/edit job posting form
-  - `frontend/src/pages/JobPostingDetails.tsx` - Posting details + applications list
-  - `frontend/src/pages/PublicApplication.tsx` - Public application form
-- API client: `frontend/src/api/hr.ts`
-
-**API Endpoints** (`/api/v1/hr`):
-- `GET /opportunities` - List open opportunities with posting status (rh/admin)
-- `POST /job-postings` - Create draft posting (rh/admin)
-- `GET /job-postings` - List all postings (rh/admin)
-- `GET /job-postings/{id}` - Get posting details (rh/admin)
-- `PATCH /job-postings/{id}` - Update draft posting (rh/admin)
-- `POST /job-postings/{id}/publish` - Publish to Turnover-IT (rh/admin)
-- `POST /job-postings/{id}/close` - Close posting (rh/admin)
-- `GET /job-postings/{id}/applications` - List applications (rh/admin)
-- `GET /applications/{id}` - Get application details (rh/admin)
-- `PATCH /applications/{id}/status` - Update status (rh/admin)
-- `PATCH /applications/{id}/note` - Update notes (rh/admin)
-- `GET /applications/{id}/cv` - Get CV download URL (rh/admin)
-- `POST /applications/{id}/create-in-boond` - Create candidate in Boond (rh/admin)
-
-**Public API Endpoints** (`/api/v1/postuler`):
-- `GET /{token}` - Get public job posting info
-- `POST /{token}` - Submit application (multipart/form-data with CV)
-
-**Environment Variables**:
-```
-TURNOVERIT_API_KEY=...        # Turnover-IT API key
-S3_ENDPOINT_URL=...           # e.g., https://s3.fr-par.scw.cloud
-S3_BUCKET_NAME=esn-cooptation-cvs
-S3_REGION=fr-par
-S3_ACCESS_KEY=...
-S3_SECRET_KEY=...
-```
-
-**TypeScript Types**:
+### HR Types
 ```typescript
 type JobPostingStatus = 'draft' | 'published' | 'closed';
 type ApplicationStatus = 'nouveau' | 'en_cours' | 'entretien' | 'accepte' | 'refuse';
 
 interface OpportunityForHR {
-  id: string;                              // Boond opportunity ID
+  id: string;
   title: string;
   reference: string;
   client_name: string | null;
-  state: number | null;                    // Boond state code
-  state_name: string | null;               // Human-readable state
-  state_color: string | null;              // Badge color (blue, green, etc.)
+  state: number | null;
+  state_name: string | null;
+  state_color: string | null;
   hr_manager_name: string | null;
   has_job_posting: boolean;
   job_posting_id: string | null;
@@ -683,88 +930,7 @@ interface MatchingDetails {
 }
 ```
 
-### 8. Published Opportunities (Anonymized Boond)
-Allow commercials and admins to publish anonymized opportunities for cooptation.
-
-**Access**: admin, commercial roles only (for publishing), all authenticated users (for viewing)
-
-**Features**:
-- View Boond opportunities where user is main manager
-- AI-powered anonymization using Gemini (removes client names, internal references)
-- Preview and edit anonymized content before publishing
-- Skills extraction from job description
-- Anti-duplicate check (boond_opportunity_id unique)
-- Published opportunities visible to all consultants for cooptation
-- **Dedicated detail page** at `/opportunities/:id` with full description
-- **Cooptation support**: Consultants can propose candidates directly from opportunity detail
-
-**Workflow**:
-1. Commercial views their Boond opportunities (filtered by manager principal)
-2. Clicks "Proposer" to anonymize with AI
-3. Reviews/edits the anonymized title and description
-4. Publishes the opportunity (saved in database)
-5. Consultants see published opportunities in `/opportunities` page
-6. Click on opportunity card to view full detail page
-7. Click "Proposer un candidat" to submit cooptation
-
-**Boond Opportunity States** (filtered for publication):
-- 0: Perdue
-- 5: En cours
-- 6: Signée
-- 7: Abandonnée
-- 10: En attente
-
-**Anonymization Rules** (Gemini prompt):
-- Client names → Generic descriptions ("BNP Paribas" → "Grande banque française")
-- Internal project names → Generic ("Projet Phoenix" → "Projet de transformation")
-- Preserves: technical skills, methodologies, duration, experience level
-- **Preserves formatting**: Line breaks, bullet points, paragraph structure
-
-**Cooptation Integration**:
-- When creating cooptation for published opportunity, system:
-  1. Checks `opportunities` table first
-  2. If not found, checks `published_opportunities` table
-  3. Converts `PublishedOpportunity` to `Opportunity` entity
-  4. Saves to `opportunities` table (for FK constraint)
-  5. Creates cooptation with reference `PUB-{boond_opportunity_id}`
-
-**Files**:
-- Domain entity: `backend/app/domain/entities/published_opportunity.py`
-- Value object: `backend/app/domain/value_objects/status.py` (OpportunityStatus)
-- Repository: `backend/app/infrastructure/database/repositories.py` (PublishedOpportunityRepository)
-- Anonymizer: `backend/app/infrastructure/anonymizer/gemini_anonymizer.py`
-- Use cases: `backend/app/application/use_cases/published_opportunities.py`
-- API routes: `backend/app/api/routes/v1/published_opportunities.py`
-- Frontend pages:
-  - `frontend/src/pages/MyBoondOpportunities.tsx` - Commercial view to publish
-  - `frontend/src/pages/Opportunities.tsx` - List published opportunities
-  - `frontend/src/pages/OpportunityDetail.tsx` - Full detail page
-- API client: `frontend/src/api/publishedOpportunities.ts`
-
-**API Endpoints** (`/api/v1/published-opportunities`):
-- `GET /my-boond` - List Boond opportunities for current manager (admin/commercial)
-- `POST /anonymize` - Anonymize opportunity with AI (admin/commercial)
-- `POST /publish` - Publish anonymized opportunity (admin/commercial)
-- `GET /` - List published opportunities (all authenticated users)
-- `GET /{id}` - Get published opportunity detail (all authenticated users)
-- `PATCH /{id}/close` - Close opportunity (publisher or admin)
-
-**Database Model** (migration `008_add_published_opportunities.py`):
-```python
-id: UUID (PK)
-boond_opportunity_id: String(50), unique, not null  # Anti-doublon
-title: String(255), not null                        # Anonymisé
-description: Text, not null                         # Anonymisé
-skills: ARRAY(String(100))                          # Extraites par IA
-original_title: String(255)                         # Interne uniquement
-original_data: JSON                                 # Backup Boond
-end_date: Date, nullable
-status: String(20), default='published'             # draft/published/closed
-published_by: UUID, FK(users.id)
-created_at, updated_at: DateTime
-```
-
-**TypeScript Types**:
+### Published Opportunity Types
 ```typescript
 type PublishedOpportunityStatus = 'draft' | 'published' | 'closed';
 
@@ -793,194 +959,235 @@ interface PublishedOpportunity {
 }
 ```
 
+### BoondManager Types
+```typescript
+interface BoondResource {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string | null;
+  manager_id: string | null;
+  manager_name: string | null;
+  agency_id: string | null;
+  agency_name: string | null;
+  resource_type: number | null;
+  resource_type_name: string | null;
+  state: number | null;
+  state_name: string | null;
+  suggested_role: UserRole;
+}
+```
+
+## BoondManager Hardcoded Values
+
+```python
+RESOURCE_TYPE_NAMES = {
+    0: "Consultant",
+    1: "Consultant",
+    2: "Commercial",
+    5: "RH",
+    6: "Direction RH",
+    10: "Consultant",
+}
+
+AGENCY_NAMES = {
+    1: "Gemini",
+    5: "Craftmania",
+}
+
+RESOURCE_STATE_NAMES = {
+    0: "Sortie",
+    1: "En cours",
+    2: "Intercontrat",
+    3: "Arrivée prochaine",
+    7: "Sortie prochaine",
+}
+
+ACTIVE_OPPORTUNITY_STATES = [0, 5, 6, 7, 10]
+# 0: Piste identifiée
+# 5: En cours
+# 6: Récurrent
+# 7: AO ouvert
+# 10: Besoin en avant de phase
+```
+
+## Common Commands
+
+```bash
+# Backend
+cd backend
+alembic upgrade head          # Run migrations
+alembic revision -m "desc"    # Create migration
+uvicorn app.main:app --reload # Dev server
+pytest                        # Run tests
+ruff check .                  # Lint
+mypy .                        # Type check
+
+# Frontend
+cd frontend
+npm run dev                   # Dev server
+npm run build                 # Build
+npm run lint                  # Lint
+npm run test                  # Run tests
+npm run type-check            # Type check
+npx playwright test           # E2E tests
+```
+
+## Deployment (Railway)
+
+**Dockerfile CMD**:
+```dockerfile
+CMD alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2
+```
+
+- Migrations run automatically on startup
+- Backend and Frontend as separate services
+- CORS configured in `backend/app/main.py`
+
+## Dependencies
+
+### Backend (pyproject.toml)
+```toml
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.6.0",
+    "python-jose[cryptography]>=3.3.0",
+    "bcrypt>=4.2.0",
+    "httpx>=0.28.0",
+    "tenacity>=9.0.0",
+    "redis>=5.2.0",
+    "aiosmtplib>=3.0.2",
+    "resend>=2.5.0",
+    "structlog>=24.4.0",
+    "python-multipart>=0.0.18",
+    "email-validator>=2.2.0",
+    "google-generativeai>=0.8.3",
+    "docxtpl>=0.19.0",
+    "python-docx>=1.1.2",
+    "openpyxl>=3.1.5",
+    "PyPDF2>=3.0.1",
+    "aioboto3>=13.2.0",
+    "boto3>=1.35.0",
+    "slowapi>=0.1.9",
+]
+```
+
+### Frontend (package.json)
+```json
+{
+  "dependencies": {
+    "@headlessui/react": "^2.2.0",
+    "@tanstack/react-query": "^5.62.0",
+    "axios": "^1.7.9",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.54.0",
+    "react-router-dom": "^7.0.2",
+    "sonner": "^1.7.1",
+    "zod": "^3.24.1",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@hookform/resolvers": "^3.9.1",
+    "@tailwindcss/forms": "^0.5.9",
+    "@types/react": "^18.3.14",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^3.4.16",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vitest": "^2.1.8",
+    "@testing-library/react": "^16.1.0",
+    "@playwright/test": "^1.49.1"
+  }
+}
+```
+
+## Technical Debt
+
+### Google Gemini SDK Migration
+- **Current**: `google-generativeai` (deprecated)
+- **Target**: `google-genai`
+- **Files**: `gemini_client.py`, `gemini_anonymizer.py`, `gemini_matcher.py`
+- **Priority**: Medium
+- **Reference**: https://github.com/google-gemini/deprecated-generative-ai-python
+
+## Architectural Patterns
+
+1. **Layered Architecture**: API → Use Cases → Domain → Infrastructure
+2. **Repository Pattern**: Data access abstraction
+3. **Value Objects**: Strongly-typed enums (UserRole, CooptationStatus, etc.)
+4. **Dependency Injection**: Factory functions, type hints
+5. **Async/Await**: Fully async with asyncio, httpx, aioboto3
+6. **CQRS-like**: Read models separate from domain entities
+7. **Domain-Driven Design**: Rich entities with business logic
+8. **Event-driven**: Email notifications for events
+
 ## Recent Changes Log
+
+### 2026-01-19
+- Updated CLAUDE.md with comprehensive documentation
 
 ### 2026-01-18
 **Security Hardening Implementation**:
 - Added rate limiting with slowapi and Redis backend
-  - `/auth/login`: 5/minute (brute force protection)
-  - `/auth/register`: 3/minute (spam prevention)
-  - `/auth/forgot-password`: 3/minute (abuse prevention)
-  - `/cv-transformer/transform`: 10/hour (expensive operation)
 - Added security headers middleware (HSTS, CSP, X-Frame-Options, etc.)
-- Implemented Row Level Security (RLS) on PostgreSQL tables:
-  - `cooptations`: Users see own, commercials see their opportunities', admin/rh see all
-  - `job_applications`: Admin/rh see all, public can insert
-  - `cv_transformation_logs`: Users see own, admin sees all
-- Added structured audit logging for security events:
-  - Login success/failure tracking
-  - Role changes
-  - CV transformations
-  - Unauthorized access attempts
+- Implemented Row Level Security (RLS) on PostgreSQL tables
+- Added structured audit logging for security events
 
 **Files created**:
-- `backend/app/api/middleware/rate_limiter.py` - Rate limiting configuration
-- `backend/app/api/middleware/security_headers.py` - Security headers middleware
-- `backend/app/api/middleware/rls_context.py` - RLS context management
-- `backend/app/infrastructure/audit/logger.py` - Audit logging module
-- `backend/alembic/versions/010_add_row_level_security.py` - RLS migration
-
-**Files modified**:
-- `backend/pyproject.toml` - Added slowapi, secure dependencies
-- `backend/app/main.py` - Integrated rate limiter and security headers
-- `backend/app/api/routes/v1/auth.py` - Added rate limits and audit logging
-- `backend/app/api/routes/v1/cv_transformer.py` - Added rate limits and audit logging
-- `backend/app/api/middleware/__init__.py` - Exported new middleware
-
-### 2026-01-17 (session 2)
-**HR Opportunities from BoondManager**:
-- Changed HR opportunity listing to fetch from BoondManager API instead of local database
-- **Admin users**: See ALL open opportunities from BoondManager
-- **RH users**: See only opportunities where they are HR manager (uses `perimeterManagersType: "hr"`)
-- Added Boond state display with colored badges
-- Uses same opportunity states as commercial module: `[0, 5, 6, 7, 10]`
-- Added efficient batch lookup for job posting status
-- Updated frontend with client-side instant search filtering
-
-**Files modified**:
-- `backend/app/infrastructure/boond/client.py` - Added `get_hr_manager_opportunities()` method
-- `backend/app/application/use_cases/job_postings.py` - Changed to use BoondClient
-- `backend/app/application/read_models/hr.py` - Added Boond-specific fields
-- `backend/app/api/routes/v1/hr.py` - Updated to pass user's boond_resource_id
-- `backend/app/infrastructure/database/repositories/job_posting_repository.py` - Added batch lookup
-- `frontend/src/types/index.ts` - Updated OpportunityForHR interface
-- `frontend/src/pages/HRDashboard.tsx` - Updated to display Boond state
-- `frontend/src/pages/CreateJobPosting.tsx` - Updated for new data structure
-- `frontend/src/api/hr.ts` - Removed pagination params
-- `backend/tests/unit/use_cases/test_hr_use_cases.py` - Updated tests
-- `frontend/src/api/hr.test.ts` - Updated tests
+- `backend/app/api/middleware/rate_limiter.py`
+- `backend/app/api/middleware/security_headers.py`
+- `backend/app/api/middleware/rls_context.py`
+- `backend/app/infrastructure/audit/logger.py`
+- `backend/alembic/versions/010_add_row_level_security.py`
+- `backend/alembic/versions/011_add_turnoverit_skills_table.py`
+- `backend/alembic/versions/012_add_app_settings_table.py`
+- `backend/alembic/versions/013_add_turnoverit_skills_table.py`
 
 ### 2026-01-17
-**HR Feature Review & Quality Improvements**:
-- Verified complete implementation of HR Recruitment feature (Turnover-IT integration)
-- Added comprehensive backend tests:
-  - `tests/unit/use_cases/test_hr_use_cases.py` - Use case tests for job postings and applications
-  - `tests/integration/api/test_hr.py` - API integration tests
-- Added frontend tests:
-  - `src/api/hr.test.ts` - HR API client tests
-- Added E2E tests:
-  - `e2e/hr.spec.ts` - Full HR workflow tests (access control, forms, applications)
-- Updated dependencies to latest stable versions:
-  - Backend: FastAPI 0.115+, SQLAlchemy 2.0.36+, Pydantic 2.10+, etc.
-  - Frontend: React 18.3+, React Query 5.62+, Vite 6+, TypeScript 5.7+, etc.
-- Updated CLAUDE.md with HR feature documentation
+**HR Opportunities from BoondManager**:
+- Changed HR opportunity listing to fetch from BoondManager API
+- Admin: ALL opportunities, RH: HR manager filtered
+- Added Boond state display with colored badges
+- Added efficient batch lookup for job posting status
 
-**Files created/modified**:
-- `backend/tests/unit/use_cases/test_hr_use_cases.py` - New
-- `backend/tests/integration/api/test_hr.py` - New
-- `frontend/src/api/hr.test.ts` - New
-- `frontend/e2e/hr.spec.ts` - New
-- `backend/pyproject.toml` - Updated dependencies
-- `frontend/package.json` - Updated dependencies
-- `CLAUDE.md` - Added HR feature documentation
+**HR Feature Review & Quality**:
+- Added comprehensive backend tests
+- Added frontend tests
+- Added E2E tests
+- Updated dependencies
 
-### 2026-01-15 (session 3)
-**Published Opportunities - Bug Fixes & Improvements**:
-- Fixed blank page after publishing: added `setTimeout` to defer `invalidateQueries`
-- Fixed HTTP 422 error on publish: `end_date` now sends `null` instead of empty string
-- **Opportunities page rewrite**: Now uses `/published-opportunities` API instead of old `/opportunities`
-- **New OpportunityDetail page** (`frontend/src/pages/OpportunityDetail.tsx`):
-  - Full dedicated page at `/opportunities/:id` instead of modal popup
-  - Back link to opportunities list
-  - Header card with title, status badge, publish date, end date
-  - Description card with `whitespace-pre-wrap` for formatting
-  - Skills card with styled badges
-  - CTA card to propose candidate
-  - Cooptation form modal
-- **Card component update**: Added `onClick` prop with accessibility attributes (role, tabIndex, onKeyDown)
-- **Gemini anonymization prompt improved**: Added rule 5 "PRÉSERVE LA MISE EN FORME" to preserve line breaks, bullet points, and paragraph structure
-- **Cooptation for published opportunities**:
-  - Added `PublishedOpportunityRepository` dependency to `CreateCooptationUseCase`
-  - If opportunity not found in `opportunities` table, checks `published_opportunities`
-  - Converts `PublishedOpportunity` to `Opportunity` entity
-  - Saves to `opportunities` table to satisfy foreign key constraint `fk_cooptations_opportunity`
-
-**Files modified**:
-- `frontend/src/pages/Opportunities.tsx` - Rewrote to use published opportunities
-- `frontend/src/pages/OpportunityDetail.tsx` - New file
-- `frontend/src/App.tsx` - Added route `/opportunities/:id`
-- `frontend/src/components/ui/Card.tsx` - Added onClick support
-- `backend/app/infrastructure/anonymizer/gemini_anonymizer.py` - Improved formatting preservation
-- `backend/app/application/use_cases/cooptations.py` - Support for published opportunities
-- `backend/app/api/routes/v1/cooptations.py` - Added PublishedOpportunityRepository
-
-### 2026-01-15 (session 2)
+### 2026-01-15
 **Published Opportunities Feature**:
-- Created migration `008_add_published_opportunities.py` for published_opportunities table
-- Added `OpportunityStatus` value object (draft/published/closed)
-- Created `PublishedOpportunity` entity with business methods
-- Added `PublishedOpportunityModel` to SQLAlchemy models
-- Created `PublishedOpportunityRepository` with CRUD operations
-- Extended `BoondClient` with `get_manager_opportunities()` method
-- Created `GeminiAnonymizer` for AI-powered opportunity anonymization
-- Created use cases: GetMyBoondOpportunities, Anonymize, Publish, List, Close
-- Added API routes at `/api/v1/published-opportunities`
-- Created `MyBoondOpportunities` page with table, detail modal, anonymization flow
-- Added "Commercial" section in sidebar for admin/commercial roles
-- Added `AdminOrCommercialUser` dependency for route protection
+- Created migration for published_opportunities table
+- Added AI anonymization with Gemini
+- Created dedicated detail page
+- Added cooptation support from detail page
 
-### 2026-01-15 (session 1)
-**Quotation Generator - Major Fixes**:
-- Fixed Redis serialization: added `period_name`, `quotation_date`, `need_title`, `pdf_path`, `merged_pdf_path` to storage
-- Fixed template PDF filename collision: template now uses `_template.pdf` suffix to avoid being deleted
-- Fixed background task garbage collection: tasks stored in module-level set
-- Fixed error quotation creation: use `quantity=1` instead of `quantity=0`
-- Fixed download buttons: show based on `completedCount > 0` instead of stored paths
-- Added delete button (trash icon) to remove quotations from preview
-- Added name formatting as "Prénom NOM" (e.g., "Raphael COLLARD")
-- Unsupported domains now allowed with `max_price=0` and comment "Pas de grille pour ce périmètre"
-- Removed "Télécharger PDF fusionné" button, kept only "Télécharger ZIP"
-- Renamed "Nouveau batch" to "Nouvelle génération"
+**Quotation Generator Fixes**:
+- Fixed Redis serialization
+- Fixed template PDF collision
+- Fixed background task garbage collection
+- Added delete quotation functionality
 
-### 2026-01-14 (session 2)
-- Added role and status filters to Users tab in Admin panel
-- Fixed actions alignment in Users table (centered with inline-flex)
-- Added delete user functionality for admin (with confirmation modal)
-- Fixed BoondManager invitation pre-fill issue:
-  - Created migration `006_add_names_to_invitations.py` for first_name, last_name columns
-  - Invitation now stores first_name, last_name from BoondManager
-  - AcceptInvitation form pre-fills with invitation data
-- Added state filter to BoondManager resources (default: "En cours")
-- Display manager name instead of ID in resource details modal
-- Made only user/resource names clickable for modals (not entire row)
-- Fixed CV Transformer "none:" prefix for formations/certifications without dates:
-  - Added `_nettoyer_formations()` method to clean None/null values
-  - Added `display` field for pre-formatted output (e.g., "2015: Master" or just "Master")
-
-### 2026-01-14 (session 1)
-- Added phone number support (international format +33...) for users and invitations
-- Created migration `005_add_phone_fields.py` to add phone column to users and invitations tables
-- Added phone field to BoondManager resource sync (mobile/phone1)
-- Added user details modal in Admin > Users with editable fields (name, phone, boond IDs)
-- Made user rows clickable to view/edit details
-- Phone is passed from invitation to user on registration
+### 2026-01-14
+- Added phone number support
+- Added user details modal in Admin
+- Fixed CV Transformer "none:" prefix
+- Added state filter to BoondManager resources
+- Added delete user functionality
 
 ### 2026-01-13
-- Added CV Transformer feature for transforming CVs to standardized Word documents
-- Created migration `004_add_cv_transformer_tables.py` for templates and logs
-- Added Gemini AI integration for CV data extraction
-- Created infrastructure services for PDF/DOCX text extraction
-- Added CvTransformer page with drag & drop upload, template selection, progress
-- Added Templates management tab in Admin panel
-- Added Stats tab in Admin panel for transformation statistics
-- Added `/cv-transformer` route accessible to admin, commercial, rh roles
-- Added "Outils" section in sidebar navigation
-
-### 2025-01-13
-- Added BoondManager resources endpoint for invitations
-- Created migration `003_add_inv_boond_ids.py` for boond fields
-- Redesigned InvitationsTab with resources table
-- Added resource state filtering (1, 2 only)
-- Implemented role suggestion based on resource type
-- Fixed Mail icon import in Admin.tsx
-- Added automatic migration execution in Dockerfile
-- Optimized BoondManager API calls (removed unnecessary requests)
-- Added pagination support to fetch all resources (maxResults=500)
-- Added agency and type filters to InvitationsTab
-- Added role selector dropdown before sending invitation
-- Created new `rh` role for HR users (types 5, 6)
-- Added system-based dark mode support (`darkMode: 'media'` → `darkMode: 'class'`)
-- Created `useTheme` hook for theme management
-- Created `ThemeProvider` component for theme initialization
-- Added manual theme toggle button in Header (Auto/Clair/Sombre)
-- Fixed dark mode styling across all Admin page components
+- Added CV Transformer feature
+- Added BoondManager resources endpoint
+- Redesigned InvitationsTab
+- Added dark mode support
+- Created `rh` role
