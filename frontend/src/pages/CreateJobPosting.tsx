@@ -66,7 +66,59 @@ const createJobPostingSchema = z.object({
 
 type CreateJobPostingFormData = z.infer<typeof createJobPostingSchema>;
 
-type ViewStep = 'loading' | 'ready' | 'anonymizing' | 'form' | 'saving' | 'error';
+type ViewStep = 'loading' | 'ready' | 'anonymizing' | 'form' | 'saving' | 'auto-saving' | 'error';
+
+// LocalStorage cache key prefix
+const CACHE_KEY_PREFIX = 'job-posting-cache-';
+
+interface CachedAnonymization {
+  oppId: string;
+  data: AnonymizedJobPostingResponse;
+  timestamp: number;
+}
+
+// Cache expires after 24 hours
+const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
+function getCachedAnonymization(oppId: string): AnonymizedJobPostingResponse | null {
+  try {
+    const cached = localStorage.getItem(`${CACHE_KEY_PREFIX}${oppId}`);
+    if (!cached) return null;
+
+    const parsed: CachedAnonymization = JSON.parse(cached);
+
+    // Check if cache is expired
+    if (Date.now() - parsed.timestamp > CACHE_EXPIRY_MS) {
+      localStorage.removeItem(`${CACHE_KEY_PREFIX}${oppId}`);
+      return null;
+    }
+
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedAnonymization(oppId: string, data: AnonymizedJobPostingResponse): void {
+  try {
+    const cacheEntry: CachedAnonymization = {
+      oppId,
+      data,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(`${CACHE_KEY_PREFIX}${oppId}`, JSON.stringify(cacheEntry));
+  } catch {
+    // Ignore localStorage errors (quota exceeded, etc.)
+  }
+}
+
+function clearCachedAnonymization(oppId: string): void {
+  try {
+    localStorage.removeItem(`${CACHE_KEY_PREFIX}${oppId}`);
+  } catch {
+    // Ignore
+  }
+}
 
 const CONTRACT_TYPES = [
   { value: 'PERMANENT', label: 'CDI' },
@@ -114,6 +166,7 @@ export default function CreateJobPosting() {
   const [selectedPlace, setSelectedPlace] = useState<TurnoverITPlace | null>(null);
   const [placeSearch, setPlaceSearch] = useState('');
   const [showPlaceDropdown, setShowPlaceDropdown] = useState(false);
+  const [draftId, setDraftId] = useState<string | null>(null);
   const skillInputRef = useRef<HTMLInputElement>(null);
   const skillDropdownRef = useRef<HTMLDivElement>(null);
   const placeInputRef = useRef<HTMLInputElement>(null);
@@ -195,6 +248,9 @@ export default function CreateJobPosting() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // State to track if we used cached data
+  const [usedCache, setUsedCache] = useState(false);
+
   // Load opportunity detail on mount
   useEffect(() => {
     if (!oppId) {
@@ -207,7 +263,27 @@ export default function CreateJobPosting() {
       try {
         const detail = await hrApi.getOpportunityDetail(oppId);
         setOpportunity(detail);
-        setStep('ready');
+
+        // Check for cached anonymization
+        const cached = getCachedAnonymization(oppId);
+        if (cached) {
+          // Apply cached data directly
+          setAnonymizedData(cached);
+          reset({
+            title: cached.title,
+            description: cached.description,
+            qualifications: cached.qualifications,
+            employer_overview: '',
+          });
+          setSelectedSkills(cached.skills);
+          if (detail.place) {
+            setPlaceSearch(detail.place);
+          }
+          setUsedCache(true);
+          setStep('form');
+        } else {
+          setStep('ready');
+        }
       } catch (error) {
         setErrorMessage(getErrorMessage(error));
         setStep('error');
@@ -215,7 +291,63 @@ export default function CreateJobPosting() {
     };
 
     loadOpportunity();
-  }, [oppId]);
+  }, [oppId, reset]);
+
+  // Helper to apply anonymized data to form
+  const applyAnonymizedData = useCallback((result: AnonymizedJobPostingResponse) => {
+    setAnonymizedData(result);
+
+    // Pre-fill form with anonymized data
+    reset({
+      title: result.title,
+      description: result.description,
+      qualifications: result.qualifications,
+      employer_overview: '',
+    });
+
+    // Set skills
+    setSelectedSkills(result.skills);
+
+    // Pre-fill place search with opportunity location if available
+    if (opportunity?.place) {
+      setPlaceSearch(opportunity.place);
+    }
+  }, [opportunity?.place, reset]);
+
+  // Auto-save mutation - creates draft after anonymization
+  const autoSaveMutation = useMutation({
+    mutationFn: async (anonymizedResult: AnonymizedJobPostingResponse) => {
+      if (!oppId) throw new Error('ID opportunité manquant');
+
+      const request: CreateJobPostingRequest = {
+        opportunity_id: oppId,
+        title: anonymizedResult.title,
+        description: anonymizedResult.description,
+        qualifications: anonymizedResult.qualifications,
+        location_country: 'France',
+        contract_types: ['FREELANCE'], // Default
+        skills: anonymizedResult.skills,
+        pushToTop: true,
+      };
+
+      return hrApi.createJobPosting(request);
+    },
+    onSuccess: (posting) => {
+      setDraftId(posting.id);
+      // Clear cache after draft is saved to database
+      if (oppId) {
+        clearCachedAnonymization(oppId);
+      }
+      queryClient.invalidateQueries({ queryKey: ['hr-opportunities'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-job-postings'] });
+      setStep('form');
+    },
+    onError: (error) => {
+      // If auto-save fails, still show the form (user can manually save later)
+      console.error('Auto-save failed:', error);
+      setStep('form');
+    },
+  });
 
   // Anonymize mutation
   const anonymizeMutation = useMutation({
@@ -235,25 +367,16 @@ export default function CreateJobPosting() {
       });
     },
     onSuccess: (result) => {
-      setAnonymizedData(result);
-
-      // Pre-fill form with anonymized data
-      reset({
-        title: result.title,
-        description: result.description,
-        qualifications: result.qualifications,
-        employer_overview: '',
-      });
-
-      // Set skills
-      setSelectedSkills(result.skills);
-
-      // Pre-fill place search with opportunity location if available
-      if (opportunity?.place) {
-        setPlaceSearch(opportunity.place);
+      // Cache the anonymization result
+      if (oppId) {
+        setCachedAnonymization(oppId, result);
       }
 
-      setStep('form');
+      applyAnonymizedData(result);
+
+      // Auto-save as draft
+      setStep('auto-saving');
+      autoSaveMutation.mutate(result);
     },
     onError: (error) => {
       setErrorMessage(getErrorMessage(error));
@@ -261,8 +384,8 @@ export default function CreateJobPosting() {
     },
   });
 
-  // Create mutation
-  const createMutation = useMutation({
+  // Save mutation - creates or updates draft
+  const saveMutation = useMutation({
     mutationFn: async (data: CreateJobPostingFormData) => {
       if (!oppId) throw new Error('ID opportunité manquant');
       if (selectedContractTypes.length === 0) {
@@ -318,8 +441,7 @@ export default function CreateJobPosting() {
           : undefined;
       }
 
-      const request: CreateJobPostingRequest = {
-        opportunity_id: oppId,
+      const requestData = {
         title: data.title,
         description: data.description,
         qualifications: data.qualifications,
@@ -341,9 +463,21 @@ export default function CreateJobPosting() {
         pushToTop: true,
       };
 
-      return hrApi.createJobPosting(request);
+      // If we have a draft ID, update it; otherwise create new
+      if (draftId) {
+        return hrApi.updateJobPosting(draftId, requestData);
+      } else {
+        return hrApi.createJobPosting({
+          ...requestData,
+          opportunity_id: oppId,
+        });
+      }
     },
     onSuccess: (posting) => {
+      // Clear cache after successful save
+      if (oppId) {
+        clearCachedAnonymization(oppId);
+      }
       queryClient.invalidateQueries({ queryKey: ['hr-opportunities'] });
       queryClient.invalidateQueries({ queryKey: ['hr-job-postings'] });
       navigate(`/rh/annonces/${posting.id}`);
@@ -364,7 +498,7 @@ export default function CreateJobPosting() {
 
   const onSubmit = (data: CreateJobPostingFormData) => {
     setStep('saving');
-    createMutation.mutate(data);
+    saveMutation.mutate(data);
   };
 
   const selectSkill = useCallback((skill: TurnoverITSkill) => {
@@ -582,6 +716,21 @@ export default function CreateJobPosting() {
     );
   }
 
+  // Auto-saving state
+  if (step === 'auto-saving') {
+    return (
+      <div className="flex flex-col items-center justify-center h-96">
+        <Loader2 className="h-16 w-16 animate-spin text-blue-500" />
+        <p className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
+          Enregistrement automatique du brouillon...
+        </p>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
+          Vous pourrez reprendre la rédaction plus tard
+        </p>
+      </div>
+    );
+  }
+
   // Form state (after anonymization)
   return (
     <div className="space-y-6">
@@ -594,14 +743,28 @@ export default function CreateJobPosting() {
           <ChevronLeft className="h-5 w-5" />
           Retour aux opportunités
         </Link>
-        <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Prévisualisation</h1>
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            {draftId ? 'Modifier le brouillon' : 'Prévisualisation'}
+          </h1>
           <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-sm rounded-full">
             Anonymisé
           </span>
+          {draftId && (
+            <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm rounded-full">
+              Brouillon sauvegardé
+            </span>
+          )}
+          {usedCache && !draftId && (
+            <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-sm rounded-full">
+              Depuis le cache
+            </span>
+          )}
         </div>
         <p className="mt-1 text-gray-600 dark:text-gray-400">
-          Vérifiez et ajustez le contenu avant de créer le brouillon
+          {draftId
+            ? 'Complétez les informations et enregistrez vos modifications'
+            : 'Vérifiez et ajustez le contenu avant de créer le brouillon'}
         </p>
       </div>
 
@@ -1136,14 +1299,14 @@ export default function CreateJobPosting() {
         </div>
 
         {/* Error Message */}
-        {createMutation.isError && (
+        {saveMutation.isError && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
               <p className="text-red-800 dark:text-red-200">
-                {createMutation.error instanceof Error
-                  ? createMutation.error.message
-                  : "Erreur lors de la création de l'annonce"}
+                {saveMutation.error instanceof Error
+                  ? saveMutation.error.message
+                  : "Erreur lors de l'enregistrement de l'annonce"}
               </p>
             </div>
           </div>
@@ -1153,14 +1316,16 @@ export default function CreateJobPosting() {
         <div className="flex gap-3 pt-2">
           <button
             type="submit"
-            disabled={createMutation.isPending || selectedContractTypes.length === 0}
+            disabled={saveMutation.isPending || selectedContractTypes.length === 0}
             className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
           >
-            {createMutation.isPending || step === 'saving' ? (
+            {saveMutation.isPending || step === 'saving' ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Création en cours...
+                Enregistrement...
               </>
+            ) : draftId ? (
+              'Mettre à jour le brouillon'
             ) : (
               'Créer le brouillon'
             )}

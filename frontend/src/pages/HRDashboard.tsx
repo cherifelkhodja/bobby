@@ -17,6 +17,7 @@ import {
   Filter,
   TrendingUp,
   AlertCircle,
+  Pencil,
 } from 'lucide-react';
 import { hrApi } from '../api/hr';
 import { Card } from '../components/ui/Card';
@@ -393,15 +394,27 @@ export default function HRDashboard() {
                     <td className="py-2 px-3">
                       <div className="flex justify-end">
                         {opportunity.has_job_posting ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleViewPosting(opportunity)}
-                            leftIcon={<Eye className="h-3 w-3" />}
-                            className="text-xs px-2 py-1"
-                          >
-                            Voir
-                          </Button>
+                          opportunity.job_posting_status === 'draft' ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleViewPosting(opportunity)}
+                              leftIcon={<Pencil className="h-3 w-3" />}
+                              className="text-xs px-2 py-1 border-amber-500 text-amber-600 hover:bg-amber-50 dark:border-amber-400 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                            >
+                              Reprendre
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleViewPosting(opportunity)}
+                              leftIcon={<Eye className="h-3 w-3" />}
+                              className="text-xs px-2 py-1"
+                            >
+                              Voir
+                            </Button>
+                          )
                         ) : (
                           <Button
                             size="sm"
