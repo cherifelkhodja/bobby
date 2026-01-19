@@ -75,12 +75,11 @@ const CONTRACT_TYPES = [
   { value: 'CDI', label: 'CDI' },
   { value: 'CDD', label: 'CDD' },
   { value: 'FREELANCE', label: 'Freelance' },
-  { value: 'INTERIM', label: 'Intérim' },
   { value: 'INTERCONTRACT', label: 'Sous-traitance' },
 ];
 
 // Contract types that enable salary fields (annual)
-const SALARY_CONTRACT_TYPES = ['CDI', 'CDD', 'INTERIM'];
+const SALARY_CONTRACT_TYPES = ['CDI', 'CDD'];
 // Contract types that enable TJM fields (daily rate)
 const TJM_CONTRACT_TYPES = ['FREELANCE', 'INTERCONTRACT'];
 
@@ -929,11 +928,11 @@ export default function CreateJobPosting() {
             Les champs sont activés selon les types de contrat sélectionnés
           </p>
 
-          {/* Salary fields (CDI, CDD, Intérim) */}
+          {/* Salary fields (CDI, CDD) */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Salaire annuel (CDI, CDD, Intérim)
+                Salaire annuel (CDI, CDD)
               </h4>
               {!hasSalaryContractType && (
                 <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
