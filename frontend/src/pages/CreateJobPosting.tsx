@@ -113,6 +113,7 @@ export default function CreateJobPosting() {
   const [isAsap, setIsAsap] = useState(false);
   const [durationUnit, setDurationUnit] = useState<'months' | 'years'>('months');
   const [durationValue, setDurationValue] = useState<number | ''>('');
+  const [isSalaryByProfile, setIsSalaryByProfile] = useState(false);
   const skillInputRef = useRef<HTMLInputElement>(null);
   const skillDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -251,10 +252,10 @@ export default function CreateJobPosting() {
         throw new Error('Sélectionnez au moins un type de contrat');
       }
 
-      // Calculate start date: today if ASAP, otherwise form value
-      let startDate: string | undefined;
+      // Calculate start date: null if ASAP, otherwise form value
+      let startDate: string | null | undefined;
       if (isAsap) {
-        startDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+        startDate = null; // ASAP means no specific start date
       } else {
         startDate = data.start_date || undefined;
       }
@@ -265,21 +266,37 @@ export default function CreateJobPosting() {
         durationMonths = durationUnit === 'years' ? durationValue * 12 : durationValue;
       }
 
-      // Only include salary fields if salary contract types are selected
-      const salaryMinAnnual = hasSalaryContractType && typeof data.salary_min_annual === 'number'
-        ? data.salary_min_annual
-        : undefined;
-      const salaryMaxAnnual = hasSalaryContractType && typeof data.salary_max_annual === 'number'
-        ? data.salary_max_annual
-        : undefined;
+      // Handle salary fields based on contract types and "salary by profile" option
+      let salaryMinAnnual: number | null | undefined;
+      let salaryMaxAnnual: number | null | undefined;
+      let salaryMinDaily: number | null | undefined;
+      let salaryMaxDaily: number | null | undefined;
 
-      // Only include TJM fields if TJM contract types are selected
-      const salaryMinDaily = hasTjmContractType && typeof data.salary_min_daily === 'number'
-        ? data.salary_min_daily
-        : undefined;
-      const salaryMaxDaily = hasTjmContractType && typeof data.salary_max_daily === 'number'
-        ? data.salary_max_daily
-        : undefined;
+      if (isSalaryByProfile) {
+        // "Rémunération selon profil" checked: send null for relevant fields
+        if (hasSalaryContractType) {
+          salaryMinAnnual = null;
+          salaryMaxAnnual = null;
+        }
+        if (hasTjmContractType) {
+          salaryMinDaily = null;
+          salaryMaxDaily = null;
+        }
+      } else {
+        // Normal behavior: only include fields if contract types are selected
+        salaryMinAnnual = hasSalaryContractType && typeof data.salary_min_annual === 'number'
+          ? data.salary_min_annual
+          : undefined;
+        salaryMaxAnnual = hasSalaryContractType && typeof data.salary_max_annual === 'number'
+          ? data.salary_max_annual
+          : undefined;
+        salaryMinDaily = hasTjmContractType && typeof data.salary_min_daily === 'number'
+          ? data.salary_min_daily
+          : undefined;
+        salaryMaxDaily = hasTjmContractType && typeof data.salary_max_daily === 'number'
+          ? data.salary_max_daily
+          : undefined;
+      }
 
       const request: CreateJobPostingRequest = {
         opportunity_id: oppId,
@@ -950,9 +967,9 @@ export default function CreateJobPosting() {
                   {...register('salary_min_annual')}
                   placeholder="35000"
                   min={0}
-                  disabled={!hasSalaryContractType}
+                  disabled={!hasSalaryContractType || isSalaryByProfile}
                   className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    !hasSalaryContractType ? 'opacity-50 cursor-not-allowed' : ''
+                    !hasSalaryContractType || isSalaryByProfile ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 />
               </div>
@@ -965,9 +982,9 @@ export default function CreateJobPosting() {
                   {...register('salary_max_annual')}
                   placeholder="50000"
                   min={0}
-                  disabled={!hasSalaryContractType}
+                  disabled={!hasSalaryContractType || isSalaryByProfile}
                   className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    !hasSalaryContractType ? 'opacity-50 cursor-not-allowed' : ''
+                    !hasSalaryContractType || isSalaryByProfile ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 />
               </div>
@@ -996,9 +1013,9 @@ export default function CreateJobPosting() {
                   {...register('salary_min_daily')}
                   placeholder="400"
                   min={0}
-                  disabled={!hasTjmContractType}
+                  disabled={!hasTjmContractType || isSalaryByProfile}
                   className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    !hasTjmContractType ? 'opacity-50 cursor-not-allowed' : ''
+                    !hasTjmContractType || isSalaryByProfile ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 />
               </div>
@@ -1011,13 +1028,31 @@ export default function CreateJobPosting() {
                   {...register('salary_max_daily')}
                   placeholder="550"
                   min={0}
-                  disabled={!hasTjmContractType}
+                  disabled={!hasTjmContractType || isSalaryByProfile}
                   className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    !hasTjmContractType ? 'opacity-50 cursor-not-allowed' : ''
+                    !hasTjmContractType || isSalaryByProfile ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 />
               </div>
             </div>
+          </div>
+
+          {/* Salary by profile checkbox */}
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isSalaryByProfile}
+                onChange={(e) => setIsSalaryByProfile(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Rémunération selon profil
+              </span>
+            </label>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">
+              La rémunération sera déterminée en fonction du profil du candidat
+            </p>
           </div>
 
           {/* Employer Overview */}
