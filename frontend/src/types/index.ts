@@ -422,6 +422,7 @@ export interface JobPosting {
   location_region: string | null;
   location_postal_code: string | null;
   location_city: string | null;
+  location_key: string | null;  // Turnover-IT location key
   client_name: string | null;
   contract_types: string[];
   skills: string[];
@@ -487,6 +488,7 @@ export interface CreateJobPostingRequest {
   location_region?: string | null;
   location_postal_code?: string | null;
   location_city?: string | null;
+  location_key?: string | null;  // Turnover-IT location key for normalization
   contract_types: string[];
   skills?: string[];
   salary_min?: number | null;
@@ -510,6 +512,8 @@ export interface UpdateJobPostingRequest {
   location_country?: string;
   location_region?: string | null;
   location_postal_code?: string | null;
+  location_city?: string | null;
+  location_key?: string | null;  // Turnover-IT location key for normalization
   contract_types?: string[];
   skills?: string[];
   salary_min?: number | null;

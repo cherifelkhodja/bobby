@@ -115,6 +115,7 @@ class JobPosting:
     location_region: Optional[str] = None
     location_postal_code: Optional[str] = None
     location_city: Optional[str] = None
+    location_key: Optional[str] = None  # Turnover-IT location key for normalization
 
     # Job details
     contract_types: list[str] = field(default_factory=lambda: ["PERMANENT"])
@@ -310,6 +311,8 @@ class JobPosting:
         }
 
         # Optional location fields
+        if self.location_key:
+            payload["location"]["key"] = self.location_key
         if self.location_region:
             payload["location"]["region"] = self.location_region
         if self.location_postal_code:

@@ -76,6 +76,7 @@ class JobPostingReadModel(BaseModel):
     location_region: Optional[str] = None
     location_postal_code: Optional[str] = None
     location_city: Optional[str] = None
+    location_key: Optional[str] = None  # Turnover-IT location key
     contract_types: list[str]
     skills: list[str]
     experience_level: Optional[str] = None

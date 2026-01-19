@@ -105,6 +105,7 @@ class JobPostingRepository:
             model.location_region = posting.location_region
             model.location_postal_code = posting.location_postal_code
             model.location_city = posting.location_city
+            model.location_key = posting.location_key
             model.contract_types = posting.contract_types
             model.skills = posting.skills
             model.experience_level = posting.experience_level
@@ -135,6 +136,7 @@ class JobPostingRepository:
                 location_region=posting.location_region,
                 location_postal_code=posting.location_postal_code,
                 location_city=posting.location_city,
+                location_key=posting.location_key,
                 contract_types=posting.contract_types,
                 skills=posting.skills,
                 experience_level=posting.experience_level,
@@ -248,6 +250,7 @@ class JobPostingRepository:
             location_region=model.location_region,
             location_postal_code=model.location_postal_code,
             location_city=model.location_city,
+            location_key=model.location_key,
             contract_types=model.contract_types or [],
             skills=model.skills or [],
             experience_level=model.experience_level,

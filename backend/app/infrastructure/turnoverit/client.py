@@ -211,13 +211,13 @@ class TurnoverITClient:
             raise TurnoverITError(f"Erreur de connexion: {str(e)}")
 
     async def get_places(self, search: str) -> list[dict[str, Any]]:
-        """Get place suggestions from Turnover-IT.
+        """Get place suggestions from Turnover-IT locations autocomplete API.
 
         Args:
             search: Search query (city, postal code, region).
 
         Returns:
-            List of places with locality, region, country, etc.
+            List of places with key, label, locality, region, country, etc.
         """
         if not self._is_configured():
             return []
@@ -226,48 +226,43 @@ class TurnoverITClient:
             return []
 
         try:
-            # Places endpoint is outside /v2 path (same as skills)
-            places_url = f"{self.base_url.replace('/v2', '')}/places"
+            # Locations autocomplete endpoint: https://app.turnover-it.com/api/locations/autocomplete
+            locations_url = "https://app.turnover-it.com/api/locations/autocomplete"
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
-                    places_url,
+                    locations_url,
                     headers=self._get_headers(),
-                    params={"q": search},
+                    params={"search": search},
                 )
 
-                logger.info(f"Turnover-IT places response: url={places_url}, status={response.status_code}, body={response.text[:500]}")
+                logger.info(
+                    f"Turnover-IT locations response: url={locations_url}, "
+                    f"status={response.status_code}, body={response.text[:500]}"
+                )
 
                 if response.status_code == 200:
-                    data = response.json()
-                    members = data.get("hydra:member", [])
-                    return [
-                        {
-                            "locality": place.get("locality", ""),
-                            "region": place.get("region", ""),
-                            "county": place.get("county", ""),
-                            "country": place.get("country", ""),
-                            "postalCode": place.get("postalCode", ""),
-                            "display": self._format_place_display(place),
-                        }
-                        for place in members
-                    ]
+                    places = response.json()
+                    # API returns a list directly, not hydra format
+                    if isinstance(places, list):
+                        return [
+                            {
+                                "key": place.get("key", ""),
+                                "label": place.get("label", ""),
+                                "shortLabel": place.get("shortLabel", ""),
+                                "locality": place.get("locality") or place.get("adminLevel2", ""),
+                                "region": place.get("adminLevel1", ""),
+                                "postalCode": place.get("postalCode", ""),
+                                "country": place.get("country", ""),
+                                "countryCode": place.get("countryCode", ""),
+                            }
+                            for place in places
+                        ]
 
                 return []
 
         except Exception as e:
             logger.warning(f"Failed to fetch places: {e}")
             return []
-
-    def _format_place_display(self, place: dict[str, Any]) -> str:
-        """Format place for display in autocomplete."""
-        parts = []
-        if place.get("locality"):
-            parts.append(place["locality"])
-        if place.get("region"):
-            parts.append(place["region"])
-        if place.get("country") and place.get("country") != "France":
-            parts.append(place["country"])
-        return ", ".join(parts) if parts else place.get("postalCode", "")
 
     async def get_skills(self, search: Optional[str] = None) -> list[dict[str, str]]:
         """Get available skills from Turnover-IT.

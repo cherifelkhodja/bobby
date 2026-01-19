@@ -49,12 +49,14 @@ export interface TurnoverITSkillsResponse {
 }
 
 export interface TurnoverITPlace {
-  locality: string;
-  region: string;
-  county: string;
-  country: string;
-  postalCode: string;
-  display: string;
+  key: string;           // Unique identifier for persistence (e.g., "fr~ile-de-france~paris~")
+  label: string;         // Full display label (e.g., "Paris, France")
+  shortLabel: string;    // Short label (e.g., "Paris")
+  locality: string;      // City name (from adminLevel2)
+  region: string;        // Region name (from adminLevel1)
+  postalCode: string;    // Postal code
+  country: string;       // Country name
+  countryCode: string;   // ISO country code (e.g., "FR")
 }
 
 export interface TurnoverITPlacesResponse {

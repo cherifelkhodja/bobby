@@ -172,6 +172,7 @@ class CreateJobPostingCommand:
     location_region: Optional[str] = None
     location_postal_code: Optional[str] = None
     location_city: Optional[str] = None
+    location_key: Optional[str] = None  # Turnover-IT location key for normalization
     contract_types: list[str] = None  # type: ignore
     skills: list[str] = None  # type: ignore
     experience_level: Optional[str] = None
@@ -239,6 +240,7 @@ class CreateJobPostingUseCase:
             location_region=command.location_region,
             location_postal_code=command.location_postal_code,
             location_city=command.location_city,
+            location_key=command.location_key,
             contract_types=contract_types,
             skills=command.skills,
             experience_level=experience_level,
@@ -284,6 +286,7 @@ class CreateJobPostingUseCase:
             location_region=posting.location_region,
             location_postal_code=posting.location_postal_code,
             location_city=posting.location_city,
+            location_key=posting.location_key,
             contract_types=[str(ct) for ct in posting.contract_types],
             skills=posting.skills,
             experience_level=str(posting.experience_level) if posting.experience_level else None,
@@ -372,6 +375,7 @@ class GetJobPostingUseCase:
             location_region=posting.location_region,
             location_postal_code=posting.location_postal_code,
             location_city=posting.location_city,
+            location_key=posting.location_key,
             contract_types=[str(ct) for ct in posting.contract_types],
             skills=posting.skills,
             experience_level=str(posting.experience_level) if posting.experience_level else None,
@@ -426,6 +430,7 @@ class GetJobPostingByTokenUseCase:
             location_country=posting.location_country,
             location_region=posting.location_region,
             location_city=posting.location_city,
+            location_key=posting.location_key,
             contract_types=[str(ct) for ct in posting.contract_types],
             skills=posting.skills,
             experience_level=str(posting.experience_level) if posting.experience_level else None,
@@ -614,6 +619,7 @@ class PublishJobPostingUseCase:
             location_region=posting.location_region,
             location_postal_code=posting.location_postal_code,
             location_city=posting.location_city,
+            location_key=posting.location_key,
             contract_types=[str(ct) for ct in posting.contract_types],
             skills=posting.skills,
             experience_level=str(posting.experience_level) if posting.experience_level else None,
@@ -714,6 +720,7 @@ class CloseJobPostingUseCase:
             location_region=posting.location_region,
             location_postal_code=posting.location_postal_code,
             location_city=posting.location_city,
+            location_key=posting.location_key,
             contract_types=[str(ct) for ct in posting.contract_types],
             skills=posting.skills,
             experience_level=str(posting.experience_level) if posting.experience_level else None,
@@ -752,6 +759,7 @@ class UpdateJobPostingCommand:
     location_region: Optional[str] = None
     location_postal_code: Optional[str] = None
     location_city: Optional[str] = None
+    location_key: Optional[str] = None  # Turnover-IT location key for normalization
     contract_types: Optional[list[str]] = None
     skills: Optional[list[str]] = None
     experience_level: Optional[str] = None
@@ -802,6 +810,8 @@ class UpdateJobPostingUseCase:
             posting.location_postal_code = command.location_postal_code
         if command.location_city is not None:
             posting.location_city = command.location_city
+        if command.location_key is not None:
+            posting.location_key = command.location_key
         if command.contract_types is not None:
             posting.contract_types = [ContractType(ct) for ct in command.contract_types]
         if command.skills is not None:
@@ -869,6 +879,7 @@ class UpdateJobPostingUseCase:
             location_region=posting.location_region,
             location_postal_code=posting.location_postal_code,
             location_city=posting.location_city,
+            location_key=posting.location_key,
             contract_types=[str(ct) for ct in posting.contract_types],
             skills=posting.skills,
             experience_level=str(posting.experience_level) if posting.experience_level else None,

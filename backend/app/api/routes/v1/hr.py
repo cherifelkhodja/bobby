@@ -76,6 +76,7 @@ class CreateJobPostingRequest(BaseModel):
     location_region: Optional[str] = Field(None, max_length=100)
     location_postal_code: Optional[str] = Field(None, max_length=20)
     location_city: Optional[str] = Field(None, max_length=100)
+    location_key: Optional[str] = Field(None, max_length=200)  # Turnover-IT location key
     contract_types: list[str] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)
     experience_level: Optional[str] = None
@@ -100,6 +101,7 @@ class UpdateJobPostingRequest(BaseModel):
     location_region: Optional[str] = Field(None, max_length=100)
     location_postal_code: Optional[str] = Field(None, max_length=20)
     location_city: Optional[str] = Field(None, max_length=100)
+    location_key: Optional[str] = Field(None, max_length=200)  # Turnover-IT location key
     contract_types: Optional[list[str]] = None
     skills: Optional[list[str]] = None
     experience_level: Optional[str] = None
@@ -174,14 +176,16 @@ class TurnoverITSkillsListResponse(BaseModel):
 
 
 class TurnoverITPlaceItem(BaseModel):
-    """A single Turnover-IT place."""
+    """A single Turnover-IT place from locations autocomplete API."""
 
-    locality: str
-    region: str
-    county: str
-    country: str
-    postalCode: str
-    display: str
+    key: str  # Unique identifier for persistence (e.g., "fr~ile-de-france~paris~")
+    label: str  # Full display label (e.g., "Paris, France")
+    shortLabel: str  # Short label (e.g., "Paris")
+    locality: str  # City name (from adminLevel2)
+    region: str  # Region name (from adminLevel1)
+    postalCode: str  # Postal code
+    country: str  # Country name
+    countryCode: str  # ISO country code (e.g., "FR")
 
 
 class TurnoverITPlacesListResponse(BaseModel):
@@ -556,6 +560,7 @@ async def create_job_posting(
             location_region=request.location_region,
             location_postal_code=request.location_postal_code,
             location_city=request.location_city,
+            location_key=request.location_key,
             contract_types=request.contract_types,
             skills=request.skills,
             experience_level=request.experience_level,
@@ -664,6 +669,7 @@ async def update_job_posting(
             location_region=request.location_region,
             location_postal_code=request.location_postal_code,
             location_city=request.location_city,
+            location_key=request.location_key,
             contract_types=request.contract_types,
             skills=request.skills,
             experience_level=request.experience_level,

@@ -445,10 +445,11 @@ export default function CreateJobPosting() {
         title: data.title,
         description: data.description,
         qualifications: data.qualifications,
-        location_country: 'France',
+        location_country: selectedPlace.countryCode === 'FR' ? 'France' : selectedPlace.country,
         location_region: selectedPlace.region || undefined,
         location_postal_code: selectedPlace.postalCode || undefined,
         location_city: selectedPlace.locality || undefined,
+        location_key: selectedPlace.key || undefined,
         contract_types: selectedContractTypes,
         skills: selectedSkills,
         experience_level: data.experience_level || undefined,
@@ -522,7 +523,7 @@ export default function CreateJobPosting() {
 
   const selectPlace = useCallback((place: TurnoverITPlace) => {
     setSelectedPlace(place);
-    setPlaceSearch(place.display);
+    setPlaceSearch(place.label);
     setShowPlaceDropdown(false);
   }, []);
 
@@ -960,7 +961,7 @@ export default function CreateJobPosting() {
                 onChange={(e) => {
                   setPlaceSearch(e.target.value);
                   setShowPlaceDropdown(true);
-                  if (selectedPlace && e.target.value !== selectedPlace.display) {
+                  if (selectedPlace && e.target.value !== selectedPlace.label) {
                     setSelectedPlace(null);
                   }
                 }}
@@ -996,14 +997,14 @@ export default function CreateJobPosting() {
                       : 'Aucun lieu trouvé'}
                   </div>
                 ) : (
-                  placesData.places.map((place, index) => (
+                  placesData.places.map((place) => (
                     <button
-                      key={`${place.locality}-${place.region}-${index}`}
+                      key={place.key}
                       type="button"
                       onClick={() => selectPlace(place)}
                       className="w-full px-4 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-900/30 text-gray-900 dark:text-white text-sm transition-colors"
                     >
-                      {place.display}
+                      {place.label}
                     </button>
                   ))
                 )}
@@ -1018,7 +1019,7 @@ export default function CreateJobPosting() {
             {selectedPlace && (
               <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <p className="text-sm text-green-800 dark:text-green-300">
-                  <span className="font-medium">Lieu sélectionné :</span> {selectedPlace.display}
+                  <span className="font-medium">Lieu sélectionné :</span> {selectedPlace.label}
                 </p>
                 {selectedPlace.postalCode && (
                   <p className="text-xs text-green-600 dark:text-green-400 mt-1">

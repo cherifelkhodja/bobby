@@ -333,6 +333,7 @@ class JobPostingModel(Base):
     location_region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     location_postal_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     location_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    location_key: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)  # Turnover-IT location key
     contract_types: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     skills: Mapped[Optional[list]] = mapped_column(JSON, nullable=True, default=list)
     experience_level: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
