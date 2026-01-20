@@ -837,9 +837,6 @@ class UpdateJobPostingUseCase:
 
         posting.updated_at = datetime.utcnow()
 
-        # Validate
-        posting.validate()
-
         saved = await self.job_posting_repository.save(posting)
 
         opportunity = await self.opportunity_repository.get_by_id(posting.opportunity_id)
