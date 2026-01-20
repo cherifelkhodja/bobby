@@ -9,7 +9,7 @@
  * 5. User saves as draft
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -68,45 +68,13 @@ type CreateJobPostingFormData = z.infer<typeof createJobPostingSchema>;
 
 type ViewStep = 'loading' | 'ready' | 'anonymizing' | 'form' | 'saving' | 'auto-saving' | 'error';
 
-// LocalStorage cache key prefix
+// LocalStorage cache key prefix (for anonymization only - before auto-save)
 const CACHE_KEY_PREFIX = 'job-posting-cache-';
-const FORM_CACHE_KEY_PREFIX = 'job-posting-form-';
 
 interface CachedAnonymization {
   oppId: string;
   data: AnonymizedJobPostingResponse;
   timestamp: number;
-}
-
-interface CachedFormData {
-  oppId: string;
-  timestamp: number;
-  // Form fields
-  title: string;
-  description: string;
-  qualifications: string;
-  employer_overview: string;
-  // Skills
-  selectedSkills: string[];
-  // Contract
-  selectedContractTypes: string[];
-  // Location
-  selectedPlace: TurnoverITPlace | null;
-  placeSearch: string;
-  // Dates & Duration
-  isAsap: boolean;
-  durationUnit: 'months' | 'years';
-  durationValue: number | '';
-  startDate: string;
-  // Salary
-  isSalaryByProfile: boolean;
-  salaryMinAnnual: string;
-  salaryMaxAnnual: string;
-  salaryMinDaily: string;
-  salaryMaxDaily: string;
-  // Other
-  experienceLevel: string;
-  remote: string;
 }
 
 // Cache expires after 48 hours
@@ -147,46 +115,6 @@ function setCachedAnonymization(oppId: string, data: AnonymizedJobPostingRespons
 function clearCachedAnonymization(oppId: string): void {
   try {
     localStorage.removeItem(`${CACHE_KEY_PREFIX}${oppId}`);
-  } catch {
-    // Ignore
-  }
-}
-
-function getCachedFormData(oppId: string): CachedFormData | null {
-  try {
-    const cached = localStorage.getItem(`${FORM_CACHE_KEY_PREFIX}${oppId}`);
-    if (!cached) return null;
-
-    const parsed: CachedFormData = JSON.parse(cached);
-
-    // Check if cache is expired (48h)
-    if (Date.now() - parsed.timestamp > CACHE_EXPIRY_MS) {
-      localStorage.removeItem(`${FORM_CACHE_KEY_PREFIX}${oppId}`);
-      return null;
-    }
-
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function setCachedFormData(oppId: string, data: Omit<CachedFormData, 'oppId' | 'timestamp'>): void {
-  try {
-    const cacheEntry: CachedFormData = {
-      oppId,
-      timestamp: Date.now(),
-      ...data,
-    };
-    localStorage.setItem(`${FORM_CACHE_KEY_PREFIX}${oppId}`, JSON.stringify(cacheEntry));
-  } catch {
-    // Ignore localStorage errors (quota exceeded, etc.)
-  }
-}
-
-function clearCachedFormData(oppId: string): void {
-  try {
-    localStorage.removeItem(`${FORM_CACHE_KEY_PREFIX}${oppId}`);
   } catch {
     // Ignore
   }
@@ -273,64 +201,6 @@ export default function CreateJobPosting() {
   const titleWatch = watch('title');
   const descriptionWatch = watch('description');
   const qualificationsWatch = watch('qualifications');
-  const employerOverviewWatch = watch('employer_overview');
-  const startDateWatch = watch('start_date');
-  const experienceLevelWatch = watch('experience_level');
-  const remoteWatch = watch('remote');
-  const salaryMinAnnualWatch = watch('salary_min_annual');
-  const salaryMaxAnnualWatch = watch('salary_max_annual');
-  const salaryMinDailyWatch = watch('salary_min_daily');
-  const salaryMaxDailyWatch = watch('salary_max_daily');
-
-  // Debounced form cache save
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Save form data to cache (debounced)
-  useEffect(() => {
-    if (!oppId || step !== 'form') return;
-
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    // Debounce save by 500ms
-    saveTimeoutRef.current = setTimeout(() => {
-      setCachedFormData(oppId, {
-        title: titleWatch || '',
-        description: descriptionWatch || '',
-        qualifications: qualificationsWatch || '',
-        employer_overview: employerOverviewWatch || '',
-        selectedSkills,
-        selectedContractTypes,
-        selectedPlace,
-        placeSearch,
-        isAsap,
-        durationUnit,
-        durationValue,
-        startDate: startDateWatch || '',
-        isSalaryByProfile,
-        salaryMinAnnual: String(salaryMinAnnualWatch || ''),
-        salaryMaxAnnual: String(salaryMaxAnnualWatch || ''),
-        salaryMinDaily: String(salaryMinDailyWatch || ''),
-        salaryMaxDaily: String(salaryMaxDailyWatch || ''),
-        experienceLevel: experienceLevelWatch || '',
-        remote: remoteWatch || '',
-      });
-    }, 500);
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [
-    oppId, step, titleWatch, descriptionWatch, qualificationsWatch, employerOverviewWatch,
-    selectedSkills, selectedContractTypes, selectedPlace, placeSearch, isAsap,
-    durationUnit, durationValue, startDateWatch, isSalaryByProfile,
-    salaryMinAnnualWatch, salaryMaxAnnualWatch, salaryMinDailyWatch, salaryMaxDailyWatch,
-    experienceLevelWatch, remoteWatch,
-  ]);
 
   // Fetch Turnover-IT skills for autocomplete
   const { data: skillsData } = useQuery({
@@ -394,54 +264,25 @@ export default function CreateJobPosting() {
         const detail = await hrApi.getOpportunityDetail(oppId);
         setOpportunity(detail);
 
-        // Check for cached form data first (more complete)
-        const cachedForm = getCachedFormData(oppId);
-        if (cachedForm) {
-          // Restore full form state from cache
+        // Check for cached anonymization (before auto-save completes)
+        const cached = getCachedAnonymization(oppId);
+        if (cached) {
+          // Apply cached data directly
+          setAnonymizedData(cached);
           reset({
-            title: cachedForm.title,
-            description: cachedForm.description,
-            qualifications: cachedForm.qualifications,
-            employer_overview: cachedForm.employer_overview,
-            experience_level: cachedForm.experienceLevel || undefined,
-            remote: cachedForm.remote || undefined,
-            start_date: cachedForm.startDate || undefined,
-            salary_min_annual: cachedForm.salaryMinAnnual ? Number(cachedForm.salaryMinAnnual) : undefined,
-            salary_max_annual: cachedForm.salaryMaxAnnual ? Number(cachedForm.salaryMaxAnnual) : undefined,
-            salary_min_daily: cachedForm.salaryMinDaily ? Number(cachedForm.salaryMinDaily) : undefined,
-            salary_max_daily: cachedForm.salaryMaxDaily ? Number(cachedForm.salaryMaxDaily) : undefined,
+            title: cached.title,
+            description: cached.description,
+            qualifications: cached.qualifications,
+            employer_overview: '',
           });
-          setSelectedSkills(cachedForm.selectedSkills);
-          setSelectedContractTypes(cachedForm.selectedContractTypes);
-          setSelectedPlace(cachedForm.selectedPlace);
-          setPlaceSearch(cachedForm.placeSearch);
-          setIsAsap(cachedForm.isAsap);
-          setDurationUnit(cachedForm.durationUnit);
-          setDurationValue(cachedForm.durationValue);
-          setIsSalaryByProfile(cachedForm.isSalaryByProfile);
+          setSelectedSkills(cached.skills);
+          if (detail.place) {
+            setPlaceSearch(detail.place);
+          }
           setUsedCache(true);
           setStep('form');
         } else {
-          // Check for cached anonymization (less complete, just AI result)
-          const cached = getCachedAnonymization(oppId);
-          if (cached) {
-            // Apply cached data directly
-            setAnonymizedData(cached);
-            reset({
-              title: cached.title,
-              description: cached.description,
-              qualifications: cached.qualifications,
-              employer_overview: '',
-            });
-            setSelectedSkills(cached.skills);
-            if (detail.place) {
-              setPlaceSearch(detail.place);
-            }
-            setUsedCache(true);
-            setStep('form');
-          } else {
-            setStep('ready');
-          }
+          setStep('ready');
         }
       } catch (error) {
         setErrorMessage(getErrorMessage(error));
@@ -493,10 +334,9 @@ export default function CreateJobPosting() {
     },
     onSuccess: (posting) => {
       setDraftId(posting.id);
-      // Clear caches after draft is saved to database
+      // Clear anonymization cache after draft is saved to database
       if (oppId) {
         clearCachedAnonymization(oppId);
-        clearCachedFormData(oppId);
       }
       queryClient.invalidateQueries({ queryKey: ['hr-opportunities'] });
       queryClient.invalidateQueries({ queryKey: ['hr-job-postings'] });
@@ -635,10 +475,9 @@ export default function CreateJobPosting() {
       }
     },
     onSuccess: (posting) => {
-      // Clear all caches after successful save
+      // Clear anonymization cache after successful save
       if (oppId) {
         clearCachedAnonymization(oppId);
-        clearCachedFormData(oppId);
       }
       queryClient.invalidateQueries({ queryKey: ['hr-opportunities'] });
       queryClient.invalidateQueries({ queryKey: ['hr-job-postings'] });
