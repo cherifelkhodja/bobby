@@ -14,7 +14,6 @@ from app.application.read_models.hr import (
 )
 from app.config import settings
 from app.domain.entities import JobPosting, JobPostingStatus
-from app.domain.entities.job_posting import ContractType, ExperienceLevel, RemotePolicy
 from app.domain.exceptions import (
     JobPostingNotFoundError,
     OpportunityNotFoundError,
@@ -221,16 +220,7 @@ class CreateJobPostingUseCase:
                 f"A job posting already exists for opportunity {command.opportunity_id}"
             )
 
-        # Parse enums
-        contract_types = [ContractType(ct) for ct in command.contract_types]
-        experience_level = (
-            ExperienceLevel(command.experience_level)
-            if command.experience_level
-            else None
-        )
-        remote = RemotePolicy(command.remote) if command.remote else None
-
-        # Create job posting entity
+        # Create job posting entity (keep values as strings)
         job_posting = JobPosting(
             opportunity_id=command.opportunity_id,
             title=command.title,
@@ -241,10 +231,10 @@ class CreateJobPostingUseCase:
             location_postal_code=command.location_postal_code,
             location_city=command.location_city,
             location_key=command.location_key,
-            contract_types=contract_types,
+            contract_types=command.contract_types,
             skills=command.skills,
-            experience_level=experience_level,
-            remote=remote,
+            experience_level=command.experience_level,
+            remote=command.remote,
             start_date=command.start_date,
             duration_months=command.duration_months,
             salary_min_annual=command.salary_min_annual,
@@ -813,13 +803,13 @@ class UpdateJobPostingUseCase:
         if command.location_key is not None:
             posting.location_key = command.location_key
         if command.contract_types is not None:
-            posting.contract_types = [ContractType(ct) for ct in command.contract_types]
+            posting.contract_types = command.contract_types  # Keep as strings
         if command.skills is not None:
             posting.skills = command.skills
         if command.experience_level is not None:
-            posting.experience_level = ExperienceLevel(command.experience_level) if command.experience_level else None
+            posting.experience_level = command.experience_level  # Keep as string
         if command.remote is not None:
-            posting.remote = RemotePolicy(command.remote) if command.remote else None
+            posting.remote = command.remote  # Keep as string
         if command.start_date is not None:
             posting.start_date = command.start_date
         if command.duration_months is not None:
