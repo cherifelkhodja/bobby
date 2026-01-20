@@ -50,6 +50,7 @@ from app.infrastructure.database.repositories import (
     OpportunityRepository,
     UserRepository,
 )
+from app.domain.entities import Opportunity
 from app.infrastructure.anonymizer.job_posting_anonymizer import JobPostingAnonymizer
 from app.infrastructure.matching.gemini_matcher import GeminiMatchingService
 from app.infrastructure.security.jwt import decode_token
@@ -543,6 +544,23 @@ async def create_job_posting(
     opportunity_repo = OpportunityRepository(db)
     user_repo = UserRepository(db)
 
+    # opportunity_id from request is a Boond external ID (e.g., "12345")
+    # We need to find or create the local opportunity record
+    boond_opportunity_id = request.opportunity_id
+
+    # Try to find existing opportunity by Boond external ID
+    opportunity = await opportunity_repo.get_by_external_id(boond_opportunity_id)
+
+    if not opportunity:
+        # Create a minimal opportunity record for the job posting
+        # The title from the request will be used as the opportunity title
+        opportunity = Opportunity(
+            external_id=boond_opportunity_id,
+            title=request.title,  # Use job posting title as opportunity title
+            reference=f"BOOND-{boond_opportunity_id}",  # Generate reference from Boond ID
+        )
+        opportunity = await opportunity_repo.save(opportunity)
+
     use_case = CreateJobPostingUseCase(
         job_posting_repository=job_posting_repo,
         opportunity_repository=opportunity_repo,
@@ -551,7 +569,7 @@ async def create_job_posting(
 
     try:
         command = CreateJobPostingCommand(
-            opportunity_id=UUID(request.opportunity_id),
+            opportunity_id=opportunity.id,  # Use local UUID, not Boond ID
             created_by=user_id,
             title=request.title,
             description=request.description,
