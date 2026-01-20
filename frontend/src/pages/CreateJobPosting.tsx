@@ -37,7 +37,6 @@ import {
   type TurnoverITPlace,
 } from '../api/hr';
 import { getErrorMessage } from '../api/client';
-import type { CreateJobPostingRequest } from '../types';
 
 // Validation schema
 const createJobPostingSchema = z.object({
@@ -748,7 +747,7 @@ export default function CreateJobPosting() {
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={(e) => e.preventDefault()} className="space-y-8">
         {/* Basic Info */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-3">
