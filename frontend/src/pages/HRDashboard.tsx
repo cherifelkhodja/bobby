@@ -151,7 +151,12 @@ export default function HRDashboard() {
 
   const handleViewPosting = (opportunity: OpportunityForHR) => {
     if (opportunity.job_posting_id) {
-      navigate(`/rh/annonces/${opportunity.job_posting_id}`);
+      // For drafts, go to edit page; for others, go to details page
+      if (opportunity.job_posting_status === 'draft') {
+        navigate(`/rh/annonces/edit/${opportunity.job_posting_id}`);
+      } else {
+        navigate(`/rh/annonces/${opportunity.job_posting_id}`);
+      }
     }
   };
 
@@ -376,7 +381,7 @@ export default function HRDashboard() {
                       )}
                     </td>
                     <td className="py-2 px-3">
-                      {opportunity.has_job_posting ? (
+                      {opportunity.has_job_posting && opportunity.job_posting_status !== 'draft' ? (
                         <div className="flex items-center gap-1.5">
                           <span className="text-gray-900 dark:text-gray-100">
                             {opportunity.applications_count}

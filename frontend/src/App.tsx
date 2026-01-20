@@ -16,6 +16,7 @@ import { CvTransformer } from './pages/CvTransformer';
 import { QuotationGenerator } from './pages/QuotationGenerator';
 import HRDashboard from './pages/HRDashboard';
 import CreateJobPosting from './pages/CreateJobPosting';
+import EditJobPosting from './pages/EditJobPosting';
 import JobPostingDetails from './pages/JobPostingDetails';
 import PublicApplication from './pages/PublicApplication';
 import { MyBoondOpportunities } from './pages/MyBoondOpportunities';
@@ -117,6 +118,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin', 'rh']}>
               <CreateJobPosting />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="rh/annonces/edit/:postingId"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'rh']}>
+              <EditJobPosting />
             </ProtectedRoute>
           }
         />
