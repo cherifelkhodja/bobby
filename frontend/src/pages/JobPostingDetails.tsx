@@ -928,26 +928,115 @@ export default function JobPostingDetails() {
                         </td>
                         <td className="py-2 px-3">
                           {application.matching_score !== null ? (
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getMatchingScoreColor(
-                                application.matching_score
-                              )}`}
-                            >
-                              {application.matching_score}%
-                            </span>
+                            <div className="relative group">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-help ${getMatchingScoreColor(
+                                  application.matching_score
+                                )}`}
+                              >
+                                {application.matching_score}%
+                                <Info className="h-3 w-3 opacity-60" />
+                              </span>
+                              {application.matching_details && (
+                                <div className="absolute left-0 top-full mt-1 z-50 hidden group-hover:block w-72 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg text-xs">
+                                  <p className="font-medium text-gray-900 dark:text-white mb-2">Analyse Matching</p>
+                                  <p className="text-gray-600 dark:text-gray-400 mb-2">{application.matching_details.summary}</p>
+                                  {application.matching_details.strengths.length > 0 && (
+                                    <div className="mb-2">
+                                      <p className="font-medium text-green-700 dark:text-green-400">Points forts :</p>
+                                      <ul className="list-disc list-inside text-gray-600 dark:text-gray-400">
+                                        {application.matching_details.strengths.slice(0, 3).map((s, i) => (
+                                          <li key={i}>{s}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  {application.matching_details.gaps.length > 0 && (
+                                    <div>
+                                      <p className="font-medium text-orange-700 dark:text-orange-400">Attention :</p>
+                                      <ul className="list-disc list-inside text-gray-600 dark:text-gray-400">
+                                        {application.matching_details.gaps.slice(0, 3).map((g, i) => (
+                                          <li key={i}>{g}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-gray-500 dark:text-gray-400">-</span>
                           )}
                         </td>
                         <td className="py-2 px-3">
-                          {application.cv_quality_score !== null ? (
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getCvQualityScoreColor(
-                                application.cv_quality_score
-                              )}`}
-                            >
-                              {application.cv_quality_score}/20
-                            </span>
+                          {application.cv_quality_score !== null && application.cv_quality ? (
+                            <div className="relative group">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-help ${getCvQualityScoreColor(
+                                  application.cv_quality_score
+                                )}`}
+                              >
+                                {application.cv_quality_score}/20
+                                <Info className="h-3 w-3 opacity-60" />
+                              </span>
+                              <div className="absolute left-0 top-full mt-1 z-50 hidden group-hover:block w-80 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg text-xs">
+                                <p className="font-medium text-gray-900 dark:text-white mb-2">Analyse Qualité CV</p>
+                                <div className="flex gap-2 mb-2">
+                                  <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300">
+                                    {application.cv_quality.niveau_experience}
+                                  </span>
+                                  <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300">
+                                    {application.cv_quality.annees_experience} ans
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded ${
+                                    application.cv_quality.classification === 'EXCELLENT' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                    application.cv_quality.classification === 'BON' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                                    application.cv_quality.classification === 'MOYEN' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
+                                    'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                  }`}>
+                                    {application.cv_quality.classification}
+                                  </span>
+                                </div>
+                                {application.cv_quality.details_notes && (
+                                  <div className="space-y-1 mb-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+                                    <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Détail des notes :</p>
+                                    {application.cv_quality.details_notes.stabilite_missions && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600 dark:text-gray-400">Stabilité missions</span>
+                                        <span className="font-medium">{application.cv_quality.details_notes.stabilite_missions.note}/{application.cv_quality.details_notes.stabilite_missions.max}</span>
+                                      </div>
+                                    )}
+                                    {application.cv_quality.details_notes.qualite_comptes && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600 dark:text-gray-400">Qualité comptes</span>
+                                        <span className="font-medium">{application.cv_quality.details_notes.qualite_comptes.note}/{application.cv_quality.details_notes.qualite_comptes.max}</span>
+                                      </div>
+                                    )}
+                                    {application.cv_quality.details_notes.parcours_scolaire && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600 dark:text-gray-400">Parcours scolaire</span>
+                                        <span className="font-medium">{application.cv_quality.details_notes.parcours_scolaire.note}/{application.cv_quality.details_notes.parcours_scolaire.max}</span>
+                                      </div>
+                                    )}
+                                    {application.cv_quality.details_notes.continuite_parcours && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600 dark:text-gray-400">Continuité parcours</span>
+                                        <span className="font-medium">{application.cv_quality.details_notes.continuite_parcours.note}/{application.cv_quality.details_notes.continuite_parcours.max}</span>
+                                      </div>
+                                    )}
+                                    {application.cv_quality.details_notes.bonus_malus && application.cv_quality.details_notes.bonus_malus.valeur !== 0 && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600 dark:text-gray-400">Bonus/Malus</span>
+                                        <span className={`font-medium ${application.cv_quality.details_notes.bonus_malus.valeur > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                          {application.cv_quality.details_notes.bonus_malus.valeur > 0 ? '+' : ''}{application.cv_quality.details_notes.bonus_malus.valeur}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                <p className="text-gray-600 dark:text-gray-400 italic">{application.cv_quality.synthese}</p>
+                              </div>
+                            </div>
                           ) : (
                             <span className="text-gray-500 dark:text-gray-400">-</span>
                           )}
