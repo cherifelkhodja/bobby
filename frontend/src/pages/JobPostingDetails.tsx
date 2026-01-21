@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   ChevronLeft,
   Loader2,
@@ -587,8 +588,10 @@ export default function JobPostingDetails() {
     try {
       await hrApi.getApplication(application.id, true);
       refetchApplications();
+      toast.success('Candidature marquée comme lue');
     } catch (error) {
       console.error('Error marking as read:', error);
+      toast.error('Erreur lors du marquage comme lu');
     }
   };
 
@@ -598,8 +601,10 @@ export default function JobPostingDetails() {
     try {
       await hrApi.updateApplicationStatus(application.id, 'valide');
       refetchApplications();
+      toast.success(`Candidature de ${application.full_name} validée`);
     } catch (error) {
       console.error('Error validating application:', error);
+      toast.error('Erreur lors de la validation');
     }
   };
 
@@ -609,8 +614,10 @@ export default function JobPostingDetails() {
     try {
       await hrApi.updateApplicationStatus(application.id, 'refuse');
       refetchApplications();
+      toast.success(`Candidature de ${application.full_name} refusée`);
     } catch (error) {
       console.error('Error rejecting application:', error);
+      toast.error('Erreur lors du refus');
     }
   };
 
@@ -982,7 +989,13 @@ export default function JobPostingDetails() {
                     Candidat
                   </th>
                   <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
+                    Statut Pro
+                  </th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     TJM
+                  </th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
+                    Salaire
                   </th>
                   <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     Disponibilité
@@ -1030,7 +1043,15 @@ export default function JobPostingDetails() {
                           </div>
                         </td>
                         <td className="py-2 px-3">
-                          <p className="text-gray-900 dark:text-white">{application.tjm_range}</p>
+                          <p className="text-gray-900 dark:text-white">
+                            {application.employment_status_display || '-'}
+                          </p>
+                        </td>
+                        <td className="py-2 px-3">
+                          <p className="text-gray-900 dark:text-white">{application.tjm_range || '-'}</p>
+                        </td>
+                        <td className="py-2 px-3">
+                          <p className="text-gray-900 dark:text-white">{application.salary_range || '-'}</p>
                         </td>
                         <td className="py-2 px-3">
                           <p className="text-gray-900 dark:text-white">
@@ -1219,7 +1240,7 @@ export default function JobPostingDetails() {
                       {/* Inline expansion row */}
                       {isExpanded && selectedApplication && selectedApplication.id === application.id && (
                         <tr className="bg-blue-50/50 dark:bg-blue-900/10">
-                          <td colSpan={6} className="p-0">
+                          <td colSpan={9} className="p-0">
                             <div className="border-l-4 border-blue-500">
                               <ApplicationDetailContent
                                 application={selectedApplication}
