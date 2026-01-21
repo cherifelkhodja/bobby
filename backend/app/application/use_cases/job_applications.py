@@ -13,7 +13,6 @@ from app.application.read_models.hr import (
     StatusChangeReadModel,
 )
 from app.domain.entities import ApplicationStatus, JobApplication, JobPostingStatus
-from app.domain.entities.job_application import MatchingResult
 from app.domain.exceptions import (
     InvalidStatusTransitionError,
     JobApplicationNotFoundError,
@@ -137,12 +136,13 @@ Compétences recherchées:
                     job_description=job_description,
                 )
                 matching_score = result.get("score", 0)
-                matching_details = MatchingResult(
-                    score=matching_score,
-                    strengths=result.get("strengths", []),
-                    gaps=result.get("gaps", []),
-                    summary=result.get("summary", ""),
-                )
+                # Convert to dict for JSON storage
+                matching_details = {
+                    "score": matching_score,
+                    "strengths": result.get("strengths", []),
+                    "gaps": result.get("gaps", []),
+                    "summary": result.get("summary", ""),
+                }
             except Exception:
                 # Continue without matching
                 pass
