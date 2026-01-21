@@ -351,9 +351,14 @@ export default function HRDashboard() {
                   >
                     <td className="py-2 px-3">
                       <div>
-                        <p className="font-medium text-gray-900 dark:text-gray-100">
+                        <a
+                          href={`https://ui.boondmanager.com/#opportunity/${opportunity.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
+                        >
                           {opportunity.title}
-                        </p>
+                        </a>
                         <p className="text-gray-500 dark:text-gray-400 font-mono text-[11px]">
                           {opportunity.reference}
                         </p>
