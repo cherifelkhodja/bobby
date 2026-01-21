@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ChevronLeft,
@@ -21,6 +21,7 @@ import {
   FileText,
   Edit2,
   CheckCircle,
+  Trash2,
 } from 'lucide-react';
 import { hrApi } from '../api/hr';
 import {
@@ -48,11 +49,13 @@ const JOB_POSTING_STATUS_BADGES = {
 export default function JobPostingDetails() {
   const { postingId } = useParams<{ postingId: string }>();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | ''>('');
   const [selectedApplication, setSelectedApplication] = useState<JobApplication | null>(null);
   const [noteText, setNoteText] = useState('');
   const [newStatus, setNewStatus] = useState<ApplicationStatus | ''>('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Fetch job posting
   const {
@@ -95,6 +98,16 @@ export default function JobPostingDetails() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hr-job-posting', postingId] });
       queryClient.invalidateQueries({ queryKey: ['hr-opportunities'] });
+    },
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: () => hrApi.deleteJobPosting(postingId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-opportunities'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-job-postings'] });
+      navigate('/rh');
     },
   });
 
@@ -205,18 +218,27 @@ export default function JobPostingDetails() {
           </div>
           <div className="flex gap-2">
             {posting.status === 'draft' && (
-              <button
-                onClick={() => publishMutation.mutate()}
-                disabled={publishMutation.isPending}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors"
-              >
-                {publishMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-                Publier sur Turnover-IT
-              </button>
+              <>
+                <button
+                  onClick={() => publishMutation.mutate()}
+                  disabled={publishMutation.isPending}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors"
+                >
+                  {publishMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  Publier sur Turnover-IT
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 font-medium rounded-lg transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Supprimer
+                </button>
+              </>
             )}
             {posting.status === 'published' && (
               <button
@@ -638,6 +660,47 @@ export default function JobPostingDetails() {
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {selectedApplication.cv_filename}
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                  <Trash2 className="h-6 w-6 text-red-600 dark:text-red-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Supprimer le brouillon
+                </h3>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Êtes-vous sûr de vouloir supprimer ce brouillon d'annonce ? Cette action est irréversible.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-lg transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={() => deleteMutation.mutate()}
+                  disabled={deleteMutation.isPending}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium rounded-lg transition-colors"
+                >
+                  {deleteMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Supprimer
+                </button>
               </div>
             </div>
           </div>

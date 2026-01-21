@@ -227,6 +227,13 @@ export const hrApi = {
     return response.data;
   },
 
+  /**
+   * Delete a draft job posting
+   */
+  deleteJobPosting: async (postingId: string): Promise<void> => {
+    await apiClient.delete(`/hr/job-postings/${postingId}`);
+  },
+
   // ========== Applications ==========
 
   /**

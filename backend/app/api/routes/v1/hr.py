@@ -772,6 +772,38 @@ async def close_job_posting(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.delete("/job-postings/{posting_id}", status_code=204)
+async def delete_job_posting(
+    posting_id: str,
+    db: DbSession,
+    authorization: str = Header(default=""),
+):
+    """Delete a draft job posting.
+
+    Only draft postings can be deleted. Published postings must be closed first.
+    """
+    await require_hr_access(db, authorization)
+
+    job_posting_repo = JobPostingRepository(db)
+
+    # Get the posting first to check status
+    posting = await job_posting_repo.get_by_id(UUID(posting_id))
+    if not posting:
+        raise HTTPException(status_code=404, detail="Annonce non trouvée")
+
+    if posting.status.value != "draft":
+        raise HTTPException(
+            status_code=400,
+            detail="Seuls les brouillons peuvent être supprimés. Fermez d'abord l'annonce.",
+        )
+
+    deleted = await job_posting_repo.delete(UUID(posting_id))
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Annonce non trouvée")
+
+    return None
+
+
 # --- Applications Endpoints ---
 
 
