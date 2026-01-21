@@ -2,12 +2,64 @@
  * Public application form page (no authentication required).
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+
+// Cache duration: 48 hours in milliseconds
+const CACHE_DURATION_MS = 48 * 60 * 60 * 1000;
+
+interface CachedFormData {
+  data: Partial<ApplicationFormData>;
+  timestamp: number;
+}
+
+function getCacheKey(token: string): string {
+  return `bobby_application_form_${token}`;
+}
+
+function loadCachedFormData(token: string): Partial<ApplicationFormData> | null {
+  try {
+    const cached = localStorage.getItem(getCacheKey(token));
+    if (!cached) return null;
+
+    const parsed: CachedFormData = JSON.parse(cached);
+    const now = Date.now();
+
+    // Check if cache is expired (48h)
+    if (now - parsed.timestamp > CACHE_DURATION_MS) {
+      localStorage.removeItem(getCacheKey(token));
+      return null;
+    }
+
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+function saveCachedFormData(token: string, data: Partial<ApplicationFormData>): void {
+  try {
+    const cacheEntry: CachedFormData = {
+      data,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(getCacheKey(token), JSON.stringify(cacheEntry));
+  } catch {
+    // Ignore localStorage errors (quota exceeded, etc.)
+  }
+}
+
+function clearCachedFormData(token: string): void {
+  try {
+    localStorage.removeItem(getCacheKey(token));
+  } catch {
+    // Ignore errors
+  }
+}
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import {
@@ -117,6 +169,10 @@ export default function PublicApplication() {
   const [submitted, setSubmitted] = useState(false);
   const [submissionMessage, setSubmissionMessage] = useState('');
   const [showEnglishTooltip, setShowEnglishTooltip] = useState<string | null>(null);
+  const [hasCachedData, setHasCachedData] = useState(false);
+
+  // Load cached form data
+  const cachedData = token ? loadCachedFormData(token) : null;
 
   // Fetch job posting info
   const { data: posting, isLoading, error } = useQuery({
@@ -125,7 +181,7 @@ export default function PublicApplication() {
     enabled: !!token,
   });
 
-  // Form setup
+  // Form setup with cached values
   const {
     register,
     handleSubmit,
@@ -135,12 +191,45 @@ export default function PublicApplication() {
   } = useForm<ApplicationFormData>({
     resolver: zodResolver(applicationSchema),
     defaultValues: {
-      phone: '',
-      availability: '',
-      employment_status: '',
-      english_level: '',
+      first_name: cachedData?.first_name || '',
+      last_name: cachedData?.last_name || '',
+      email: cachedData?.email || '',
+      phone: cachedData?.phone || '',
+      job_title: cachedData?.job_title || '',
+      availability: cachedData?.availability || '',
+      employment_status: cachedData?.employment_status || '',
+      english_level: cachedData?.english_level || '',
+      tjm_current: cachedData?.tjm_current ?? undefined,
+      tjm_desired: cachedData?.tjm_desired ?? undefined,
+      salary_current: cachedData?.salary_current ?? undefined,
+      salary_desired: cachedData?.salary_desired ?? undefined,
     },
   });
+
+  // Watch all form values for caching
+  const watchedValues = watch();
+
+  // Show cache indicator on mount if data was restored
+  useEffect(() => {
+    if (cachedData && Object.keys(cachedData).some(k => cachedData[k as keyof typeof cachedData])) {
+      setHasCachedData(true);
+      // Hide indicator after 5 seconds
+      const timer = setTimeout(() => setHasCachedData(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Save form data to cache on changes (debounced)
+  const saveToCache = useCallback(() => {
+    if (token && !submitted) {
+      saveCachedFormData(token, watchedValues);
+    }
+  }, [token, watchedValues, submitted]);
+
+  useEffect(() => {
+    const timer = setTimeout(saveToCache, 500);
+    return () => clearTimeout(timer);
+  }, [saveToCache]);
 
   const employmentStatus = watch('employment_status');
   const showFreelanceFields = employmentStatus === 'freelance' || employmentStatus === 'both';
@@ -179,6 +268,10 @@ export default function PublicApplication() {
     onSuccess: (result) => {
       setSubmitted(true);
       setSubmissionMessage(result.message);
+      // Clear cached form data on successful submission
+      if (token) {
+        clearCachedFormData(token);
+      }
     },
     onError: (error: Error) => {
       setSubmissionMessage(error.message || 'Une erreur est survenue');
@@ -359,9 +452,19 @@ export default function PublicApplication() {
 
         {/* Application Form */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
             Postuler à cette offre
           </h2>
+
+          {/* Cache restoration indicator */}
+          {hasCachedData && (
+            <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2">
+              <Check className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <p className="text-sm text-blue-800 dark:text-blue-300">
+                Vos informations précédentes ont été restaurées.
+              </p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Name Fields */}
