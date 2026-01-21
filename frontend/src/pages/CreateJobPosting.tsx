@@ -1284,7 +1284,7 @@ export default function CreateJobPosting() {
           <button
             type="button"
             onClick={handleSubmit(onSaveDraft)}
-            disabled={saveMutation.isPending || publishMutation.isPending || selectedContractTypes.length === 0}
+            disabled={saveMutation.isPending || publishMutation.isPending || selectedContractTypes.length === 0 || !selectedPlace}
             className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
           >
             {saveMutation.isPending ? (
