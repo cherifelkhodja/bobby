@@ -2,7 +2,7 @@
  * Public application form page (no authentication required).
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
@@ -176,6 +176,8 @@ export default function PublicApplication() {
   // Employment status checkboxes
   const [isFreelance, setIsFreelance] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false);
+  // Track if checkboxes have been initialized to prevent resetting on re-renders
+  const checkboxesInitializedRef = useRef(false);
 
   // Load cached form data
   const cachedData = token ? loadCachedFormData(token) : null;
@@ -215,13 +217,18 @@ export default function PublicApplication() {
   const allowsEmployee = posting?.contract_types?.some((ct) => EMPLOYEE_CONTRACT_TYPES.includes(ct)) ?? false;
   const allowsFreelance = posting?.contract_types?.some((ct) => FREELANCE_CONTRACT_TYPES.includes(ct)) ?? false;
 
-  // Initialize checkboxes from cached data or posting
+  // Initialize checkboxes from cached data or posting (only once)
   useEffect(() => {
+    // Skip if already initialized to prevent resetting user selections
+    if (checkboxesInitializedRef.current) return;
+    // Wait until posting is loaded to know which options are available
+    if (!posting) return;
+
     if (cachedData?.employment_status) {
       const statuses = cachedData.employment_status.split(',');
       setIsFreelance(statuses.includes('freelance') && allowsFreelance);
       setIsEmployee(statuses.includes('employee') && allowsEmployee);
-    } else if (posting) {
+    } else {
       // Auto-select if only one option available
       if (allowsFreelance && !allowsEmployee) {
         setIsFreelance(true);
@@ -229,6 +236,7 @@ export default function PublicApplication() {
         setIsEmployee(true);
       }
     }
+    checkboxesInitializedRef.current = true;
   }, [posting, cachedData, allowsEmployee, allowsFreelance]);
 
   // Watch all form values for caching
