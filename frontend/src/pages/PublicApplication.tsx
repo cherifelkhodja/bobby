@@ -785,43 +785,53 @@ export default function PublicApplication() {
 
             {/* English Level */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Niveau d'anglais *
-              </label>
-              <div className="space-y-2">
-                {ENGLISH_LEVELS.map((level) => (
-                  <label
-                    key={level.value}
-                    className="flex items-start gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+              <div className="flex items-center gap-2 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Niveau d'anglais *
+                </label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowEnglishTooltip(showEnglishTooltip ? null : 'all')}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                   >
-                    <input
-                      type="radio"
-                      {...register('english_level')}
-                      value={level.value}
-                      className="mt-1 w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {level.label}
-                        </span>
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                  {showEnglishTooltip && (
+                    <div className="absolute left-0 top-6 z-50 w-80 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium text-gray-900 dark:text-white text-sm">Niveaux d'anglais</span>
                         <button
                           type="button"
-                          onClick={() => setShowEnglishTooltip(showEnglishTooltip === level.value ? null : level.value)}
+                          onClick={() => setShowEnglishTooltip(null)}
                           className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                         >
-                          <HelpCircle className="h-4 w-4" />
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
-                      {showEnglishTooltip === level.value && (
-                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                          {level.description}
-                        </p>
-                      )}
+                      <div className="space-y-2 text-xs">
+                        {ENGLISH_LEVELS.map((level) => (
+                          <div key={level.value}>
+                            <span className="font-medium text-gray-800 dark:text-gray-200">{level.label}:</span>
+                            <span className="text-gray-600 dark:text-gray-400 ml-1">{level.description}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </label>
-                ))}
+                  )}
+                </div>
               </div>
+              <select
+                {...register('english_level')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">-- Sélectionner --</option>
+                {ENGLISH_LEVELS.map((level) => (
+                  <option key={level.value} value={level.value}>
+                    {level.label}
+                  </option>
+                ))}
+              </select>
               {errors.english_level && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">
                   {errors.english_level.message}
