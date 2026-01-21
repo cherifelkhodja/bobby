@@ -355,10 +355,11 @@ export interface PublishedOpportunityListResponse {
 
 // HR Feature - Job Postings & Applications
 export type JobPostingStatus = 'draft' | 'published' | 'closed';
-export type ApplicationStatus = 'nouveau' | 'en_cours' | 'entretien' | 'accepte' | 'refuse';
+export type ApplicationStatus = 'nouveau' | 'vu' | 'en_cours' | 'entretien' | 'accepte' | 'refuse';
 
 export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
   nouveau: 'Nouveau',
+  vu: 'Vu',
   en_cours: 'En cours',
   entretien: 'Entretien',
   accepte: 'Accepté',
@@ -367,6 +368,7 @@ export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
 
 export const APPLICATION_STATUS_COLORS: Record<ApplicationStatus, string> = {
   nouveau: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  vu: 'bg-gray-100 text-gray-800 dark:bg-gray-700/50 dark:text-gray-300',
   en_cours: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
   entretien: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
   accepte: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',

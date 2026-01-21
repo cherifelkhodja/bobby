@@ -549,10 +549,10 @@ class GetApplicationUseCase:
         if not application:
             raise JobApplicationNotFoundError(str(application_id))
 
-        # Auto-transition from NOUVEAU to EN_COURS when viewed
+        # Auto-transition from NOUVEAU to VU when viewed
         if mark_viewed and application.status == ApplicationStatus.NOUVEAU:
             application.change_status(
-                new_status=ApplicationStatus.EN_COURS,
+                new_status=ApplicationStatus.VU,
                 changed_by=viewed_by,
                 comment="Marqué comme vu automatiquement",
             )

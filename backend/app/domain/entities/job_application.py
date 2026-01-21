@@ -11,6 +11,7 @@ class ApplicationStatus(str, Enum):
     """Application status lifecycle (French names for display)."""
 
     NOUVEAU = "nouveau"
+    VU = "vu"
     EN_COURS = "en_cours"
     ENTRETIEN = "entretien"
     ACCEPTE = "accepte"
@@ -24,6 +25,7 @@ class ApplicationStatus(str, Enum):
         """Human-readable status name in French."""
         names = {
             ApplicationStatus.NOUVEAU: "Nouveau",
+            ApplicationStatus.VU: "Vu",
             ApplicationStatus.EN_COURS: "En cours",
             ApplicationStatus.ENTRETIEN: "Entretien",
             ApplicationStatus.ACCEPTE: "Accepté",
@@ -45,7 +47,8 @@ class ApplicationStatus(str, Enum):
         """Check if transition to new status is valid.
 
         State machine:
-        - NOUVEAU → EN_COURS, REFUSE
+        - NOUVEAU → VU, EN_COURS, REFUSE
+        - VU → EN_COURS, REFUSE
         - EN_COURS → ENTRETIEN, ACCEPTE, REFUSE
         - ENTRETIEN → ACCEPTE, REFUSE
         - ACCEPTE → (final)
@@ -53,6 +56,11 @@ class ApplicationStatus(str, Enum):
         """
         valid_transitions: dict[ApplicationStatus, set[ApplicationStatus]] = {
             ApplicationStatus.NOUVEAU: {
+                ApplicationStatus.VU,
+                ApplicationStatus.EN_COURS,
+                ApplicationStatus.REFUSE,
+            },
+            ApplicationStatus.VU: {
                 ApplicationStatus.EN_COURS,
                 ApplicationStatus.REFUSE,
             },
