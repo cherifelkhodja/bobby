@@ -334,4 +334,10 @@ class JobPosting:
             "currency": "EUR",
         }
 
+        # Application redirect URL - candidates clicking "Apply" on Free-Work
+        # will be redirected to our own application form (paid option)
+        payload["application"] = {
+            "url": f"{application_base_url}/{self.application_token}",
+        }
+
         return payload
