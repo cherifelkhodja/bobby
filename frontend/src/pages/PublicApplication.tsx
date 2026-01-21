@@ -638,7 +638,7 @@ export default function PublicApplication() {
                     <div>
                       <span className="font-medium text-gray-900 dark:text-white">Freelance</span>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Vous êtes indépendant ou souhaitez l'être
+                        Vous êtes indépendant ou en portage salarial (uniquement les vraies sociétés de portage sont acceptées)
                       </p>
                     </div>
                   </label>
