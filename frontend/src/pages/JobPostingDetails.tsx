@@ -464,7 +464,7 @@ export default function JobPostingDetails() {
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-gray-900 dark:text-white">
-                        {new Date(application.availability_date).toLocaleDateString('fr-FR')}
+                        {application.availability_display || application.availability || '-'}
                       </p>
                     </td>
                     <td className="px-6 py-4">
@@ -557,15 +557,33 @@ export default function JobPostingDetails() {
                   </p>
                 </div>
                 <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Statut professionnel</p>
+                  <p className="font-medium text-gray-900 dark:text-white">
+                    {selectedApplication.employment_status_display || '-'}
+                  </p>
+                </div>
+                <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">TJM</p>
                   <p className="font-medium text-gray-900 dark:text-white">
-                    {selectedApplication.tjm_range}
+                    {selectedApplication.tjm_range || '-'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Salaire</p>
+                  <p className="font-medium text-gray-900 dark:text-white">
+                    {selectedApplication.salary_range || '-'}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">Disponibilité</p>
                   <p className="font-medium text-gray-900 dark:text-white">
-                    {new Date(selectedApplication.availability_date).toLocaleDateString('fr-FR')}
+                    {selectedApplication.availability_display || selectedApplication.availability || '-'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Niveau d'anglais</p>
+                  <p className="font-medium text-gray-900 dark:text-white">
+                    {selectedApplication.english_level_display || '-'}
                   </p>
                 </div>
                 <div>

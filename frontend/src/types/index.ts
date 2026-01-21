@@ -538,12 +538,26 @@ export interface JobApplication {
   last_name: string;
   full_name: string;
   job_title: string;
-  tjm_min: number;
-  tjm_max: number;
-  tjm_range: string;
-  availability_date: string;
   phone: string;
   email: string;
+  // New fields
+  availability: string;
+  availability_display: string;
+  employment_status: string;
+  employment_status_display: string;
+  english_level: string;
+  english_level_display: string;
+  tjm_current: number | null;
+  tjm_desired: number | null;
+  salary_current: number | null;
+  salary_desired: number | null;
+  tjm_range: string;
+  salary_range: string;
+  // Legacy fields
+  tjm_min: number | null;
+  tjm_max: number | null;
+  availability_date: string | null;
+  // CV
   cv_filename: string;
   matching_score: number | null;
   matching_details: MatchingDetails | null;

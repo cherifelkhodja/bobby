@@ -218,6 +218,8 @@ class JobApplicationRepository:
         stats = {str(s): 0 for s in ApplicationStatus}
         for status, count in result.all():
             stats[status] = count
+        # Add total count
+        stats["total"] = sum(stats.values())
         return stats
 
     def _to_entity(self, model: JobApplicationModel) -> JobApplication:
