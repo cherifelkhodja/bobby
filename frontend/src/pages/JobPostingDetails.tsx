@@ -1043,9 +1043,22 @@ export default function JobPostingDetails() {
                           </div>
                         </td>
                         <td className="py-2 px-3">
-                          <p className="text-gray-900 dark:text-white">
-                            {application.employment_status_display || '-'}
-                          </p>
+                          {application.employment_status_display ? (
+                            <div className="flex flex-wrap gap-1">
+                              {application.employment_status_display.toLowerCase().includes('salarié') && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
+                                  Salarié
+                                </span>
+                              )}
+                              {application.employment_status_display.toLowerCase().includes('freelance') && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">
+                                  Freelance
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
                         </td>
                         <td className="py-2 px-3">
                           <p className="text-gray-900 dark:text-white">{application.tjm_range || '-'}</p>

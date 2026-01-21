@@ -344,6 +344,11 @@ class JobApplication:
         self.status_history.append(status_change.to_dict())
         self.status = new_status
         self.updated_at = datetime.utcnow()
+
+        # Auto-mark as read when validated or refused
+        if new_status.is_final:
+            self.is_read = True
+
         return True
 
     def add_note(self, note: str) -> None:
