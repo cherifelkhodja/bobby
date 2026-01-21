@@ -31,6 +31,8 @@ import {
   Columns,
   PanelRight,
   Square,
+  Info,
+  Star,
 } from 'lucide-react';
 import { hrApi } from '../api/hr';
 import {
@@ -175,19 +177,28 @@ function ApplicationDetailContent({
         </div>
       </div>
 
-      {/* Matching Details */}
+      {/* Analyse Matching */}
       {application.matching_details && (
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-2">
             <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-            <h4 className="text-sm font-medium text-gray-900 dark:text-white">Analyse</h4>
-            <span
-              className={`ml-auto px-2 py-0.5 rounded-full text-xs font-medium ${getMatchingScoreColor(
-                application.matching_score ?? 0
-              )}`}
-            >
-              {application.matching_score}%
-            </span>
+            <h4 className="text-sm font-medium text-gray-900 dark:text-white">Analyse Matching</h4>
+            <div className="ml-auto relative group">
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-help ${getMatchingScoreColor(
+                  application.matching_score ?? 0
+                )}`}
+              >
+                {application.matching_score}%
+                <Info className="h-3 w-3" />
+              </span>
+              <div className="absolute right-0 top-full mt-1 z-50 hidden group-hover:block w-64 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg text-xs">
+                <p className="font-medium text-gray-900 dark:text-white mb-1">Score de matching</p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Évalue l'adéquation entre le CV du candidat et les exigences du poste (compétences, expérience, technologies).
+                </p>
+              </div>
+            </div>
           </div>
           <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
             {application.matching_details.summary}
@@ -211,6 +222,64 @@ function ApplicationDetailContent({
               </p>
               <ul className="list-disc list-inside text-xs text-gray-600 dark:text-gray-400">
                 {application.matching_details.gaps.map((g, i) => (
+                  <li key={i}>{g}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Analyse Qualité CV */}
+      {application.cv_quality && (
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Star className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+            <h4 className="text-sm font-medium text-gray-900 dark:text-white">Analyse Qualité CV</h4>
+            <div className="ml-auto relative group">
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-help ${getCvQualityScoreColor(
+                  application.cv_quality_score ?? 0
+                )}`}
+              >
+                {application.cv_quality_score}/20
+                <Info className="h-3 w-3" />
+              </span>
+              <div className="absolute right-0 top-full mt-1 z-50 hidden group-hover:block w-72 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg text-xs">
+                <p className="font-medium text-gray-900 dark:text-white mb-1">Note de qualité CV</p>
+                <p className="text-gray-600 dark:text-gray-400 mb-2">
+                  Évalue la qualité intrinsèque du profil : stabilité des missions, qualité des comptes, parcours scolaire, continuité.
+                </p>
+                <div className="space-y-1 text-gray-600 dark:text-gray-400">
+                  <p><span className="font-medium">Niveau :</span> {application.cv_quality.niveau_experience}</p>
+                  <p><span className="font-medium">Expérience :</span> {application.cv_quality.annees_experience} ans</p>
+                  <p><span className="font-medium">Classification :</span> {application.cv_quality.classification}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+            {application.cv_quality.synthese}
+          </p>
+          {application.cv_quality.points_forts.length > 0 && (
+            <div className="mb-2">
+              <p className="text-xs font-medium text-green-700 dark:text-green-400 mb-1">
+                Points forts
+              </p>
+              <ul className="list-disc list-inside text-xs text-gray-600 dark:text-gray-400">
+                {application.cv_quality.points_forts.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {application.cv_quality.points_faibles.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-orange-700 dark:text-orange-400 mb-1">
+                Points faibles
+              </p>
+              <ul className="list-disc list-inside text-xs text-gray-600 dark:text-gray-400">
+                {application.cv_quality.points_faibles.map((g, i) => (
                   <li key={i}>{g}</li>
                 ))}
               </ul>
