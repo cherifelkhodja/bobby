@@ -32,6 +32,7 @@ Application de cooptation pour ESN (Entreprise de Services du Numérique) avec i
 | `docs/skills/workflow-devops.md` | Git, CI/CD, Docker, déploiement |
 | `docs/api/boondmanager.md` | Endpoints, auth, exemples |
 | `docs/api/turnoverit.md` | JobConnect v2 API |
+| `docs/api/gemini.md` | CV parsing, anonymisation, matching |
 
 ## Tech Stack
 

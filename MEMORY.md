@@ -83,6 +83,15 @@
 | Google Gemini SDK | Migration `google-generativeai` → `google-genai` | Medium |
 | Tests E2E | Couverture à améliorer | Medium |
 
+### Détails dette Gemini SDK
+- **Current** : `google-generativeai` (deprecated)
+- **Target** : `google-genai`
+- **Fichiers à migrer** :
+  - `backend/app/infrastructure/cv_transformer/gemini_client.py`
+  - `backend/app/infrastructure/anonymizer/gemini_anonymizer.py`
+  - `backend/app/infrastructure/matching/gemini_matcher.py`
+- **Référence** : https://github.com/google-gemini/deprecated-generative-ai-python
+
 ---
 
 ## Prochaines étapes
@@ -126,6 +135,8 @@ docker-compose up # Start all services
 
 ### 2026-01-21
 - Setup système de documentation (MEMORY.md, docs/skills, docs/api)
+- Allègement CLAUDE.md (-112 lignes) : déport des infos dupliquées vers fichiers spécialisés
+- Création docs/api/gemini.md (CV parsing, anonymisation, matching)
 
 ### 2026-01-19
 - Mise à jour documentation CLAUDE.md
