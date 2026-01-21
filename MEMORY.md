@@ -134,6 +134,24 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-01-21
+- **feat(hr)**: Système de matching CV-offre amélioré
+  - Nouvelle configuration Gemini (temperature 0.1 pour des résultats plus cohérents)
+  - Prompt enrichi avec critères pondérés : techniques (40%), expérience (25%), formation (15%), soft skills (20%)
+  - Réponse JSON native (`response_mime_type: application/json`)
+  - Scores détaillés par catégorie dans `scores_details`
+  - Nouvelles infos : `competences_matchees`, `competences_manquantes`, `points_forts`, `points_vigilance`
+  - Recommandation avec niveau (fort/moyen/faible) et action suggérée
+  - Inclusion des infos candidat (poste, TJM, disponibilité) dans l'analyse
+  - Rétrocompatibilité complète avec l'ancien format
+  - Fichiers modifiés : `gemini_matcher.py`, `job_applications.py`, `hr.py` (read_models), `types/index.ts`
+- **fix(ui)**: Correction superposition filtres avec z-index et overflow
+  - Création classe CSS `.filter-select` pour styling cohérent des dropdowns
+  - Fichiers modifiés : `JobPostingDetails.tsx`, `index.css`
+- **feat(hr)**: 4 modes d'affichage pour les détails candidature
+  - Modal (défaut), Drawer (panneau latéral), Split view (écran divisé), Inline (expansion dans le tableau)
+  - Sélecteur de mode avec icônes
+  - Composant `ApplicationDetailContent` réutilisable
+  - Fichier modifié : `JobPostingDetails.tsx`
 - **feat(hr)**: Filtres et tri pour les candidatures
   - Filtres: statut application, statut professionnel (freelance/salarié/les deux), disponibilité
   - Tri: score matching, TJM, salaire, date de candidature (asc/desc)

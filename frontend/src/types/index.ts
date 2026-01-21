@@ -524,11 +524,33 @@ export interface UpdateJobPostingRequest {
   duration_months?: number | null;
 }
 
+export interface ScoresDetails {
+  competences_techniques: number;
+  experience: number;
+  formation: number;
+  soft_skills: number;
+}
+
+export interface MatchingRecommendation {
+  niveau: 'fort' | 'moyen' | 'faible';
+  action_suggeree: string;
+}
+
 export interface MatchingDetails {
+  // Legacy fields (kept for backward compatibility)
   score: number;
   strengths: string[];
   gaps: string[];
   summary: string;
+  // Enhanced fields
+  score_global?: number;
+  scores_details?: ScoresDetails;
+  competences_matchees?: string[];
+  competences_manquantes?: string[];
+  points_forts?: string[];
+  points_vigilance?: string[];
+  synthese?: string;
+  recommandation?: MatchingRecommendation;
 }
 
 export interface JobApplication {

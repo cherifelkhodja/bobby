@@ -10,6 +10,8 @@ from app.application.read_models.hr import (
     JobApplicationListReadModel,
     JobApplicationReadModel,
     MatchingDetailsReadModel,
+    MatchingRecommendationReadModel,
+    ScoresDetailsReadModel,
     StatusChangeReadModel,
 )
 from app.domain.entities import ApplicationStatus, JobApplication, JobPostingStatus
@@ -118,35 +120,64 @@ class SubmitApplicationUseCase:
             # Continue without text extraction
             pass
 
-        # Calculate matching score
+        # Calculate matching score using enhanced method
         matching_score = None
         matching_details = None
         if cv_text:
             try:
                 # Build job description for matching
                 job_description = f"""
-Titre: {posting.title}
-
-Description:
 {posting.description}
 
 Qualifications requises:
 {posting.qualifications}
-
-Compétences recherchées:
-{', '.join(posting.skills) if posting.skills else 'Non spécifiées'}
 """
-                result = await self.matching_service.calculate_match(
+                # Build TJM range string
+                tjm_range_str = None
+                if command.tjm_current or command.tjm_desired:
+                    parts = []
+                    if command.tjm_current:
+                        parts.append(f"Actuel: {command.tjm_current}€")
+                    if command.tjm_desired:
+                        parts.append(f"Souhaité: {command.tjm_desired}€")
+                    tjm_range_str = " / ".join(parts)
+
+                # Map availability to display string
+                availability_map = {
+                    "asap": "Immédiate",
+                    "1_month": "Sous 1 mois",
+                    "2_months": "Sous 2 mois",
+                    "3_months": "Sous 3 mois",
+                    "more_3_months": "Plus de 3 mois",
+                }
+                availability_display = availability_map.get(command.availability, command.availability)
+
+                # Use enhanced matching with candidate info
+                result = await self.matching_service.calculate_match_enhanced(
                     cv_text=cv_text,
+                    job_title_offer=posting.title,
                     job_description=job_description,
+                    required_skills=posting.skills,
+                    candidate_job_title=command.job_title,
+                    candidate_tjm_range=tjm_range_str,
+                    candidate_availability=availability_display,
                 )
-                matching_score = result.get("score", 0)
-                # Convert to dict for JSON storage
+                matching_score = result.get("score_global", result.get("score", 0))
+                # Store full enhanced matching details
                 matching_details = {
                     "score": matching_score,
-                    "strengths": result.get("strengths", []),
-                    "gaps": result.get("gaps", []),
-                    "summary": result.get("summary", ""),
+                    "score_global": result.get("score_global", matching_score),
+                    "scores_details": result.get("scores_details", {}),
+                    "competences_matchees": result.get("competences_matchees", []),
+                    "competences_manquantes": result.get("competences_manquantes", []),
+                    "points_forts": result.get("points_forts", []),
+                    "points_vigilance": result.get("points_vigilance", []),
+                    "synthese": result.get("synthese", result.get("summary", "")),
+                    "recommandation": result.get("recommandation", {}),
+                    # Legacy fields for backward compatibility
+                    "strengths": result.get("strengths", result.get("points_forts", [])),
+                    "gaps": result.get("gaps", result.get("competences_manquantes", [])),
+                    "summary": result.get("summary", result.get("synthese", "")),
                 }
             except Exception:
                 # Continue without matching
@@ -283,14 +314,7 @@ class ListApplicationsForPostingUseCase:
             for sh in application.status_history
         ]
 
-        matching_details_model = None
-        if application.matching_details:
-            matching_details_model = MatchingDetailsReadModel(
-                score=application.matching_details.get("score", 0),
-                strengths=application.matching_details.get("strengths", []),
-                gaps=application.matching_details.get("gaps", []),
-                summary=application.matching_details.get("summary", ""),
-            )
+        matching_details_model = _build_matching_details_model(application.matching_details)
 
         return JobApplicationReadModel(
             id=str(application.id),
@@ -332,6 +356,54 @@ class ListApplicationsForPostingUseCase:
             created_at=application.created_at,
             updated_at=application.updated_at,
         )
+
+
+def _build_matching_details_model(
+    matching_details: Optional[dict],
+) -> Optional[MatchingDetailsReadModel]:
+    """Build MatchingDetailsReadModel from matching details dict.
+
+    Handles both legacy and enhanced matching result formats.
+    """
+    if not matching_details:
+        return None
+
+    # Build scores_details if present
+    scores_details_model = None
+    if matching_details.get("scores_details"):
+        sd = matching_details["scores_details"]
+        scores_details_model = ScoresDetailsReadModel(
+            competences_techniques=sd.get("competences_techniques", 0),
+            experience=sd.get("experience", 0),
+            formation=sd.get("formation", 0),
+            soft_skills=sd.get("soft_skills", 0),
+        )
+
+    # Build recommandation if present
+    recommandation_model = None
+    if matching_details.get("recommandation"):
+        reco = matching_details["recommandation"]
+        recommandation_model = MatchingRecommendationReadModel(
+            niveau=reco.get("niveau", "faible"),
+            action_suggeree=reco.get("action_suggeree", ""),
+        )
+
+    return MatchingDetailsReadModel(
+        # Legacy fields
+        score=matching_details.get("score", 0),
+        strengths=matching_details.get("strengths", []),
+        gaps=matching_details.get("gaps", []),
+        summary=matching_details.get("summary", ""),
+        # Enhanced fields
+        score_global=matching_details.get("score_global"),
+        scores_details=scores_details_model,
+        competences_matchees=matching_details.get("competences_matchees", []),
+        competences_manquantes=matching_details.get("competences_manquantes", []),
+        points_forts=matching_details.get("points_forts", []),
+        points_vigilance=matching_details.get("points_vigilance", []),
+        synthese=matching_details.get("synthese", ""),
+        recommandation=recommandation_model,
+    )
 
 
 class GetApplicationUseCase:
@@ -408,14 +480,7 @@ class GetApplicationUseCase:
             for sh in application.status_history
         ]
 
-        matching_details_model = None
-        if application.matching_details:
-            matching_details_model = MatchingDetailsReadModel(
-                score=application.matching_details.get("score", 0),
-                strengths=application.matching_details.get("strengths", []),
-                gaps=application.matching_details.get("gaps", []),
-                summary=application.matching_details.get("summary", ""),
-            )
+        matching_details_model = _build_matching_details_model(application.matching_details)
 
         return JobApplicationReadModel(
             id=str(application.id),
@@ -550,14 +615,7 @@ class UpdateApplicationStatusUseCase:
                 )
             )
 
-        matching_details_model = None
-        if application.matching_details:
-            matching_details_model = MatchingDetailsReadModel(
-                score=application.matching_details.get("score", 0),
-                strengths=application.matching_details.get("strengths", []),
-                gaps=application.matching_details.get("gaps", []),
-                summary=application.matching_details.get("summary", ""),
-            )
+        matching_details_model = _build_matching_details_model(application.matching_details)
 
         return JobApplicationReadModel(
             id=str(application.id),
@@ -663,14 +721,7 @@ class UpdateApplicationNoteUseCase:
             for sh in application.status_history
         ]
 
-        matching_details_model = None
-        if application.matching_details:
-            matching_details_model = MatchingDetailsReadModel(
-                score=application.matching_details.get("score", 0),
-                strengths=application.matching_details.get("strengths", []),
-                gaps=application.matching_details.get("gaps", []),
-                summary=application.matching_details.get("summary", ""),
-            )
+        matching_details_model = _build_matching_details_model(application.matching_details)
 
         return JobApplicationReadModel(
             id=str(application.id),
@@ -795,14 +846,7 @@ class CreateCandidateInBoondUseCase:
             for sh in application.status_history
         ]
 
-        matching_details_model = None
-        if application.matching_details:
-            matching_details_model = MatchingDetailsReadModel(
-                score=application.matching_details.get("score", 0),
-                strengths=application.matching_details.get("strengths", []),
-                gaps=application.matching_details.get("gaps", []),
-                summary=application.matching_details.get("summary", ""),
-            )
+        matching_details_model = _build_matching_details_model(application.matching_details)
 
         return JobApplicationReadModel(
             id=str(application.id),

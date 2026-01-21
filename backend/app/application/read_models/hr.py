@@ -48,15 +48,46 @@ class OpportunityListForHRReadModel(BaseModel):
     page_size: int
 
 
-class MatchingDetailsReadModel(BaseModel):
-    """Matching details read model."""
+class ScoresDetailsReadModel(BaseModel):
+    """Detailed scoring breakdown by category."""
 
     model_config = ConfigDict(frozen=True)
 
+    competences_techniques: int = 0
+    experience: int = 0
+    formation: int = 0
+    soft_skills: int = 0
+
+
+class MatchingRecommendationReadModel(BaseModel):
+    """Matching recommendation read model."""
+
+    model_config = ConfigDict(frozen=True)
+
+    niveau: str = "faible"  # fort, moyen, faible
+    action_suggeree: str = ""
+
+
+class MatchingDetailsReadModel(BaseModel):
+    """Enhanced matching details read model with detailed scores."""
+
+    model_config = ConfigDict(frozen=True)
+
+    # Legacy fields (kept for backward compatibility)
     score: int
-    strengths: list[str]
-    gaps: list[str]
-    summary: str
+    strengths: list[str] = []
+    gaps: list[str] = []
+    summary: str = ""
+
+    # Enhanced fields
+    score_global: Optional[int] = None
+    scores_details: Optional[ScoresDetailsReadModel] = None
+    competences_matchees: list[str] = []
+    competences_manquantes: list[str] = []
+    points_forts: list[str] = []
+    points_vigilance: list[str] = []
+    synthese: str = ""
+    recommandation: Optional[MatchingRecommendationReadModel] = None
 
 
 class JobPostingReadModel(BaseModel):
