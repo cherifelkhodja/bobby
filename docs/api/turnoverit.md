@@ -358,6 +358,103 @@ Structure reçue via webhook ou GET /jobs/:reference :
 
 ---
 
+## Webhook (réception candidatures)
+
+Un webhook est une URL à laquelle Turnover-IT envoie les candidatures dès leur réception.
+
+### Fonctionnement
+
+Quand un candidat postule à une offre, Turnover-IT envoie une requête **POST** à l'URL configurée avec les données JSON de la candidature. Chaque requête contient une seule candidature.
+
+### Configuration de l'URL
+
+L'URL doit utiliser **HTTPS**. Deux options :
+
+| Option | Description |
+|--------|-------------|
+| **URL globale** | Une seule URL pour toutes les candidatures. Utiliser `jobPostingReference` et `jobConnectToken` pour identifier l'offre. Configuré dans les paramètres du compte client. |
+| **URL dynamique** | Une URL différente par offre via `application.callbackUrl` lors de la création. Ex: `https://bobby.example.com/webhook/turnoverit/{reference}` |
+
+### Politique de retry
+
+En cas d'indisponibilité du webhook (code != 200/201), Turnover-IT renvoie la candidature :
+
+| Retry | Délai |
+|-------|-------|
+| 1 | 0.6s |
+| 2 | 3s |
+| 3 | 15s |
+| 4 | 75s |
+| 5-10 | 90s |
+
+Après échec, renvoi toutes les **6 heures** pendant **1 semaine maximum**. Ensuite, utiliser `GET /jobs/:reference` pour récupérer les candidatures.
+
+### Payload reçu (exemple)
+
+```json
+{
+  "jobPostingReference": "ref-001",
+  "jobConnectToken": "1234-1234-1234-1234",
+  "title": "Full-stack developer",
+  "gender": "male",
+  "firstname": "Jean-Paul",
+  "lastname": "Dumas",
+  "email": "jean-paul.dumas@example.com",
+  "phone": "+33602030405",
+  "studyLevel": "5",
+  "studies": [
+    {
+      "diplomaTitle": "Ingénieur logiciel",
+      "diplomaLevel": "Bac+ 5",
+      "school": "EFREI",
+      "graduationYear": 2022
+    }
+  ],
+  "experience": "JUNIOR",
+  "remote": ["PARTIAL", "NONE"],
+  "availability": "WITHIN_1_MONTH",
+  "desiredJobs": ["Administrateur BDD", "Dev Full-Stack"],
+  "skills": ["php", "go", "sql"],
+  "softSkills": ["Agilité", "Gestion de projet"],
+  "languages": [
+    { "language": "PT", "level": "FULL_PROFESSIONAL_CAPACITY" }
+  ],
+  "location": {
+    "locality": "Lyon",
+    "postalCode": null,
+    "county": "Métropole de Lyon",
+    "region": "Auvergne-Rhône-Alpes",
+    "country": "France"
+  },
+  "mobilities": [
+    {
+      "locality": "Paris",
+      "postalCode": "75000",
+      "county": null,
+      "region": "Île-de-France",
+      "country": "France"
+    }
+  ],
+  "downloadUrl": "https://example.com/download/url"
+}
+```
+
+### Test du webhook
+
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"jobPostingReference":"ref-001","firstname":"Test","lastname":"User","email":"test@example.com"}' \
+  "https://bobby.example.com/webhook/turnoverit"
+```
+
+### Implémentation Bobby
+
+> **Note** : Bobby n'utilise pas actuellement le webhook. Les candidatures sont soumises via le formulaire public `/postuler/:token` qui stocke directement en base.
+
+**Alternative future** : Implémenter un endpoint webhook pour recevoir les candidatures Free-Work directement.
+
+---
+
 ## Client Bobby
 
 **Fichier** : `backend/app/infrastructure/turnoverit/client.py`
