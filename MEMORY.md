@@ -137,6 +137,7 @@ docker-compose up # Start all services
 - Setup système de documentation (MEMORY.md, docs/skills, docs/api)
 - Allègement CLAUDE.md (-112 lignes) : déport des infos dupliquées vers fichiers spécialisés
 - Création docs/api/gemini.md (CV parsing, anonymisation, matching)
+- Mise à jour docs/api/turnoverit.md avec documentation officielle JobConnect v2
 
 ### 2026-01-19
 - Mise à jour documentation CLAUDE.md

@@ -9,7 +9,9 @@ Documentation de l'intégration Turnover-IT pour Bobby.
 Turnover-IT est la plateforme utilisée pour :
 - Publier des offres d'emploi (diffusion sur Free-Work)
 - Synchroniser les compétences disponibles
-- Gérer les candidatures externes
+- Recevoir les candidatures via webhook
+
+**Base URL** : `https://api.turnover-it.com/jobconnect/v2`
 
 ---
 
@@ -24,14 +26,335 @@ TURNOVERIT_API_URL=https://api.turnover-it.com/jobconnect/v2
 
 ### Authentification
 
-L'API utilise une **API Key** dans le header :
+L'API utilise **OAuth Bearer token** :
 
-```python
-headers = {
-    "Authorization": f"Bearer {api_key}",
-    "Content-Type": "application/json",
+```bash
+curl --request POST \
+  --url https://api.turnover-it.com/jobconnect/v2/jobs \
+  --header 'Authorization: Bearer 10a9cea1-0001-0002-0003-113a756cf4a3'
+```
+
+> **Note** : Les tokens préfixés par `test-` sont des tokens de test. Les offres sont automatiquement en Draft et ne peuvent pas être publiées.
+
+### Format de sortie
+
+Utiliser `Accept: application/ld+json` pour le format JSON-LD avec pagination Hydra (recommandé).
+
+---
+
+## Endpoints API
+
+### Jobs
+
+#### GET /jobs/list
+Liste toutes les offres **sans les candidatures** (recommandé pour listing).
+
+```bash
+curl --request GET \
+  --url https://api.turnover-it.com/jobconnect/v2/jobs/list \
+  --header 'Authorization: Bearer {token}' \
+  --header 'Accept: application/ld+json'
+```
+
+#### GET /jobs
+Liste toutes les offres **avec leurs candidatures** (backup uniquement).
+
+#### GET /jobs/:reference
+Récupère une offre et ses candidatures par référence.
+
+```bash
+curl --request GET \
+  --url https://api.turnover-it.com/jobconnect/v2/jobs/ref-001 \
+  --header 'Authorization: Bearer {token}'
+```
+
+#### POST /jobs
+Crée une nouvelle offre d'emploi.
+
+```bash
+curl --request POST \
+  --url https://api.turnover-it.com/jobconnect/v2/jobs \
+  --header 'Authorization: Bearer {token}' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "reference": "ref-001",
+    "contract": ["PERMANENT", "FREELANCE"],
+    "title": "Front-end developer",
+    "description": "(≥500 chars) Lorem ipsum...",
+    "qualifications": "(≥150 chars) Lorem ipsum...",
+    "employerOverview": "Description entreprise...",
+    "experienceLevel": "INTERMEDIATE",
+    "startDate": "2024-04-30",
+    "skills": ["php", "go", "sql"],
+    "durationInMonths": 10,
+    "salary": {
+      "minAnnual": 20000,
+      "maxAnnual": 40000,
+      "minDaily": 500,
+      "maxDaily": 900,
+      "currency": "EUR"
+    },
+    "location": {
+      "country": "France",
+      "locality": "Paris",
+      "region": "Île-de-France",
+      "postalCode": "75008"
+    },
+    "remote": "PARTIAL",
+    "application": {
+      "callbackUrl": "https://bobby.example.com/webhook/turnoverit"
+    },
+    "status": "PUBLISHED"
+  }'
+```
+
+**Réponse 201** :
+```json
+{
+  "success": true,
+  "message": "Job created successfully"
 }
 ```
+
+#### PUT /jobs/:reference
+Met à jour une offre (tous les champs doivent être renvoyés).
+
+#### DELETE /jobs/:reference
+Supprime une offre.
+
+```bash
+curl --request DELETE \
+  --url https://api.turnover-it.com/jobconnect/v2/jobs/ref-001 \
+  --header 'Authorization: Bearer {token}'
+```
+
+### Skills
+
+#### GET /jobconnect/skills
+Liste des compétences disponibles (paginé, ~1244 skills).
+
+```bash
+curl --request GET \
+  --url https://api.turnover-it.com/jobconnect/skills \
+  --header 'Authorization: Bearer {token}'
+```
+
+**Recherche** : `GET /jobconnect/skills?q=python`
+
+---
+
+## Enums officiels
+
+### Contract (type de contrat)
+
+| Key | Description |
+|-----|-------------|
+| `PERMANENT` | CDI |
+| `TEMPORARY` | CDD |
+| `FREELANCE` | Freelance |
+| `INTERNSHIP` | Stage |
+| `APPRENTICESHIP` | Alternance |
+
+### Remote (télétravail)
+
+| Key | Description |
+|-----|-------------|
+| `NONE` | Pas de télétravail |
+| `PARTIAL` | 50% télétravail |
+| `FULL` | 100% télétravail |
+
+### Experience Level
+
+| Key | Description |
+|-----|-------------|
+| `JUNIOR` | 0-2 ans |
+| `INTERMEDIATE` | 3-5 ans |
+| `SENIOR` | 6-10 ans |
+| `EXPERT` | > 10 ans |
+
+### Status
+
+| Key | Description |
+|-----|-------------|
+| `DRAFT` | Brouillon |
+| `PUBLISHED` | Publiée |
+| `PRIVATE` | Privée |
+| `INACTIVE` | Inactive |
+| `EXPIRED` | Expirée |
+
+### Currency
+
+| Key | Description |
+|-----|-------------|
+| `EUR` | Euros |
+| `USD` | US Dollars |
+| `GBP` | British Pounds |
+
+### Availability (candidat)
+
+| Key | Description |
+|-----|-------------|
+| `IMMEDIATE` | Immédiate |
+| `WITHIN_1_MONTH` | Sous 1 mois |
+| `WITHIN_2_MONTH` | Sous 2 mois |
+| `WITHIN_3_MONTH` | Sous 3 mois |
+| `MORE_THAN_3_MONTH` | Plus de 3 mois |
+
+### Language Level
+
+| Key | Description |
+|-----|-------------|
+| `NOTIONS` | Notions |
+| `LIMITED_PROFESSIONAL_SKILLS` | Compétences professionnelles limitées |
+| `FULL_PROFESSIONAL_CAPACITY` | Capacité professionnelle complète |
+| `NATIVE_OR_BILINGUAL` | Natif ou bilingue |
+
+---
+
+## Job Resource (structure complète)
+
+```json
+{
+  "reference": "ref-001",           // required, unique
+  "recruiterAlias": "recruiter-1",  // optional
+  "contract": ["PERMANENT"],        // required, array
+  "title": "Front-end developer",   // required, 5-100 chars
+  "description": "...",             // required, 500-3000 chars
+  "qualifications": "...",          // required, 150-3000 chars
+  "employerOverview": "...",        // optional, <3000 chars
+  "experienceLevel": "INTERMEDIATE",// optional, enum
+  "startDate": "2024-04-30",        // optional, yyyy-mm-dd (null = ASAP)
+  "skills": ["php", "go"],          // optional, slugs from /skills
+  "durationInMonths": 10,           // optional, for fixed-term
+  "pushToTop": true,                // optional, push d+7
+  "salary": {
+    "minAnnual": 40000,
+    "maxAnnual": 50000,
+    "minDaily": 350,                // for FREELANCE
+    "maxDaily": 500,
+    "currency": "EUR"               // required in salary
+  },
+  "location": {                     // required
+    "country": "France",            // required
+    "region": "Île-de-France",      // required (or postalCode)
+    "locality": "Paris",            // optional
+    "postalCode": "75008"           // optional (or region)
+  },
+  "remote": "PARTIAL",              // optional, default NONE
+  "application": {                  // optional
+    "name": "Jane Doe",             // contact name (option payante)
+    "phone": "06 01 02 03 04",      // contact phone (option payante)
+    "email": "jane@company.com",    // contact email (option payante)
+    "url": "https://apply.com",     // redirect URL (option payante)
+    "callbackUrl": "https://webhook.com"  // webhook URL
+  },
+  "status": "PUBLISHED"             // required, enum
+}
+```
+
+### Contraintes de validation
+
+| Champ | Contrainte |
+|-------|------------|
+| `title` | 5-100 caractères |
+| `description` | 500-3000 caractères |
+| `qualifications` | 150-3000 caractères (sinon null) |
+| `salary.maxDaily - minDaily` | ≤ 500 |
+| `salary.maxAnnual - minAnnual` | ≤ 50000 |
+
+---
+
+## Application Resource (candidature)
+
+Structure reçue via webhook ou GET /jobs/:reference :
+
+```json
+{
+  "jobPostingReference": "ref-001",
+  "jobConnectToken": "1234-1234-1234-1234",
+  "title": "Full-stack developer",
+  "content": "Message du candidat...",
+  "gender": "male",
+  "firstname": "Jean-Paul",
+  "lastname": "Dumas",
+  "email": "jean-paul@example.com",
+  "phone": "+33602030405",
+  "contracts": ["PERMANENT"],
+  "studyLevel": 5,
+  "studies": [
+    {
+      "diplomaTitle": "Software Engineer",
+      "diplomaLevel": "Bac+ 5",
+      "school": "EFREI",
+      "graduationYear": 2022
+    }
+  ],
+  "experience": "JUNIOR",
+  "remoteModes": ["PARTIAL", "NONE"],
+  "availability": "WITHIN_1_MONTH",
+  "salary": {
+    "averageDaily": 500,
+    "grossAnnual": 48000,
+    "currency": "EUR"
+  },
+  "desiredJobs": ["Administrateur BDD", "Dev Full-Stack"],
+  "professionalExperience": [
+    {
+      "jobTitle": "Developer",
+      "contract": "PERMANENT",
+      "companyName": "Company",
+      "location": { "region": "Île-de-France", "country": "France" },
+      "description": "...",
+      "remoteMode": "NONE",
+      "startYearAt": 2020,
+      "endYearAt": 2023,
+      "current": false
+    }
+  ],
+  "skills": ["php", "go", "sql"],
+  "softSkills": ["Agilité", "Gestion de projet"],
+  "languages": [
+    { "language": "FR", "level": "NATIVE_OR_BILINGUAL" },
+    { "language": "EN", "level": "FULL_PROFESSIONAL_CAPACITY" }
+  ],
+  "location": {
+    "locality": "Lyon",
+    "region": "Auvergne-Rhône-Alpes",
+    "country": "France"
+  },
+  "mobilities": [
+    { "region": "Île-de-France", "country": "France" }
+  ],
+  "linkedInUrl": null,
+  "downloadUrl": "https://app.turnover-it.com/download/cv.pdf",
+  "additionalDocumentUrl": null
+}
+```
+
+> **Note** : `downloadUrl` valide 1 heure seulement.
+
+---
+
+## Pagination (JSON-LD Hydra)
+
+```json
+{
+  "@context": "/contexts/JobPosting",
+  "@id": "/jobconnect/v2/jobs/list",
+  "@type": "hydra:Collection",
+  "hydra:totalItems": 54,
+  "hydra:member": [...],
+  "hydra:view": {
+    "@id": "/jobconnect/v2/jobs/list?page=1",
+    "@type": "hydra:PartialCollectionView",
+    "hydra:first": "/jobconnect/v2/jobs/list?page=1",
+    "hydra:last": "/jobconnect/v2/jobs/list?page=2",
+    "hydra:next": "/jobconnect/v2/jobs/list?page=2"
+  }
+}
+```
+
+**Pagination** : `GET /jobs/list?page=2` (30 items/page par défaut)
 
 ---
 
@@ -39,214 +362,68 @@ headers = {
 
 **Fichier** : `backend/app/infrastructure/turnoverit/client.py`
 
-### Configuration
+### Implémentation
 
 ```python
 class TurnoverITClient:
-    def __init__(
-        self,
-        api_url: str,
-        api_key: str,
-        timeout: float = 10.0,
-    ):
+    def __init__(self, api_url: str, api_key: str, timeout: float = 10.0):
         self.api_url = api_url
         self.api_key = api_key
         self.timeout = timeout
+
+    async def publish_job(self, job: JobPostingCreate) -> JobPublishResult:
+        payload = {
+            "reference": job.reference,
+            "contract": job.contract_types,  # ["FREELANCE", "PERMANENT"]
+            "title": job.title,
+            "description": job.description,  # ≥500 chars
+            "qualifications": job.qualifications,  # ≥150 chars
+            "employerOverview": job.employer_overview,
+            "experienceLevel": job.experience_level,  # JUNIOR, INTERMEDIATE, SENIOR, EXPERT
+            "startDate": job.start_date.isoformat() if job.start_date else None,
+            "skills": job.skills,  # slugs from /skills
+            "durationInMonths": job.duration_months,
+            "salary": {
+                "minAnnual": job.salary_min_annual,
+                "maxAnnual": job.salary_max_annual,
+                "minDaily": job.salary_min_daily,
+                "maxDaily": job.salary_max_daily,
+                "currency": "EUR",
+            },
+            "location": {
+                "country": job.location_country,
+                "region": job.location_region,
+                "locality": job.location_city,
+                "postalCode": job.location_postal_code,
+            },
+            "remote": job.remote,  # NONE, PARTIAL, FULL
+            "status": "PUBLISHED",
+        }
+        response = await self._post("/jobs", json=payload)
+        # Response contains publicUrl after publication
+        return JobPublishResult(reference=job.reference, public_url=response.get("publicUrl"))
+
+    async def delete_job(self, reference: str) -> None:
+        await self._delete(f"/jobs/{reference}")
+
+    async def get_skills(self, page: int = 1) -> list[Skill]:
+        response = await self._get(f"/skills?page={page}")
+        return [Skill(name=s["name"], slug=s["slug"]) for s in response["hydra:member"]]
 ```
 
 ---
 
-## Endpoints utilisés
+## Cache des compétences Bobby
 
-### Compétences
-
-#### GET /skills
-Récupère la liste des compétences disponibles.
-
-```python
-async def get_skills(self) -> list[Skill]:
-    response = await self._get("/skills")
-    return [
-        Skill(
-            name=item["name"],
-            slug=item["slug"],
-        )
-        for item in response["data"]
-    ]
-```
-
-**Réponse** :
-```json
-{
-  "data": [
-    {"name": "Python", "slug": "python"},
-    {"name": "React", "slug": "react"},
-    {"name": "FastAPI", "slug": "fastapi"}
-  ]
-}
-```
-
-### Offres d'emploi
-
-#### POST /jobs
-Publie une nouvelle offre d'emploi.
-
-```python
-async def publish_job(self, job: JobPostingCreate) -> JobPublishResult:
-    payload = {
-        "title": job.title,
-        "description": job.description,
-        "qualifications": job.qualifications,
-        "location": {
-            "country": job.location_country,
-            "region": job.location_region,
-            "city": job.location_city,
-            "postalCode": job.location_postal_code,
-        },
-        "contractTypes": job.contract_types,
-        "skills": job.skills,
-        "experienceLevel": job.experience_level,
-        "remote": job.remote,
-        "startDate": job.start_date.isoformat() if job.start_date else None,
-        "durationMonths": job.duration_months,
-        "salary": {
-            "minAnnual": job.salary_min_annual,
-            "maxAnnual": job.salary_max_annual,
-            "minDaily": job.salary_min_daily,
-            "maxDaily": job.salary_max_daily,
-        },
-        "employerOverview": job.employer_overview,
-    }
-
-    response = await self._post("/jobs", json=payload)
-
-    return JobPublishResult(
-        reference=response["data"]["reference"],
-        public_url=response["data"]["publicUrl"],
-    )
-```
-
-**Payload d'exemple** :
-```json
-{
-  "title": "Développeur Python Senior",
-  "description": "Mission de 6 mois...",
-  "qualifications": "5 ans d'expérience minimum...",
-  "location": {
-    "country": "FR",
-    "region": "Île-de-France",
-    "city": "Paris",
-    "postalCode": "75008"
-  },
-  "contractTypes": ["freelance", "portage"],
-  "skills": ["python", "fastapi", "postgresql"],
-  "experienceLevel": "senior",
-  "remote": "partial",
-  "startDate": "2026-02-01",
-  "durationMonths": 6,
-  "salary": {
-    "minDaily": 500,
-    "maxDaily": 650
-  },
-  "employerOverview": "ESN spécialisée..."
-}
-```
-
-**Réponse** :
-```json
-{
-  "data": {
-    "reference": "TIT-2026-12345",
-    "publicUrl": "https://www.free-work.com/fr/jobs/12345"
-  }
-}
-```
-
-#### PATCH /jobs/{reference}
-Met à jour une offre existante.
-
-```python
-async def update_job(
-    self,
-    reference: str,
-    updates: JobPostingUpdate,
-) -> None:
-    payload = updates.model_dump(exclude_unset=True)
-    await self._patch(f"/jobs/{reference}", json=payload)
-```
-
-#### DELETE /jobs/{reference}
-Ferme/supprime une offre.
-
-```python
-async def close_job(self, reference: str) -> None:
-    await self._delete(f"/jobs/{reference}")
-```
-
----
-
-## Modèles de données
-
-### JobPostingCreate
-
-```python
-@dataclass
-class JobPostingCreate:
-    title: str
-    description: str
-    qualifications: str
-    location_country: str  # Code ISO (FR, BE, CH...)
-    location_region: str | None = None
-    location_city: str | None = None
-    location_postal_code: str | None = None
-    contract_types: list[str] = field(default_factory=list)  # freelance, portage, cdi, cdd
-    skills: list[str] = field(default_factory=list)  # Slugs des compétences
-    experience_level: str | None = None  # junior, mid, senior, lead
-    remote: str | None = None  # full, partial, none
-    start_date: date | None = None
-    duration_months: int | None = None
-    salary_min_annual: int | None = None
-    salary_max_annual: int | None = None
-    salary_min_daily: int | None = None  # TJM min
-    salary_max_daily: int | None = None  # TJM max
-    employer_overview: str | None = None
-```
-
-### JobPublishResult
-
-```python
-@dataclass
-class JobPublishResult:
-    reference: str  # Référence Turnover-IT
-    public_url: str  # URL publique Free-Work
-```
-
-### Skill
-
-```python
-@dataclass
-class Skill:
-    name: str   # Nom affiché
-    slug: str   # Identifiant pour l'API
-```
-
----
-
-## Cache des compétences
-
-Les compétences sont cachées dans la base de données pour éviter les appels API répétés.
-
-### Tables
+### Tables SQL
 
 ```sql
--- turnoverit_skills
 CREATE TABLE turnoverit_skills (
     id UUID PRIMARY KEY,
     name VARCHAR NOT NULL,
     slug VARCHAR UNIQUE NOT NULL
 );
 
--- turnoverit_skills_metadata
 CREATE TABLE turnoverit_skills_metadata (
     id INTEGER PRIMARY KEY,
     last_synced_at TIMESTAMP NOT NULL,
@@ -254,144 +431,53 @@ CREATE TABLE turnoverit_skills_metadata (
 );
 ```
 
-### Synchronisation
+### Endpoints Bobby
 
-```python
-async def sync_skills(self) -> int:
-    """Synchronise les compétences depuis Turnover-IT."""
-    skills = await self.client.get_skills()
-
-    # Upsert dans la base
-    for skill in skills:
-        await self.skill_repo.upsert(skill)
-
-    # Mettre à jour metadata
-    await self.metadata_repo.update(
-        last_synced_at=datetime.utcnow(),
-        total_skills=len(skills),
-    )
-
-    return len(skills)
-```
-
----
-
-## Utilisation dans Bobby
-
-### Endpoints API Bobby
-
-| Endpoint Bobby | Méthode Turnover-IT |
-|----------------|---------------------|
-| `GET /admin/turnoverit/skills` | Cache local (DB) |
-| `POST /admin/turnoverit/skills/sync` | `get_skills()` |
-| `POST /hr/job-postings/{id}/publish` | `publish_job()` |
-| `POST /hr/job-postings/{id}/close` | `close_job()` |
-
-### Workflow de publication
-
-```python
-# 1. Créer le brouillon en base
-job_posting = await job_posting_repo.create(draft_data)
-
-# 2. Publier sur Turnover-IT
-result = await turnoverit.publish_job(job_posting)
-
-# 3. Mettre à jour avec la référence
-job_posting.turnoverit_reference = result.reference
-job_posting.turnoverit_public_url = result.public_url
-job_posting.status = "published"
-job_posting.published_at = datetime.utcnow()
-
-await job_posting_repo.save(job_posting)
-```
-
----
-
-## Types de contrats
-
-| Code | Description |
-|------|-------------|
-| `freelance` | Freelance / Indépendant |
-| `portage` | Portage salarial |
-| `cdi` | CDI |
-| `cdd` | CDD |
-| `interim` | Intérim |
-
----
-
-## Niveaux d'expérience
-
-| Code | Description |
-|------|-------------|
-| `junior` | 0-2 ans |
-| `mid` | 3-5 ans |
-| `senior` | 5-10 ans |
-| `lead` | 10+ ans |
-
----
-
-## Télétravail
-
-| Code | Description |
-|------|-------------|
-| `full` | 100% télétravail |
-| `partial` | Hybride |
-| `none` | Présentiel uniquement |
+| Endpoint Bobby | Action |
+|----------------|--------|
+| `GET /admin/turnoverit/skills` | Liste depuis cache DB |
+| `POST /admin/turnoverit/skills/sync` | Sync depuis API Turnover-IT |
+| `POST /hr/job-postings/{id}/publish` | Publie sur Turnover-IT |
+| `POST /hr/job-postings/{id}/close` | Supprime de Turnover-IT |
 
 ---
 
 ## Gestion des erreurs
 
-### Exceptions
-
 ```python
 class TurnoverITError(Exception):
-    """Erreur générique API Turnover-IT."""
     def __init__(self, status_code: int, message: str):
         self.status_code = status_code
         self.message = message
 
 class TurnoverITValidationError(TurnoverITError):
-    """Erreur de validation (400)."""
+    """400 - Erreur de validation."""
     pass
 
 class TurnoverITAuthError(TurnoverITError):
-    """Erreur d'authentification (401)."""
-    pass
-
-class TurnoverITRateLimitError(TurnoverITError):
-    """Rate limit dépassé (429)."""
+    """401 - Token invalide."""
     pass
 ```
 
-### Handling
-
-```python
-async def _request(self, method: str, endpoint: str, **kwargs):
-    async with httpx.AsyncClient(timeout=self.timeout) as client:
-        response = await client.request(
-            method,
-            f"{self.api_url}{endpoint}",
-            headers={"Authorization": f"Bearer {self.api_key}"},
-            **kwargs,
-        )
-
-        if response.status_code == 400:
-            raise TurnoverITValidationError(400, response.json().get("message"))
-        if response.status_code == 401:
-            raise TurnoverITAuthError(401, "Invalid API key")
-        if response.status_code == 429:
-            raise TurnoverITRateLimitError(429, "Rate limit exceeded")
-        if response.status_code >= 400:
-            raise TurnoverITError(response.status_code, response.text)
-
-        return response.json()
+**Exemple erreur 400** :
+```json
+{
+  "success": false,
+  "message": [
+    {
+      "title": "An error occurred",
+      "detail": "description: String must be at least 500 characters long.",
+      "message": "String must be at least 500 characters long."
+    }
+  ]
+}
 ```
 
 ---
 
 ## Références
 
-- API Documentation : JobConnect v2
-- Base URL : `https://api.turnover-it.com/jobconnect/v2`
-- Diffusion : Free-Work (www.free-work.com)
+- **API Base URL** : `https://api.turnover-it.com/jobconnect/v2`
+- **Skills URL** : `https://api.turnover-it.com/jobconnect/skills`
+- **Diffusion** : Free-Work (www.free-work.com)
+- **Token management** : https://app.turnover-it.com/
