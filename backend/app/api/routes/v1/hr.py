@@ -71,6 +71,7 @@ class CreateJobPostingRequest(BaseModel):
     """Request body for creating a job posting."""
 
     opportunity_id: str
+    client_name: Optional[str] = Field(None, max_length=200)  # Client name from Boond
     title: str = Field(..., min_length=5, max_length=100)
     description: str = Field(..., min_length=500, max_length=3000)
     qualifications: str = Field(..., min_length=150, max_length=3000)
@@ -559,7 +560,12 @@ async def create_job_posting(
             external_id=boond_opportunity_id,
             title=request.title,  # Use job posting title as opportunity title
             reference=f"BOOND-{boond_opportunity_id}",  # Generate reference from Boond ID
+            client_name=request.client_name,  # Store client name from Boond
         )
+        opportunity = await opportunity_repo.save(opportunity)
+    elif request.client_name and not opportunity.client_name:
+        # Update existing opportunity with client_name if missing
+        opportunity.client_name = request.client_name
         opportunity = await opportunity_repo.save(opportunity)
 
     use_case = CreateJobPostingUseCase(

@@ -179,6 +179,7 @@ class JobPostingReadModel(BaseModel):
 
     id: str
     opportunity_id: str
+    boond_opportunity_id: Optional[str] = None  # Boond external ID for API calls
     opportunity_title: Optional[str] = None
     opportunity_reference: Optional[str] = None
     client_name: Optional[str] = None

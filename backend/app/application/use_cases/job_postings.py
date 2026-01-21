@@ -246,7 +246,7 @@ class CreateJobPostingUseCase:
         )
 
         saved = await self.job_posting_repository.save(job_posting)
-        return await self._to_read_model(saved, opportunity.title, opportunity.reference, opportunity.client_name)
+        return await self._to_read_model(saved, opportunity.title, opportunity.reference, opportunity.client_name, opportunity.external_id)
 
     async def _to_read_model(
         self,
@@ -254,6 +254,7 @@ class CreateJobPostingUseCase:
         opportunity_title: Optional[str] = None,
         opportunity_reference: Optional[str] = None,
         client_name: Optional[str] = None,
+        boond_opportunity_id: Optional[str] = None,
     ) -> JobPostingReadModel:
         created_by_name = None
         if posting.created_by:
@@ -266,6 +267,7 @@ class CreateJobPostingUseCase:
         return JobPostingReadModel(
             id=str(posting.id),
             opportunity_id=str(posting.opportunity_id),
+            boond_opportunity_id=boond_opportunity_id,
             opportunity_title=opportunity_title,
             opportunity_reference=opportunity_reference,
             client_name=client_name,
@@ -333,6 +335,7 @@ class GetJobPostingUseCase:
             opportunity.title if opportunity else None,
             opportunity.reference if opportunity else None,
             opportunity.client_name if opportunity else None,
+            opportunity.external_id if opportunity else None,
             stats,
         )
 
@@ -342,6 +345,7 @@ class GetJobPostingUseCase:
         opportunity_title: Optional[str] = None,
         opportunity_reference: Optional[str] = None,
         client_name: Optional[str] = None,
+        boond_opportunity_id: Optional[str] = None,
         stats: Optional[dict] = None,
     ) -> JobPostingReadModel:
         created_by_name = None
@@ -355,6 +359,7 @@ class GetJobPostingUseCase:
         return JobPostingReadModel(
             id=str(posting.id),
             opportunity_id=str(posting.opportunity_id),
+            boond_opportunity_id=boond_opportunity_id,
             opportunity_title=opportunity_title,
             opportunity_reference=opportunity_reference,
             client_name=client_name,

@@ -481,6 +481,7 @@ export interface JobPostingListResponse {
 export interface CreateJobPostingRequest {
   opportunity_id?: string;
   boond_opportunity_id?: string;
+  client_name?: string | null;  // Client name from Boond
   title: string;
   description: string;
   qualifications: string;

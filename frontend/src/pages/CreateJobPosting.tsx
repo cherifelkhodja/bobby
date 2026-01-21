@@ -351,6 +351,7 @@ export default function CreateJobPosting() {
         return hrApi.createJobPosting({
           ...requestData,
           opportunity_id: oppId,
+          client_name: opportunity?.company_name,
         });
       }
     },
@@ -442,6 +443,7 @@ export default function CreateJobPosting() {
         const created = await hrApi.createJobPosting({
           ...requestData,
           opportunity_id: oppId,
+          client_name: opportunity?.company_name,
         });
         postingId = created.id;
       }
