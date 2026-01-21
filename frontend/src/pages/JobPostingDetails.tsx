@@ -988,28 +988,28 @@ export default function JobPostingDetails() {
                   <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     Candidat
                   </th>
-                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px] w-[180px]">
                     Statut Pro
                   </th>
-                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px] w-[100px]">
                     TJM
                   </th>
-                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px] w-[140px]">
                     Salaire
                   </th>
-                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px] w-[120px]">
                     Disponibilité
                   </th>
-                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
+                  <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px] w-[90px]">
                     Matching
                   </th>
-                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
+                  <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px] w-[90px]">
                     Qualité CV
                   </th>
-                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
+                  <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px] w-[90px]">
                     Statut
                   </th>
-                  <th className="text-right py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
+                  <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px] w-[140px]">
                     Actions
                   </th>
                 </tr>
@@ -1061,19 +1061,19 @@ export default function JobPostingDetails() {
                           )}
                         </td>
                         <td className="py-2 px-3">
-                          <p className="text-gray-900 dark:text-white">{application.tjm_range || '-'}</p>
+                          <span className="text-sm text-gray-900 dark:text-white whitespace-nowrap">{application.tjm_range || '-'}</span>
                         </td>
                         <td className="py-2 px-3">
-                          <p className="text-gray-900 dark:text-white">{application.salary_range || '-'}</p>
+                          <span className="text-sm text-gray-900 dark:text-white whitespace-nowrap">{application.salary_range || '-'}</span>
                         </td>
                         <td className="py-2 px-3">
-                          <p className="text-gray-900 dark:text-white">
+                          <span className="text-sm text-gray-900 dark:text-white whitespace-nowrap">
                             {application.availability_display || application.availability || '-'}
-                          </p>
+                          </span>
                         </td>
-                        <td className="py-2 px-3">
+                        <td className="py-2 px-3 text-center">
                           {application.matching_score !== null ? (
-                            <div className="relative group">
+                            <div className="relative group inline-block">
                               <span
                                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-help ${getMatchingScoreColor(
                                   application.matching_score
@@ -1113,9 +1113,9 @@ export default function JobPostingDetails() {
                             <span className="text-gray-500 dark:text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="py-2 px-3">
+                        <td className="py-2 px-3 text-center">
                           {application.cv_quality_score !== null && application.cv_quality ? (
-                            <div className="relative group">
+                            <div className="relative group inline-block">
                               <span
                                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-help ${getCvQualityScoreColor(
                                   application.cv_quality_score
@@ -1186,7 +1186,7 @@ export default function JobPostingDetails() {
                             <span className="text-gray-500 dark:text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="py-2 px-3">
+                        <td className="py-2 px-3 text-center">
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
                               APPLICATION_STATUS_COLORS[application.status as ApplicationStatus]
@@ -1195,9 +1195,9 @@ export default function JobPostingDetails() {
                             {APPLICATION_STATUS_LABELS[application.status as ApplicationStatus]}
                           </span>
                         </td>
-                        <td className="py-2 px-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {/* Voir - toujours visible */}
+                        <td className="py-2 px-3">
+                          <div className="flex items-center justify-center gap-0.5">
+                            {/* Voir */}
                             <button
                               onClick={() => handleOpenApplication(application)}
                               className={`p-1.5 rounded-lg transition-colors ${
@@ -1209,36 +1209,45 @@ export default function JobPostingDetails() {
                             >
                               <Eye className="h-4 w-4" />
                             </button>
-                            {/* Vu - seulement si non lu */}
-                            {!application.is_read && (
-                              <button
-                                onClick={() => handleMarkAsRead(application)}
-                                className="p-1.5 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
-                                title="Marquer comme lu"
-                              >
-                                <EyeOff className="h-4 w-4" />
-                              </button>
-                            )}
-                            {/* Validé - seulement si en_cours */}
-                            {application.status === 'en_cours' && (
-                              <button
-                                onClick={() => handleQuickValidate(application)}
-                                className="p-1.5 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                                title="Valider"
-                              >
-                                <Check className="h-4 w-4" />
-                              </button>
-                            )}
-                            {/* Refusé - seulement si en_cours */}
-                            {application.status === 'en_cours' && (
-                              <button
-                                onClick={() => handleQuickReject(application)}
-                                className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                title="Refuser"
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </button>
-                            )}
+                            {/* Marquer comme lu */}
+                            <button
+                              onClick={() => !application.is_read && handleMarkAsRead(application)}
+                              disabled={application.is_read}
+                              className={`p-1.5 rounded-lg transition-colors ${
+                                application.is_read
+                                  ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                                  : 'text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20'
+                              }`}
+                              title={application.is_read ? 'Déjà lu' : 'Marquer comme lu'}
+                            >
+                              <EyeOff className="h-4 w-4" />
+                            </button>
+                            {/* Valider */}
+                            <button
+                              onClick={() => application.status === 'en_cours' && handleQuickValidate(application)}
+                              disabled={application.status !== 'en_cours'}
+                              className={`p-1.5 rounded-lg transition-colors ${
+                                application.status !== 'en_cours'
+                                  ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                                  : 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
+                              }`}
+                              title={application.status === 'en_cours' ? 'Valider' : 'Non disponible'}
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+                            {/* Refuser */}
+                            <button
+                              onClick={() => application.status === 'en_cours' && handleQuickReject(application)}
+                              disabled={application.status !== 'en_cours'}
+                              className={`p-1.5 rounded-lg transition-colors ${
+                                application.status !== 'en_cours'
+                                  ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                                  : 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
+                              }`}
+                              title={application.status === 'en_cours' ? 'Refuser' : 'Non disponible'}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </button>
                             {/* Télécharger CV */}
                             <button
                               onClick={() => handleDownloadCv(application)}
