@@ -19,8 +19,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = "016"
-down_revision = "015"
+revision = "016_add_application_form_fields"
+down_revision = "015_fix_contract_types_enum"
 branch_labels = None
 depends_on = None
 
