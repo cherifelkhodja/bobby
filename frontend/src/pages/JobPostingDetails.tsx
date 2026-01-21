@@ -33,8 +33,11 @@ import {
   Square,
   Info,
   Star,
+  Briefcase,
+  User,
+  Phone,
 } from 'lucide-react';
-import { hrApi } from '../api/hr';
+import { hrApi, type OpportunityDetailResponse } from '../api/hr';
 import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_STATUS_COLORS,
@@ -383,6 +386,10 @@ export default function JobPostingDetails() {
   const [noteText, setNoteText] = useState('');
   const [newStatus, setNewStatus] = useState<ApplicationStatus | ''>('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // Opportunity detail state
+  const [showOpportunityDetail, setShowOpportunityDetail] = useState(false);
+  const [opportunityDetail, setOpportunityDetail] = useState<OpportunityDetailResponse | null>(null);
+  const [loadingOpportunityDetail, setLoadingOpportunityDetail] = useState(false);
 
   // Fetch job posting
   const {
@@ -540,6 +547,31 @@ export default function JobPostingDetails() {
     }
   };
 
+  // Fetch and show opportunity details from Boond
+  const handleShowOpportunityDetail = async () => {
+    if (!posting) return;
+    // Extract Boond ID from reference (format: "BOOND-1234")
+    const boondId = posting.boond_opportunity_id || posting.opportunity_reference?.replace('BOOND-', '');
+    if (!boondId) return;
+
+    setLoadingOpportunityDetail(true);
+    setShowOpportunityDetail(true);
+    try {
+      const detail = await hrApi.getOpportunityDetail(boondId);
+      setOpportunityDetail(detail);
+    } catch (error) {
+      console.error('Error fetching opportunity detail:', error);
+    } finally {
+      setLoadingOpportunityDetail(false);
+    }
+  };
+
+  // Close opportunity detail panel
+  const handleCloseOpportunityDetail = () => {
+    setShowOpportunityDetail(false);
+    setOpportunityDetail(null);
+  };
+
   if (loadingPosting) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -596,7 +628,14 @@ export default function JobPostingDetails() {
               </span>
             </div>
             <p className="text-gray-600 dark:text-gray-400">
-              {posting.opportunity_reference} • Créée le{' '}
+              <button
+                onClick={handleShowOpportunityDetail}
+                className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                title="Voir les détails de l'opportunité Boond"
+              >
+                {posting.opportunity_reference}
+              </button>
+              {' '}• Créée le{' '}
               {new Date(posting.created_at).toLocaleDateString('fr-FR')}
             </p>
           </div>
@@ -1229,6 +1268,188 @@ export default function JobPostingDetails() {
           animation: slide-in-right 0.2s ease-out;
         }
       `}</style>
+
+      {/* Opportunity Detail Drawer */}
+      {showOpportunityDetail && (
+        <div className="fixed inset-0 bg-black/50 flex justify-end z-50">
+          <div
+            className="w-full max-w-lg bg-white dark:bg-gray-800 shadow-xl animate-slide-in-right overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <Briefcase className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white">Détails Opportunité Boond</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {opportunityDetail?.reference || posting?.opportunity_reference}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleCloseOpportunityDetail}
+                className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 space-y-4">
+              {loadingOpportunityDetail ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                </div>
+              ) : opportunityDetail ? (
+                <>
+                  {/* Title */}
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                      {opportunityDetail.title}
+                    </h4>
+                    {opportunityDetail.state_name && (
+                      <span
+                        className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium"
+                        style={{
+                          backgroundColor: opportunityDetail.state_color ? `${opportunityDetail.state_color}20` : '#e5e7eb',
+                          color: opportunityDetail.state_color || '#6b7280',
+                        }}
+                      >
+                        {opportunityDetail.state_name}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Client / Company */}
+                  {opportunityDetail.company_name && (
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <Building2 className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Client</p>
+                        <p className="font-medium text-gray-900 dark:text-white">{opportunityDetail.company_name}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Manager */}
+                  {opportunityDetail.manager_name && (
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <User className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Responsable commercial</p>
+                        <p className="font-medium text-gray-900 dark:text-white">{opportunityDetail.manager_name}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Contact */}
+                  {opportunityDetail.contact_name && (
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <Phone className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Contact client</p>
+                        <p className="font-medium text-gray-900 dark:text-white">{opportunityDetail.contact_name}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Location */}
+                  {opportunityDetail.place && (
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <MapPin className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Lieu</p>
+                        <p className="font-medium text-gray-900 dark:text-white">{opportunityDetail.place}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dates */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {opportunityDetail.start_date && (
+                      <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Date de début</p>
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          {new Date(opportunityDetail.start_date).toLocaleDateString('fr-FR')}
+                        </p>
+                      </div>
+                    )}
+                    {opportunityDetail.end_date && (
+                      <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Date de fin</p>
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          {new Date(opportunityDetail.end_date).toLocaleDateString('fr-FR')}
+                        </p>
+                      </div>
+                    )}
+                    {opportunityDetail.duration && (
+                      <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Durée</p>
+                        <p className="font-medium text-gray-900 dark:text-white">{opportunityDetail.duration} jours</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  {opportunityDetail.description && (
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                      <h5 className="font-medium text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Description
+                      </h5>
+                      <div
+                        className="text-sm text-gray-700 dark:text-gray-300 prose prose-sm dark:prose-invert max-w-none"
+                        dangerouslySetInnerHTML={{ __html: opportunityDetail.description }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Criteria */}
+                  {opportunityDetail.criteria && (
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                      <h5 className="font-medium text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        Critères
+                      </h5>
+                      <div
+                        className="text-sm text-gray-700 dark:text-gray-300 prose prose-sm dark:prose-invert max-w-none"
+                        dangerouslySetInnerHTML={{ __html: opportunityDetail.criteria }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Expertise Area */}
+                  {opportunityDetail.expertise_area && (
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                      <h5 className="font-medium text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                        <Star className="h-4 w-4" />
+                        Domaine d'expertise
+                      </h5>
+                      <p className="text-sm text-gray-700 dark:text-gray-300">{opportunityDetail.expertise_area}</p>
+                    </div>
+                  )}
+
+                  {/* Agency */}
+                  {opportunityDetail.agency_name && (
+                    <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Agence</p>
+                      <p className="font-medium text-gray-900 dark:text-white">{opportunityDetail.agency_name}</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+                  <p>Impossible de charger les détails</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
