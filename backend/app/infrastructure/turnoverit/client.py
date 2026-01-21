@@ -224,6 +224,68 @@ class TurnoverITClient:
             logger.error(f"Request error closing job {reference}: {e}")
             raise TurnoverITError(f"Erreur de connexion: {str(e)}")
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+        reraise=True,
+    )
+    async def reactivate_job(self, reference: str, job_payload: dict[str, Any]) -> bool:
+        """Reactivate a closed job posting on Turnover-IT by setting status to PUBLISHED.
+
+        Args:
+            reference: The job reference.
+            job_payload: The full job payload with status set to PUBLISHED.
+
+        Returns:
+            True if update was successful.
+
+        Raises:
+            TurnoverITError: If API call fails.
+        """
+        if not self._is_configured():
+            raise TurnoverITError("API key not configured")
+
+        # Ensure status is PUBLISHED
+        job_payload["status"] = "PUBLISHED"
+
+        logger.info(f"Reactivating job on Turnover-IT: {reference}")
+        logger.info(f"Payload: {json.dumps(job_payload, indent=2, ensure_ascii=False)}")
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.put(
+                    f"{self.base_url}/jobs/{reference}",
+                    headers=self._get_headers(),
+                    json=job_payload,
+                )
+
+                logger.info(f"Response: {response.status_code} - {response.text}")
+
+                if response.status_code == 200:
+                    logger.info(f"Successfully reactivated job: {reference}")
+                    return True
+
+                error_msg = response.text
+                try:
+                    error_data = response.json()
+                    if isinstance(error_data.get("message"), list):
+                        errors = [e.get("message", str(e)) for e in error_data["message"]]
+                        error_msg = "; ".join(errors)
+                    else:
+                        error_msg = error_data.get("message", error_msg)
+                except Exception:
+                    pass
+
+                logger.error(f"Failed to reactivate job {reference}: {error_msg}")
+                raise TurnoverITError(f"Réactivation échouée: {error_msg}")
+
+        except httpx.TimeoutException:
+            logger.error(f"Timeout reactivating job {reference}")
+            raise TurnoverITError("Délai d'attente dépassé")
+        except httpx.RequestError as e:
+            logger.error(f"Request error reactivating job {reference}: {e}")
+            raise TurnoverITError(f"Erreur de connexion: {str(e)}")
+
     async def get_places(self, search: str) -> list[dict[str, Any]]:
         """Get place suggestions from Turnover-IT locations autocomplete API.
 

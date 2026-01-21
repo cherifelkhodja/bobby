@@ -22,6 +22,7 @@ import {
   Edit2,
   CheckCircle,
   Trash2,
+  RefreshCw,
 } from 'lucide-react';
 import { hrApi } from '../api/hr';
 import {
@@ -95,6 +96,15 @@ export default function JobPostingDetails() {
   // Close mutation
   const closeMutation = useMutation({
     mutationFn: () => hrApi.closeJobPosting(postingId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-job-posting', postingId] });
+      queryClient.invalidateQueries({ queryKey: ['hr-opportunities'] });
+    },
+  });
+
+  // Reactivate mutation
+  const reactivateMutation = useMutation({
+    mutationFn: () => hrApi.reactivateJobPosting(postingId!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hr-job-posting', postingId] });
       queryClient.invalidateQueries({ queryKey: ['hr-opportunities'] });
@@ -252,6 +262,20 @@ export default function JobPostingDetails() {
                   <XCircle className="h-4 w-4" />
                 )}
                 Fermer l'annonce
+              </button>
+            )}
+            {posting.status === 'closed' && (
+              <button
+                onClick={() => reactivateMutation.mutate()}
+                disabled={reactivateMutation.isPending}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors"
+              >
+                {reactivateMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Réactiver l'annonce
               </button>
             )}
             {posting.turnoverit_public_url && (

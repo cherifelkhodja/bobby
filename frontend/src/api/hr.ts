@@ -228,6 +228,14 @@ export const hrApi = {
   },
 
   /**
+   * Reactivate a closed job posting
+   */
+  reactivateJobPosting: async (postingId: string): Promise<JobPosting> => {
+    const response = await apiClient.post<JobPosting>(`/hr/job-postings/${postingId}/reactivate`);
+    return response.data;
+  },
+
+  /**
    * Delete a draft job posting
    */
   deleteJobPosting: async (postingId: string): Promise<void> => {

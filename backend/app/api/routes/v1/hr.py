@@ -31,6 +31,7 @@ from app.application.use_cases.job_postings import (
     ListJobPostingsUseCase,
     ListOpenOpportunitiesForHRUseCase,
     PublishJobPostingUseCase,
+    ReactivateJobPostingUseCase,
     UpdateJobPostingCommand,
     UpdateJobPostingUseCase,
 )
@@ -770,6 +771,41 @@ async def close_job_posting(
         raise HTTPException(status_code=404, detail="Annonce non trouvée")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/job-postings/{posting_id}/reactivate", response_model=JobPostingReadModel)
+async def reactivate_job_posting(
+    posting_id: str,
+    db: DbSession,
+    app_settings: AppSettings,
+    authorization: str = Header(default=""),
+):
+    """Reactivate a closed job posting."""
+    await require_hr_access(db, authorization)
+
+    job_posting_repo = JobPostingRepository(db)
+    opportunity_repo = OpportunityRepository(db)
+    user_repo = UserRepository(db)
+    turnoverit_client = TurnoverITClient(app_settings)
+
+    use_case = ReactivateJobPostingUseCase(
+        job_posting_repository=job_posting_repo,
+        opportunity_repository=opportunity_repo,
+        user_repository=user_repo,
+        turnoverit_client=turnoverit_client,
+    )
+
+    try:
+        return await use_case.execute(UUID(posting_id))
+    except JobPostingNotFoundError:
+        raise HTTPException(status_code=404, detail="Annonce non trouvée")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la réactivation: {str(e)}",
+        )
 
 
 @router.delete("/job-postings/{posting_id}", status_code=204)

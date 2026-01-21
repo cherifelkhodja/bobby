@@ -740,6 +740,108 @@ class CloseJobPostingUseCase:
         )
 
 
+class ReactivateJobPostingUseCase:
+    """Reactivate a closed job posting."""
+
+    def __init__(
+        self,
+        job_posting_repository: JobPostingRepository,
+        opportunity_repository: OpportunityRepository,
+        user_repository: UserRepository,
+        turnoverit_client: TurnoverITClient,
+    ) -> None:
+        self.job_posting_repository = job_posting_repository
+        self.opportunity_repository = opportunity_repository
+        self.user_repository = user_repository
+        self.turnoverit_client = turnoverit_client
+
+    async def execute(self, posting_id: UUID) -> JobPostingReadModel:
+        """Reactivate a closed job posting on Turnover-IT."""
+        posting = await self.job_posting_repository.get_by_id(posting_id)
+        if not posting:
+            raise JobPostingNotFoundError(str(posting_id))
+
+        if posting.status != JobPostingStatus.CLOSED:
+            raise ValueError(f"Cannot reactivate posting with status {posting.status}")
+
+        # Get opportunity for context
+        opportunity = await self.opportunity_repository.get_by_id(posting.opportunity_id)
+
+        # Reactivate on Turnover-IT if reference exists
+        if posting.turnoverit_reference:
+            # Build the payload with current job data (status will be set to PUBLISHED by the client)
+            application_base_url = f"{settings.FRONTEND_URL}/postuler"
+            payload = posting.to_turnoverit_payload(application_base_url)
+            await self.turnoverit_client.reactivate_job(posting.turnoverit_reference, payload)
+
+        # Update posting status back to published
+        posting.status = JobPostingStatus.PUBLISHED
+        posting.closed_at = None
+        posting.updated_at = datetime.utcnow()
+        saved = await self.job_posting_repository.save(posting)
+
+        return await self._to_read_model(
+            saved,
+            opportunity.title if opportunity else None,
+            opportunity.reference if opportunity else None,
+            opportunity.client_name if opportunity else None,
+        )
+
+    async def _to_read_model(
+        self,
+        posting: JobPosting,
+        opportunity_title: Optional[str] = None,
+        opportunity_reference: Optional[str] = None,
+        client_name: Optional[str] = None,
+    ) -> JobPostingReadModel:
+        created_by_name = None
+        if posting.created_by:
+            user = await self.user_repository.get_by_id(posting.created_by)
+            if user:
+                created_by_name = user.full_name
+
+        application_url = f"{settings.FRONTEND_URL}/postuler/{posting.application_token}"
+
+        return JobPostingReadModel(
+            id=str(posting.id),
+            opportunity_id=str(posting.opportunity_id),
+            opportunity_title=opportunity_title,
+            opportunity_reference=opportunity_reference,
+            client_name=client_name,
+            title=posting.title,
+            description=posting.description,
+            qualifications=posting.qualifications,
+            location_country=posting.location_country,
+            location_region=posting.location_region,
+            location_postal_code=posting.location_postal_code,
+            location_city=posting.location_city,
+            location_key=posting.location_key,
+            contract_types=[str(ct) for ct in posting.contract_types],
+            skills=posting.skills,
+            experience_level=str(posting.experience_level) if posting.experience_level else None,
+            remote=str(posting.remote) if posting.remote else None,
+            start_date=posting.start_date,
+            duration_months=posting.duration_months,
+            salary_min_annual=posting.salary_min_annual,
+            salary_max_annual=posting.salary_max_annual,
+            salary_min_daily=posting.salary_min_daily,
+            salary_max_daily=posting.salary_max_daily,
+            employer_overview=posting.employer_overview,
+            status=str(posting.status),
+            status_display=posting.status.display_name,
+            turnoverit_reference=posting.turnoverit_reference,
+            turnoverit_public_url=posting.turnoverit_public_url,
+            application_token=posting.application_token,
+            application_url=application_url,
+            created_by=str(posting.created_by) if posting.created_by else None,
+            created_by_name=created_by_name,
+            created_at=posting.created_at,
+            updated_at=posting.updated_at,
+            published_at=posting.published_at,
+            closed_at=posting.closed_at,
+        )
+
+
 @dataclass
 class UpdateJobPostingCommand:
     """Command for updating a job posting."""
