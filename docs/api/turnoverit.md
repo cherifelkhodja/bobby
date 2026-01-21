@@ -151,7 +151,9 @@ curl --request GET \
 |-----|-------------|
 | `PERMANENT` | CDI |
 | `TEMPORARY` | CDD |
+| `FIXED-TERM` | CDD (alias) |
 | `FREELANCE` | Freelance |
+| `INTERCONTRACT` | Intercontrat (spécifique ESN) |
 | `INTERNSHIP` | Stage |
 | `APPRENTICESHIP` | Alternance |
 
@@ -159,9 +161,12 @@ curl --request GET \
 
 | Key | Description |
 |-----|-------------|
+| `""` (vide) | Non spécifié |
 | `NONE` | Pas de télétravail |
 | `PARTIAL` | 50% télétravail |
 | `FULL` | 100% télétravail |
+
+> **Note** : La valeur peut être une chaîne vide dans les réponses API.
 
 ### Experience Level
 
@@ -213,6 +218,8 @@ curl --request GET \
 
 ## Job Resource (structure complète)
 
+### Champs pour création (POST /jobs)
+
 ```json
 {
   "reference": "ref-001",           // required, unique
@@ -251,6 +258,27 @@ curl --request GET \
   "status": "PUBLISHED"             // required, enum
 }
 ```
+
+### Champs supplémentaires en lecture (GET /jobs)
+
+```json
+{
+  "@id": "/jobconnect/v2/jobs/ref-001",
+  "@type": "JobPosting",
+  "publicUrl": "https://www.free-work.com/fr/tech-it/.../job-mission/...",
+  "location": {
+    "county": "Paris",              // Département
+    "latitude": 48.8588897,         // Coordonnées GPS
+    "longitude": 2.320041
+  },
+  "salary": {
+    "@type": "SalaryDTO",
+    "@id": "/.well-known/genid/..."
+  }
+}
+```
+
+> **Note** : Les champs `@id`, `@type`, `publicUrl`, `county`, `latitude`, `longitude` sont retournés uniquement en lecture.
 
 ### Contraintes de validation
 
