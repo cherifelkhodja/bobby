@@ -134,6 +134,10 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-01-21
+- **fix(turnoverit)**: Correction types de contrat - `TEMPORARY` → `FIXED-TERM` (seule valeur CDD acceptée par API)
+  - Fichiers modifiés : `CreateJobPosting.tsx`, `EditJobPosting.tsx`, `job_posting.py`, `turnoverit.md`
+  - Suppression des types non valides : INTERNSHIP, APPRENTICESHIP
+  - Valeurs valides API : PERMANENT, FIXED-TERM, FREELANCE, INTERCONTRACT
 - Setup système de documentation (MEMORY.md, docs/skills, docs/api)
 - Allègement CLAUDE.md (-112 lignes) : déport des infos dupliquées vers fichiers spécialisés
 - Création docs/api/gemini.md (CV parsing, anonymisation, matching)

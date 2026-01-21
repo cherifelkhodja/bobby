@@ -59,12 +59,12 @@ type ViewStep = 'loading' | 'form' | 'saving' | 'publishing' | 'error';
 
 const CONTRACT_TYPES = [
   { value: 'PERMANENT', label: 'CDI' },
-  { value: 'TEMPORARY', label: 'CDD' },
+  { value: 'FIXED-TERM', label: 'CDD' },
   { value: 'FREELANCE', label: 'Freelance' },
   { value: 'INTERCONTRACT', label: 'Sous-traitance' },
 ];
 
-const SALARY_CONTRACT_TYPES = ['PERMANENT', 'TEMPORARY'];
+const SALARY_CONTRACT_TYPES = ['PERMANENT', 'FIXED-TERM'];
 const TJM_CONTRACT_TYPES = ['FREELANCE', 'INTERCONTRACT'];
 
 const REMOTE_POLICIES = [

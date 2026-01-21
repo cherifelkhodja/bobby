@@ -69,13 +69,13 @@ type ViewStep = 'loading' | 'ready' | 'anonymizing' | 'form' | 'saving' | 'publi
 
 const CONTRACT_TYPES = [
   { value: 'PERMANENT', label: 'CDI' },
-  { value: 'TEMPORARY', label: 'CDD' },
+  { value: 'FIXED-TERM', label: 'CDD' },
   { value: 'FREELANCE', label: 'Freelance' },
   { value: 'INTERCONTRACT', label: 'Sous-traitance' },
 ];
 
 // Contract types that enable salary fields (annual)
-const SALARY_CONTRACT_TYPES = ['PERMANENT', 'TEMPORARY'];
+const SALARY_CONTRACT_TYPES = ['PERMANENT', 'FIXED-TERM'];
 // Contract types that enable TJM fields (daily rate)
 const TJM_CONTRACT_TYPES = ['FREELANCE', 'INTERCONTRACT'];
 

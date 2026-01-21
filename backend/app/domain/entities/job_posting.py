@@ -35,25 +35,28 @@ class JobPostingStatus(str, Enum):
 
 
 class ContractType(str, Enum):
-    """Contract types for Turnover-IT."""
+    """Contract types for Turnover-IT.
+
+    Valid values as per Turnover-IT API (JobConnect v2):
+    - PERMANENT: CDI
+    - FIXED-TERM: CDD
+    - FREELANCE: Freelance
+    - INTERCONTRACT: Sous-traitance (ESN-specific)
+    """
 
     PERMANENT = "PERMANENT"  # CDI
-    TEMPORARY = "TEMPORARY"  # CDD
+    FIXED_TERM = "FIXED-TERM"  # CDD
     FREELANCE = "FREELANCE"
     INTERCONTRACT = "INTERCONTRACT"  # Sous-traitance
-    INTERNSHIP = "INTERNSHIP"
-    APPRENTICESHIP = "APPRENTICESHIP"
 
     @property
     def display_name(self) -> str:
         """Human-readable contract type in French."""
         names = {
             ContractType.PERMANENT: "CDI",
-            ContractType.TEMPORARY: "CDD",
+            ContractType.FIXED_TERM: "CDD",
             ContractType.FREELANCE: "Freelance",
             ContractType.INTERCONTRACT: "Sous-traitance",
-            ContractType.INTERNSHIP: "Stage",
-            ContractType.APPRENTICESHIP: "Alternance",
         }
         return names[self]
 
