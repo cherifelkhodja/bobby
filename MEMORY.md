@@ -134,6 +134,12 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-01-21
+- **feat(hr)**: Cache local des réponses du formulaire de candidature (48h)
+  - Sauvegarde automatique dans localStorage à chaque modification
+  - Restauration des données si l'utilisateur revient dans les 48h
+  - Effacement du cache après soumission réussie
+  - Indicateur visuel de restauration des données
+  - Fichier modifié : `PublicApplication.tsx`
 - **feat(hr)**: Bouton "Modifier" pour les annonces d'emploi (tous statuts)
   - Permet d'éditer les annonces publiées avec synchronisation automatique vers Turnover-IT
   - Fichiers modifiés : `JobPostingDetails.tsx`, `EditJobPosting.tsx`, `job_postings.py` (use case), `hr.py` (route)
