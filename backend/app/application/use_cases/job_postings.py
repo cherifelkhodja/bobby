@@ -109,7 +109,7 @@ class ListOpenOpportunitiesForHRUseCase:
                 applications_count = await self.job_application_repository.count_by_posting(
                     job_posting.id
                 )
-                new_applications_count = await self.job_application_repository.count_new_by_posting(
+                new_applications_count = await self.job_application_repository.count_unread_by_posting(
                     job_posting.id
                 )
 
@@ -395,7 +395,7 @@ class GetJobPostingUseCase:
             published_at=posting.published_at,
             closed_at=posting.closed_at,
             applications_total=stats.get("total", 0) if stats else 0,
-            applications_new=stats.get("nouveau", 0) if stats else 0,
+            applications_new=stats.get("unread", 0) if stats else 0,
         )
 
 
@@ -520,7 +520,7 @@ class ListJobPostingsUseCase:
                     published_at=posting.published_at,
                     closed_at=posting.closed_at,
                     applications_total=stats.get("total", 0),
-                    applications_new=stats.get("nouveau", 0),
+                    applications_new=stats.get("unread", 0),
                 )
             )
 

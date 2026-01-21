@@ -429,8 +429,8 @@ class JobApplicationRepositoryPort(Protocol):
         """Count applications for a job posting with optional status filter."""
         ...
 
-    async def count_new_by_posting(self, posting_id: UUID) -> int:
-        """Count new (unread) applications for a job posting."""
+    async def count_unread_by_posting(self, posting_id: UUID) -> int:
+        """Count unread applications for a job posting."""
         ...
 
     async def get_stats_by_posting(self, posting_id: UUID) -> dict[str, int]:

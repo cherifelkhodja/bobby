@@ -88,7 +88,7 @@ class TestListOpenOpportunitiesForHRUseCase:
             "BOOND-123": posting
         }
         mock_deps["job_application_repo"].count_by_posting.return_value = 5
-        mock_deps["job_application_repo"].count_new_by_posting.return_value = 2
+        mock_deps["job_application_repo"].count_unread_by_posting.return_value = 2
 
         result = await use_case.execute(hr_manager_boond_id="12345")
 

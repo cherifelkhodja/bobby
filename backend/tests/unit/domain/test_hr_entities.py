@@ -47,29 +47,23 @@ class TestApplicationStatus:
     """Tests for ApplicationStatus value object."""
 
     def test_status_values(self):
-        assert ApplicationStatus.NOUVEAU.value == "nouveau"
         assert ApplicationStatus.EN_COURS.value == "en_cours"
-        assert ApplicationStatus.ENTRETIEN.value == "entretien"
-        assert ApplicationStatus.ACCEPTE.value == "accepte"
+        assert ApplicationStatus.VALIDE.value == "valide"
         assert ApplicationStatus.REFUSE.value == "refuse"
 
-    def test_nouveau_can_transition_to_en_cours(self):
-        assert ApplicationStatus.NOUVEAU.can_transition_to(ApplicationStatus.EN_COURS)
+    def test_en_cours_can_transition_to_valide(self):
+        assert ApplicationStatus.EN_COURS.can_transition_to(ApplicationStatus.VALIDE)
 
-    def test_nouveau_can_transition_to_refuse(self):
-        assert ApplicationStatus.NOUVEAU.can_transition_to(ApplicationStatus.REFUSE)
+    def test_en_cours_can_transition_to_refuse(self):
+        assert ApplicationStatus.EN_COURS.can_transition_to(ApplicationStatus.REFUSE)
 
-    def test_en_cours_can_transition_to_entretien(self):
-        assert ApplicationStatus.EN_COURS.can_transition_to(ApplicationStatus.ENTRETIEN)
-
-    def test_entretien_can_transition_to_accepte(self):
-        assert ApplicationStatus.ENTRETIEN.can_transition_to(ApplicationStatus.ACCEPTE)
-
-    def test_accepte_is_final(self):
-        assert not ApplicationStatus.ACCEPTE.can_transition_to(ApplicationStatus.REFUSE)
+    def test_valide_is_final(self):
+        assert not ApplicationStatus.VALIDE.can_transition_to(ApplicationStatus.EN_COURS)
+        assert not ApplicationStatus.VALIDE.can_transition_to(ApplicationStatus.REFUSE)
 
     def test_refuse_is_final(self):
-        assert not ApplicationStatus.REFUSE.can_transition_to(ApplicationStatus.ACCEPTE)
+        assert not ApplicationStatus.REFUSE.can_transition_to(ApplicationStatus.EN_COURS)
+        assert not ApplicationStatus.REFUSE.can_transition_to(ApplicationStatus.VALIDE)
 
 
 class TestJobPosting:
@@ -183,6 +177,11 @@ class TestJobApplication:
             "email": "jean.dupont@example.com",
             "phone": "+33612345678",
             "job_title": "Développeur Python Senior",
+            "availability": "asap",
+            "employment_status": "freelance",
+            "english_level": "professional",
+            "tjm_current": 450.0,
+            "tjm_desired": 550.0,
             "tjm_min": 450.0,
             "tjm_max": 550.0,
             "availability_date": date.today() + timedelta(days=30),
@@ -194,7 +193,8 @@ class TestJobApplication:
 
     def test_create_application(self):
         application = self._create_valid_application()
-        assert application.status == ApplicationStatus.NOUVEAU
+        assert application.status == ApplicationStatus.EN_COURS
+        assert application.is_read == False
         assert application.full_name == "Jean DUPONT"
 
     def test_full_name_format(self):
@@ -223,17 +223,20 @@ class TestJobApplication:
     def test_change_status_valid_transition(self):
         application = self._create_valid_application()
         user_id = uuid4()
-        application.change_status(ApplicationStatus.EN_COURS, user_id, "Profil intéressant")
-        assert application.status == ApplicationStatus.EN_COURS
+        application.change_status(ApplicationStatus.VALIDE, user_id, "Profil intéressant")
+        assert application.status == ApplicationStatus.VALIDE
         assert len(application.status_history) == 1
-        assert application.status_history[0]["from_status"] == "nouveau"
-        assert application.status_history[0]["to_status"] == "en_cours"
+        assert application.status_history[0]["from_status"] == "en_cours"
+        assert application.status_history[0]["to_status"] == "valide"
         assert application.status_history[0]["comment"] == "Profil intéressant"
 
     def test_change_status_invalid_transition_raises_error(self):
         application = self._create_valid_application()
-        with pytest.raises(InvalidStatusTransitionError):
-            application.change_status(ApplicationStatus.ACCEPTE, uuid4())
+        # First validate the application (makes it final)
+        application.change_status(ApplicationStatus.VALIDE, uuid4())
+        # Then try to change it again - should fail
+        with pytest.raises(ValueError):
+            application.change_status(ApplicationStatus.REFUSE, uuid4())
 
     def test_set_matching_score(self):
         application = self._create_valid_application()
@@ -246,15 +249,25 @@ class TestJobApplication:
         assert application.matching_score == 75
         assert application.matching_details == details
 
-    def test_set_matching_score_out_of_range_raises_error(self):
+    def test_set_matching_score_clamped_at_100(self):
         application = self._create_valid_application()
-        with pytest.raises(InvalidJobApplicationError, match="score"):
-            application.set_matching_score(101, {})
+        application.set_matching_score(150, {})
+        assert application.matching_score == 100
 
-    def test_set_matching_score_negative_raises_error(self):
+    def test_set_matching_score_clamped_at_0(self):
         application = self._create_valid_application()
-        with pytest.raises(InvalidJobApplicationError, match="score"):
-            application.set_matching_score(-1, {})
+        application.set_matching_score(-10, {})
+        assert application.matching_score == 0
+
+    def test_mark_as_read(self):
+        application = self._create_valid_application()
+        assert application.is_read == False
+        result = application.mark_as_read()
+        assert result == True
+        assert application.is_read == True
+        # Second call should return False (already read)
+        result = application.mark_as_read()
+        assert result == False
 
     def test_update_notes(self):
         application = self._create_valid_application()
@@ -263,36 +276,36 @@ class TestJobApplication:
 
     def test_status_display(self):
         application = self._create_valid_application()
-        assert application.status_display == "Nouveau"
-        application.change_status(ApplicationStatus.EN_COURS, uuid4())
         assert application.status_display == "En cours"
+        application.change_status(ApplicationStatus.VALIDE, uuid4())
+        assert application.status_display == "Validé"
 
-    def test_workflow_from_nouveau_to_accepte(self):
-        """Test complete workflow from new application to accepted."""
+    def test_workflow_to_valide(self):
+        """Test complete workflow from en_cours to validated."""
         application = self._create_valid_application()
         user_id = uuid4()
 
-        # nouveau -> en_cours
-        application.change_status(ApplicationStatus.EN_COURS, user_id, "CV validé")
-        assert application.status == ApplicationStatus.EN_COURS
+        # Mark as read first
+        application.mark_as_read()
+        assert application.is_read == True
 
-        # en_cours -> entretien
-        application.change_status(ApplicationStatus.ENTRETIEN, user_id, "Entretien planifié")
-        assert application.status == ApplicationStatus.ENTRETIEN
-
-        # entretien -> accepte
-        application.change_status(ApplicationStatus.ACCEPTE, user_id, "Candidat retenu")
-        assert application.status == ApplicationStatus.ACCEPTE
+        # en_cours -> valide
+        application.change_status(ApplicationStatus.VALIDE, user_id, "Candidat retenu")
+        assert application.status == ApplicationStatus.VALIDE
+        assert application.status.is_final
+        assert application.status.is_positive_final
 
         # Verify history
-        assert len(application.status_history) == 3
+        assert len(application.status_history) == 1
 
-    def test_workflow_from_nouveau_to_refuse(self):
+    def test_workflow_to_refuse(self):
         """Test rejection workflow."""
         application = self._create_valid_application()
         user_id = uuid4()
 
-        # nouveau -> refuse (direct)
+        # en_cours -> refuse (direct)
         application.change_status(ApplicationStatus.REFUSE, user_id, "Profil non adapté")
         assert application.status == ApplicationStatus.REFUSE
+        assert application.status.is_final
+        assert not application.status.is_positive_final
         assert len(application.status_history) == 1
