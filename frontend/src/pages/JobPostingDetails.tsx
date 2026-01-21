@@ -37,6 +37,7 @@ import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_STATUS_COLORS,
   getMatchingScoreColor,
+  getCvQualityScoreColor,
 } from '../types';
 import type { ApplicationStatus, JobApplication } from '../types';
 
@@ -815,6 +816,9 @@ export default function JobPostingDetails() {
                     Matching
                   </th>
                   <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
+                    Qualité CV
+                  </th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     Statut
                   </th>
                   <th className="text-right py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
@@ -861,6 +865,19 @@ export default function JobPostingDetails() {
                               )}`}
                             >
                               {application.matching_score}%
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 dark:text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3">
+                          {application.cv_quality_score !== null ? (
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getCvQualityScoreColor(
+                                application.cv_quality_score
+                              )}`}
+                            >
+                              {application.cv_quality_score}/20
                             </span>
                           ) : (
                             <span className="text-gray-500 dark:text-gray-400">-</span>
