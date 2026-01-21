@@ -1030,23 +1030,21 @@ export default function JobPostingDetails() {
                         }`}
                       >
                         <td className="py-2 px-3">
-                          <div className="flex items-start gap-2">
-                            {isUnread && (
-                              <span className="mt-0.5 flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500 text-white uppercase tracking-wide">
-                                New
-                              </span>
-                            )}
-                            <div>
-                              <p className={`font-medium ${isUnread ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-white'}`}>
-                                {application.full_name}
-                              </p>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">
-                                {application.job_title}
-                              </p>
-                              <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                                {application.email}
-                              </p>
-                            </div>
+                          <div>
+                            <p className={`font-medium ${isUnread ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-white'}`}>
+                              {application.full_name}
+                              {isUnread && (
+                                <span className="ml-1.5 inline-flex items-center px-1 py-px rounded text-[7px] font-semibold bg-blue-500 text-white uppercase align-middle">
+                                  new
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {application.job_title}
+                            </p>
+                            <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                              {application.email}
+                            </p>
                           </div>
                         </td>
                         <td className="py-2 px-3">
@@ -1068,13 +1066,13 @@ export default function JobPostingDetails() {
                           )}
                         </td>
                         <td className="py-2 px-3">
-                          <span className="text-sm text-gray-900 dark:text-white whitespace-nowrap">{application.tjm_range || '-'}</span>
+                          <span className="text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">{application.tjm_range || '-'}</span>
                         </td>
                         <td className="py-2 px-3">
-                          <span className="text-sm text-gray-900 dark:text-white whitespace-nowrap">{application.salary_range || '-'}</span>
+                          <span className="text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">{application.salary_range || '-'}</span>
                         </td>
                         <td className="py-2 px-3">
-                          <span className="text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                          <span className="text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">
                             {application.availability_display || application.availability || '-'}
                           </span>
                         </td>
