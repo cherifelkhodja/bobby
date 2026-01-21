@@ -134,6 +134,11 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-01-21
+- **feat(hr)**: Filtres et tri pour les candidatures
+  - Filtres: statut application, statut professionnel (freelance/salarié/les deux), disponibilité
+  - Tri: score matching, TJM, salaire, date de candidature (asc/desc)
+  - Harmonisation styles table avec HRDashboard (text-xs, padding compact)
+  - Fichiers modifiés : `job_application_repository.py`, `job_applications.py`, `hr.py`, `hr.ts`, `JobPostingDetails.tsx`
 - **feat(hr)**: Renommage CV au format "Prenom NOM - date.ext"
   - Nom de fichier propre pour téléchargement (ex: "Jean DUPONT - 20260121.pdf")
 - **feat(hr)**: Gestion automatique du statut "nouveau"
