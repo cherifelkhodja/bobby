@@ -88,8 +88,13 @@ class SubmitApplicationUseCase:
                 message="Vous avez déjà postulé à cette offre.",
             )
 
-        # Upload CV to S3
-        cv_s3_key = f"cvs/{posting.id}/{command.email.replace('@', '_at_')}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{command.cv_filename}"
+        # Upload CV to S3 with formatted name: "Prenom NOM - date.ext"
+        import os
+        file_ext = os.path.splitext(command.cv_filename)[1].lower()  # .pdf or .docx
+        upload_date = datetime.utcnow().strftime('%Y%m%d')
+        formatted_name = f"{command.first_name} {command.last_name.upper()}"
+        cv_display_name = f"{formatted_name} - {upload_date}{file_ext}"
+        cv_s3_key = f"cvs/{posting.id}/{cv_display_name}"
 
         try:
             await self.s3_client.upload_file(
@@ -163,7 +168,7 @@ Compétences recherchées:
             salary_current=command.salary_current,
             salary_desired=command.salary_desired,
             cv_s3_key=cv_s3_key,
-            cv_filename=command.cv_filename,
+            cv_filename=cv_display_name,
             cv_text=cv_text,
             matching_score=matching_score,
             matching_details=matching_details,
@@ -323,11 +328,31 @@ class GetApplicationUseCase:
         self.job_application_repository = job_application_repository
         self.s3_client = s3_client
 
-    async def execute(self, application_id: UUID) -> JobApplicationReadModel:
-        """Get application by ID."""
+    async def execute(
+        self,
+        application_id: UUID,
+        mark_viewed: bool = False,
+        viewed_by: Optional[UUID] = None,
+    ) -> JobApplicationReadModel:
+        """Get application by ID.
+
+        Args:
+            application_id: Application UUID
+            mark_viewed: If True and status is NOUVEAU, auto-transition to EN_COURS
+            viewed_by: User ID who viewed (for status history)
+        """
         application = await self.job_application_repository.get_by_id(application_id)
         if not application:
             raise JobApplicationNotFoundError(str(application_id))
+
+        # Auto-transition from NOUVEAU to EN_COURS when viewed
+        if mark_viewed and application.status == ApplicationStatus.NOUVEAU:
+            application.change_status(
+                new_status=ApplicationStatus.EN_COURS,
+                changed_by=viewed_by,
+                comment="Marqué comme vu automatiquement",
+            )
+            application = await self.job_application_repository.save(application)
 
         posting = await self.job_posting_repository.get_by_id(application.job_posting_id)
 

@@ -265,9 +265,13 @@ export const hrApi = {
 
   /**
    * Get a single application by ID
+   * @param markViewed - If true, auto-transitions from NOUVEAU to EN_COURS
    */
-  getApplication: async (applicationId: string): Promise<JobApplication> => {
-    const response = await apiClient.get<JobApplication>(`/hr/applications/${applicationId}`);
+  getApplication: async (applicationId: string, markViewed: boolean = false): Promise<JobApplication> => {
+    const response = await apiClient.get<JobApplication>(
+      `/hr/applications/${applicationId}`,
+      { params: { mark_viewed: markViewed } }
+    );
     return response.data;
   },
 

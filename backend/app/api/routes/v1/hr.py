@@ -893,9 +893,13 @@ async def get_application(
     db: DbSession,
     app_settings: AppSettings,
     authorization: str = Header(default=""),
+    mark_viewed: bool = Query(False, description="Auto-transition from NOUVEAU to EN_COURS"),
 ):
-    """Get application details."""
-    await require_hr_access(db, authorization)
+    """Get application details.
+
+    If mark_viewed=true and status is NOUVEAU, auto-transitions to EN_COURS.
+    """
+    user = await require_hr_access(db, authorization)
 
     job_posting_repo = JobPostingRepository(db)
     job_application_repo = JobApplicationRepository(db)
@@ -908,7 +912,11 @@ async def get_application(
     )
 
     try:
-        return await use_case.execute(UUID(application_id))
+        return await use_case.execute(
+            UUID(application_id),
+            mark_viewed=mark_viewed,
+            viewed_by=user.id if mark_viewed else None,
+        )
     except JobApplicationNotFoundError:
         raise HTTPException(status_code=404, detail="Candidature non trouvée")
 

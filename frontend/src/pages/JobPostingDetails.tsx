@@ -167,6 +167,35 @@ export default function JobPostingDetails() {
     });
   };
 
+  // Open application detail and mark as viewed
+  const handleOpenApplication = async (application: JobApplication) => {
+    try {
+      // Call API with markViewed=true to auto-transition from NOUVEAU to EN_COURS
+      const updatedApplication = await hrApi.getApplication(application.id, true);
+      setSelectedApplication(updatedApplication);
+      setNewStatus(updatedApplication.status as ApplicationStatus);
+      setNoteText(updatedApplication.notes || '');
+      // Refetch to update counts
+      refetchApplications();
+    } catch (error) {
+      // Fallback to local data if API fails
+      setSelectedApplication(application);
+      setNewStatus(application.status as ApplicationStatus);
+      setNoteText(application.notes || '');
+    }
+  };
+
+  // Mark as viewed without opening modal (for bulk action)
+  const handleMarkAsViewed = async (application: JobApplication) => {
+    if (application.status !== 'nouveau') return;
+    try {
+      await hrApi.getApplication(application.id, true);
+      refetchApplications();
+    } catch (error) {
+      console.error('Error marking as viewed:', error);
+    }
+  };
+
   if (loadingPosting) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -498,12 +527,17 @@ export default function JobPostingDetails() {
                         >
                           <Download className="h-4 w-4" />
                         </button>
+                        {application.status === 'nouveau' && (
+                          <button
+                            onClick={() => handleMarkAsViewed(application)}
+                            className="p-1.5 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
+                            title="Marquer comme vu"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </button>
+                        )}
                         <button
-                          onClick={() => {
-                            setSelectedApplication(application);
-                            setNewStatus(application.status as ApplicationStatus);
-                            setNoteText(application.notes || '');
-                          }}
+                          onClick={() => handleOpenApplication(application)}
                           className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
                           title="Voir détails"
                         >
