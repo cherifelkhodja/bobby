@@ -94,6 +94,32 @@
 
 ---
 
+## Commandes utiles
+
+```bash
+# Backend
+cd backend
+make dev          # Start dev server
+make test         # Run tests
+make lint         # Run linters
+make migrate      # Run migrations
+make seed         # Seed admin user
+
+# Frontend
+cd frontend
+npm run dev       # Start dev server
+npm run build     # Build production
+npm run test      # Run tests
+npm run lint      # Run linters
+
+# Docker
+make fresh        # Clean restart
+make ci           # Simulate CI locally
+docker-compose up # Start all services
+```
+
+---
+
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
@@ -124,3 +150,18 @@
 - CV Transformer feature
 - Dark mode
 - Rôle RH créé
+
+### 2026-01-12 (Création initiale)
+- Structure projet complète (backend + frontend)
+- Configuration Docker (docker-compose, Dockerfiles)
+- Backend FastAPI avec architecture Domain-Driven
+  - Domain layer (entités, value objects, exceptions, ports)
+  - Infrastructure layer (database, security, boond, cache, email)
+  - Application layer (use cases, read models)
+  - API layer (routes v1, schemas, middleware)
+- Frontend React/TypeScript avec Vite
+  - Composants UI (Button, Input, Modal, Card, Badge, Spinner)
+  - Pages (Login, Register, Dashboard, Opportunities, MyCooptations, Profile)
+  - State management Zustand + React Query
+- CI/CD GitHub Actions
+- Tests backend (structure et fixtures)
