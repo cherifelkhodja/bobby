@@ -221,7 +221,9 @@ class JobApplication:
     def salary_range(self) -> str:
         """Get salary range as formatted string."""
         if self.salary_current and self.salary_desired:
-            return f"{int(self.salary_current)}€ - {int(self.salary_desired)}€"
+            current = f"{int(self.salary_current):,}".replace(",", " ")
+            desired = f"{int(self.salary_desired):,}".replace(",", " ")
+            return f"{current}€ - {desired}€"
         return "Non spécifié"
 
     @property
