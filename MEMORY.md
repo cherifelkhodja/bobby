@@ -134,6 +134,18 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-01-21
+- **feat(hr)**: Bouton "Modifier" pour les annonces d'emploi (tous statuts)
+  - Permet d'éditer les annonces publiées avec synchronisation automatique vers Turnover-IT
+  - Fichiers modifiés : `JobPostingDetails.tsx`, `EditJobPosting.tsx`, `job_postings.py` (use case), `hr.py` (route)
+- **feat(hr)**: Formulaire de candidature enrichi avec nouveaux champs
+  - Téléphone international avec sélecteur de pays (react-phone-number-input)
+  - Disponibilité en dropdown (ASAP, Sous 1/2/3 mois, Plus de 3 mois)
+  - Statut professionnel (Freelance, Salarié, Les deux)
+  - Champs TJM/Salaire conditionnels selon le statut
+  - Niveau d'anglais avec descriptions (Notions → Bilingue C2)
+  - CV max 10 Mo, formats PDF/Word
+  - Migration 016 : nouveaux champs `availability`, `employment_status`, `english_level`, `tjm_current`, `tjm_desired`, `salary_current`, `salary_desired`
+  - Fichiers modifiés : `PublicApplication.tsx`, `hr.ts`, `public_applications.py`, `job_applications.py` (use case + entity), `job_application_repository.py`, `models.py`
 - **fix(turnoverit)**: Correction types de contrat - `TEMPORARY` → `FIXED-TERM` (seule valeur CDD acceptée par API)
   - Fichiers modifiés : `CreateJobPosting.tsx`, `EditJobPosting.tsx`, `job_posting.py`, `turnoverit.md`
   - Suppression des types non valides : INTERNSHIP, APPRENTICESHIP
