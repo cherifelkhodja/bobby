@@ -16,6 +16,7 @@ import {
   XCircle,
   X,
   Eye,
+  EyeOff,
   Download,
   Building2,
   MapPin,
@@ -23,6 +24,7 @@ import {
   Users,
   FileText,
   Edit2,
+  Check,
   CheckCircle,
   Trash2,
   RefreshCw,
@@ -592,6 +594,28 @@ export default function JobPostingDetails() {
     }
   };
 
+  // Quick validate action
+  const handleQuickValidate = async (application: JobApplication) => {
+    if (application.status !== 'en_cours') return;
+    try {
+      await hrApi.updateApplicationStatus(application.id, 'valide');
+      refetchApplications();
+    } catch (error) {
+      console.error('Error validating application:', error);
+    }
+  };
+
+  // Quick reject action
+  const handleQuickReject = async (application: JobApplication) => {
+    if (application.status !== 'en_cours') return;
+    try {
+      await hrApi.updateApplicationStatus(application.id, 'refuse');
+      refetchApplications();
+    } catch (error) {
+      console.error('Error rejecting application:', error);
+    }
+  };
+
   // Fetch and show opportunity details from Boond
   const handleShowOpportunityDetail = async () => {
     if (!posting) return;
@@ -1140,23 +1164,8 @@ export default function JobPostingDetails() {
                           </span>
                         </td>
                         <td className="py-2 px-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => handleDownloadCv(application)}
-                              className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                              title="Télécharger CV"
-                            >
-                              <Download className="h-4 w-4" />
-                            </button>
-                            {!application.is_read && (
-                              <button
-                                onClick={() => handleMarkAsRead(application)}
-                                className="p-1.5 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
-                                title="Marquer comme lu"
-                              >
-                                <CheckCircle className="h-4 w-4" />
-                              </button>
-                            )}
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Voir - toujours visible */}
                             <button
                               onClick={() => handleOpenApplication(application)}
                               className={`p-1.5 rounded-lg transition-colors ${
@@ -1164,13 +1173,47 @@ export default function JobPostingDetails() {
                                   ? 'text-blue-700 bg-blue-100 dark:text-blue-300 dark:bg-blue-800/30'
                                   : 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
                               }`}
-                              title={displayMode === 'inline' ? (isExpanded ? 'Fermer' : 'Ouvrir') : 'Voir détails'}
+                              title="Voir détails"
                             >
-                              {displayMode === 'inline' ? (
-                                isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <Eye className="h-4 w-4" />
-                              )}
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            {/* Vu - seulement si non lu */}
+                            {!application.is_read && (
+                              <button
+                                onClick={() => handleMarkAsRead(application)}
+                                className="p-1.5 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
+                                title="Marquer comme lu"
+                              >
+                                <EyeOff className="h-4 w-4" />
+                              </button>
+                            )}
+                            {/* Validé - seulement si en_cours */}
+                            {application.status === 'en_cours' && (
+                              <button
+                                onClick={() => handleQuickValidate(application)}
+                                className="p-1.5 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                title="Valider"
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
+                            )}
+                            {/* Refusé - seulement si en_cours */}
+                            {application.status === 'en_cours' && (
+                              <button
+                                onClick={() => handleQuickReject(application)}
+                                className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                title="Refuser"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </button>
+                            )}
+                            {/* Télécharger CV */}
+                            <button
+                              onClick={() => handleDownloadCv(application)}
+                              className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                              title="Télécharger CV"
+                            >
+                              <Download className="h-4 w-4" />
                             </button>
                           </div>
                         </td>
