@@ -337,11 +337,11 @@ class ListApplicationsForPostingUseCase:
     ) -> JobApplicationReadModel:
         status_history = [
             StatusChangeReadModel(
-                from_status=str(sh.from_status),
-                to_status=str(sh.to_status),
-                changed_at=sh.changed_at,
-                changed_by=str(sh.changed_by) if sh.changed_by else None,
-                comment=sh.comment,
+                from_status=str(sh["from_status"]),
+                to_status=str(sh["to_status"]),
+                changed_at=sh["changed_at"],
+                changed_by=str(sh["changed_by"]) if sh.get("changed_by") else None,
+                comment=sh.get("comment"),
             )
             for sh in application.status_history
         ]
@@ -581,11 +581,11 @@ class GetApplicationUseCase:
     ) -> JobApplicationReadModel:
         status_history = [
             StatusChangeReadModel(
-                from_status=str(sh.from_status),
-                to_status=str(sh.to_status),
-                changed_at=sh.changed_at,
-                changed_by=str(sh.changed_by) if sh.changed_by else None,
-                comment=sh.comment,
+                from_status=str(sh["from_status"]),
+                to_status=str(sh["to_status"]),
+                changed_at=sh["changed_at"],
+                changed_by=str(sh["changed_by"]) if sh.get("changed_by") else None,
+                comment=sh.get("comment"),
             )
             for sh in application.status_history
         ]
@@ -713,19 +713,21 @@ class UpdateApplicationStatusUseCase:
         status_history = []
         for sh in application.status_history:
             changed_by_name = None
-            if sh.changed_by:
-                user = await self.user_repository.get_by_id(sh.changed_by)
+            changed_by_id = sh.get("changed_by")
+            if changed_by_id:
+                from uuid import UUID
+                user = await self.user_repository.get_by_id(UUID(changed_by_id))
                 if user:
                     changed_by_name = user.full_name
 
             status_history.append(
                 StatusChangeReadModel(
-                    from_status=str(sh.from_status),
-                    to_status=str(sh.to_status),
-                    changed_at=sh.changed_at,
-                    changed_by=str(sh.changed_by) if sh.changed_by else None,
+                    from_status=str(sh["from_status"]),
+                    to_status=str(sh["to_status"]),
+                    changed_at=sh["changed_at"],
+                    changed_by=str(changed_by_id) if changed_by_id else None,
                     changed_by_name=changed_by_name,
-                    comment=sh.comment,
+                    comment=sh.get("comment"),
                 )
             )
 
@@ -830,11 +832,11 @@ class UpdateApplicationNoteUseCase:
     ) -> JobApplicationReadModel:
         status_history = [
             StatusChangeReadModel(
-                from_status=str(sh.from_status),
-                to_status=str(sh.to_status),
-                changed_at=sh.changed_at,
-                changed_by=str(sh.changed_by) if sh.changed_by else None,
-                comment=sh.comment,
+                from_status=str(sh["from_status"]),
+                to_status=str(sh["to_status"]),
+                changed_at=sh["changed_at"],
+                changed_by=str(sh["changed_by"]) if sh.get("changed_by") else None,
+                comment=sh.get("comment"),
             )
             for sh in application.status_history
         ]
@@ -959,11 +961,11 @@ class CreateCandidateInBoondUseCase:
     ) -> JobApplicationReadModel:
         status_history = [
             StatusChangeReadModel(
-                from_status=str(sh.from_status),
-                to_status=str(sh.to_status),
-                changed_at=sh.changed_at,
-                changed_by=str(sh.changed_by) if sh.changed_by else None,
-                comment=sh.comment,
+                from_status=str(sh["from_status"]),
+                to_status=str(sh["to_status"]),
+                changed_at=sh["changed_at"],
+                changed_by=str(sh["changed_by"]) if sh.get("changed_by") else None,
+                comment=sh.get("comment"),
             )
             for sh in application.status_history
         ]
@@ -1152,11 +1154,11 @@ Qualifications requises:
     ) -> JobApplicationReadModel:
         status_history = [
             StatusChangeReadModel(
-                from_status=str(sh.from_status),
-                to_status=str(sh.to_status),
-                changed_at=sh.changed_at,
-                changed_by=str(sh.changed_by) if sh.changed_by else None,
-                comment=sh.comment,
+                from_status=str(sh["from_status"]),
+                to_status=str(sh["to_status"]),
+                changed_at=sh["changed_at"],
+                changed_by=str(sh["changed_by"]) if sh.get("changed_by") else None,
+                comment=sh.get("comment"),
             )
             for sh in application.status_history
         ]
