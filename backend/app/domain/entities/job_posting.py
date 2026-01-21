@@ -39,12 +39,12 @@ class ContractType(str, Enum):
 
     Valid values as per Turnover-IT API (JobConnect v2):
     - PERMANENT: CDI
-    - FIXED-TERM: CDD
+    - TEMPORARY: CDD
     - FREELANCE: Freelance
     """
 
     PERMANENT = "PERMANENT"  # CDI
-    FIXED_TERM = "FIXED-TERM"  # CDD
+    TEMPORARY = "TEMPORARY"  # CDD
     FREELANCE = "FREELANCE"
 
     @property
@@ -52,7 +52,7 @@ class ContractType(str, Enum):
         """Human-readable contract type in French."""
         names = {
             ContractType.PERMANENT: "CDI",
-            ContractType.FIXED_TERM: "CDD",
+            ContractType.TEMPORARY: "CDD",
             ContractType.FREELANCE: "Freelance",
         }
         return names[self]

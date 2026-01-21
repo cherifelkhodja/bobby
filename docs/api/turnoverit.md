@@ -150,7 +150,7 @@ curl --request GET \
 | Key | Description |
 |-----|-------------|
 | `PERMANENT` | CDI |
-| `FIXED-TERM` | CDD |
+| `TEMPORARY` | CDD |
 | `FREELANCE` | Freelance |
 
 > **Note** : Seules ces 3 valeurs sont acceptées par l'API Turnover-IT.
