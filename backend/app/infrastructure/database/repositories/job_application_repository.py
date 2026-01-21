@@ -40,6 +40,21 @@ class JobApplicationRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
+    async def exists_by_email_and_posting(
+        self,
+        email: str,
+        posting_id: UUID,
+    ) -> bool:
+        """Check if an application exists for a given email and posting."""
+        result = await self.session.execute(
+            select(func.count(JobApplicationModel.id)).where(
+                JobApplicationModel.email == email,
+                JobApplicationModel.job_posting_id == posting_id,
+            )
+        )
+        count = result.scalar() or 0
+        return count > 0
+
     async def save(self, application: JobApplication) -> JobApplication:
         """Save job application (create or update)."""
         result = await self.session.execute(
