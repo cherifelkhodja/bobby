@@ -131,25 +131,62 @@ docker-compose up # Start all services
 - Mise à jour documentation CLAUDE.md
 
 ### 2026-01-18
-- Security hardening : rate limiting, security headers, RLS, audit logging
+**Security Hardening Implementation**
+- Rate limiting avec slowapi + Redis backend
+- Security headers middleware (HSTS, CSP, X-Frame-Options, etc.)
+- Row Level Security (RLS) sur tables PostgreSQL
+- Audit logging structuré pour événements sécurité
+
+**Fichiers créés** :
+- `backend/app/api/middleware/rate_limiter.py`
+- `backend/app/api/middleware/security_headers.py`
+- `backend/app/api/middleware/rls_context.py`
+- `backend/app/infrastructure/audit/logger.py`
+- Migrations : `010_add_row_level_security.py`, `011-013_turnoverit_skills_and_settings.py`
 
 ### 2026-01-17
-- HR : Listing opportunités depuis Boond API
-- Tests complets feature HR
+**HR Opportunities from BoondManager**
+- Listing opportunités HR depuis API BoondManager (Admin: ALL, RH: HR manager filtered)
+- Affichage état Boond avec badges colorés
+- Batch lookup efficace pour statut job postings
+
+**HR Feature Review & Quality**
+- Tests backend complets
+- Tests frontend
+- Tests E2E
+- Mise à jour dépendances
 
 ### 2026-01-15
-- Feature opportunités publiées avec anonymisation IA
-- Fixes quotation generator
+**Published Opportunities Feature**
+- Migration table `published_opportunities`
+- Anonymisation IA avec Gemini
+- Page détail dédiée
+- Support cooptation depuis page détail
+
+**Quotation Generator Fixes**
+- Fix sérialisation Redis
+- Fix collision PDF template
+- Fix garbage collection background tasks
+- Fonctionnalité delete quotation
 
 ### 2026-01-14
-- Support numéro téléphone
-- Filtre état ressources Boond
-- Delete user functionality
+- Support numéro téléphone (users + invitations)
+- Modal détails utilisateur dans Admin
+- Fix CV Transformer préfixe "none:"
+- Filtre état ressources BoondManager
+- Fonctionnalité delete user
 
 ### 2026-01-13
-- CV Transformer feature
-- Dark mode
-- Rôle RH créé
+**CV Transformer Feature**
+- Upload CV (PDF/DOCX)
+- Extraction avec Gemini AI
+- Génération Word formaté avec templates
+
+**Autres**
+- Endpoint ressources BoondManager
+- Redesign InvitationsTab
+- Dark mode (System/Light/Dark)
+- Création rôle `rh`
 
 ### 2026-01-12 (Création initiale)
 - Structure projet complète (backend + frontend)
