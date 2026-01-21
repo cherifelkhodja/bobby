@@ -1017,23 +1017,30 @@ export default function JobPostingDetails() {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {applicationsData?.items.map((application) => {
                   const isExpanded = displayMode === 'inline' && expandedRowId === application.id;
+                  const isUnread = !application.is_read;
                   return (
                     <React.Fragment key={application.id}>
                       <tr
-                        className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
-                          isExpanded ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                        className={`transition-colors ${
+                          isExpanded
+                            ? 'bg-blue-50 dark:bg-blue-900/20'
+                            : isUnread
+                              ? 'bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-100/50 dark:hover:bg-blue-900/20'
+                              : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
                         }`}
                       >
                         <td className="py-2 px-3">
                           <div className="flex items-start gap-2">
-                            {!application.is_read && (
-                              <span className="mt-1.5 w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" title="Non lu" />
+                            {isUnread && (
+                              <span className="mt-0.5 flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500 text-white uppercase tracking-wide">
+                                New
+                              </span>
                             )}
                             <div>
-                              <p className="font-medium text-gray-900 dark:text-white">
+                              <p className={`font-medium ${isUnread ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-white'}`}>
                                 {application.full_name}
                               </p>
-                              <p className="text-gray-500 dark:text-gray-400">
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
                                 {application.job_title}
                               </p>
                               <p className="text-[10px] text-gray-400 dark:text-gray-500">
