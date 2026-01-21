@@ -233,6 +233,59 @@ from app.config import settings
 API_KEY = settings.api_key
 ```
 
+### Gestion des secrets
+
+#### Variables d'environnement (par défaut)
+
+```bash
+# .env (local) ou Railway/Docker (prod)
+JWT_SECRET=your-secret-key
+BOOND_PASSWORD=your-password
+GEMINI_API_KEY=your-api-key
+```
+
+#### AWS Secrets Manager (optionnel)
+
+Pour les environnements sensibles, Bobby supporte AWS Secrets Manager.
+
+**Configuration** :
+```bash
+AWS_SECRETS_ENABLED=true
+AWS_SECRETS_NAME=esn-cooptation/prod
+AWS_SECRETS_REGION=eu-west-3
+```
+
+**Implémentation** : `backend/app/infrastructure/secrets/aws_secrets_manager.py`
+
+```python
+from app.infrastructure.secrets import load_secrets_from_aws
+
+# Chargement au démarrage
+secrets = load_secrets_from_aws(
+    region_name="eu-west-3",
+    secret_name="esn-cooptation/prod",
+)
+
+# Accès à un secret
+jwt_secret = secrets.get("JWT_SECRET")
+```
+
+**Fonctionnalités** :
+- Cache mémoire (évite les appels répétés)
+- Fallback sur variables d'environnement si désactivé/erreur
+- Support IAM roles (ECS, Lambda) ou credentials explicites
+
+**Structure du secret AWS** (JSON) :
+```json
+{
+  "JWT_SECRET": "...",
+  "DATABASE_URL": "...",
+  "BOOND_PASSWORD": "...",
+  "GEMINI_API_KEY": "...",
+  "TURNOVERIT_API_KEY": "..."
+}
+```
+
 ### Rate Limiting
 
 ```python
