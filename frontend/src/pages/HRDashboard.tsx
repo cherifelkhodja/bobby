@@ -26,12 +26,149 @@ import {
   User,
   FileText,
   ExternalLink,
+  X,
+  Square,
+  PanelRight,
+  Columns,
+  Layout,
 } from 'lucide-react';
-import { hrApi } from '../api/hr';
+import { hrApi, type OpportunityDetailResponse } from '../api/hr';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { PageSpinner } from '../components/ui/Spinner';
 import type { OpportunityForHR, JobPostingStatus } from '../types';
+
+// Display modes for opportunity details
+type DisplayMode = 'modal' | 'drawer' | 'split' | 'inline';
+
+const DISPLAY_MODE_OPTIONS: { value: DisplayMode; label: string; icon: typeof Layout }[] = [
+  { value: 'modal', label: 'Pop-up', icon: Square },
+  { value: 'drawer', label: 'Panel latéral', icon: PanelRight },
+  { value: 'split', label: 'Vue split', icon: Columns },
+  { value: 'inline', label: 'Expansion', icon: Layout },
+];
+
+// Opportunity detail content component
+function OpportunityDetailContent({
+  detail,
+  opportunityId,
+  isLoading,
+  compact = false,
+}: {
+  detail: OpportunityDetailResponse | undefined;
+  opportunityId: string;
+  isLoading: boolean;
+  compact?: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+        <span className="ml-2 text-sm text-gray-500">Chargement...</span>
+      </div>
+    );
+  }
+
+  if (!detail) {
+    return <p className="text-sm text-gray-500 py-4">Aucun détail disponible</p>;
+  }
+
+  return (
+    <div className={`${compact ? 'p-4' : 'p-6'} space-y-4`}>
+      {/* Title */}
+      <div>
+        <h3 className={`font-semibold text-gray-900 dark:text-white ${compact ? 'text-base' : 'text-lg'}`}>
+          {detail.title}
+        </h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{detail.reference}</p>
+      </div>
+
+      {/* Description */}
+      {detail.description && (
+        <div>
+          <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            <FileText className="h-3.5 w-3.5" />
+            Description
+          </div>
+          <p className={`text-gray-700 dark:text-gray-300 whitespace-pre-line ${compact ? 'text-xs line-clamp-6' : 'text-sm'}`}>
+            {detail.description}
+          </p>
+        </div>
+      )}
+
+      {/* Criteria */}
+      {detail.criteria && (
+        <div>
+          <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            <FileText className="h-3.5 w-3.5" />
+            Critères
+          </div>
+          <p className={`text-gray-700 dark:text-gray-300 whitespace-pre-line ${compact ? 'text-xs line-clamp-4' : 'text-sm'}`}>
+            {detail.criteria}
+          </p>
+        </div>
+      )}
+
+      {/* Metadata grid */}
+      <div className={`grid ${compact ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-3'} text-sm`}>
+        {detail.place && (
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+            <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <span>{detail.place}</span>
+          </div>
+        )}
+        {(detail.start_date || detail.end_date) && (
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+            <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <span>
+              {detail.start_date && new Date(detail.start_date).toLocaleDateString('fr-FR')}
+              {detail.start_date && detail.end_date && ' → '}
+              {detail.end_date && new Date(detail.end_date).toLocaleDateString('fr-FR')}
+              {detail.duration && ` (${detail.duration} j)`}
+            </span>
+          </div>
+        )}
+        {detail.company_name && (
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+            <Building2 className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <span>{detail.company_name}</span>
+          </div>
+        )}
+        {detail.manager_name && (
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+            <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <span>Resp: {detail.manager_name}</span>
+          </div>
+        )}
+        {detail.contact_name && (
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+            <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <span>Contact: {detail.contact_name}</span>
+          </div>
+        )}
+        {detail.expertise_area && (
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+            <Briefcase className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <span>{detail.expertise_area}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Link to BoondManager */}
+      <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+        <a
+          href={`https://ui.boondmanager.com/#opportunity/${opportunityId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400"
+        >
+          <ExternalLink className="h-3 w-3" />
+          Voir sur BoondManager
+        </a>
+      </div>
+    </div>
+  );
+}
 
 const JOB_POSTING_STATUS_BADGES: Record<JobPostingStatus, { label: string; bgClass: string; textClass: string }> = {
   draft: {
@@ -66,6 +203,8 @@ export default function HRDashboard() {
   const [stateFilter, setStateFilter] = useState<number | 'all'>('all');
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [postingFilter, setPostingFilter] = useState<string>('all');
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('drawer');
+  const [selectedOpportunity, setSelectedOpportunity] = useState<OpportunityForHR | null>(null);
   const [expandedOpportunityId, setExpandedOpportunityId] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
@@ -73,15 +212,27 @@ export default function HRDashboard() {
     queryFn: () => hrApi.getOpportunities(),
   });
 
-  // Fetch expanded opportunity details
+  // Fetch selected/expanded opportunity details
+  const activeOpportunityId = selectedOpportunity?.id || expandedOpportunityId;
   const { data: opportunityDetail, isLoading: isLoadingDetail } = useQuery({
-    queryKey: ['hr-opportunity-detail', expandedOpportunityId],
-    queryFn: () => hrApi.getOpportunityDetail(expandedOpportunityId!),
-    enabled: !!expandedOpportunityId,
+    queryKey: ['hr-opportunity-detail', activeOpportunityId],
+    queryFn: () => hrApi.getOpportunityDetail(activeOpportunityId!),
+    enabled: !!activeOpportunityId,
   });
 
-  const toggleExpand = (opportunityId: string) => {
-    setExpandedOpportunityId(prev => prev === opportunityId ? null : opportunityId);
+  const handleOpenOpportunity = (opportunity: OpportunityForHR) => {
+    if (displayMode === 'inline') {
+      setExpandedOpportunityId(prev => prev === opportunity.id ? null : opportunity.id);
+      setSelectedOpportunity(null);
+    } else {
+      setSelectedOpportunity(opportunity);
+      setExpandedOpportunityId(null);
+    }
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedOpportunity(null);
+    setExpandedOpportunityId(null);
   };
 
   // Calculate stats and available filters
@@ -319,6 +470,34 @@ export default function HRDashboard() {
             <option value="with">Avec annonce</option>
             <option value="without">Sans annonce</option>
           </select>
+
+          {/* Separator */}
+          <span className="text-gray-300 dark:text-gray-600">|</span>
+
+          {/* Display mode selector */}
+          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded p-0.5">
+            {DISPLAY_MODE_OPTIONS.map((opt) => {
+              const Icon = opt.icon;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => {
+                    setDisplayMode(opt.value);
+                    if (opt.value !== 'inline') setExpandedOpportunityId(null);
+                    if (opt.value === 'inline') setSelectedOpportunity(null);
+                  }}
+                  className={`p-1 rounded transition-colors ${
+                    displayMode === opt.value
+                      ? 'bg-white dark:bg-gray-600 shadow-sm text-blue-600 dark:text-blue-400'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}
+                  title={opt.label}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </button>
+              );
+            })}
+          </div>
         </div>
       </Card>
 
@@ -365,33 +544,36 @@ export default function HRDashboard() {
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {filteredItems.map((opportunity) => {
-                  const isExpanded = expandedOpportunityId === opportunity.id;
+                  const isExpanded = displayMode === 'inline' && expandedOpportunityId === opportunity.id;
+                  const isSelected = selectedOpportunity?.id === opportunity.id;
                   return (
                     <Fragment key={opportunity.id}>
                       <tr
                         className={`transition-colors ${
-                          isExpanded
+                          isExpanded || isSelected
                             ? 'bg-blue-50 dark:bg-blue-900/20'
                             : 'hover:bg-gray-50 dark:hover:bg-gray-800/30'
                         }`}
                       >
                         <td className="py-2 px-3">
                           <div className="flex items-start gap-2">
-                            <button
-                              onClick={() => toggleExpand(opportunity.id)}
-                              className="mt-0.5 p-0.5 text-gray-400 dark:text-gray-500"
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </button>
+                            {displayMode === 'inline' && (
+                              <button
+                                onClick={() => handleOpenOpportunity(opportunity)}
+                                className="mt-0.5 p-0.5 text-gray-400 dark:text-gray-500"
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </button>
+                            )}
                             <div>
                               <button
-                                onClick={() => toggleExpand(opportunity.id)}
+                                onClick={() => handleOpenOpportunity(opportunity)}
                                 className={`font-medium text-left ${
-                                  isExpanded
+                                  isExpanded || isSelected
                                     ? 'text-blue-700 dark:text-blue-300'
                                     : 'text-gray-900 dark:text-gray-100'
                                 }`}
@@ -478,103 +660,17 @@ export default function HRDashboard() {
                       </div>
                     </td>
                   </tr>
-                  {/* Expanded details row */}
+                  {/* Inline expanded details row */}
                   {isExpanded && (
                     <tr className="bg-blue-50/50 dark:bg-blue-900/10">
                       <td colSpan={6} className="p-0">
-                        <div className="border-l-4 border-blue-500 p-4">
-                          {isLoadingDetail ? (
-                            <div className="flex items-center justify-center py-4">
-                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-                              <span className="ml-2 text-sm text-gray-500">Chargement...</span>
-                            </div>
-                          ) : opportunityDetail ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {/* Left column - Main info */}
-                              <div className="space-y-3">
-                                {opportunityDetail.description && (
-                                  <div>
-                                    <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                                      <FileText className="h-3.5 w-3.5" />
-                                      Description
-                                    </div>
-                                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line line-clamp-4">
-                                      {opportunityDetail.description}
-                                    </p>
-                                  </div>
-                                )}
-                                {opportunityDetail.criteria && (
-                                  <div>
-                                    <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                                      <FileText className="h-3.5 w-3.5" />
-                                      Critères
-                                    </div>
-                                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line line-clamp-4">
-                                      {opportunityDetail.criteria}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                              {/* Right column - Metadata */}
-                              <div className="space-y-2 text-sm">
-                                {opportunityDetail.place && (
-                                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                                    <MapPin className="h-4 w-4 text-gray-400" />
-                                    <span>{opportunityDetail.place}</span>
-                                  </div>
-                                )}
-                                {(opportunityDetail.start_date || opportunityDetail.end_date) && (
-                                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                                    <Calendar className="h-4 w-4 text-gray-400" />
-                                    <span>
-                                      {opportunityDetail.start_date && new Date(opportunityDetail.start_date).toLocaleDateString('fr-FR')}
-                                      {opportunityDetail.start_date && opportunityDetail.end_date && ' → '}
-                                      {opportunityDetail.end_date && new Date(opportunityDetail.end_date).toLocaleDateString('fr-FR')}
-                                      {opportunityDetail.duration && ` (${opportunityDetail.duration} jours)`}
-                                    </span>
-                                  </div>
-                                )}
-                                {opportunityDetail.company_name && (
-                                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                                    <Building2 className="h-4 w-4 text-gray-400" />
-                                    <span>{opportunityDetail.company_name}</span>
-                                  </div>
-                                )}
-                                {opportunityDetail.manager_name && (
-                                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                                    <User className="h-4 w-4 text-gray-400" />
-                                    <span>Responsable: {opportunityDetail.manager_name}</span>
-                                  </div>
-                                )}
-                                {opportunityDetail.contact_name && (
-                                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                                    <User className="h-4 w-4 text-gray-400" />
-                                    <span>Contact: {opportunityDetail.contact_name}</span>
-                                  </div>
-                                )}
-                                {opportunityDetail.expertise_area && (
-                                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                                    <Briefcase className="h-4 w-4 text-gray-400" />
-                                    <span>{opportunityDetail.expertise_area}</span>
-                                  </div>
-                                )}
-                                {/* Link to BoondManager */}
-                                <div className="pt-2">
-                                  <a
-                                    href={`https://ui.boondmanager.com/#opportunity/${opportunity.id}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400"
-                                  >
-                                    <ExternalLink className="h-3 w-3" />
-                                    Voir sur BoondManager
-                                  </a>
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-500">Aucun détail disponible</p>
-                          )}
+                        <div className="border-l-4 border-blue-500">
+                          <OpportunityDetailContent
+                            detail={opportunityDetail}
+                            opportunityId={opportunity.id}
+                            isLoading={isLoadingDetail}
+                            compact
+                          />
                         </div>
                       </td>
                     </tr>
@@ -600,6 +696,74 @@ export default function HRDashboard() {
               </Link>
             </div>
           </div>
+        </Card>
+      )}
+
+      {/* Modal view */}
+      {selectedOpportunity && displayMode === 'modal' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="font-semibold text-gray-900 dark:text-white">
+                Détails de l'opportunité
+              </h2>
+              <button
+                onClick={handleCloseDetail}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <OpportunityDetailContent
+              detail={opportunityDetail}
+              opportunityId={selectedOpportunity.id}
+              isLoading={isLoadingDetail}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Drawer view */}
+      {selectedOpportunity && displayMode === 'drawer' && (
+        <div className="fixed inset-y-0 right-0 z-50 w-96 bg-white dark:bg-gray-800 shadow-xl border-l border-gray-200 dark:border-gray-700 overflow-y-auto">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800">
+            <h2 className="font-semibold text-gray-900 dark:text-white">
+              Détails de l'opportunité
+            </h2>
+            <button
+              onClick={handleCloseDetail}
+              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <OpportunityDetailContent
+            detail={opportunityDetail}
+            opportunityId={selectedOpportunity.id}
+            isLoading={isLoadingDetail}
+          />
+        </div>
+      )}
+
+      {/* Split view */}
+      {selectedOpportunity && displayMode === 'split' && (
+        <Card className="mt-4 !p-0 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+            <h2 className="font-semibold text-gray-900 dark:text-white">
+              {selectedOpportunity.title}
+            </h2>
+            <button
+              onClick={handleCloseDetail}
+              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <OpportunityDetailContent
+            detail={opportunityDetail}
+            opportunityId={selectedOpportunity.id}
+            isLoading={isLoadingDetail}
+          />
         </Card>
       )}
     </div>
