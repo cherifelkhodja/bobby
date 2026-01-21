@@ -262,10 +262,10 @@ class ListApplicationsForPostingUseCase:
         matching_details_model = None
         if application.matching_details:
             matching_details_model = MatchingDetailsReadModel(
-                score=application.matching_details.score,
-                strengths=application.matching_details.strengths,
-                gaps=application.matching_details.gaps,
-                summary=application.matching_details.summary,
+                score=application.matching_details.get("score", 0),
+                strengths=application.matching_details.get("strengths", []),
+                gaps=application.matching_details.get("gaps", []),
+                summary=application.matching_details.get("summary", ""),
             )
 
         return JobApplicationReadModel(
@@ -367,10 +367,10 @@ class GetApplicationUseCase:
         matching_details_model = None
         if application.matching_details:
             matching_details_model = MatchingDetailsReadModel(
-                score=application.matching_details.score,
-                strengths=application.matching_details.strengths,
-                gaps=application.matching_details.gaps,
-                summary=application.matching_details.summary,
+                score=application.matching_details.get("score", 0),
+                strengths=application.matching_details.get("strengths", []),
+                gaps=application.matching_details.get("gaps", []),
+                summary=application.matching_details.get("summary", ""),
             )
 
         return JobApplicationReadModel(
@@ -509,10 +509,10 @@ class UpdateApplicationStatusUseCase:
         matching_details_model = None
         if application.matching_details:
             matching_details_model = MatchingDetailsReadModel(
-                score=application.matching_details.score,
-                strengths=application.matching_details.strengths,
-                gaps=application.matching_details.gaps,
-                summary=application.matching_details.summary,
+                score=application.matching_details.get("score", 0),
+                strengths=application.matching_details.get("strengths", []),
+                gaps=application.matching_details.get("gaps", []),
+                summary=application.matching_details.get("summary", ""),
             )
 
         return JobApplicationReadModel(
@@ -622,10 +622,10 @@ class UpdateApplicationNoteUseCase:
         matching_details_model = None
         if application.matching_details:
             matching_details_model = MatchingDetailsReadModel(
-                score=application.matching_details.score,
-                strengths=application.matching_details.strengths,
-                gaps=application.matching_details.gaps,
-                summary=application.matching_details.summary,
+                score=application.matching_details.get("score", 0),
+                strengths=application.matching_details.get("strengths", []),
+                gaps=application.matching_details.get("gaps", []),
+                summary=application.matching_details.get("summary", ""),
             )
 
         return JobApplicationReadModel(
@@ -754,10 +754,10 @@ class CreateCandidateInBoondUseCase:
         matching_details_model = None
         if application.matching_details:
             matching_details_model = MatchingDetailsReadModel(
-                score=application.matching_details.score,
-                strengths=application.matching_details.strengths,
-                gaps=application.matching_details.gaps,
-                summary=application.matching_details.summary,
+                score=application.matching_details.get("score", 0),
+                strengths=application.matching_details.get("strengths", []),
+                gaps=application.matching_details.get("gaps", []),
+                summary=application.matching_details.get("summary", ""),
             )
 
         return JobApplicationReadModel(
