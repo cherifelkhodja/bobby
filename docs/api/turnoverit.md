@@ -152,9 +152,8 @@ curl --request GET \
 | `PERMANENT` | CDI |
 | `FIXED-TERM` | CDD |
 | `FREELANCE` | Freelance |
-| `INTERCONTRACT` | Sous-traitance (spécifique ESN) |
 
-> **Note** : Seules ces 4 valeurs sont acceptées par l'API Turnover-IT.
+> **Note** : Seules ces 3 valeurs sont acceptées par l'API Turnover-IT.
 
 ### Remote (télétravail)
 

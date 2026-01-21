@@ -41,13 +41,11 @@ class ContractType(str, Enum):
     - PERMANENT: CDI
     - FIXED-TERM: CDD
     - FREELANCE: Freelance
-    - INTERCONTRACT: Sous-traitance (ESN-specific)
     """
 
     PERMANENT = "PERMANENT"  # CDI
     FIXED_TERM = "FIXED-TERM"  # CDD
     FREELANCE = "FREELANCE"
-    INTERCONTRACT = "INTERCONTRACT"  # Sous-traitance
 
     @property
     def display_name(self) -> str:
@@ -56,7 +54,6 @@ class ContractType(str, Enum):
             ContractType.PERMANENT: "CDI",
             ContractType.FIXED_TERM: "CDD",
             ContractType.FREELANCE: "Freelance",
-            ContractType.INTERCONTRACT: "Sous-traitance",
         }
         return names[self]
 
@@ -306,19 +303,14 @@ class JobPosting:
             "status": "PUBLISHED",
         }
 
-        # Location: use key if available (preferred), otherwise use individual fields
-        if self.location_key:
-            # When key is provided, it's the complete location identifier
-            payload["location"] = {"key": self.location_key}
-        else:
-            # Fallback to individual fields
-            payload["location"] = {"country": self.location_country}
-            if self.location_region:
-                payload["location"]["region"] = self.location_region
-            if self.location_postal_code:
-                payload["location"]["postalCode"] = self.location_postal_code
-            if self.location_city:
-                payload["location"]["locality"] = self.location_city
+        # Location: always use individual fields (key is not supported by API)
+        payload["location"] = {
+            "locality": self.location_city or "",
+            "postalCode": self.location_postal_code or "",
+            "county": "",  # Département - not stored separately
+            "region": self.location_region or "",
+            "country": self.location_country or "France",
+        }
 
         # Optional job details
         if self.skills:

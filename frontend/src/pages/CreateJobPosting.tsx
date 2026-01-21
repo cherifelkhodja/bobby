@@ -71,13 +71,12 @@ const CONTRACT_TYPES = [
   { value: 'PERMANENT', label: 'CDI' },
   { value: 'FIXED-TERM', label: 'CDD' },
   { value: 'FREELANCE', label: 'Freelance' },
-  { value: 'INTERCONTRACT', label: 'Sous-traitance' },
 ];
 
 // Contract types that enable salary fields (annual)
 const SALARY_CONTRACT_TYPES = ['PERMANENT', 'FIXED-TERM'];
 // Contract types that enable TJM fields (daily rate)
-const TJM_CONTRACT_TYPES = ['FREELANCE', 'INTERCONTRACT'];
+const TJM_CONTRACT_TYPES = ['FREELANCE'];
 
 const REMOTE_POLICIES = [
   { value: 'NONE', label: 'Pas de télétravail' },

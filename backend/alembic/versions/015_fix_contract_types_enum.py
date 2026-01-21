@@ -8,11 +8,10 @@ Turnover-IT API only accepts these contract types:
 - PERMANENT (CDI)
 - FIXED-TERM (CDD)
 - FREELANCE
-- INTERCONTRACT (Sous-traitance)
 
 This migration:
 - Replaces TEMPORARY with FIXED-TERM
-- Removes INTERNSHIP and APPRENTICESHIP (not supported)
+- Removes invalid values: INTERNSHIP, APPRENTICESHIP, INTERCONTRACT
 """
 
 from alembic import op
@@ -29,8 +28,7 @@ def upgrade() -> None:
     """Fix contract_types values in job_postings table."""
     # Use raw SQL to update JSON array
     # 1. Replace TEMPORARY with FIXED-TERM (if FIXED-TERM not already present)
-    # 2. Remove TEMPORARY if FIXED-TERM already exists
-    # 3. Remove INTERNSHIP and APPRENTICESHIP
+    # 2. Remove invalid values: TEMPORARY, INTERNSHIP, APPRENTICESHIP, INTERCONTRACT
 
     op.execute("""
         UPDATE job_postings
@@ -42,11 +40,12 @@ def upgrade() -> None:
                 END
             )
             FROM jsonb_array_elements_text(contract_types::jsonb) AS elem
-            WHERE elem NOT IN ('INTERNSHIP', 'APPRENTICESHIP')
+            WHERE elem NOT IN ('TEMPORARY', 'INTERNSHIP', 'APPRENTICESHIP', 'INTERCONTRACT')
         )::json
         WHERE contract_types::text LIKE '%TEMPORARY%'
            OR contract_types::text LIKE '%INTERNSHIP%'
-           OR contract_types::text LIKE '%APPRENTICESHIP%';
+           OR contract_types::text LIKE '%APPRENTICESHIP%'
+           OR contract_types::text LIKE '%INTERCONTRACT%';
     """)
 
 
