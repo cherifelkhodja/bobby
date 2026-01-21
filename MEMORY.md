@@ -134,6 +134,12 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-01-21
+- **feat(hr)**: Renommage CV au format "Prenom NOM - date.ext"
+  - Nom de fichier propre pour téléchargement (ex: "Jean DUPONT - 20260121.pdf")
+- **feat(hr)**: Gestion automatique du statut "nouveau"
+  - Auto-transition vers "en_cours" quand le RH ouvre le détail d'une candidature
+  - Bouton "Marquer comme vu" (✓) dans la liste pour les candidatures nouvelles
+  - Paramètre API `mark_viewed` pour contrôler le comportement
 - **feat(hr)**: Cache local des réponses du formulaire de candidature (48h)
   - Sauvegarde automatique dans localStorage à chaque modification
   - Restauration des données si l'utilisateur revient dans les 48h
