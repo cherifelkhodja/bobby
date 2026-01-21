@@ -1,165 +1,126 @@
-# MEMORY - Bobby
+# Bobby - Mémoire du Projet
 
-> Fichier de suivi des iterations. Mis a jour a chaque session.
-
-## Etat actuel
-
-**Derniere mise a jour** : 2026-01-12
-**Version** : 0.1.0
-**Statut** : En developpement
-
-### Checklist fonctionnalites
-- [x] Espace membre
-  - [x] Inscription
-  - [x] Connexion
-  - [x] Reset password
-  - [ ] Magic link (feature flag actif, implementation partielle)
-- [x] Tableau opportunites
-- [x] Soumission cooptation
-- [x] Tableau de bord
-- [x] Notifications email (templates HTML)
-
-### Sante technique
-| Metrique | Actuel | Cible |
-|----------|--------|-------|
-| Tests backend | Structure prete | 80% |
-| Tests frontend | Structure prete | 80% |
-| CI | Configure | Actif |
-| Docker build | Configure | Actif |
+> Ce fichier contient l'historique, les décisions et l'état du projet.
+> **Claude doit le consulter avant chaque tâche et le mettre à jour après chaque modification significative.**
 
 ---
 
-## Journal des iterations
+## Résumé du projet
 
-### Iteration 1 - 2026-01-12
+**Bobby** est une application de cooptation pour Gemini Consulting (ESN) avec intégration BoondManager.
 
-#### Objectif
-Creation initiale de l'application complete de cooptation avec architecture Clean/DDD
-
-#### Realise
-- [x] Structure projet complete (backend + frontend)
-- [x] Configuration Docker (docker-compose, Dockerfiles)
-- [x] Backend FastAPI avec architecture Domain-Driven
-- [x] Domain layer (entites, value objects, exceptions, ports)
-- [x] Infrastructure layer (database, security, boond, cache, email)
-- [x] Application layer (use cases, read models)
-- [x] API layer (routes v1, schemas, middleware)
-- [x] Tests backend (structure et fixtures Boond)
-- [x] Frontend React/TypeScript avec Vite
-- [x] Composants UI (Button, Input, Modal, Card, Badge, Spinner)
-- [x] Pages (Login, Register, Dashboard, Opportunities, MyCooptations, Profile)
-- [x] State management avec Zustand
-- [x] API client avec React Query
-- [x] CI/CD GitHub Actions
-
-#### Fichiers crees
-```
-+ .env.example
-+ .gitignore
-+ Makefile
-+ docker-compose.yml
-+ docker-compose.override.yml
-+ docker-compose.test.yml
-+ .github/workflows/ci.yml
-
-Backend:
-+ backend/Dockerfile
-+ backend/pyproject.toml
-+ backend/alembic.ini
-+ backend/alembic/env.py
-+ backend/app/__init__.py
-+ backend/app/main.py
-+ backend/app/config.py
-+ backend/app/dependencies.py
-+ backend/app/domain/... (entities, value_objects, ports, exceptions)
-+ backend/app/application/... (use_cases, read_models)
-+ backend/app/infrastructure/... (database, security, boond, cache, email)
-+ backend/app/api/... (routes/v1, schemas, middleware)
-+ backend/tests/... (conftest, fixtures, unit tests, contract tests)
-
-Frontend:
-+ frontend/Dockerfile
-+ frontend/package.json
-+ frontend/tsconfig.json
-+ frontend/vite.config.ts
-+ frontend/tailwind.config.js
-+ frontend/index.html
-+ frontend/src/main.tsx
-+ frontend/src/App.tsx
-+ frontend/src/types/index.ts
-+ frontend/src/stores/authStore.ts
-+ frontend/src/api/... (client, auth, opportunities, cooptations)
-+ frontend/src/components/... (ui, layout, cooptations)
-+ frontend/src/pages/... (Login, Register, Dashboard, etc.)
-```
-
-#### Decisions techniques
-| Decision | Raison | Impact |
-|----------|--------|--------|
-| SQLAlchemy 2.0 async | Performance et modernite | Meilleure scalabilite |
-| Pydantic v2 | Validation performante | Schemas stricts |
-| React Query | Gestion cache API | UX amelioree |
-| Zustand | State management simple | Code maintenable |
-| Structlog | Logs structures JSON | Observabilite |
-
-#### Problemes rencontres
-- Aucun probleme majeur durant cette iteration
-
-#### Prochaine session
-- [ ] Generer la migration Alembic initiale
-- [ ] Tester le build Docker complet
-- [ ] Implementer l'upload de CV
-- [ ] Ajouter plus de tests unitaires
-- [ ] Implementer le magic link completement
+### Stack technique
+- **Backend** : Python 3.12, FastAPI, SQLAlchemy async, PostgreSQL, Redis
+- **Frontend** : React 18, TypeScript, Vite, TailwindCSS, Zustand
+- **IA** : Google Gemini (transformation CV, anonymisation, matching)
+- **Déploiement** : Railway (Docker)
 
 ---
 
-## Backlog technique
+## État actuel des fonctionnalités
 
-### Priorite haute
-- [ ] Migration Alembic initiale
-- [ ] Tests d'integration API
-- [ ] Upload CV (fichiers)
-- [ ] Authentification OAuth2 complete
-
-### Dette technique
-- [ ] Ajouter plus de tests unitaires (coverage 80%)
-- [ ] Documentation API (OpenAPI enrichie)
-- [ ] Monitoring et alerting
-
----
-
-## Commandes utiles
-```bash
-make dev          # Start + logs
-make test         # Run all tests
-make ci           # Simulate CI locally
-make fresh        # Clean restart
-make check-imports # Verify imports
-make migrate      # Run migrations
-make seed         # Seed admin user
-```
+| Fonctionnalité | Status | Notes |
+|----------------|--------|-------|
+| Auth JWT (access + refresh) | ✅ Done | Password reset, email verification |
+| Intégration BoondManager | ✅ Done | Resources, opportunities, candidates |
+| Système d'invitations | ✅ Done | Depuis ressources Boond |
+| Panel Admin | ✅ Done | Users, invitations, Boond, templates |
+| Dark Mode | ✅ Done | System/Light/Dark |
+| CV Transformer | ✅ Done | PDF/DOCX → Word avec Gemini |
+| Opportunités publiées | ✅ Done | Anonymisation IA |
+| Quotation Generator (Thales) | ✅ Done | Excel + PDF merge |
+| Recrutement RH | ✅ Done | Turnover-IT, matching IA |
+| Rate Limiting | ✅ Done | Redis + slowapi |
+| Security Headers | ✅ Done | HSTS, CSP, etc. |
+| Row Level Security | ✅ Done | PostgreSQL RLS |
+| Audit Logging | ✅ Done | Structuré |
 
 ---
 
-## Architecture
+## Décisions techniques (ADRs)
 
-### Backend (Clean Architecture)
-```
-app/
-├── domain/          # Entites, Value Objects, Ports (interfaces)
-├── application/     # Use Cases, Read Models
-├── infrastructure/  # Implementations (DB, Cache, API externes)
-└── api/            # Routes FastAPI, Schemas, Middleware
-```
+### ADR-001 : Architecture Hexagonale
+- **Date** : 2024-12
+- **Décision** : Adopter l'architecture hexagonale (ports/adapters)
+- **Raison** : Séparation claire domain/infra, testabilité, flexibilité
+- **Structure** : domain/ → application/ → infrastructure/ → api/
 
-### Frontend (Feature-based)
-```
-src/
-├── api/           # Clients API
-├── components/    # Composants reutilisables
-├── pages/         # Pages/Vues
-├── stores/        # State management
-├── types/         # Types TypeScript
-└── utils/         # Utilitaires
-```
+### ADR-002 : SQLAlchemy Async
+- **Date** : 2024-12
+- **Décision** : Utiliser SQLAlchemy 2.0 en mode async avec asyncpg
+- **Raison** : Performance, cohérence avec FastAPI async
+
+### ADR-003 : Google Gemini pour l'IA
+- **Date** : 2024-12
+- **Décision** : Utiliser Google Gemini pour transformation CV, anonymisation, matching
+- **Raison** : Coût, qualité, facilité d'intégration
+
+### ADR-004 : JWT avec Refresh Token
+- **Date** : 2025-01
+- **Décision** : Access token 30min, refresh token 7 jours
+- **Raison** : Sécurité + UX (pas de re-login fréquent)
+
+### ADR-005 : Turnover-IT pour le recrutement
+- **Date** : 2025-01
+- **Décision** : Intégrer JobConnect v2 pour publier les offres
+- **Raison** : Visibilité sur Free-Work, intégration existante Gemini
+
+---
+
+## Problèmes connus
+
+| Problème | Impact | Workaround | Priorité |
+|----------|--------|------------|----------|
+| Rate limit Boond non documenté | Faible | Retry avec backoff | Low |
+| Gemini SDK deprecated | Medium | Fonctionne encore | Medium |
+
+---
+
+## Dette technique
+
+| Élément | Description | Priorité |
+|---------|-------------|----------|
+| Google Gemini SDK | Migration `google-generativeai` → `google-genai` | Medium |
+| Tests E2E | Couverture à améliorer | Medium |
+
+---
+
+## Prochaines étapes
+
+- [ ] Migration SDK Gemini
+- [ ] Améliorer couverture tests E2E
+- [ ] Dashboard analytics cooptations
+- [ ] Notifications push
+
+---
+
+## Changelog
+
+> ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-01-21
+- Setup système de documentation (MEMORY.md, docs/skills, docs/api)
+
+### 2026-01-19
+- Mise à jour documentation CLAUDE.md
+
+### 2026-01-18
+- Security hardening : rate limiting, security headers, RLS, audit logging
+
+### 2026-01-17
+- HR : Listing opportunités depuis Boond API
+- Tests complets feature HR
+
+### 2026-01-15
+- Feature opportunités publiées avec anonymisation IA
+- Fixes quotation generator
+
+### 2026-01-14
+- Support numéro téléphone
+- Filtre état ressources Boond
+- Delete user functionality
+
+### 2026-01-13
+- CV Transformer feature
+- Dark mode
+- Rôle RH créé

@@ -5,6 +5,34 @@ Application de cooptation pour ESN (Entreprise de Services du Numérique) avec i
 
 **Nom de l'application**: Bobby
 
+## Documentation et Mémoire
+
+### ⚠️ RÈGLE OBLIGATOIRE
+**Avant chaque tâche** : Consulter `MEMORY.md` pour comprendre le contexte.
+**Après chaque modification significative** : Mettre à jour `MEMORY.md` (changelog + sections concernées).
+
+### Quand mettre à jour MEMORY.md
+- ✅ Nouvelle fonctionnalité ajoutée
+- ✅ Bug significatif corrigé
+- ✅ Décision d'architecture prise (ajouter un ADR)
+- ✅ Dépendance majeure mise à jour
+- ✅ Problème découvert ou résolu
+- ✅ Refactoring important
+- ❌ Changements mineurs (typos, formatting)
+- ❌ Commits intermédiaires de travail en cours
+
+### Structure de la documentation
+
+| Fichier | Description |
+|---------|-------------|
+| `MEMORY.md` | État du projet, historique, décisions (**maintenir à jour**) |
+| `docs/skills/python-craftsmanship.md` | SOLID, Clean Code, typage, async |
+| `docs/skills/hexagonal-architecture.md` | Structure, ports/adapters, DDD |
+| `docs/skills/quality-security.md` | Tests, sécurité, observabilité |
+| `docs/skills/workflow-devops.md` | Git, CI/CD, Docker, déploiement |
+| `docs/api/boondmanager.md` | Endpoints, auth, exemples |
+| `docs/api/turnoverit.md` | JobConnect v2 API |
+
 ## Tech Stack
 
 ### Backend
