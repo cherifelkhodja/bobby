@@ -57,6 +57,21 @@ type EditJobPostingFormData = z.infer<typeof editJobPostingSchema>;
 
 type ViewStep = 'loading' | 'form' | 'saving' | 'publishing' | 'error';
 
+const STATUS_BADGES: Record<string, { label: string; color: string }> = {
+  draft: {
+    label: 'Brouillon',
+    color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
+  },
+  published: {
+    label: 'Publiée',
+    color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
+  },
+  closed: {
+    label: 'Fermée',
+    color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
+  },
+};
+
 const CONTRACT_TYPES = [
   { value: 'PERMANENT', label: 'CDI' },
   { value: 'TEMPORARY', label: 'CDD' },
@@ -207,13 +222,18 @@ export default function EditJobPosting() {
     }
   }, [posting, reset]);
 
-  // Handle loading/error states
+  // Handle loading/error states and closed postings
   useEffect(() => {
     if (postingError) {
       setErrorMessage(getErrorMessage(postingError));
       setStep('error');
     }
-  }, [postingError]);
+    // Closed postings cannot be edited directly
+    if (posting?.status === 'closed') {
+      setErrorMessage("Cette annonce est fermée. Réactivez-la depuis la page de détails avant de la modifier.");
+      setStep('error');
+    }
+  }, [postingError, posting?.status]);
 
   // Fetch Turnover-IT skills for autocomplete
   const { data: skillsData } = useQuery({
@@ -544,14 +564,18 @@ export default function EditJobPosting() {
         </Link>
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Modifier le brouillon
+            {posting?.status === 'draft' ? "Modifier le brouillon" : "Modifier l'annonce"}
           </h1>
-          <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-sm rounded-full">
-            Brouillon
-          </span>
+          {posting?.status && STATUS_BADGES[posting.status] && (
+            <span className={`px-2 py-1 text-sm rounded-full ${STATUS_BADGES[posting.status].color}`}>
+              {STATUS_BADGES[posting.status].label}
+            </span>
+          )}
         </div>
         <p className="mt-1 text-gray-600 dark:text-gray-400">
-          Modifiez les informations puis enregistrez ou publiez directement
+          {posting?.status === 'draft'
+            ? "Modifiez les informations puis enregistrez ou publiez directement"
+            : "Les modifications seront synchronisées avec Turnover-IT"}
         </p>
       </div>
 
@@ -1080,38 +1104,58 @@ export default function EditJobPosting() {
 
         {/* Actions */}
         <div className="flex gap-3 pt-2">
-          <button
-            type="button"
-            onClick={handleSubmit(onSaveDraft)}
-            disabled={saveMutation.isPending || publishMutation.isPending || selectedContractTypes.length === 0 || !selectedPlace}
-            className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-          >
-            {saveMutation.isPending ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Enregistrement...
-              </>
-            ) : (
-              '💾 Enregistrer brouillon'
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit(onPublish)}
-            disabled={saveMutation.isPending || publishMutation.isPending || selectedContractTypes.length === 0 || !selectedPlace}
-            className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-          >
-            {publishMutation.isPending ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Publication...
-              </>
-            ) : (
-              '🚀 Publier sur Turnover-IT'
-            )}
-          </button>
+          {posting?.status === 'draft' ? (
+            <>
+              <button
+                type="button"
+                onClick={handleSubmit(onSaveDraft)}
+                disabled={saveMutation.isPending || publishMutation.isPending || selectedContractTypes.length === 0 || !selectedPlace}
+                className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {saveMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Enregistrement...
+                  </>
+                ) : (
+                  '💾 Enregistrer brouillon'
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit(onPublish)}
+                disabled={saveMutation.isPending || publishMutation.isPending || selectedContractTypes.length === 0 || !selectedPlace}
+                className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {publishMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Publication...
+                  </>
+                ) : (
+                  '🚀 Publier sur Turnover-IT'
+                )}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSubmit(onSaveDraft)}
+              disabled={saveMutation.isPending || selectedContractTypes.length === 0 || !selectedPlace}
+              className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              {saveMutation.isPending ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Enregistrement...
+                </>
+              ) : (
+                '💾 Enregistrer les modifications'
+              )}
+            </button>
+          )}
           <Link
-            to="/rh"
+            to={`/rh/annonces/${postingId}`}
             className="px-6 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-lg transition-colors text-center"
           >
             Annuler

@@ -869,26 +869,29 @@ class UpdateJobPostingCommand:
 
 
 class UpdateJobPostingUseCase:
-    """Update a draft job posting."""
+    """Update a job posting (draft or published)."""
 
     def __init__(
         self,
         job_posting_repository: JobPostingRepository,
         opportunity_repository: OpportunityRepository,
         user_repository: UserRepository,
+        turnoverit_client: TurnoverITClient,
     ) -> None:
         self.job_posting_repository = job_posting_repository
         self.opportunity_repository = opportunity_repository
         self.user_repository = user_repository
+        self.turnoverit_client = turnoverit_client
 
     async def execute(self, command: UpdateJobPostingCommand) -> JobPostingReadModel:
-        """Update job posting (only drafts can be updated)."""
+        """Update job posting (drafts and published postings can be updated)."""
         posting = await self.job_posting_repository.get_by_id(command.posting_id)
         if not posting:
             raise JobPostingNotFoundError(str(command.posting_id))
 
-        if posting.status != JobPostingStatus.DRAFT:
-            raise ValueError(f"Cannot update posting with status {posting.status}")
+        # Only closed postings cannot be updated directly
+        if posting.status == JobPostingStatus.CLOSED:
+            raise ValueError("Cannot update a closed posting. Reactivate it first.")
 
         # Update fields if provided
         if command.title is not None:
@@ -933,6 +936,17 @@ class UpdateJobPostingUseCase:
         posting.updated_at = datetime.utcnow()
 
         saved = await self.job_posting_repository.save(posting)
+
+        # Sync to Turnover-IT if posting is published
+        if saved.status == JobPostingStatus.PUBLISHED and saved.turnoverit_reference:
+            try:
+                application_base_url = f"{settings.FRONTEND_URL}/postuler"
+                payload = saved.to_turnoverit_payload(application_base_url)
+                await self.turnoverit_client.update_job(saved.turnoverit_reference, payload)
+            except TurnoverITError as e:
+                # Log but don't fail - the local update succeeded
+                import logging
+                logging.warning(f"Failed to sync update to Turnover-IT: {e}")
 
         opportunity = await self.opportunity_repository.get_by_id(posting.opportunity_id)
 

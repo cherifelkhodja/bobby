@@ -662,20 +662,23 @@ async def get_job_posting(
 async def update_job_posting(
     posting_id: str,
     db: DbSession,
+    app_settings: AppSettings,
     request: UpdateJobPostingRequest,
     authorization: str = Header(default=""),
 ):
-    """Update a draft job posting."""
+    """Update a job posting (draft or published)."""
     await require_hr_access(db, authorization)
 
     job_posting_repo = JobPostingRepository(db)
     opportunity_repo = OpportunityRepository(db)
     user_repo = UserRepository(db)
+    turnoverit_client = TurnoverITClient(app_settings)
 
     use_case = UpdateJobPostingUseCase(
         job_posting_repository=job_posting_repo,
         opportunity_repository=opportunity_repo,
         user_repository=user_repo,
+        turnoverit_client=turnoverit_client,
     )
 
     try:

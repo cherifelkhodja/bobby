@@ -23,6 +23,7 @@ import {
   CheckCircle,
   Trash2,
   RefreshCw,
+  Pencil,
 } from 'lucide-react';
 import { hrApi } from '../api/hr';
 import {
@@ -227,6 +228,14 @@ export default function JobPostingDetails() {
             </p>
           </div>
           <div className="flex gap-2">
+            {/* Edit button - available for all statuses */}
+            <Link
+              to={`/rh/annonces/edit/${postingId}`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            >
+              <Pencil className="h-4 w-4" />
+              Modifier
+            </Link>
             {posting.status === 'draft' && (
               <>
                 <button
