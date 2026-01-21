@@ -37,11 +37,15 @@ class SubmitApplicationCommand:
     first_name: str
     last_name: str
     email: str
-    phone: str  # Format +33...
+    phone: str  # Format international +33...
     job_title: str
-    tjm_min: float
-    tjm_max: float
-    availability_date: date
+    availability: str  # asap, 1_month, 2_months, 3_months, more_3_months
+    employment_status: str  # freelance, employee, both
+    english_level: str  # notions, intermediate, professional, fluent, bilingual
+    tjm_current: Optional[float]  # For freelance/both
+    tjm_desired: Optional[float]  # For freelance/both
+    salary_current: Optional[float]  # For employee/both
+    salary_desired: Optional[float]  # For employee/both
     cv_content: bytes
     cv_filename: str
     cv_content_type: str
@@ -151,9 +155,13 @@ Compétences recherchées:
             email=command.email.lower(),
             phone=command.phone,
             job_title=command.job_title,
-            tjm_min=command.tjm_min,
-            tjm_max=command.tjm_max,
-            availability_date=command.availability_date,
+            availability=command.availability,
+            employment_status=command.employment_status,
+            english_level=command.english_level,
+            tjm_current=command.tjm_current,
+            tjm_desired=command.tjm_desired,
+            salary_current=command.salary_current,
+            salary_desired=command.salary_desired,
             cv_s3_key=cv_s3_key,
             cv_filename=command.cv_filename,
             cv_text=cv_text,
@@ -270,9 +278,22 @@ class ListApplicationsForPostingUseCase:
             email=application.email,
             phone=application.phone,
             job_title=application.job_title,
+            # New fields
+            availability=application.availability,
+            availability_display=application.availability_display,
+            employment_status=application.employment_status,
+            employment_status_display=application.employment_status_display,
+            english_level=application.english_level,
+            english_level_display=application.english_level_display,
+            tjm_current=application.tjm_current,
+            tjm_desired=application.tjm_desired,
+            salary_current=application.salary_current,
+            salary_desired=application.salary_desired,
+            tjm_range=application.tjm_range,
+            salary_range=application.salary_range,
+            # Legacy fields
             tjm_min=application.tjm_min,
             tjm_max=application.tjm_max,
-            tjm_range=f"{int(application.tjm_min)}€ - {int(application.tjm_max)}€",
             availability_date=application.availability_date,
             cv_s3_key=application.cv_s3_key,
             cv_filename=application.cv_filename,
@@ -362,9 +383,22 @@ class GetApplicationUseCase:
             email=application.email,
             phone=application.phone,
             job_title=application.job_title,
+            # New fields
+            availability=application.availability,
+            availability_display=application.availability_display,
+            employment_status=application.employment_status,
+            employment_status_display=application.employment_status_display,
+            english_level=application.english_level,
+            english_level_display=application.english_level_display,
+            tjm_current=application.tjm_current,
+            tjm_desired=application.tjm_desired,
+            salary_current=application.salary_current,
+            salary_desired=application.salary_desired,
+            tjm_range=application.tjm_range,
+            salary_range=application.salary_range,
+            # Legacy fields
             tjm_min=application.tjm_min,
             tjm_max=application.tjm_max,
-            tjm_range=f"{int(application.tjm_min)}€ - {int(application.tjm_max)}€",
             availability_date=application.availability_date,
             cv_s3_key=application.cv_s3_key,
             cv_filename=application.cv_filename,
@@ -491,9 +525,22 @@ class UpdateApplicationStatusUseCase:
             email=application.email,
             phone=application.phone,
             job_title=application.job_title,
+            # New fields
+            availability=application.availability,
+            availability_display=application.availability_display,
+            employment_status=application.employment_status,
+            employment_status_display=application.employment_status_display,
+            english_level=application.english_level,
+            english_level_display=application.english_level_display,
+            tjm_current=application.tjm_current,
+            tjm_desired=application.tjm_desired,
+            salary_current=application.salary_current,
+            salary_desired=application.salary_desired,
+            tjm_range=application.tjm_range,
+            salary_range=application.salary_range,
+            # Legacy fields
             tjm_min=application.tjm_min,
             tjm_max=application.tjm_max,
-            tjm_range=f"{int(application.tjm_min)}€ - {int(application.tjm_max)}€",
             availability_date=application.availability_date,
             cv_s3_key=application.cv_s3_key,
             cv_filename=application.cv_filename,
@@ -591,9 +638,22 @@ class UpdateApplicationNoteUseCase:
             email=application.email,
             phone=application.phone,
             job_title=application.job_title,
+            # New fields
+            availability=application.availability,
+            availability_display=application.availability_display,
+            employment_status=application.employment_status,
+            employment_status_display=application.employment_status_display,
+            english_level=application.english_level,
+            english_level_display=application.english_level_display,
+            tjm_current=application.tjm_current,
+            tjm_desired=application.tjm_desired,
+            salary_current=application.salary_current,
+            salary_desired=application.salary_desired,
+            tjm_range=application.tjm_range,
+            salary_range=application.salary_range,
+            # Legacy fields
             tjm_min=application.tjm_min,
             tjm_max=application.tjm_max,
-            tjm_range=f"{int(application.tjm_min)}€ - {int(application.tjm_max)}€",
             availability_date=application.availability_date,
             cv_s3_key=application.cv_s3_key,
             cv_filename=application.cv_filename,
@@ -710,9 +770,22 @@ class CreateCandidateInBoondUseCase:
             email=application.email,
             phone=application.phone,
             job_title=application.job_title,
+            # New fields
+            availability=application.availability,
+            availability_display=application.availability_display,
+            employment_status=application.employment_status,
+            employment_status_display=application.employment_status_display,
+            english_level=application.english_level,
+            english_level_display=application.english_level_display,
+            tjm_current=application.tjm_current,
+            tjm_desired=application.tjm_desired,
+            salary_current=application.salary_current,
+            salary_desired=application.salary_desired,
+            tjm_range=application.tjm_range,
+            salary_range=application.salary_range,
+            # Legacy fields
             tjm_min=application.tjm_min,
             tjm_max=application.tjm_max,
-            tjm_range=f"{int(application.tjm_min)}€ - {int(application.tjm_max)}€",
             availability_date=application.availability_date,
             cv_s3_key=application.cv_s3_key,
             cv_filename=application.cv_filename,

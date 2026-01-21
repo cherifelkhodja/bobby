@@ -162,13 +162,21 @@ class JobApplication:
     email: str
     phone: str  # International format +33...
     job_title: str  # Titre poste souhaité
-    tjm_min: float  # TJM minimum
-    tjm_max: float  # TJM maximum
-    availability_date: date  # Date de disponibilité
+
+    # Availability and status
+    availability: str  # asap, 1_month, 2_months, 3_months, more_3_months
+    employment_status: str  # freelance, employee, both
+    english_level: str  # notions, intermediate, professional, fluent, bilingual
+
+    # Salary fields (conditional based on employment_status)
+    tjm_current: Optional[float] = None  # Freelance: TJM actuel
+    tjm_desired: Optional[float] = None  # Freelance: TJM souhaité
+    salary_current: Optional[float] = None  # Employee: Salaire actuel
+    salary_desired: Optional[float] = None  # Employee: Salaire souhaité
 
     # CV storage
-    cv_s3_key: str  # S3/MinIO storage key
-    cv_filename: str  # Original filename
+    cv_s3_key: str = ""  # S3/MinIO storage key
+    cv_filename: str = ""  # Original filename
 
     # CV text extraction (for matching)
     cv_text: Optional[str] = None
@@ -186,6 +194,11 @@ class JobApplication:
 
     # BoondManager integration
     boond_candidate_id: Optional[str] = None
+
+    # Legacy fields (kept for backward compatibility, may be null)
+    tjm_min: Optional[float] = None
+    tjm_max: Optional[float] = None
+    availability_date: Optional[date] = None
 
     # Audit fields
     id: UUID = field(default_factory=uuid4)
@@ -205,7 +218,53 @@ class JobApplication:
     @property
     def tjm_range(self) -> str:
         """Get TJM range as formatted string."""
-        return f"{int(self.tjm_min)}€ - {int(self.tjm_max)}€"
+        if self.tjm_current and self.tjm_desired:
+            return f"{int(self.tjm_current)}€ - {int(self.tjm_desired)}€"
+        elif self.tjm_min and self.tjm_max:
+            # Legacy field support
+            return f"{int(self.tjm_min)}€ - {int(self.tjm_max)}€"
+        return "Non spécifié"
+
+    @property
+    def salary_range(self) -> str:
+        """Get salary range as formatted string."""
+        if self.salary_current and self.salary_desired:
+            return f"{int(self.salary_current)}€ - {int(self.salary_desired)}€"
+        return "Non spécifié"
+
+    @property
+    def availability_display(self) -> str:
+        """Get availability as formatted string."""
+        labels = {
+            "asap": "ASAP (immédiat)",
+            "1_month": "Sous 1 mois",
+            "2_months": "Sous 2 mois",
+            "3_months": "Sous 3 mois",
+            "more_3_months": "Plus de 3 mois",
+        }
+        return labels.get(self.availability, self.availability)
+
+    @property
+    def employment_status_display(self) -> str:
+        """Get employment status as formatted string."""
+        labels = {
+            "freelance": "Freelance",
+            "employee": "Salarié",
+            "both": "Freelance ou Salarié",
+        }
+        return labels.get(self.employment_status, self.employment_status)
+
+    @property
+    def english_level_display(self) -> str:
+        """Get English level as formatted string."""
+        labels = {
+            "notions": "Notions",
+            "intermediate": "Intermédiaire (B1)",
+            "professional": "Professionnel (B2)",
+            "fluent": "Courant (C1)",
+            "bilingual": "Bilingue (C2)",
+        }
+        return labels.get(self.english_level, self.english_level)
 
     @property
     def has_matching_score(self) -> bool:
@@ -305,12 +364,15 @@ class JobApplication:
         Returns:
             Dictionary with candidate data for BoondManager API
         """
+        daily_rate = self.tjm_desired or self.tjm_current or self.tjm_max
         return {
             "firstName": self.first_name,
             "lastName": self.last_name,
             "email": self.email,
             "phone": self.phone,
             "title": self.job_title,
-            "dailyRate": self.tjm_max,  # Use max TJM as daily rate
-            "availability": self.availability_date.isoformat(),
+            "dailyRate": daily_rate,
+            "availability": self.availability_display,
+            "englishLevel": self.english_level_display,
+            "employmentStatus": self.employment_status_display,
         }

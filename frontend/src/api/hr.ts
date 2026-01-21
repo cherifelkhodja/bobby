@@ -344,9 +344,13 @@ export const publicApplicationApi = {
       email: string;
       phone: string;
       job_title: string;
-      tjm_min: number;
-      tjm_max: number;
-      availability_date: string;
+      availability: string;
+      employment_status: string;
+      english_level: string;
+      tjm_current: number | null;
+      tjm_desired: number | null;
+      salary_current: number | null;
+      salary_desired: number | null;
       cv: File;
     }
   ): Promise<ApplicationSubmissionResult> => {
@@ -356,9 +360,21 @@ export const publicApplicationApi = {
     formData.append('email', data.email);
     formData.append('phone', data.phone);
     formData.append('job_title', data.job_title);
-    formData.append('tjm_min', data.tjm_min.toString());
-    formData.append('tjm_max', data.tjm_max.toString());
-    formData.append('availability_date', data.availability_date);
+    formData.append('availability', data.availability);
+    formData.append('employment_status', data.employment_status);
+    formData.append('english_level', data.english_level);
+    if (data.tjm_current !== null) {
+      formData.append('tjm_current', data.tjm_current.toString());
+    }
+    if (data.tjm_desired !== null) {
+      formData.append('tjm_desired', data.tjm_desired.toString());
+    }
+    if (data.salary_current !== null) {
+      formData.append('salary_current', data.salary_current.toString());
+    }
+    if (data.salary_desired !== null) {
+      formData.append('salary_desired', data.salary_desired.toString());
+    }
     formData.append('cv', data.cv);
 
     const response = await apiClient.post<ApplicationSubmissionResult>(

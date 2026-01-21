@@ -383,9 +383,23 @@ class JobApplicationModel(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     phone: Mapped[str] = mapped_column(String(30), nullable=False)
     job_title: Mapped[str] = mapped_column(String(200), nullable=False)
-    tjm_min: Mapped[float] = mapped_column(Float, nullable=False)
-    tjm_max: Mapped[float] = mapped_column(Float, nullable=False)
-    availability_date: Mapped[date] = mapped_column(Date, nullable=False)
+
+    # New fields for availability and status
+    availability: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # asap, 1_month, etc.
+    employment_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # freelance, employee, both
+    english_level: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # notions, intermediate, etc.
+
+    # New salary fields
+    tjm_current: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    tjm_desired: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    salary_current: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    salary_desired: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # Legacy fields (kept for backward compatibility)
+    tjm_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    tjm_max: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    availability_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
     cv_s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
     cv_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     cv_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

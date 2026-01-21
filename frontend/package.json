@@ -19,6 +19,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.54.0",
+    "react-phone-number-input": "^3.4.14",
     "react-router-dom": "^7.0.2",
     "sonner": "^1.7.1",
     "zod": "^3.24.1",
@@ -26,7 +27,10 @@
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.9.1",
+    "@playwright/test": "^1.49.1",
     "@tailwindcss/forms": "^0.5.9",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
     "@types/react": "^18.3.14",
     "@types/react-dom": "^18.3.2",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
@@ -36,14 +40,11 @@
     "eslint": "^9.16.0",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.16",
+    "jsdom": "^25.0.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.16",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",
-    "vitest": "^2.1.8",
-    "@testing-library/react": "^16.1.0",
-    "@testing-library/jest-dom": "^6.6.3",
-    "jsdom": "^25.0.1",
-    "@playwright/test": "^1.49.1"
+    "vitest": "^2.1.8"
   }
 }

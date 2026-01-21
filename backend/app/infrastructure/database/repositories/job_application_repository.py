@@ -54,6 +54,15 @@ class JobApplicationRepository:
             model.email = application.email
             model.phone = application.phone
             model.job_title = application.job_title
+            # New fields
+            model.availability = application.availability
+            model.employment_status = application.employment_status
+            model.english_level = application.english_level
+            model.tjm_current = application.tjm_current
+            model.tjm_desired = application.tjm_desired
+            model.salary_current = application.salary_current
+            model.salary_desired = application.salary_desired
+            # Legacy fields
             model.tjm_min = application.tjm_min
             model.tjm_max = application.tjm_max
             model.availability_date = application.availability_date
@@ -76,6 +85,15 @@ class JobApplicationRepository:
                 email=application.email,
                 phone=application.phone,
                 job_title=application.job_title,
+                # New fields
+                availability=application.availability,
+                employment_status=application.employment_status,
+                english_level=application.english_level,
+                tjm_current=application.tjm_current,
+                tjm_desired=application.tjm_desired,
+                salary_current=application.salary_current,
+                salary_desired=application.salary_desired,
+                # Legacy fields
                 tjm_min=application.tjm_min,
                 tjm_max=application.tjm_max,
                 availability_date=application.availability_date,
@@ -197,6 +215,15 @@ class JobApplicationRepository:
             email=model.email,
             phone=model.phone,
             job_title=model.job_title,
+            # New fields
+            availability=model.availability or "asap",
+            employment_status=model.employment_status or "freelance",
+            english_level=model.english_level or "notions",
+            tjm_current=model.tjm_current,
+            tjm_desired=model.tjm_desired,
+            salary_current=model.salary_current,
+            salary_desired=model.salary_desired,
+            # Legacy fields
             tjm_min=model.tjm_min,
             tjm_max=model.tjm_max,
             availability_date=model.availability_date,

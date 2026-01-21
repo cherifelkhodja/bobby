@@ -5,9 +5,11 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 import {
   Briefcase,
   MapPin,
@@ -18,8 +20,54 @@ import {
   Loader2,
   FileText,
   X,
+  HelpCircle,
 } from 'lucide-react';
 import { publicApplicationApi } from '../api/hr';
+
+// Availability options
+const AVAILABILITY_OPTIONS = [
+  { value: 'asap', label: 'ASAP (immédiat)' },
+  { value: '1_month', label: 'Sous 1 mois' },
+  { value: '2_months', label: 'Sous 2 mois' },
+  { value: '3_months', label: 'Sous 3 mois' },
+  { value: 'more_3_months', label: 'Plus de 3 mois' },
+];
+
+// Employment status options
+const EMPLOYMENT_STATUS_OPTIONS = [
+  { value: 'freelance', label: 'Freelance' },
+  { value: 'employee', label: 'Salarié' },
+  { value: 'both', label: 'Les deux possibles' },
+];
+
+// English level options with descriptions
+const ENGLISH_LEVELS = [
+  {
+    value: 'notions',
+    label: 'Notions',
+    description: 'Vocabulaire basique, phrases simples. Peut comprendre des consignes écrites.',
+  },
+  {
+    value: 'intermediate',
+    label: 'Intermédiaire (B1)',
+    description: 'Peut comprendre les points essentiels et se débrouiller dans la plupart des situations.',
+  },
+  {
+    value: 'professional',
+    label: 'Professionnel (B2)',
+    description: 'Peut communiquer avec aisance dans un contexte professionnel. Réunions, emails, présentations.',
+  },
+  {
+    value: 'fluent',
+    label: 'Courant (C1)',
+    description: 'Expression fluide et spontanée. Peut utiliser la langue de façon efficace en contexte social et professionnel.',
+  },
+  {
+    value: 'bilingual',
+    label: 'Bilingue (C2)',
+    description: 'Maîtrise parfaite équivalente à un natif. Peut comprendre et s\'exprimer sans effort.',
+  },
+];
 
 // Validation schema
 const applicationSchema = z.object({
@@ -28,12 +76,18 @@ const applicationSchema = z.object({
   email: z.string().email('Email invalide'),
   phone: z
     .string()
-    .min(10, 'Numéro de téléphone invalide')
-    .regex(/^\+?[0-9\s-]+$/, 'Format de téléphone invalide'),
+    .min(1, 'Le numéro de téléphone est requis')
+    .refine((val) => isValidPhoneNumber(val || ''), 'Numéro de téléphone invalide'),
   job_title: z.string().min(1, 'Le titre du poste est requis').max(200),
-  tjm_min: z.number().min(0, 'Le TJM minimum doit être positif'),
-  tjm_max: z.number().min(0, 'Le TJM maximum doit être positif'),
-  availability_date: z.string().min(1, 'La date de disponibilité est requise'),
+  availability: z.string().min(1, 'La disponibilité est requise'),
+  employment_status: z.string().min(1, 'Le statut est requis'),
+  english_level: z.string().min(1, "Le niveau d'anglais est requis"),
+  // Freelance fields (optional based on status)
+  tjm_current: z.number().min(0).optional().nullable(),
+  tjm_desired: z.number().min(0).optional().nullable(),
+  // Employee fields (optional based on status)
+  salary_current: z.number().min(0).optional().nullable(),
+  salary_desired: z.number().min(0).optional().nullable(),
 });
 
 type ApplicationFormData = z.infer<typeof applicationSchema>;
@@ -62,6 +116,7 @@ export default function PublicApplication() {
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submissionMessage, setSubmissionMessage] = useState('');
+  const [showEnglishTooltip, setShowEnglishTooltip] = useState<string | null>(null);
 
   // Fetch job posting info
   const { data: posting, isLoading, error } = useQuery({
@@ -74,13 +129,22 @@ export default function PublicApplication() {
   const {
     register,
     handleSubmit,
+    control,
+    watch,
     formState: { errors },
   } = useForm<ApplicationFormData>({
     resolver: zodResolver(applicationSchema),
     defaultValues: {
-      phone: '+33',
+      phone: '',
+      availability: '',
+      employment_status: '',
+      english_level: '',
     },
   });
+
+  const employmentStatus = watch('employment_status');
+  const showFreelanceFields = employmentStatus === 'freelance' || employmentStatus === 'both';
+  const showEmployeeFields = employmentStatus === 'employee' || employmentStatus === 'both';
 
   // Submit mutation
   const submitMutation = useMutation({
@@ -88,8 +152,27 @@ export default function PublicApplication() {
       if (!cvFile) throw new Error('CV requis');
       if (!token) throw new Error('Token invalide');
 
+      // Validate salary/TJM based on status
+      if (showFreelanceFields && (!data.tjm_current || !data.tjm_desired)) {
+        throw new Error('Veuillez renseigner vos TJM actuel et souhaité');
+      }
+      if (showEmployeeFields && (!data.salary_current || !data.salary_desired)) {
+        throw new Error('Veuillez renseigner vos salaires actuel et souhaité');
+      }
+
       return publicApplicationApi.submitApplication(token, {
-        ...data,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        email: data.email,
+        phone: data.phone,
+        job_title: data.job_title,
+        availability: data.availability,
+        employment_status: data.employment_status,
+        english_level: data.english_level,
+        tjm_current: data.tjm_current || null,
+        tjm_desired: data.tjm_desired || null,
+        salary_current: data.salary_current || null,
+        salary_desired: data.salary_desired || null,
         cv: cvFile,
       });
     },
@@ -103,12 +186,6 @@ export default function PublicApplication() {
   });
 
   const onSubmit = (data: ApplicationFormData) => {
-    // Validate TJM range
-    if (data.tjm_max < data.tjm_min) {
-      alert('Le TJM maximum doit être supérieur ou égal au TJM minimum');
-      return;
-    }
-
     if (!cvFile) {
       alert('Veuillez télécharger votre CV');
       return;
@@ -347,11 +424,19 @@ export default function PublicApplication() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Téléphone *
                 </label>
-                <input
-                  type="tel"
-                  {...register('phone')}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="+33 6 12 34 56 78"
+                <Controller
+                  name="phone"
+                  control={control}
+                  render={({ field: { onChange, value } }) => (
+                    <PhoneInput
+                      international
+                      defaultCountry="FR"
+                      value={value}
+                      onChange={(val) => onChange(val || '')}
+                      className="phone-input-container"
+                      inputClassName="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  )}
                 />
                 {errors.phone && (
                   <p className="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -379,58 +464,186 @@ export default function PublicApplication() {
               )}
             </div>
 
-            {/* TJM Range */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  TJM minimum (€/jour) *
-                </label>
-                <input
-                  type="number"
-                  {...register('tjm_min', { valueAsNumber: true })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="400"
-                  min={0}
-                />
-                {errors.tjm_min && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {errors.tjm_min.message}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  TJM maximum (€/jour) *
-                </label>
-                <input
-                  type="number"
-                  {...register('tjm_max', { valueAsNumber: true })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="550"
-                  min={0}
-                />
-                {errors.tjm_max && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {errors.tjm_max.message}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Availability Date */}
+            {/* Employment Status */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Date de disponibilité *
+                Statut professionnel *
               </label>
-              <input
-                type="date"
-                {...register('availability_date')}
+              <select
+                {...register('employment_status')}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              {errors.availability_date && (
+              >
+                <option value="">-- Sélectionner --</option>
+                {EMPLOYMENT_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {errors.employment_status && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                  {errors.availability_date.message}
+                  {errors.employment_status.message}
+                </p>
+              )}
+            </div>
+
+            {/* Freelance Fields - TJM */}
+            {showFreelanceFields && (
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg space-y-4">
+                <h3 className="font-medium text-blue-900 dark:text-blue-300">
+                  Tarif journalier (Freelance)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      TJM actuel (€/jour) *
+                    </label>
+                    <input
+                      type="number"
+                      {...register('tjm_current', { valueAsNumber: true })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="450"
+                      min={0}
+                    />
+                    {errors.tjm_current && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                        {errors.tjm_current.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      TJM souhaité (€/jour) *
+                    </label>
+                    <input
+                      type="number"
+                      {...register('tjm_desired', { valueAsNumber: true })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="500"
+                      min={0}
+                    />
+                    {errors.tjm_desired && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                        {errors.tjm_desired.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Employee Fields - Salary */}
+            {showEmployeeFields && (
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg space-y-4">
+                <h3 className="font-medium text-green-900 dark:text-green-300">
+                  Salaire annuel brut (Salarié)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Salaire actuel (€/an) *
+                    </label>
+                    <input
+                      type="number"
+                      {...register('salary_current', { valueAsNumber: true })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="45000"
+                      min={0}
+                    />
+                    {errors.salary_current && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                        {errors.salary_current.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Salaire souhaité (€/an) *
+                    </label>
+                    <input
+                      type="number"
+                      {...register('salary_desired', { valueAsNumber: true })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="50000"
+                      min={0}
+                    />
+                    {errors.salary_desired && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                        {errors.salary_desired.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Availability */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Disponibilité *
+              </label>
+              <select
+                {...register('availability')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">-- Sélectionner --</option>
+                {AVAILABILITY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {errors.availability && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                  {errors.availability.message}
+                </p>
+              )}
+            </div>
+
+            {/* English Level */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Niveau d'anglais *
+              </label>
+              <div className="space-y-2">
+                {ENGLISH_LEVELS.map((level) => (
+                  <label
+                    key={level.value}
+                    className="flex items-start gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                  >
+                    <input
+                      type="radio"
+                      {...register('english_level')}
+                      value={level.value}
+                      className="mt-1 w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {level.label}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowEnglishTooltip(showEnglishTooltip === level.value ? null : level.value)}
+                          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        >
+                          <HelpCircle className="h-4 w-4" />
+                        </button>
+                      </div>
+                      {showEnglishTooltip === level.value && (
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                          {level.description}
+                        </p>
+                      )}
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {errors.english_level && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                  {errors.english_level.message}
                 </p>
               )}
             </div>
@@ -438,7 +651,7 @@ export default function PublicApplication() {
             {/* CV Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                CV (PDF ou DOCX) *
+                CV (PDF ou Word, max 10 Mo) *
               </label>
               <div className="mt-1">
                 {cvFile ? (
@@ -467,12 +680,12 @@ export default function PublicApplication() {
                       Cliquez pour télécharger ou glissez-déposez
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500">
-                      PDF ou DOCX (max 10 Mo)
+                      PDF ou Word (max 10 Mo)
                     </p>
                     <input
                       type="file"
                       className="hidden"
-                      accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       onChange={handleFileChange}
                     />
                   </label>
@@ -508,6 +721,44 @@ export default function PublicApplication() {
           </form>
         </div>
       </div>
+
+      {/* Custom styles for phone input */}
+      <style>{`
+        .PhoneInput {
+          display: flex;
+          align-items: center;
+        }
+        .PhoneInputCountry {
+          padding: 0.5rem;
+          border: 1px solid #d1d5db;
+          border-right: none;
+          border-radius: 0.5rem 0 0 0.5rem;
+          background: white;
+        }
+        .dark .PhoneInputCountry {
+          border-color: #4b5563;
+          background: #374151;
+        }
+        .PhoneInputInput {
+          flex: 1;
+          padding: 0.5rem 1rem;
+          border: 1px solid #d1d5db;
+          border-radius: 0 0.5rem 0.5rem 0;
+          background: white;
+          color: #111827;
+        }
+        .dark .PhoneInputInput {
+          border-color: #4b5563;
+          background: #374151;
+          color: white;
+        }
+        .PhoneInputInput:focus {
+          outline: none;
+          ring: 2px;
+          ring-color: #3b82f6;
+          border-color: transparent;
+        }
+      `}</style>
     </div>
   );
 }

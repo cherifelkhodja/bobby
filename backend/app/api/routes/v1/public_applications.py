@@ -1,6 +1,5 @@
 """Public API endpoints for job applications (no authentication required)."""
 
-from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -33,8 +32,14 @@ MAX_CV_SIZE = 10 * 1024 * 1024
 ALLOWED_CV_TYPES = {
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/msword",  # .doc files
 }
-ALLOWED_CV_EXTENSIONS = {".pdf", ".docx"}
+ALLOWED_CV_EXTENSIONS = {".pdf", ".docx", ".doc"}
+
+# Valid values for enum fields
+VALID_AVAILABILITY = {"asap", "1_month", "2_months", "3_months", "more_3_months"}
+VALID_EMPLOYMENT_STATUS = {"freelance", "employee", "both"}
+VALID_ENGLISH_LEVELS = {"notions", "intermediate", "professional", "fluent", "bilingual"}
 
 
 class ApplicationFormRequest(BaseModel):
@@ -43,11 +48,15 @@ class ApplicationFormRequest(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
-    phone: str = Field(..., min_length=10, max_length=30, pattern=r"^\+?[0-9\s\-]+$")
+    phone: str = Field(..., min_length=1, max_length=30)
     job_title: str = Field(..., min_length=1, max_length=200)
-    tjm_min: float = Field(..., ge=0)
-    tjm_max: float = Field(..., ge=0)
-    availability_date: date
+    availability: str = Field(..., description="asap, 1_month, 2_months, 3_months, more_3_months")
+    employment_status: str = Field(..., description="freelance, employee, both")
+    english_level: str = Field(..., description="notions, intermediate, professional, fluent, bilingual")
+    tjm_current: Optional[float] = Field(None, ge=0)
+    tjm_desired: Optional[float] = Field(None, ge=0)
+    salary_current: Optional[float] = Field(None, ge=0)
+    salary_desired: Optional[float] = Field(None, ge=0)
 
 
 @router.get("/{token}", response_model=JobPostingPublicReadModel)
@@ -83,11 +92,15 @@ async def submit_application(
     first_name: str = Form(..., min_length=1, max_length=100),
     last_name: str = Form(..., min_length=1, max_length=100),
     email: str = Form(...),
-    phone: str = Form(..., min_length=10, max_length=30),
+    phone: str = Form(..., min_length=1, max_length=30),
     job_title: str = Form(..., min_length=1, max_length=200),
-    tjm_min: float = Form(..., ge=0),
-    tjm_max: float = Form(..., ge=0),
-    availability_date: date = Form(...),
+    availability: str = Form(...),
+    employment_status: str = Form(...),
+    english_level: str = Form(...),
+    tjm_current: Optional[float] = Form(None, ge=0),
+    tjm_desired: Optional[float] = Form(None, ge=0),
+    salary_current: Optional[float] = Form(None, ge=0),
+    salary_desired: Optional[float] = Form(None, ge=0),
     cv: UploadFile = File(...),
 ):
     """Submit a job application through the public form.
@@ -104,20 +117,46 @@ async def submit_application(
     except Exception:
         raise HTTPException(status_code=400, detail="Adresse email invalide")
 
-    # Validate phone format (basic check for French phone)
+    # Validate phone format (international format required)
     phone = phone.strip()
-    if not phone.replace("+", "").replace(" ", "").replace("-", "").isdigit():
+    if not phone.startswith("+"):
         raise HTTPException(
             status_code=400,
-            detail="Numéro de téléphone invalide. Utilisez le format +33...",
+            detail="Numéro de téléphone invalide. Utilisez le format international (+33...)",
         )
 
-    # Validate TJM range
-    if tjm_max < tjm_min:
+    # Validate enum fields
+    if availability not in VALID_AVAILABILITY:
         raise HTTPException(
             status_code=400,
-            detail="Le TJM maximum doit être supérieur ou égal au TJM minimum",
+            detail=f"Disponibilité invalide. Valeurs acceptées: {', '.join(VALID_AVAILABILITY)}",
         )
+
+    if employment_status not in VALID_EMPLOYMENT_STATUS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Statut professionnel invalide. Valeurs acceptées: {', '.join(VALID_EMPLOYMENT_STATUS)}",
+        )
+
+    if english_level not in VALID_ENGLISH_LEVELS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Niveau d'anglais invalide. Valeurs acceptées: {', '.join(VALID_ENGLISH_LEVELS)}",
+        )
+
+    # Validate salary/TJM based on employment status
+    if employment_status in ("freelance", "both"):
+        if tjm_current is None or tjm_desired is None:
+            raise HTTPException(
+                status_code=400,
+                detail="TJM actuel et souhaité requis pour les freelances",
+            )
+    if employment_status in ("employee", "both"):
+        if salary_current is None or salary_desired is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Salaire actuel et souhaité requis pour les salariés",
+            )
 
     # Validate CV file
     if not cv.filename:
@@ -178,9 +217,13 @@ async def submit_application(
             email=email.strip().lower(),
             phone=phone,
             job_title=job_title.strip(),
-            tjm_min=tjm_min,
-            tjm_max=tjm_max,
-            availability_date=availability_date,
+            availability=availability,
+            employment_status=employment_status,
+            english_level=english_level,
+            tjm_current=tjm_current,
+            tjm_desired=tjm_desired,
+            salary_current=salary_current,
+            salary_desired=salary_desired,
             cv_content=cv_content,
             cv_filename=cv.filename,
             cv_content_type=content_type,

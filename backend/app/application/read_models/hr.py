@@ -165,10 +165,23 @@ class JobApplicationReadModel(BaseModel):
     email: str
     phone: str
     job_title: str
-    tjm_min: float
-    tjm_max: float
+    # New fields
+    availability: str
+    availability_display: str
+    employment_status: str
+    employment_status_display: str
+    english_level: str
+    english_level_display: str
+    tjm_current: Optional[float] = None
+    tjm_desired: Optional[float] = None
+    salary_current: Optional[float] = None
+    salary_desired: Optional[float] = None
     tjm_range: str
-    availability_date: date
+    salary_range: str
+    # Legacy fields (kept for backward compatibility)
+    tjm_min: Optional[float] = None
+    tjm_max: Optional[float] = None
+    availability_date: Optional[date] = None
     cv_s3_key: str
     cv_filename: str
     cv_download_url: Optional[str] = None
