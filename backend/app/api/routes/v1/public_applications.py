@@ -38,7 +38,9 @@ ALLOWED_CV_EXTENSIONS = {".pdf", ".docx", ".doc"}
 
 # Valid values for enum fields
 VALID_AVAILABILITY = {"asap", "1_month", "2_months", "3_months", "more_3_months"}
-VALID_EMPLOYMENT_STATUS = {"freelance", "employee", "both"}
+# Base employment statuses (can be combined with comma)
+VALID_EMPLOYMENT_STATUS_BASE = {"freelance", "employee"}
+VALID_EMPLOYMENT_STATUS = {"freelance", "employee", "both", "freelance,employee", "employee,freelance"}
 VALID_ENGLISH_LEVELS = {"notions", "intermediate", "professional", "fluent", "bilingual"}
 
 
@@ -145,13 +147,17 @@ async def submit_application(
         )
 
     # Validate salary/TJM based on employment status
-    if employment_status in ("freelance", "both"):
+    # Handle comma-separated values (e.g., "freelance,employee")
+    has_freelance = "freelance" in employment_status
+    has_employee = "employee" in employment_status
+
+    if has_freelance:
         if tjm_current is None or tjm_desired is None:
             raise HTTPException(
                 status_code=400,
                 detail="TJM actuel et souhaité requis pour les freelances",
             )
-    if employment_status in ("employee", "both"):
+    if has_employee:
         if salary_current is None or salary_desired is None:
             raise HTTPException(
                 status_code=400,
