@@ -928,7 +928,7 @@ async def get_application(
         return await use_case.execute(
             UUID(application_id),
             mark_viewed=mark_viewed,
-            viewed_by=user.id if mark_viewed else None,
+            viewed_by=user if mark_viewed else None,
         )
     except JobApplicationNotFoundError:
         raise HTTPException(status_code=404, detail="Candidature non trouvée")
