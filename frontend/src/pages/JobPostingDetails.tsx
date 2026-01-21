@@ -83,6 +83,20 @@ const SORT_OPTIONS = [
   { value: 'date', label: 'Date candidature' },
 ];
 
+// CV Quality display labels
+const EXPERIENCE_LEVEL_LABELS: Record<string, string> = {
+  JUNIOR: 'Junior',
+  CONFIRME: 'Confirmé',
+  SENIOR: 'Senior',
+};
+
+const CLASSIFICATION_LABELS: Record<string, string> = {
+  EXCELLENT: 'Excellent',
+  BON: 'Bon',
+  MOYEN: 'Moyen',
+  FAIBLE: 'Faible',
+};
+
 // Display modes for application details
 type DisplayMode = 'modal' | 'drawer' | 'split' | 'inline';
 
@@ -254,9 +268,9 @@ function ApplicationDetailContent({
                   Évalue la qualité intrinsèque du profil : stabilité des missions, qualité des comptes, parcours scolaire, continuité.
                 </p>
                 <div className="space-y-1 text-gray-600 dark:text-gray-400">
-                  <p><span className="font-medium">Niveau :</span> {application.cv_quality.niveau_experience}</p>
+                  <p><span className="font-medium">Niveau :</span> {EXPERIENCE_LEVEL_LABELS[application.cv_quality.niveau_experience] || application.cv_quality.niveau_experience}</p>
                   <p><span className="font-medium">Expérience :</span> {application.cv_quality.annees_experience} ans</p>
-                  <p><span className="font-medium">Classification :</span> {application.cv_quality.classification}</p>
+                  <p><span className="font-medium">Classification :</span> {CLASSIFICATION_LABELS[application.cv_quality.classification] || application.cv_quality.classification}</p>
                 </div>
               </div>
             </div>
@@ -1022,7 +1036,7 @@ export default function JobPostingDetails() {
                                 <p className="font-medium text-gray-900 dark:text-white mb-2">Analyse Qualité CV</p>
                                 <div className="flex gap-2 mb-2">
                                   <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300">
-                                    {application.cv_quality.niveau_experience}
+                                    {EXPERIENCE_LEVEL_LABELS[application.cv_quality.niveau_experience] || application.cv_quality.niveau_experience}
                                   </span>
                                   <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300">
                                     {application.cv_quality.annees_experience} ans
@@ -1033,7 +1047,7 @@ export default function JobPostingDetails() {
                                     application.cv_quality.classification === 'MOYEN' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
                                     'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
                                   }`}>
-                                    {application.cv_quality.classification}
+                                    {CLASSIFICATION_LABELS[application.cv_quality.classification] || application.cv_quality.classification}
                                   </span>
                                 </div>
                                 {application.cv_quality.details_notes && (
