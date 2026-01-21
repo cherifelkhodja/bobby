@@ -48,6 +48,74 @@ class MatchingResult(BaseModel):
     recommandation: MatchingRecommendation = Field(description="Recommendation")
 
 
+# ============== CV Quality Evaluation Models ==============
+
+class StabilityScore(BaseModel):
+    """Mission stability scoring details."""
+
+    note: float = Field(ge=0, le=8, description="Score out of 8")
+    max: int = Field(default=8)
+    duree_moyenne_mois: float = Field(description="Average mission duration in months")
+    commentaire: str = Field(description="Observation")
+
+
+class AccountQualityScore(BaseModel):
+    """Account/employer quality scoring details."""
+
+    note: float = Field(ge=0, le=6, description="Score out of 6")
+    max: int = Field(default=6)
+    comptes_identifies: list[str] = Field(description="Identified accounts")
+    commentaire: str = Field(description="Observation")
+
+
+class EducationScore(BaseModel):
+    """Education/training scoring details."""
+
+    note: float = Field(ge=0, le=6, description="Score out of 2/4/6 depending on level")
+    max: int = Field(description="Max score: 2 for senior, 4 for confirmed, 6 for junior")
+    formations_identifiees: list[str] = Field(description="Identified formations")
+    commentaire: str = Field(description="Observation")
+
+
+class ContinuityScore(BaseModel):
+    """Career continuity scoring details."""
+
+    note: float = Field(ge=0, le=4, description="Score out of 4")
+    max: int = Field(default=4)
+    trous_identifies: list[str] = Field(description="Identified gaps in career")
+    commentaire: str = Field(description="Observation")
+
+
+class BonusMalus(BaseModel):
+    """Bonus/malus adjustments."""
+
+    valeur: float = Field(ge=-1, le=1, description="Value between -1 and +1")
+    raisons: list[str] = Field(description="Reasons for bonus/malus")
+
+
+class CvQualityDetailsNotes(BaseModel):
+    """Detailed notes breakdown for CV quality."""
+
+    stabilite_missions: StabilityScore = Field(description="Mission stability score")
+    qualite_comptes: AccountQualityScore = Field(description="Account quality score")
+    parcours_scolaire: EducationScore = Field(description="Education score")
+    continuite_parcours: ContinuityScore = Field(description="Career continuity score")
+    bonus_malus: BonusMalus = Field(description="Bonus/malus adjustments")
+
+
+class CvQualityResult(BaseModel):
+    """Complete CV quality evaluation result."""
+
+    niveau_experience: str = Field(description="JUNIOR, CONFIRME, or SENIOR")
+    annees_experience: float = Field(ge=0, description="Years of experience")
+    note_globale: float = Field(ge=0, le=20, description="Global score out of 20")
+    details_notes: CvQualityDetailsNotes = Field(description="Detailed scores breakdown")
+    points_forts: list[str] = Field(description="CV strengths")
+    points_faibles: list[str] = Field(description="CV weaknesses")
+    synthese: str = Field(description="2-3 sentences summary")
+    classification: str = Field(description="EXCELLENT, BON, MOYEN, or FAIBLE")
+
+
 MATCHING_SYSTEM_PROMPT = """Tu es un expert en recrutement IT spécialisé dans l'évaluation de candidatures.
 
 Ton rôle est d'analyser la correspondance entre un CV de candidat et une offre d'emploi.
@@ -123,6 +191,150 @@ MATCHING_USER_PROMPT = """Analyse la correspondance entre ce candidat et cette o
 ---
 
 Analyse et retourne le JSON :"""
+
+
+# ============== CV Quality Evaluation Prompt ==============
+
+CV_QUALITY_SYSTEM_PROMPT = """Tu es un expert en recrutement IT pour une ESN (Entreprise de Services du Numérique).
+
+## Ta mission
+Évaluer la qualité intrinsèque d'un CV de consultant IT et attribuer une note sur 20.
+
+## Détermination du niveau d'expérience
+
+Calcule d'abord les années d'expérience totales du candidat :
+- **Junior** : < 3 ans d'expérience
+- **Confirmé** : 3 à 7 ans d'expérience
+- **Senior** : > 7 ans d'expérience
+
+## Critères d'évaluation et barème
+
+### 1. Stabilité des missions (/8 points)
+
+Évalue la durée moyenne des missions/postes :
+- Missions de 3 ans ou plus : 8/8
+- Missions de 2-3 ans : 6-7/8
+- Missions de 1-2 ans : 4-5/8
+- Missions < 1 an fréquentes : 1-3/8
+- Enchaînement de missions très courtes (< 6 mois) : 0-2/8
+
+**Attention** : Des missions courtes répétées sont un signal d'alerte (problèmes relationnels, manque de compétences, instabilité).
+
+### 2. Qualité des comptes / employeurs (/6 points)
+
+Évalue le prestige et la complexité des environnements :
+- **Grands comptes CAC40** (BNP, Société Générale, TotalEnergies, LVMH, Airbus, etc.) : valorisés
+- **Éditeurs logiciels majeurs** (FIS, Sungard, Murex, Calypso, Bloomberg, SAP, Salesforce, etc.) : très valorisés
+- **ETI / Scale-ups tech reconnues** : correct
+- **PME / TPE uniquement** : moins valorisé (contextes moins complexes, volumétries faibles)
+
+Barème :
+- Majorité grands comptes / éditeurs : 5-6/6
+- Mix grands comptes + ETI : 3-4/6
+- Principalement ETI/PME : 1-2/6
+- Uniquement petites structures : 0-1/6
+
+### 3. Parcours scolaire et formation
+
+**Points attribués selon le niveau d'expérience :**
+- Junior (< 3 ans) : /6 points
+- Confirmé (3-7 ans) : /4 points
+- Senior (> 7 ans) : /2 points
+
+**Écoles/formations valorisées :**
+- Écoles d'ingénieurs : Polytechnique, Centrale (Paris, Lyon, Nantes), Mines, EPITA, EPITECH, INSA, ENSIMAG, Télécom Paris/SudParis, ISEP, ECE, ESIEA
+- Universités info réputées : Paris-Saclay, Sorbonne, Dauphine, Lyon 1, Grenoble
+- Masters spécialisés reconnus
+
+**Barème (adapter au nombre de points du niveau) :**
+- École d'ingé top / Master top : 100% des points
+- Bonne école d'ingé / Bonne université : 70-85% des points
+- Formation correcte : 40-60% des points
+- Formation non pertinente ou non renseignée : 0-30% des points
+
+### 4. Absence de trous dans le parcours (/4 points)
+
+Analyse la continuité du parcours professionnel :
+- Aucun trou > 3 mois : 4/4
+- 1 trou de 3-6 mois : 3/4
+- 1 trou de 6-12 mois ou plusieurs trous 3-6 mois : 2/4
+- Trous > 12 mois ou multiples trous : 0-1/4
+
+**Note** : Un trou explicitement justifié (formation, reconversion, projet personnel mentionné) est moins pénalisant.
+
+### 5. Points bonus/malus (ajustement final)
+
+- **Bonus** (+0.5 à +1) : Certifications pertinentes (AWS, Azure, Scrum Master, PMP), contributions open source, publications
+- **Malus** (-0.5 à -1) : Incohérences dans les dates, CV mal structuré/illisible, fautes d'orthographe nombreuses
+
+## Calcul du total
+TOTAL = Stabilité (/8) + Qualité comptes (/6) + Parcours scolaire (/2, /4 ou /6 selon niveau) + Absence trous (/4) + Bonus/Malus
+
+**Important** : Le total doit toujours être ramené sur 20. Ajuste proportionnellement si nécessaire.
+
+## Format de réponse STRICT
+
+Réponds UNIQUEMENT avec un objet JSON valide :
+
+{{
+  "niveau_experience": "JUNIOR" | "CONFIRME" | "SENIOR",
+  "annees_experience": <number>,
+  "note_globale": <number 0-20, 1 décimale>,
+  "details_notes": {{
+    "stabilite_missions": {{
+      "note": <number>,
+      "max": 8,
+      "duree_moyenne_mois": <number>,
+      "commentaire": "<observation>"
+    }},
+    "qualite_comptes": {{
+      "note": <number>,
+      "max": 6,
+      "comptes_identifies": ["<compte1>", "<compte2>"],
+      "commentaire": "<observation>"
+    }},
+    "parcours_scolaire": {{
+      "note": <number>,
+      "max": <2|4|6 selon niveau>,
+      "formations_identifiees": ["<formation1>", "<formation2>"],
+      "commentaire": "<observation>"
+    }},
+    "continuite_parcours": {{
+      "note": <number>,
+      "max": 4,
+      "trous_identifies": ["<période1>", "<période2>"],
+      "commentaire": "<observation>"
+    }},
+    "bonus_malus": {{
+      "valeur": <number entre -1 et +1>,
+      "raisons": ["<raison1>", "<raison2>"]
+    }}
+  }},
+  "points_forts": ["<point1>", "<point2>"],
+  "points_faibles": ["<point1>", "<point2>"],
+  "synthese": "<2-3 phrases résumant la qualité du profil>",
+  "classification": "EXCELLENT" | "BON" | "MOYEN" | "FAIBLE"
+}}
+
+Classification :
+- EXCELLENT : 16-20
+- BON : 12-15.9
+- MOYEN : 8-11.9
+- FAIBLE : 0-7.9
+"""
+
+
+CV_QUALITY_USER_PROMPT = """Évalue la qualité intrinsèque de ce CV de consultant IT.
+
+---
+
+## CV DU CANDIDAT :
+
+{cv_text}
+
+---
+
+Analyse et retourne le JSON avec la note sur 20 :"""
 
 
 # Legacy prompt for backward compatibility
@@ -365,6 +577,251 @@ class GeminiMatchingService:
         except Exception as e:
             logger.error(f"CV matching failed: {e}")
             raise CvMatchingError(f"Analyse échouée: {str(e)}")
+
+    async def evaluate_cv_quality(
+        self,
+        cv_text: str,
+    ) -> dict[str, Any]:
+        """Evaluate the intrinsic quality of a CV with a score out of 20.
+
+        This evaluation is independent of any job offer and assesses:
+        - Mission stability (duration of assignments)
+        - Account quality (prestige of employers/clients)
+        - Education (schools, certifications)
+        - Career continuity (gaps in employment)
+
+        Args:
+            cv_text: Extracted text from candidate's CV.
+
+        Returns:
+            CV quality evaluation result with:
+                - note_globale: float (0-20)
+                - niveau_experience: str (JUNIOR/CONFIRME/SENIOR)
+                - classification: str (EXCELLENT/BON/MOYEN/FAIBLE)
+                - details_notes: detailed breakdown by category
+                - points_forts, points_faibles, synthese
+
+        Raises:
+            CvMatchingError: If evaluation fails.
+        """
+        if not self._is_configured():
+            logger.warning("Gemini not configured, returning default CV quality score")
+            return self._default_cv_quality_result()
+
+        try:
+            self._configure()
+
+            # Truncate input to avoid token limits
+            cv_text_truncated = cv_text[:12000] if cv_text else ""
+
+            if not cv_text_truncated:
+                logger.warning("Empty CV text for quality evaluation")
+                return self._default_cv_quality_result()
+
+            # Build user prompt
+            user_prompt = CV_QUALITY_USER_PROMPT.format(cv_text=cv_text_truncated)
+
+            # Use flash model with system instruction
+            model = genai.GenerativeModel(
+                "gemini-2.5-flash-lite",
+                system_instruction=CV_QUALITY_SYSTEM_PROMPT,
+            )
+
+            # Run synchronous API in thread pool with enhanced config
+            response = await asyncio.to_thread(
+                model.generate_content,
+                user_prompt,
+                generation_config=genai.GenerationConfig(**self.ENHANCED_GENERATION_CONFIG),
+            )
+
+            if not response.text:
+                logger.warning("Empty response from Gemini for CV quality evaluation")
+                return self._default_cv_quality_result()
+
+            # Parse and validate JSON response
+            result = self._parse_cv_quality_response(response.text)
+
+            logger.info(
+                f"CV quality evaluation completed: {result['note_globale']}/20 "
+                f"({result['classification']}, {result['niveau_experience']})"
+            )
+            return result
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse Gemini CV quality response: {e}")
+            raise CvMatchingError("Réponse invalide de l'IA pour l'évaluation qualité")
+        except Exception as e:
+            logger.error(f"CV quality evaluation failed: {e}")
+            raise CvMatchingError(f"Évaluation qualité échouée: {str(e)}")
+
+    def _parse_cv_quality_response(self, response_text: str) -> dict[str, Any]:
+        """Parse and validate CV quality evaluation response from Gemini.
+
+        Args:
+            response_text: Raw response from Gemini (should be JSON).
+
+        Returns:
+            Validated and normalized CV quality result dictionary.
+
+        Raises:
+            json.JSONDecodeError: If parsing fails.
+        """
+        # Clean up response text
+        text = response_text.strip()
+
+        # Remove markdown code blocks if present
+        if text.startswith("```json"):
+            text = text[7:]
+        elif text.startswith("```"):
+            text = text[3:]
+
+        if text.endswith("```"):
+            text = text[:-3]
+
+        # Find JSON object boundaries
+        start = text.find("{")
+        end = text.rfind("}") + 1
+
+        if start != -1 and end > start:
+            text = text[start:end]
+
+        # Parse JSON
+        raw_result = json.loads(text.strip())
+
+        # Validate and normalize using Pydantic model
+        try:
+            validated = CvQualityResult.model_validate(raw_result)
+            result = validated.model_dump()
+        except Exception as e:
+            logger.warning(f"CV quality response validation failed, using raw result: {e}")
+            # Fallback: use raw result with normalization
+            result = self._normalize_cv_quality_result(raw_result)
+
+        # Ensure note_globale is within bounds
+        result["note_globale"] = round(max(0, min(20, result.get("note_globale", 0))), 1)
+
+        # Ensure classification is consistent with score
+        note = result["note_globale"]
+        if note >= 16:
+            result["classification"] = "EXCELLENT"
+        elif note >= 12:
+            result["classification"] = "BON"
+        elif note >= 8:
+            result["classification"] = "MOYEN"
+        else:
+            result["classification"] = "FAIBLE"
+
+        return result
+
+    def _normalize_cv_quality_result(self, raw_result: dict[str, Any]) -> dict[str, Any]:
+        """Normalize raw CV quality result to ensure all expected fields are present.
+
+        Args:
+            raw_result: Raw parsed JSON from Gemini.
+
+        Returns:
+            Normalized result with all expected fields.
+        """
+        # Normalize details_notes
+        details = raw_result.get("details_notes", {})
+
+        stabilite = details.get("stabilite_missions", {})
+        normalized_stabilite = {
+            "note": max(0, min(8, stabilite.get("note", 0))),
+            "max": 8,
+            "duree_moyenne_mois": stabilite.get("duree_moyenne_mois", 0),
+            "commentaire": stabilite.get("commentaire", ""),
+        }
+
+        qualite_comptes = details.get("qualite_comptes", {})
+        normalized_comptes = {
+            "note": max(0, min(6, qualite_comptes.get("note", 0))),
+            "max": 6,
+            "comptes_identifies": qualite_comptes.get("comptes_identifies", [])[:5],
+            "commentaire": qualite_comptes.get("commentaire", ""),
+        }
+
+        parcours = details.get("parcours_scolaire", {})
+        max_parcours = parcours.get("max", 4)
+        normalized_parcours = {
+            "note": max(0, min(max_parcours, parcours.get("note", 0))),
+            "max": max_parcours,
+            "formations_identifiees": parcours.get("formations_identifiees", [])[:3],
+            "commentaire": parcours.get("commentaire", ""),
+        }
+
+        continuite = details.get("continuite_parcours", {})
+        normalized_continuite = {
+            "note": max(0, min(4, continuite.get("note", 0))),
+            "max": 4,
+            "trous_identifies": continuite.get("trous_identifies", [])[:3],
+            "commentaire": continuite.get("commentaire", ""),
+        }
+
+        bonus = details.get("bonus_malus", {})
+        normalized_bonus = {
+            "valeur": max(-1, min(1, bonus.get("valeur", 0))),
+            "raisons": bonus.get("raisons", [])[:3],
+        }
+
+        return {
+            "niveau_experience": raw_result.get("niveau_experience", "CONFIRME"),
+            "annees_experience": max(0, raw_result.get("annees_experience", 0)),
+            "note_globale": raw_result.get("note_globale", 0),
+            "details_notes": {
+                "stabilite_missions": normalized_stabilite,
+                "qualite_comptes": normalized_comptes,
+                "parcours_scolaire": normalized_parcours,
+                "continuite_parcours": normalized_continuite,
+                "bonus_malus": normalized_bonus,
+            },
+            "points_forts": raw_result.get("points_forts", [])[:3],
+            "points_faibles": raw_result.get("points_faibles", [])[:3],
+            "synthese": raw_result.get("synthese", "Analyse non disponible."),
+            "classification": raw_result.get("classification", "MOYEN"),
+        }
+
+    def _default_cv_quality_result(self) -> dict[str, Any]:
+        """Return default CV quality result when evaluation cannot be performed."""
+        return {
+            "niveau_experience": "CONFIRME",
+            "annees_experience": 0,
+            "note_globale": 0,
+            "details_notes": {
+                "stabilite_missions": {
+                    "note": 0,
+                    "max": 8,
+                    "duree_moyenne_mois": 0,
+                    "commentaire": "Analyse non disponible",
+                },
+                "qualite_comptes": {
+                    "note": 0,
+                    "max": 6,
+                    "comptes_identifies": [],
+                    "commentaire": "Analyse non disponible",
+                },
+                "parcours_scolaire": {
+                    "note": 0,
+                    "max": 4,
+                    "formations_identifiees": [],
+                    "commentaire": "Analyse non disponible",
+                },
+                "continuite_parcours": {
+                    "note": 0,
+                    "max": 4,
+                    "trous_identifies": [],
+                    "commentaire": "Analyse non disponible",
+                },
+                "bonus_malus": {
+                    "valeur": 0,
+                    "raisons": [],
+                },
+            },
+            "points_forts": [],
+            "points_faibles": ["Analyse non disponible"],
+            "synthese": "L'évaluation automatique n'a pas pu être effectuée.",
+            "classification": "FAIBLE",
+        }
 
     def _parse_response(self, response_text: str) -> dict[str, Any]:
         """Parse and clean Gemini response to extract JSON.

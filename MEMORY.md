@@ -134,6 +134,18 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-01-21
+- **feat(hr)**: Évaluation qualité CV (/20) - indépendante de l'offre
+  - Score global /20 avec classification (EXCELLENT/BON/MOYEN/FAIBLE)
+  - Détection automatique niveau expérience (JUNIOR/CONFIRME/SENIOR)
+  - Critères d'évaluation :
+    - Stabilité des missions (/8) : durée moyenne, cohérence
+    - Qualité des comptes (/6) : grands comptes CAC40, éditeurs logiciels, ESN
+    - Parcours scolaire (/2, /4 ou /6 selon niveau) : écoles d'ingénieurs, universités
+    - Continuité parcours (/4) : trous dans le CV
+    - Bonus/malus (-1 à +1) : certifications, contributions, qualité rédaction
+  - Exécution en parallèle avec le matching offre (asyncio.gather)
+  - Migration 017 : colonnes `cv_quality_score` et `cv_quality` (JSON)
+  - Fichiers modifiés : `gemini_matcher.py`, `job_applications.py`, `job_application_repository.py`, `hr.py` (read_models), `job_application.py` (entity), `models.py`, `types/index.ts`
 - **feat(hr)**: Système de matching CV-offre amélioré
   - Nouvelle configuration Gemini (temperature 0.1 pour des résultats plus cohérents)
   - Prompt enrichi avec critères pondérés : techniques (40%), expérience (25%), formation (15%), soft skills (20%)

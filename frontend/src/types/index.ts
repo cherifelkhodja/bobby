@@ -553,6 +553,76 @@ export interface MatchingDetails {
   recommandation?: MatchingRecommendation;
 }
 
+// CV Quality Evaluation Types (/20)
+export interface StabilityScore {
+  note: number;
+  max: number;
+  duree_moyenne_mois: number;
+  commentaire: string;
+}
+
+export interface AccountQualityScore {
+  note: number;
+  max: number;
+  comptes_identifies: string[];
+  commentaire: string;
+}
+
+export interface EducationScore {
+  note: number;
+  max: number;
+  formations_identifiees: string[];
+  commentaire: string;
+}
+
+export interface ContinuityScore {
+  note: number;
+  max: number;
+  trous_identifies: string[];
+  commentaire: string;
+}
+
+export interface BonusMalus {
+  valeur: number;
+  raisons: string[];
+}
+
+export interface CvQualityDetailsNotes {
+  stabilite_missions?: StabilityScore;
+  qualite_comptes?: AccountQualityScore;
+  parcours_scolaire?: EducationScore;
+  continuite_parcours?: ContinuityScore;
+  bonus_malus?: BonusMalus;
+}
+
+export interface CvQuality {
+  niveau_experience: 'JUNIOR' | 'CONFIRME' | 'SENIOR';
+  annees_experience: number;
+  note_globale: number;
+  details_notes?: CvQualityDetailsNotes;
+  points_forts: string[];
+  points_faibles: string[];
+  synthese: string;
+  classification: 'EXCELLENT' | 'BON' | 'MOYEN' | 'FAIBLE';
+}
+
+export function getCvQualityScoreColor(score: number): string {
+  if (score >= 16) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+  if (score >= 12) return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+  if (score >= 8) return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
+  return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+}
+
+export function getCvQualityClassificationLabel(classification: string): string {
+  const labels: Record<string, string> = {
+    EXCELLENT: 'Excellent',
+    BON: 'Bon',
+    MOYEN: 'Moyen',
+    FAIBLE: 'Faible',
+  };
+  return labels[classification] || classification;
+}
+
 export interface JobApplication {
   id: string;
   job_posting_id: string;
@@ -583,6 +653,9 @@ export interface JobApplication {
   cv_filename: string;
   matching_score: number | null;
   matching_details: MatchingDetails | null;
+  // CV Quality evaluation (/20)
+  cv_quality_score: number | null;
+  cv_quality: CvQuality | null;
   status: ApplicationStatus;
   status_display: string;
   notes: string | null;

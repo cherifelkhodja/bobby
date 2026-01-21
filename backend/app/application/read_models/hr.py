@@ -90,6 +90,88 @@ class MatchingDetailsReadModel(BaseModel):
     recommandation: Optional[MatchingRecommendationReadModel] = None
 
 
+# ============== CV Quality Evaluation Models ==============
+
+class StabilityScoreReadModel(BaseModel):
+    """Mission stability score details."""
+
+    model_config = ConfigDict(frozen=True)
+
+    note: float
+    max: int = 8
+    duree_moyenne_mois: float = 0
+    commentaire: str = ""
+
+
+class AccountQualityScoreReadModel(BaseModel):
+    """Account/employer quality score details."""
+
+    model_config = ConfigDict(frozen=True)
+
+    note: float
+    max: int = 6
+    comptes_identifies: list[str] = []
+    commentaire: str = ""
+
+
+class EducationScoreReadModel(BaseModel):
+    """Education score details."""
+
+    model_config = ConfigDict(frozen=True)
+
+    note: float
+    max: int = 4  # 2/4/6 depending on experience level
+    formations_identifiees: list[str] = []
+    commentaire: str = ""
+
+
+class ContinuityScoreReadModel(BaseModel):
+    """Career continuity score details."""
+
+    model_config = ConfigDict(frozen=True)
+
+    note: float
+    max: int = 4
+    trous_identifies: list[str] = []
+    commentaire: str = ""
+
+
+class BonusMalusReadModel(BaseModel):
+    """Bonus/malus adjustments."""
+
+    model_config = ConfigDict(frozen=True)
+
+    valeur: float = 0
+    raisons: list[str] = []
+
+
+class CvQualityDetailsNotesReadModel(BaseModel):
+    """Detailed notes breakdown for CV quality."""
+
+    model_config = ConfigDict(frozen=True)
+
+    stabilite_missions: Optional[StabilityScoreReadModel] = None
+    qualite_comptes: Optional[AccountQualityScoreReadModel] = None
+    parcours_scolaire: Optional[EducationScoreReadModel] = None
+    continuite_parcours: Optional[ContinuityScoreReadModel] = None
+    bonus_malus: Optional[BonusMalusReadModel] = None
+
+
+class CvQualityReadModel(BaseModel):
+    """CV quality evaluation result (/20)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    niveau_experience: str  # JUNIOR, CONFIRME, SENIOR
+    annees_experience: float = 0
+    note_globale: float  # 0-20
+    details_notes: Optional[CvQualityDetailsNotesReadModel] = None
+    points_forts: list[str] = []
+    points_faibles: list[str] = []
+    synthese: str = ""
+    classification: str  # EXCELLENT, BON, MOYEN, FAIBLE
+
+
 class JobPostingReadModel(BaseModel):
     """Job posting read model."""
 
@@ -218,6 +300,9 @@ class JobApplicationReadModel(BaseModel):
     cv_download_url: Optional[str] = None
     matching_score: Optional[int] = None
     matching_details: Optional[MatchingDetailsReadModel] = None
+    # CV Quality evaluation (/20)
+    cv_quality_score: Optional[float] = None
+    cv_quality: Optional[CvQualityReadModel] = None
     status: str
     status_display: str
     status_history: list[StatusChangeReadModel] = []

@@ -405,6 +405,8 @@ class JobApplicationModel(Base):
     cv_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     matching_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     matching_details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    cv_quality_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    cv_quality: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="nouveau", index=True)
     status_history: Mapped[Optional[list]] = mapped_column(JSON, nullable=True, default=list)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

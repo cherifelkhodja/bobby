@@ -6,12 +6,19 @@ from typing import Optional
 from uuid import UUID
 
 from app.application.read_models.hr import (
+    AccountQualityScoreReadModel,
     ApplicationSubmissionResultReadModel,
+    BonusMalusReadModel,
+    ContinuityScoreReadModel,
+    CvQualityDetailsNotesReadModel,
+    CvQualityReadModel,
+    EducationScoreReadModel,
     JobApplicationListReadModel,
     JobApplicationReadModel,
     MatchingDetailsReadModel,
     MatchingRecommendationReadModel,
     ScoresDetailsReadModel,
+    StabilityScoreReadModel,
     StatusChangeReadModel,
 )
 from app.domain.entities import ApplicationStatus, JobApplication, JobPostingStatus
@@ -120,11 +127,16 @@ class SubmitApplicationUseCase:
             # Continue without text extraction
             pass
 
-        # Calculate matching score using enhanced method
+        # Calculate matching score and CV quality evaluation in parallel
         matching_score = None
         matching_details = None
+        cv_quality_score = None
+        cv_quality = None
+
         if cv_text:
             try:
+                import asyncio
+
                 # Build job description for matching
                 job_description = f"""
 {posting.description}
@@ -152,8 +164,8 @@ Qualifications requises:
                 }
                 availability_display = availability_map.get(command.availability, command.availability)
 
-                # Use enhanced matching with candidate info
-                result = await self.matching_service.calculate_match_enhanced(
+                # Run both evaluations in parallel
+                matching_task = self.matching_service.calculate_match_enhanced(
                     cv_text=cv_text,
                     job_title_offer=posting.title,
                     job_description=job_description,
@@ -162,25 +174,43 @@ Qualifications requises:
                     candidate_tjm_range=tjm_range_str,
                     candidate_availability=availability_display,
                 )
-                matching_score = result.get("score_global", result.get("score", 0))
-                # Store full enhanced matching details
-                matching_details = {
-                    "score": matching_score,
-                    "score_global": result.get("score_global", matching_score),
-                    "scores_details": result.get("scores_details", {}),
-                    "competences_matchees": result.get("competences_matchees", []),
-                    "competences_manquantes": result.get("competences_manquantes", []),
-                    "points_forts": result.get("points_forts", []),
-                    "points_vigilance": result.get("points_vigilance", []),
-                    "synthese": result.get("synthese", result.get("summary", "")),
-                    "recommandation": result.get("recommandation", {}),
-                    # Legacy fields for backward compatibility
-                    "strengths": result.get("strengths", result.get("points_forts", [])),
-                    "gaps": result.get("gaps", result.get("competences_manquantes", [])),
-                    "summary": result.get("summary", result.get("synthese", "")),
-                }
+                quality_task = self.matching_service.evaluate_cv_quality(cv_text)
+
+                results = await asyncio.gather(
+                    matching_task,
+                    quality_task,
+                    return_exceptions=True,
+                )
+
+                # Process matching result
+                matching_result = results[0]
+                if not isinstance(matching_result, Exception):
+                    matching_score = matching_result.get("score_global", matching_result.get("score", 0))
+                    # Store full enhanced matching details
+                    matching_details = {
+                        "score": matching_score,
+                        "score_global": matching_result.get("score_global", matching_score),
+                        "scores_details": matching_result.get("scores_details", {}),
+                        "competences_matchees": matching_result.get("competences_matchees", []),
+                        "competences_manquantes": matching_result.get("competences_manquantes", []),
+                        "points_forts": matching_result.get("points_forts", []),
+                        "points_vigilance": matching_result.get("points_vigilance", []),
+                        "synthese": matching_result.get("synthese", matching_result.get("summary", "")),
+                        "recommandation": matching_result.get("recommandation", {}),
+                        # Legacy fields for backward compatibility
+                        "strengths": matching_result.get("strengths", matching_result.get("points_forts", [])),
+                        "gaps": matching_result.get("gaps", matching_result.get("competences_manquantes", [])),
+                        "summary": matching_result.get("summary", matching_result.get("synthese", "")),
+                    }
+
+                # Process CV quality result
+                quality_result = results[1]
+                if not isinstance(quality_result, Exception):
+                    cv_quality_score = quality_result.get("note_globale", 0)
+                    cv_quality = quality_result
+
             except Exception:
-                # Continue without matching
+                # Continue without matching/quality evaluation
                 pass
 
         # Create application
@@ -203,6 +233,8 @@ Qualifications requises:
             cv_text=cv_text,
             matching_score=matching_score,
             matching_details=matching_details,
+            cv_quality_score=cv_quality_score,
+            cv_quality=cv_quality,
         )
 
         saved = await self.job_application_repository.save(application)
@@ -315,6 +347,7 @@ class ListApplicationsForPostingUseCase:
         ]
 
         matching_details_model = _build_matching_details_model(application.matching_details)
+        cv_quality_model = _build_cv_quality_model(application.cv_quality)
 
         return JobApplicationReadModel(
             id=str(application.id),
@@ -348,6 +381,8 @@ class ListApplicationsForPostingUseCase:
             cv_download_url=cv_download_url,
             matching_score=application.matching_score,
             matching_details=matching_details_model,
+            cv_quality_score=application.cv_quality_score,
+            cv_quality=cv_quality_model,
             status=str(application.status),
             status_display=application.status.display_name,
             status_history=status_history,
@@ -403,6 +438,84 @@ def _build_matching_details_model(
         points_vigilance=matching_details.get("points_vigilance", []),
         synthese=matching_details.get("synthese", ""),
         recommandation=recommandation_model,
+    )
+
+
+def _build_cv_quality_model(
+    cv_quality: Optional[dict],
+) -> Optional[CvQualityReadModel]:
+    """Build CvQualityReadModel from cv_quality dict.
+
+    Converts the raw CV quality evaluation result into a structured read model.
+    """
+    if not cv_quality:
+        return None
+
+    # Build details_notes if present
+    details_notes_model = None
+    if cv_quality.get("details_notes"):
+        dn = cv_quality["details_notes"]
+
+        # Stabilite missions
+        stabilite = dn.get("stabilite_missions", {})
+        stabilite_model = StabilityScoreReadModel(
+            note=stabilite.get("note", 0),
+            max=stabilite.get("max", 8),
+            duree_moyenne_mois=stabilite.get("duree_moyenne_mois", 0),
+            commentaire=stabilite.get("commentaire", ""),
+        ) if stabilite else None
+
+        # Qualite comptes
+        comptes = dn.get("qualite_comptes", {})
+        comptes_model = AccountQualityScoreReadModel(
+            note=comptes.get("note", 0),
+            max=comptes.get("max", 6),
+            comptes_identifies=comptes.get("comptes_identifies", []),
+            commentaire=comptes.get("commentaire", ""),
+        ) if comptes else None
+
+        # Parcours scolaire
+        parcours = dn.get("parcours_scolaire", {})
+        parcours_model = EducationScoreReadModel(
+            note=parcours.get("note", 0),
+            max=parcours.get("max", 4),
+            formations_identifiees=parcours.get("formations_identifiees", []),
+            commentaire=parcours.get("commentaire", ""),
+        ) if parcours else None
+
+        # Continuite parcours
+        continuite = dn.get("continuite_parcours", {})
+        continuite_model = ContinuityScoreReadModel(
+            note=continuite.get("note", 0),
+            max=continuite.get("max", 4),
+            trous_identifies=continuite.get("trous_identifies", []),
+            commentaire=continuite.get("commentaire", ""),
+        ) if continuite else None
+
+        # Bonus/malus
+        bonus = dn.get("bonus_malus", {})
+        bonus_model = BonusMalusReadModel(
+            valeur=bonus.get("valeur", 0),
+            raisons=bonus.get("raisons", []),
+        ) if bonus else None
+
+        details_notes_model = CvQualityDetailsNotesReadModel(
+            stabilite_missions=stabilite_model,
+            qualite_comptes=comptes_model,
+            parcours_scolaire=parcours_model,
+            continuite_parcours=continuite_model,
+            bonus_malus=bonus_model,
+        )
+
+    return CvQualityReadModel(
+        niveau_experience=cv_quality.get("niveau_experience", "CONFIRME"),
+        annees_experience=cv_quality.get("annees_experience", 0),
+        note_globale=cv_quality.get("note_globale", 0),
+        details_notes=details_notes_model,
+        points_forts=cv_quality.get("points_forts", []),
+        points_faibles=cv_quality.get("points_faibles", []),
+        synthese=cv_quality.get("synthese", ""),
+        classification=cv_quality.get("classification", "MOYEN"),
     )
 
 
@@ -481,6 +594,7 @@ class GetApplicationUseCase:
         ]
 
         matching_details_model = _build_matching_details_model(application.matching_details)
+        cv_quality_model = _build_cv_quality_model(application.cv_quality)
 
         return JobApplicationReadModel(
             id=str(application.id),
@@ -514,6 +628,8 @@ class GetApplicationUseCase:
             cv_download_url=cv_download_url,
             matching_score=application.matching_score,
             matching_details=matching_details_model,
+            cv_quality_score=application.cv_quality_score,
+            cv_quality=cv_quality_model,
             status=str(application.status),
             status_display=application.status.display_name,
             status_history=status_history,
@@ -616,6 +732,7 @@ class UpdateApplicationStatusUseCase:
             )
 
         matching_details_model = _build_matching_details_model(application.matching_details)
+        cv_quality_model = _build_cv_quality_model(application.cv_quality)
 
         return JobApplicationReadModel(
             id=str(application.id),
@@ -649,6 +766,8 @@ class UpdateApplicationStatusUseCase:
             cv_download_url=cv_download_url,
             matching_score=application.matching_score,
             matching_details=matching_details_model,
+            cv_quality_score=application.cv_quality_score,
+            cv_quality=cv_quality_model,
             status=str(application.status),
             status_display=application.status.display_name,
             status_history=status_history,
@@ -722,6 +841,7 @@ class UpdateApplicationNoteUseCase:
         ]
 
         matching_details_model = _build_matching_details_model(application.matching_details)
+        cv_quality_model = _build_cv_quality_model(application.cv_quality)
 
         return JobApplicationReadModel(
             id=str(application.id),
@@ -755,6 +875,8 @@ class UpdateApplicationNoteUseCase:
             cv_download_url=cv_download_url,
             matching_score=application.matching_score,
             matching_details=matching_details_model,
+            cv_quality_score=application.cv_quality_score,
+            cv_quality=cv_quality_model,
             status=str(application.status),
             status_display=application.status.display_name,
             status_history=status_history,
@@ -847,6 +969,7 @@ class CreateCandidateInBoondUseCase:
         ]
 
         matching_details_model = _build_matching_details_model(application.matching_details)
+        cv_quality_model = _build_cv_quality_model(application.cv_quality)
 
         return JobApplicationReadModel(
             id=str(application.id),
@@ -880,6 +1003,8 @@ class CreateCandidateInBoondUseCase:
             cv_download_url=cv_download_url,
             matching_score=application.matching_score,
             matching_details=matching_details_model,
+            cv_quality_score=application.cv_quality_score,
+            cv_quality=cv_quality_model,
             status=str(application.status),
             status_display=application.status.display_name,
             status_history=status_history,

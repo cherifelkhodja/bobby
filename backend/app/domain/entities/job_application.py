@@ -185,6 +185,10 @@ class JobApplication:
     matching_score: Optional[int] = None  # 0-100
     matching_details: Optional[dict[str, Any]] = None
 
+    # CV Quality evaluation results (/20)
+    cv_quality_score: Optional[float] = None  # 0-20
+    cv_quality: Optional[dict[str, Any]] = None
+
     # Status workflow
     status: ApplicationStatus = ApplicationStatus.NOUVEAU
     status_history: list[dict] = field(default_factory=list)

@@ -86,6 +86,8 @@ class JobApplicationRepository:
             model.cv_text = application.cv_text
             model.matching_score = application.matching_score
             model.matching_details = application.matching_details
+            model.cv_quality_score = application.cv_quality_score
+            model.cv_quality = application.cv_quality
             model.status = str(application.status)
             model.status_history = application.status_history
             model.notes = application.notes
@@ -117,6 +119,8 @@ class JobApplicationRepository:
                 cv_text=application.cv_text,
                 matching_score=application.matching_score,
                 matching_details=application.matching_details,
+                cv_quality_score=application.cv_quality_score,
+                cv_quality=application.cv_quality,
                 status=str(application.status),
                 status_history=application.status_history,
                 notes=application.notes,
@@ -308,6 +312,8 @@ class JobApplicationRepository:
             cv_text=model.cv_text,
             matching_score=model.matching_score,
             matching_details=model.matching_details,
+            cv_quality_score=model.cv_quality_score,
+            cv_quality=model.cv_quality,
             status=ApplicationStatus(model.status),
             status_history=model.status_history or [],
             notes=model.notes,
