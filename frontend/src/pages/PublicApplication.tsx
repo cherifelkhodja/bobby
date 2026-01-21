@@ -39,12 +39,9 @@ const applicationSchema = z.object({
 type ApplicationFormData = z.infer<typeof applicationSchema>;
 
 const CONTRACT_TYPE_LABELS: Record<string, string> = {
-  CDI: 'CDI',
-  CDD: 'CDD',
+  PERMANENT: 'CDI',
+  TEMPORARY: 'CDD',
   FREELANCE: 'Freelance',
-  INTERIM: 'Intérim',
-  STAGE: 'Stage',
-  ALTERNANCE: 'Alternance',
 };
 
 const REMOTE_LABELS: Record<string, string> = {
