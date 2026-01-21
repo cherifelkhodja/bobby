@@ -173,14 +173,15 @@ class TurnoverITClient:
         wait=wait_exponential(multiplier=1, min=1, max=4),
         reraise=True,
     )
-    async def close_job(self, reference: str) -> bool:
-        """Close/delete a job posting on Turnover-IT.
+    async def close_job(self, reference: str, job_payload: dict[str, Any]) -> bool:
+        """Close a job posting on Turnover-IT by setting status to INACTIVE.
 
         Args:
             reference: The job reference.
+            job_payload: The full job payload with status set to INACTIVE.
 
         Returns:
-            True if deletion was successful.
+            True if update was successful.
 
         Raises:
             TurnoverITError: If API call fails.
@@ -188,14 +189,21 @@ class TurnoverITClient:
         if not self._is_configured():
             raise TurnoverITError("API key not configured")
 
+        # Ensure status is INACTIVE
+        job_payload["status"] = "INACTIVE"
+
         logger.info(f"Closing job on Turnover-IT: {reference}")
+        logger.info(f"Payload: {json.dumps(job_payload, indent=2, ensure_ascii=False)}")
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.delete(
+                response = await client.put(
                     f"{self.base_url}/jobs/{reference}",
                     headers=self._get_headers(),
+                    json=job_payload,
                 )
+
+                logger.info(f"Response: {response.status_code} - {response.text}")
 
                 if response.status_code == 200:
                     logger.info(f"Successfully closed job: {reference}")

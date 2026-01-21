@@ -666,7 +666,10 @@ class CloseJobPostingUseCase:
         # Close on Turnover-IT if reference exists
         if posting.turnoverit_reference:
             try:
-                await self.turnoverit_client.close_job(posting.turnoverit_reference)
+                # Build the payload with current job data (status will be set to INACTIVE by the client)
+                application_base_url = f"{settings.FRONTEND_URL}/postuler"
+                payload = posting.to_turnoverit_payload(application_base_url)
+                await self.turnoverit_client.close_job(posting.turnoverit_reference, payload)
             except Exception as e:
                 # Log but don't fail - job might already be closed on their side
                 pass
