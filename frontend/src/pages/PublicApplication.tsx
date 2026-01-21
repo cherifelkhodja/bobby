@@ -12,8 +12,12 @@ import { z } from 'zod';
 // Cache duration: 48 hours in milliseconds
 const CACHE_DURATION_MS = 48 * 60 * 60 * 1000;
 
+interface CachedFormDataValues extends Partial<ApplicationFormData> {
+  employment_status?: string;
+}
+
 interface CachedFormData {
-  data: Partial<ApplicationFormData>;
+  data: CachedFormDataValues;
   timestamp: number;
 }
 
@@ -21,7 +25,7 @@ function getCacheKey(token: string): string {
   return `bobby_application_form_${token}`;
 }
 
-function loadCachedFormData(token: string): Partial<ApplicationFormData> | null {
+function loadCachedFormData(token: string): CachedFormDataValues | null {
   try {
     const cached = localStorage.getItem(getCacheKey(token));
     if (!cached) return null;
@@ -41,7 +45,7 @@ function loadCachedFormData(token: string): Partial<ApplicationFormData> | null 
   }
 }
 
-function saveCachedFormData(token: string, data: Partial<ApplicationFormData>): void {
+function saveCachedFormData(token: string, data: CachedFormDataValues): void {
   try {
     const cacheEntry: CachedFormData = {
       data,
@@ -85,12 +89,11 @@ const AVAILABILITY_OPTIONS = [
   { value: 'more_3_months', label: 'Plus de 3 mois' },
 ];
 
-// Employment status options
-const EMPLOYMENT_STATUS_OPTIONS = [
-  { value: 'freelance', label: 'Freelance' },
-  { value: 'employee', label: 'Salarié' },
-  { value: 'both', label: 'Les deux possibles' },
-];
+// Employment status - no longer dropdown, using checkboxes
+// Contract types that allow employee status (CDI/CDD)
+const EMPLOYEE_CONTRACT_TYPES = ['PERMANENT', 'FIXED-TERM'];
+// Contract types that allow freelance status
+const FREELANCE_CONTRACT_TYPES = ['FREELANCE', 'INTERCONTRACT'];
 
 // English level options with descriptions
 const ENGLISH_LEVELS = [
@@ -132,7 +135,7 @@ const applicationSchema = z.object({
     .refine((val) => isValidPhoneNumber(val || ''), 'Numéro de téléphone invalide'),
   job_title: z.string().min(1, 'Le titre du poste est requis').max(200),
   availability: z.string().min(1, 'La disponibilité est requise'),
-  employment_status: z.string().min(1, 'Le statut est requis'),
+  // employment_status is handled separately via checkboxes
   english_level: z.string().min(1, "Le niveau d'anglais est requis"),
   // Freelance fields (optional based on status)
   tjm_current: z.number().min(0).optional().nullable(),
@@ -170,6 +173,9 @@ export default function PublicApplication() {
   const [submissionMessage, setSubmissionMessage] = useState('');
   const [showEnglishTooltip, setShowEnglishTooltip] = useState<string | null>(null);
   const [hasCachedData, setHasCachedData] = useState(false);
+  // Employment status checkboxes
+  const [isFreelance, setIsFreelance] = useState(false);
+  const [isEmployee, setIsEmployee] = useState(false);
 
   // Load cached form data
   const cachedData = token ? loadCachedFormData(token) : null;
@@ -197,7 +203,6 @@ export default function PublicApplication() {
       phone: cachedData?.phone || '',
       job_title: cachedData?.job_title || '',
       availability: cachedData?.availability || '',
-      employment_status: cachedData?.employment_status || '',
       english_level: cachedData?.english_level || '',
       tjm_current: cachedData?.tjm_current ?? undefined,
       tjm_desired: cachedData?.tjm_desired ?? undefined,
@@ -205,6 +210,26 @@ export default function PublicApplication() {
       salary_desired: cachedData?.salary_desired ?? undefined,
     },
   });
+
+  // Determine allowed employment statuses based on contract types
+  const allowsEmployee = posting?.contract_types?.some((ct) => EMPLOYEE_CONTRACT_TYPES.includes(ct)) ?? false;
+  const allowsFreelance = posting?.contract_types?.some((ct) => FREELANCE_CONTRACT_TYPES.includes(ct)) ?? false;
+
+  // Initialize checkboxes from cached data or posting
+  useEffect(() => {
+    if (cachedData?.employment_status) {
+      const statuses = cachedData.employment_status.split(',');
+      setIsFreelance(statuses.includes('freelance') && allowsFreelance);
+      setIsEmployee(statuses.includes('employee') && allowsEmployee);
+    } else if (posting) {
+      // Auto-select if only one option available
+      if (allowsFreelance && !allowsEmployee) {
+        setIsFreelance(true);
+      } else if (allowsEmployee && !allowsFreelance) {
+        setIsEmployee(true);
+      }
+    }
+  }, [posting, cachedData, allowsEmployee, allowsFreelance]);
 
   // Watch all form values for caching
   const watchedValues = watch();
@@ -222,18 +247,27 @@ export default function PublicApplication() {
   // Save form data to cache on changes (debounced)
   const saveToCache = useCallback(() => {
     if (token && !submitted) {
-      saveCachedFormData(token, watchedValues);
+      // Build employment_status from checkboxes for caching
+      const statuses: string[] = [];
+      if (isFreelance) statuses.push('freelance');
+      if (isEmployee) statuses.push('employee');
+      const employmentStatus = statuses.join(',');
+
+      saveCachedFormData(token, {
+        ...watchedValues,
+        employment_status: employmentStatus,
+      });
     }
-  }, [token, watchedValues, submitted]);
+  }, [token, watchedValues, submitted, isFreelance, isEmployee]);
 
   useEffect(() => {
     const timer = setTimeout(saveToCache, 500);
     return () => clearTimeout(timer);
   }, [saveToCache]);
 
-  const employmentStatus = watch('employment_status');
-  const showFreelanceFields = employmentStatus === 'freelance' || employmentStatus === 'both';
-  const showEmployeeFields = employmentStatus === 'employee' || employmentStatus === 'both';
+  // Show salary/TJM fields based on checkbox selection
+  const showFreelanceFields = isFreelance;
+  const showEmployeeFields = isEmployee;
 
   // Submit mutation
   const submitMutation = useMutation({
@@ -241,11 +275,22 @@ export default function PublicApplication() {
       if (!cvFile) throw new Error('CV requis');
       if (!token) throw new Error('Token invalide');
 
+      // Build employment_status from checkboxes
+      const statuses: string[] = [];
+      if (isFreelance) statuses.push('freelance');
+      if (isEmployee) statuses.push('employee');
+
+      if (statuses.length === 0) {
+        throw new Error('Veuillez sélectionner au moins un statut professionnel');
+      }
+
+      const employmentStatus = statuses.join(',');
+
       // Validate salary/TJM based on status
-      if (showFreelanceFields && (!data.tjm_current || !data.tjm_desired)) {
+      if (isFreelance && (!data.tjm_current || !data.tjm_desired)) {
         throw new Error('Veuillez renseigner vos TJM actuel et souhaité');
       }
-      if (showEmployeeFields && (!data.salary_current || !data.salary_desired)) {
+      if (isEmployee && (!data.salary_current || !data.salary_desired)) {
         throw new Error('Veuillez renseigner vos salaires actuel et souhaité');
       }
 
@@ -256,7 +301,7 @@ export default function PublicApplication() {
         phone: data.phone,
         job_title: data.job_title,
         availability: data.availability,
-        employment_status: data.employment_status,
+        employment_status: employmentStatus,
         english_level: data.english_level,
         tjm_current: data.tjm_current || null,
         tjm_desired: data.tjm_desired || null,
@@ -567,25 +612,50 @@ export default function PublicApplication() {
               )}
             </div>
 
-            {/* Employment Status */}
+            {/* Employment Status - Checkboxes */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Statut professionnel *
               </label>
-              <select
-                {...register('employment_status')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">-- Sélectionner --</option>
-                {EMPLOYMENT_STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              {errors.employment_status && (
+              <div className="space-y-2">
+                {/* Freelance checkbox - only show if allowed by contract types */}
+                {allowsFreelance && (
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={isFreelance}
+                      onChange={(e) => setIsFreelance(e.target.checked)}
+                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <div>
+                      <span className="font-medium text-gray-900 dark:text-white">Freelance</span>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Vous êtes indépendant ou souhaitez l'être
+                      </p>
+                    </div>
+                  </label>
+                )}
+                {/* Employee checkbox - only show if allowed by contract types */}
+                {allowsEmployee && (
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={isEmployee}
+                      onChange={(e) => setIsEmployee(e.target.checked)}
+                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <div>
+                      <span className="font-medium text-gray-900 dark:text-white">Salarié</span>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Vous recherchez un contrat CDI ou CDD
+                      </p>
+                    </div>
+                  </label>
+                )}
+              </div>
+              {!isFreelance && !isEmployee && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                  {errors.employment_status.message}
+                  Veuillez sélectionner au moins un statut
                 </p>
               )}
             </div>

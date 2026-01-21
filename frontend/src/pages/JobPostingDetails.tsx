@@ -59,7 +59,6 @@ const EMPLOYMENT_STATUS_OPTIONS = [
   { value: '', label: 'Tous statuts pro' },
   { value: 'freelance', label: 'Freelance' },
   { value: 'employee', label: 'Salarié' },
-  { value: 'both', label: 'Freelance ou Salarié' },
 ];
 
 const AVAILABILITY_OPTIONS = [

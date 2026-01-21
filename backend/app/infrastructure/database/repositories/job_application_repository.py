@@ -173,7 +173,11 @@ class JobApplicationRepository:
         if status:
             query = query.where(JobApplicationModel.status == str(status))
         if employment_status:
-            query = query.where(JobApplicationModel.employment_status == employment_status)
+            # Filter by employment_status, handling comma-separated values
+            # When filtering by "freelance", match "freelance" and "freelance,employee"
+            query = query.where(
+                JobApplicationModel.employment_status.contains(employment_status)
+            )
         if availability:
             query = query.where(JobApplicationModel.availability == availability)
 
@@ -252,7 +256,11 @@ class JobApplicationRepository:
         if status:
             query = query.where(JobApplicationModel.status == str(status))
         if employment_status:
-            query = query.where(JobApplicationModel.employment_status == employment_status)
+            # Filter by employment_status, handling comma-separated values
+            # When filtering by "freelance", match "freelance" and "freelance,employee"
+            query = query.where(
+                JobApplicationModel.employment_status.contains(employment_status)
+            )
         if availability:
             query = query.where(JobApplicationModel.availability == availability)
         result = await self.session.execute(query)

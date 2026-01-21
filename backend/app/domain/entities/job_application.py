@@ -250,12 +250,20 @@ class JobApplication:
 
     @property
     def employment_status_display(self) -> str:
-        """Get employment status as formatted string."""
+        """Get employment status as formatted string.
+
+        Handles both legacy single values and new comma-separated values.
+        """
         labels = {
             "freelance": "Freelance",
             "employee": "Salarié",
             "both": "Freelance ou Salarié",
         }
+        # Handle comma-separated values (e.g., "freelance,employee")
+        if "," in self.employment_status:
+            parts = self.employment_status.split(",")
+            display_parts = [labels.get(p.strip(), p.strip()) for p in parts]
+            return " et ".join(display_parts)
         return labels.get(self.employment_status, self.employment_status)
 
     @property

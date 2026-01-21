@@ -134,6 +134,16 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-01-21
+- **feat(hr)**: Statut professionnel dynamique selon type de contrat
+  - Checkboxes au lieu de dropdown pour le statut professionnel (Freelance / Salarié)
+  - Affichage conditionnel selon les types de contrat de l'annonce :
+    - CDI/CDD → seulement "Salarié" disponible
+    - Freelance/Intercontrat → seulement "Freelance" disponible
+    - Mixte → les deux options disponibles
+  - Possibilité de cocher les deux statuts simultanément
+  - Stockage en format comma-separated ("freelance", "employee", "freelance,employee")
+  - Filtre RH mis à jour pour recherche partielle (LIKE)
+  - Fichiers modifiés : `PublicApplication.tsx`, `JobPostingDetails.tsx`, `job_application.py`, `job_application_repository.py`
 - **feat(hr)**: Évaluation qualité CV (/20) - indépendante de l'offre
   - Score global /20 avec classification (EXCELLENT/BON/MOYEN/FAIBLE)
   - Détection automatique niveau expérience (JUNIOR/CONFIRME/SENIOR)
