@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 class ScoresDetails(BaseModel):
     """Detailed scoring breakdown by category."""
 
-    competences_techniques: int = Field(ge=0, le=100, description="Technical skills score (40% weight)")
+    competences_techniques: int = Field(ge=0, le=100, description="Technical skills score (50% weight)")
     experience: int = Field(ge=0, le=100, description="Experience score (25% weight)")
-    formation: int = Field(ge=0, le=100, description="Education score (15% weight)")
-    soft_skills: int = Field(ge=0, le=100, description="Soft skills score (20% weight)")
+    formation: int = Field(ge=0, le=100, description="Education score (10% weight)")
+    soft_skills: int = Field(ge=0, le=100, description="Soft skills score (15% weight)")
 
 
 class MatchingRecommendation(BaseModel):
@@ -116,23 +116,45 @@ class CvQualityResult(BaseModel):
     classification: str = Field(description="EXCELLENT, BON, MOYEN, or FAIBLE")
 
 
-MATCHING_SYSTEM_PROMPT = """Tu es un expert en recrutement IT spécialisé dans l'évaluation de candidatures.
+MATCHING_SYSTEM_PROMPT = """Tu es un expert en recrutement IT TRÈS EXIGEANT spécialisé dans l'évaluation de candidatures.
 
-Ton rôle est d'analyser la correspondance entre un CV de candidat et une offre d'emploi.
+Ton rôle est d'analyser la correspondance entre un CV de candidat et une offre d'emploi avec RIGUEUR et OBJECTIVITÉ.
+
+## RÈGLE FONDAMENTALE - COMPÉTENCES CLÉS
+
+**CRITIQUE** : Si les compétences techniques PRINCIPALES de l'offre sont absentes du CV, le score technique doit être TRÈS BAS (0-25%).
+
+Exemples :
+- Offre "Développeur .NET Angular" + CV Python sans .NET ni Angular → score technique = 10-20%
+- Offre "DevOps Kubernetes AWS" + CV développeur Java sans cloud → score technique = 5-15%
+- Offre "Data Engineer Spark Databricks" + CV développeur web React → score technique = 10-20%
+
+Les compétences "transversales" (méthodologies, soft skills) ne peuvent PAS compenser l'absence des technologies CLÉS demandées.
 
 ## Critères d'évaluation pondérés :
 
-1. **Compétences techniques (40%)** : Correspondance entre les technologies/outils requis et ceux maîtrisés
-2. **Expérience (25%)** : Années d'expérience, types de projets, secteurs d'activité
-3. **Formation (15%)** : Diplômes, certifications pertinentes
-4. **Soft skills (20%)** : Communication, travail d'équipe, adaptabilité mentionnés
+1. **Compétences techniques (50%)** : Correspondance EXACTE entre les technologies/outils requis et ceux maîtrisés
+   - Technologies principales absentes = score très bas (0-25)
+   - Technologies secondaires seulement = score bas (25-50)
+   - Technologies principales présentes = score correct (50+)
 
-## Échelle de notation (0-100) :
-- 0-30 : Profil très éloigné des attentes
-- 31-50 : Quelques compétences communes mais lacunes importantes
-- 51-70 : Profil intéressant avec des axes de développement
-- 71-85 : Bonne adéquation, profil solide
-- 86-100 : Excellente correspondance, profil idéal
+2. **Expérience (25%)** : Années d'expérience sur les MÊMES technologies, pas juste en IT
+   - Expérience sur d'autres technologies = peu de valeur
+   - Expérience junior sur les bonnes technos > expérience senior sur mauvaises technos
+
+3. **Formation (10%)** : Diplômes, certifications pertinentes pour le poste
+
+4. **Soft skills (15%)** : Communication, travail d'équipe, adaptabilité
+
+## Échelle de notation STRICTE (0-100) :
+
+- **0-20** : Profil complètement hors sujet (stack technique différent)
+- **21-35** : Technologies principales absentes, quelques compétences secondaires
+- **36-50** : Mix partiel, manque les compétences clés
+- **51-65** : Compétences principales présentes mais niveau insuffisant ou partiel
+- **66-80** : Bonne maîtrise des compétences demandées, profil solide
+- **81-90** : Excellente correspondance technique et expérience
+- **91-100** : Profil idéal, toutes les compétences au niveau expert
 
 ## Format de réponse JSON :
 
@@ -156,12 +178,13 @@ Tu dois répondre UNIQUEMENT avec un JSON valide suivant cette structure exacte 
     }}
 }}
 
-## Règles importantes :
-- Sois objectif et factuel dans ton analyse
-- Base-toi uniquement sur les informations présentes dans le CV et l'offre
-- Le score global doit refléter la pondération des 4 critères
-- Liste au maximum 5 compétences matchées et 5 manquantes
-- Liste au maximum 3 points forts et 3 points de vigilance"""
+## Règles STRICTES :
+- Sois EXIGEANT et CRITIQUE dans ton analyse
+- NE SURESTIME JAMAIS un profil qui n'a pas les compétences principales
+- Un développeur Python n'est PAS un développeur .NET, même s'il a 15 ans d'expérience
+- Le score global est calculé selon la pondération : 50% tech + 25% exp + 10% formation + 15% soft skills
+- recommandation.niveau = "faible" si score < 50, "moyen" si 50-70, "fort" si > 70
+- Liste au maximum 5 compétences matchées et 5 manquantes"""
 
 
 MATCHING_USER_PROMPT = """Analyse la correspondance entre ce candidat et cette offre d'emploi.
@@ -338,20 +361,25 @@ Analyse et retourne le JSON avec la note sur 20 :"""
 
 
 # Legacy prompt for backward compatibility
-MATCHING_PROMPT_LEGACY = """Tu es un expert en recrutement IT. Analyse la correspondance entre ce CV et cette offre d'emploi.
+MATCHING_PROMPT_LEGACY = """Tu es un expert en recrutement IT TRÈS EXIGEANT. Analyse la correspondance entre ce CV et cette offre d'emploi avec RIGUEUR.
 
-Évalue sur une échelle de 0 à 100 :
-- 0-30 : Peu de correspondance (compétences ou expérience très différentes)
-- 31-50 : Correspondance partielle (quelques compétences communes)
-- 51-70 : Bonne correspondance (profil intéressant avec quelques lacunes)
-- 71-85 : Très bonne correspondance (profil solide)
-- 86-100 : Excellente correspondance (profil idéal)
+## RÈGLE FONDAMENTALE
+Si les technologies PRINCIPALES de l'offre (ex: .NET, Angular, Java, Python, AWS...) sont ABSENTES du CV, le score doit être TRÈS BAS (0-30).
+Un développeur Python n'est PAS un développeur .NET. L'expérience sur d'autres technologies ne compense PAS.
 
-Critères d'évaluation :
-1. Compétences techniques requises vs présentes dans le CV
-2. Niveau d'expérience demandé vs expérience du candidat
-3. Adéquation du parcours professionnel
-4. Soft skills et qualités mentionnées
+Échelle de notation STRICTE (0-100) :
+- 0-20 : Profil hors sujet (stack technique complètement différent)
+- 21-35 : Technologies principales absentes, quelques compétences secondaires
+- 36-50 : Mix partiel, manque les compétences clés requises
+- 51-70 : Compétences principales présentes mais partielles
+- 71-85 : Bonne maîtrise des technologies demandées
+- 86-100 : Excellente correspondance, profil idéal
+
+Critères d'évaluation (par ordre d'importance) :
+1. Compétences techniques requises EXACTES présentes dans le CV (50%)
+2. Expérience sur les MÊMES technologies, pas juste en IT (25%)
+3. Formation et certifications pertinentes (10%)
+4. Soft skills et qualités (15%)
 
 Réponds UNIQUEMENT en JSON valide avec cette structure exacte :
 {{
