@@ -326,6 +326,16 @@ export const hrApi = {
     );
     return response.data;
   },
+
+  /**
+   * Re-run AI analyses (matching + CV quality) for an application
+   */
+  reanalyzeApplication: async (applicationId: string): Promise<JobApplication> => {
+    const response = await apiClient.post<JobApplication>(
+      `/hr/applications/${applicationId}/reanalyze`
+    );
+    return response.data;
+  },
 };
 
 /**

@@ -304,6 +304,8 @@ class JobApplicationReadModel(BaseModel):
     # CV Quality evaluation (/20)
     cv_quality_score: Optional[float] = None
     cv_quality: Optional[CvQualityReadModel] = None
+    # Read state (separate from status)
+    is_read: bool = False
     status: str
     status_display: str
     status_history: list[StatusChangeReadModel] = []

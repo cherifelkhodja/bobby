@@ -355,23 +355,17 @@ export interface PublishedOpportunityListResponse {
 
 // HR Feature - Job Postings & Applications
 export type JobPostingStatus = 'draft' | 'published' | 'closed';
-export type ApplicationStatus = 'nouveau' | 'vu' | 'en_cours' | 'entretien' | 'accepte' | 'refuse';
+export type ApplicationStatus = 'en_cours' | 'valide' | 'refuse';
 
 export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
-  nouveau: 'Nouveau',
-  vu: 'Vu',
   en_cours: 'En cours',
-  entretien: 'Entretien',
-  accepte: 'Accepté',
+  valide: 'Validé',
   refuse: 'Refusé',
 };
 
 export const APPLICATION_STATUS_COLORS: Record<ApplicationStatus, string> = {
-  nouveau: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  vu: 'bg-gray-100 text-gray-800 dark:bg-gray-700/50 dark:text-gray-300',
   en_cours: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  entretien: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  accepte: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  valide: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
   refuse: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
 };
 
@@ -659,6 +653,8 @@ export interface JobApplication {
   // CV Quality evaluation (/20)
   cv_quality_score: number | null;
   cv_quality: CvQuality | null;
+  // Read state (separate from status)
+  is_read: boolean;
   status: ApplicationStatus;
   status_display: string;
   notes: string | null;

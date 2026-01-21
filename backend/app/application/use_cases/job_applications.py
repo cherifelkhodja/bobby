@@ -383,6 +383,7 @@ class ListApplicationsForPostingUseCase:
             matching_details=matching_details_model,
             cv_quality_score=application.cv_quality_score,
             cv_quality=cv_quality_model,
+            is_read=application.is_read,
             status=str(application.status),
             status_display=application.status.display_name,
             status_history=status_history,
@@ -549,13 +550,9 @@ class GetApplicationUseCase:
         if not application:
             raise JobApplicationNotFoundError(str(application_id))
 
-        # Auto-transition from NOUVEAU to VU when viewed
-        if mark_viewed and application.status == ApplicationStatus.NOUVEAU:
-            application.change_status(
-                new_status=ApplicationStatus.VU,
-                changed_by=viewed_by,
-                comment="Marqué comme vu automatiquement",
-            )
+        # Mark as read when viewed
+        if mark_viewed and not application.is_read:
+            application.mark_as_read()
             application = await self.job_application_repository.save(application)
 
         posting = await self.job_posting_repository.get_by_id(application.job_posting_id)
@@ -630,6 +627,7 @@ class GetApplicationUseCase:
             matching_details=matching_details_model,
             cv_quality_score=application.cv_quality_score,
             cv_quality=cv_quality_model,
+            is_read=application.is_read,
             status=str(application.status),
             status_display=application.status.display_name,
             status_history=status_history,
@@ -768,6 +766,7 @@ class UpdateApplicationStatusUseCase:
             matching_details=matching_details_model,
             cv_quality_score=application.cv_quality_score,
             cv_quality=cv_quality_model,
+            is_read=application.is_read,
             status=str(application.status),
             status_display=application.status.display_name,
             status_history=status_history,
@@ -877,6 +876,7 @@ class UpdateApplicationNoteUseCase:
             matching_details=matching_details_model,
             cv_quality_score=application.cv_quality_score,
             cv_quality=cv_quality_model,
+            is_read=application.is_read,
             status=str(application.status),
             status_display=application.status.display_name,
             status_history=status_history,
@@ -1005,6 +1005,7 @@ class CreateCandidateInBoondUseCase:
             matching_details=matching_details_model,
             cv_quality_score=application.cv_quality_score,
             cv_quality=cv_quality_model,
+            is_read=application.is_read,
             status=str(application.status),
             status_display=application.status.display_name,
             status_history=status_history,
@@ -1035,4 +1036,172 @@ class GetApplicationCvUrlUseCase:
         return await self.s3_client.get_presigned_url(
             key=application.cv_s3_key,
             expires_in=expires_in,
+        )
+
+
+class ReanalyzeApplicationUseCase:
+    """Re-run AI analyses (matching + CV quality) for an application."""
+
+    def __init__(
+        self,
+        job_posting_repository: JobPostingRepository,
+        job_application_repository: JobApplicationRepository,
+        s3_client: S3StorageClient,
+        matching_service: GeminiMatchingService,
+    ) -> None:
+        self.job_posting_repository = job_posting_repository
+        self.job_application_repository = job_application_repository
+        self.s3_client = s3_client
+        self.matching_service = matching_service
+
+    async def execute(self, application_id: UUID) -> JobApplicationReadModel:
+        """Re-run analyses for an application."""
+        import asyncio
+
+        application = await self.job_application_repository.get_by_id(application_id)
+        if not application:
+            raise JobApplicationNotFoundError(str(application_id))
+
+        posting = await self.job_posting_repository.get_by_id(application.job_posting_id)
+        if not posting:
+            raise JobPostingNotFoundError(str(application.job_posting_id))
+
+        # Re-run analyses if CV text is available
+        if application.cv_text:
+            # Build job description for matching
+            job_description = f"""
+{posting.description}
+
+Qualifications requises:
+{posting.qualifications}
+"""
+            # Build TJM range string
+            tjm_range_str = None
+            if application.tjm_current or application.tjm_desired:
+                parts = []
+                if application.tjm_current:
+                    parts.append(f"Actuel: {application.tjm_current}€")
+                if application.tjm_desired:
+                    parts.append(f"Souhaité: {application.tjm_desired}€")
+                tjm_range_str = " / ".join(parts)
+
+            # Run both evaluations in parallel
+            matching_task = self.matching_service.calculate_match_enhanced(
+                cv_text=application.cv_text,
+                job_title_offer=posting.title,
+                job_description=job_description,
+                required_skills=posting.skills,
+                candidate_job_title=application.job_title,
+                candidate_tjm_range=tjm_range_str,
+                candidate_availability=application.availability_display,
+            )
+            quality_task = self.matching_service.evaluate_cv_quality(application.cv_text)
+
+            results = await asyncio.gather(
+                matching_task,
+                quality_task,
+                return_exceptions=True,
+            )
+
+            # Process matching result
+            matching_result = results[0]
+            if not isinstance(matching_result, Exception):
+                matching_score = matching_result.get("score_global", matching_result.get("score", 0))
+                application.matching_score = matching_score
+                application.matching_details = {
+                    "score": matching_score,
+                    "score_global": matching_result.get("score_global", matching_score),
+                    "scores_details": matching_result.get("scores_details", {}),
+                    "competences_matchees": matching_result.get("competences_matchees", []),
+                    "competences_manquantes": matching_result.get("competences_manquantes", []),
+                    "points_forts": matching_result.get("points_forts", []),
+                    "points_vigilance": matching_result.get("points_vigilance", []),
+                    "synthese": matching_result.get("synthese", matching_result.get("summary", "")),
+                    "recommandation": matching_result.get("recommandation", {}),
+                    "strengths": matching_result.get("strengths", matching_result.get("points_forts", [])),
+                    "gaps": matching_result.get("gaps", matching_result.get("competences_manquantes", [])),
+                    "summary": matching_result.get("summary", matching_result.get("synthese", "")),
+                }
+
+            # Process CV quality result
+            quality_result = results[1]
+            if not isinstance(quality_result, Exception):
+                application.cv_quality_score = quality_result.get("note_globale", 0)
+                application.cv_quality = quality_result
+
+            application.updated_at = datetime.utcnow()
+            application = await self.job_application_repository.save(application)
+
+        # Generate presigned URL for CV download
+        cv_download_url = None
+        try:
+            cv_download_url = await self.s3_client.get_presigned_url(
+                key=application.cv_s3_key,
+                expires_in=3600,
+            )
+        except Exception:
+            pass
+
+        return self._to_read_model(application, posting.title, cv_download_url)
+
+    def _to_read_model(
+        self,
+        application: JobApplication,
+        posting_title: Optional[str] = None,
+        cv_download_url: Optional[str] = None,
+    ) -> JobApplicationReadModel:
+        status_history = [
+            StatusChangeReadModel(
+                from_status=str(sh.from_status),
+                to_status=str(sh.to_status),
+                changed_at=sh.changed_at,
+                changed_by=str(sh.changed_by) if sh.changed_by else None,
+                comment=sh.comment,
+            )
+            for sh in application.status_history
+        ]
+
+        matching_details_model = _build_matching_details_model(application.matching_details)
+        cv_quality_model = _build_cv_quality_model(application.cv_quality)
+
+        return JobApplicationReadModel(
+            id=str(application.id),
+            job_posting_id=str(application.job_posting_id),
+            job_posting_title=posting_title,
+            first_name=application.first_name,
+            last_name=application.last_name,
+            full_name=application.full_name,
+            email=application.email,
+            phone=application.phone,
+            job_title=application.job_title,
+            availability=application.availability,
+            availability_display=application.availability_display,
+            employment_status=application.employment_status,
+            employment_status_display=application.employment_status_display,
+            english_level=application.english_level,
+            english_level_display=application.english_level_display,
+            tjm_current=application.tjm_current,
+            tjm_desired=application.tjm_desired,
+            salary_current=application.salary_current,
+            salary_desired=application.salary_desired,
+            tjm_range=application.tjm_range,
+            salary_range=application.salary_range,
+            tjm_min=application.tjm_min,
+            tjm_max=application.tjm_max,
+            availability_date=application.availability_date,
+            cv_s3_key=application.cv_s3_key,
+            cv_filename=application.cv_filename,
+            cv_download_url=cv_download_url,
+            matching_score=application.matching_score,
+            matching_details=matching_details_model,
+            cv_quality_score=application.cv_quality_score,
+            cv_quality=cv_quality_model,
+            is_read=application.is_read,
+            status=str(application.status),
+            status_display=application.status.display_name,
+            status_history=status_history,
+            notes=application.notes,
+            boond_candidate_id=application.boond_candidate_id,
+            created_at=application.created_at,
+            updated_at=application.updated_at,
         )

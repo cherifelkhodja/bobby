@@ -407,7 +407,8 @@ class JobApplicationModel(Base):
     matching_details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     cv_quality_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     cv_quality: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="nouveau", index=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="en_cours", index=True)
     status_history: Mapped[Optional[list]] = mapped_column(JSON, nullable=True, default=list)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     boond_candidate_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -426,6 +427,7 @@ class JobApplicationModel(Base):
         Index("ix_job_applications_job_posting_id", "job_posting_id"),
         Index("ix_job_applications_email_posting", "email", "job_posting_id"),
         Index("ix_job_applications_status", "status"),
+        Index("ix_job_applications_is_read", "is_read"),
     )
 
 

@@ -88,6 +88,7 @@ class JobApplicationRepository:
             model.matching_details = application.matching_details
             model.cv_quality_score = application.cv_quality_score
             model.cv_quality = application.cv_quality
+            model.is_read = application.is_read
             model.status = str(application.status)
             model.status_history = application.status_history
             model.notes = application.notes
@@ -121,6 +122,7 @@ class JobApplicationRepository:
                 matching_details=application.matching_details,
                 cv_quality_score=application.cv_quality_score,
                 cv_quality=application.cv_quality,
+                is_read=application.is_read,
                 status=str(application.status),
                 status_history=application.status_history,
                 notes=application.notes,
@@ -266,18 +268,19 @@ class JobApplicationRepository:
         result = await self.session.execute(query)
         return result.scalar() or 0
 
-    async def count_new_by_posting(self, posting_id: UUID) -> int:
-        """Count new (unread) applications for a job posting."""
+    async def count_unread_by_posting(self, posting_id: UUID) -> int:
+        """Count unread applications for a job posting."""
         result = await self.session.execute(
             select(func.count(JobApplicationModel.id)).where(
                 JobApplicationModel.job_posting_id == posting_id,
-                JobApplicationModel.status == str(ApplicationStatus.NOUVEAU),
+                JobApplicationModel.is_read == False,  # noqa: E712
             )
         )
         return result.scalar() or 0
 
     async def get_stats_by_posting(self, posting_id: UUID) -> dict[str, int]:
-        """Get application statistics for a job posting (by status)."""
+        """Get application statistics for a job posting (by status and read state)."""
+        # Get counts by status
         result = await self.session.execute(
             select(
                 JobApplicationModel.status,
@@ -289,8 +292,18 @@ class JobApplicationRepository:
         stats = {str(s): 0 for s in ApplicationStatus}
         for status, count in result.all():
             stats[status] = count
+
+        # Get unread count
+        unread_result = await self.session.execute(
+            select(func.count(JobApplicationModel.id)).where(
+                JobApplicationModel.job_posting_id == posting_id,
+                JobApplicationModel.is_read == False,  # noqa: E712
+            )
+        )
+        stats["unread"] = unread_result.scalar() or 0
+
         # Add total count
-        stats["total"] = sum(stats.values())
+        stats["total"] = sum(v for k, v in stats.items() if k != "unread")
         return stats
 
     def _to_entity(self, model: JobApplicationModel) -> JobApplication:
@@ -322,6 +335,7 @@ class JobApplicationRepository:
             matching_details=model.matching_details,
             cv_quality_score=model.cv_quality_score,
             cv_quality=model.cv_quality,
+            is_read=model.is_read if hasattr(model, 'is_read') else False,
             status=ApplicationStatus(model.status),
             status_history=model.status_history or [],
             notes=model.notes,

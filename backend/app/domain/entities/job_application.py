@@ -10,11 +10,8 @@ from uuid import UUID, uuid4
 class ApplicationStatus(str, Enum):
     """Application status lifecycle (French names for display)."""
 
-    NOUVEAU = "nouveau"
-    VU = "vu"
     EN_COURS = "en_cours"
-    ENTRETIEN = "entretien"
-    ACCEPTE = "accepte"
+    VALIDE = "valide"
     REFUSE = "refuse"
 
     def __str__(self) -> str:
@@ -24,11 +21,8 @@ class ApplicationStatus(str, Enum):
     def display_name(self) -> str:
         """Human-readable status name in French."""
         names = {
-            ApplicationStatus.NOUVEAU: "Nouveau",
-            ApplicationStatus.VU: "Vu",
             ApplicationStatus.EN_COURS: "En cours",
-            ApplicationStatus.ENTRETIEN: "Entretien",
-            ApplicationStatus.ACCEPTE: "Accepté",
+            ApplicationStatus.VALIDE: "Validé",
             ApplicationStatus.REFUSE: "Refusé",
         }
         return names[self]
@@ -36,44 +30,27 @@ class ApplicationStatus(str, Enum):
     @property
     def is_final(self) -> bool:
         """Check if status is final (no more transitions)."""
-        return self in (ApplicationStatus.ACCEPTE, ApplicationStatus.REFUSE)
+        return self in (ApplicationStatus.VALIDE, ApplicationStatus.REFUSE)
 
     @property
     def is_positive_final(self) -> bool:
         """Check if status is a positive final outcome."""
-        return self == ApplicationStatus.ACCEPTE
+        return self == ApplicationStatus.VALIDE
 
     def can_transition_to(self, new_status: "ApplicationStatus") -> bool:
         """Check if transition to new status is valid.
 
         State machine:
-        - NOUVEAU → VU, EN_COURS, REFUSE
-        - VU → EN_COURS, REFUSE
-        - EN_COURS → ENTRETIEN, ACCEPTE, REFUSE
-        - ENTRETIEN → ACCEPTE, REFUSE
-        - ACCEPTE → (final)
+        - EN_COURS → VALIDE, REFUSE
+        - VALIDE → (final)
         - REFUSE → (final)
         """
         valid_transitions: dict[ApplicationStatus, set[ApplicationStatus]] = {
-            ApplicationStatus.NOUVEAU: {
-                ApplicationStatus.VU,
-                ApplicationStatus.EN_COURS,
-                ApplicationStatus.REFUSE,
-            },
-            ApplicationStatus.VU: {
-                ApplicationStatus.EN_COURS,
-                ApplicationStatus.REFUSE,
-            },
             ApplicationStatus.EN_COURS: {
-                ApplicationStatus.ENTRETIEN,
-                ApplicationStatus.ACCEPTE,
+                ApplicationStatus.VALIDE,
                 ApplicationStatus.REFUSE,
             },
-            ApplicationStatus.ENTRETIEN: {
-                ApplicationStatus.ACCEPTE,
-                ApplicationStatus.REFUSE,
-            },
-            ApplicationStatus.ACCEPTE: set(),
+            ApplicationStatus.VALIDE: set(),
             ApplicationStatus.REFUSE: set(),
         }
         return new_status in valid_transitions.get(self, set())
@@ -197,8 +174,11 @@ class JobApplication:
     cv_quality_score: Optional[float] = None  # 0-20
     cv_quality: Optional[dict[str, Any]] = None
 
+    # Read/unread state (separate from status workflow)
+    is_read: bool = False
+
     # Status workflow
-    status: ApplicationStatus = ApplicationStatus.NOUVEAU
+    status: ApplicationStatus = ApplicationStatus.EN_COURS
     status_history: list[dict] = field(default_factory=list)
 
     # RH notes
@@ -314,12 +294,24 @@ class JobApplication:
         self.matching_details = details
         self.updated_at = datetime.utcnow()
 
+    def mark_as_read(self) -> bool:
+        """Mark application as read.
+
+        Returns:
+            True if state changed, False if already read
+        """
+        if self.is_read:
+            return False
+        self.is_read = True
+        self.updated_at = datetime.utcnow()
+        return True
+
     def change_status(
         self,
         new_status: ApplicationStatus,
         changed_by: Optional[UUID] = None,
         comment: Optional[str] = None,
-    ) -> None:
+    ) -> bool:
         """Change application status with validation.
 
         Args:
@@ -327,9 +319,15 @@ class JobApplication:
             changed_by: User ID who made the change
             comment: Optional comment for the status change
 
+        Returns:
+            True if status changed successfully
+
         Raises:
             ValueError: If transition is not allowed
         """
+        if self.status == new_status:
+            return False
+
         if not self.status.can_transition_to(new_status):
             raise ValueError(
                 f"Transition de statut invalide: {self.status.display_name} → {new_status.display_name}"
@@ -346,6 +344,7 @@ class JobApplication:
         self.status_history.append(status_change.to_dict())
         self.status = new_status
         self.updated_at = datetime.utcnow()
+        return True
 
     def add_note(self, note: str) -> None:
         """Add or replace RH notes.

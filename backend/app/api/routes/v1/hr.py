@@ -19,6 +19,7 @@ from app.application.use_cases.job_applications import (
     GetApplicationCvUrlUseCase,
     GetApplicationUseCase,
     ListApplicationsForPostingUseCase,
+    ReanalyzeApplicationUseCase,
     UpdateApplicationNoteUseCase,
     UpdateApplicationStatusCommand,
     UpdateApplicationStatusUseCase,
@@ -1007,6 +1008,39 @@ async def update_application_note(
         )
     except JobApplicationNotFoundError:
         raise HTTPException(status_code=404, detail="Candidature non trouvée")
+
+
+@router.post(
+    "/applications/{application_id}/reanalyze",
+    response_model=JobApplicationReadModel,
+)
+async def reanalyze_application(
+    application_id: str,
+    db: DbSession,
+    app_settings: AppSettings,
+    authorization: str = Header(default=""),
+):
+    """Re-run AI analyses (matching + CV quality) for an application."""
+    await require_hr_access(db, authorization)
+
+    job_posting_repo = JobPostingRepository(db)
+    job_application_repo = JobApplicationRepository(db)
+    s3_client = S3StorageClient(app_settings)
+    matching_service = GeminiMatchingService(app_settings)
+
+    use_case = ReanalyzeApplicationUseCase(
+        job_posting_repository=job_posting_repo,
+        job_application_repository=job_application_repo,
+        s3_client=s3_client,
+        matching_service=matching_service,
+    )
+
+    try:
+        return await use_case.execute(UUID(application_id))
+    except JobApplicationNotFoundError:
+        raise HTTPException(status_code=404, detail="Candidature non trouvée")
+    except JobPostingNotFoundError:
+        raise HTTPException(status_code=404, detail="Annonce non trouvée")
 
 
 @router.get(

@@ -117,8 +117,10 @@ interface ApplicationDetailContentProps {
   handleStatusChange: () => void;
   handleNoteUpdate: (application: JobApplication) => void;
   handleDownloadCv: (application: JobApplication) => void;
+  handleReanalyze: (application: JobApplication) => void;
   updateStatusMutation: { isPending: boolean };
   updateNoteMutation: { isPending: boolean };
+  reanalyzeMutation: { isPending: boolean };
   compact?: boolean;
 }
 
@@ -131,8 +133,10 @@ function ApplicationDetailContent({
   handleStatusChange,
   handleNoteUpdate,
   handleDownloadCv,
+  handleReanalyze,
   updateStatusMutation,
   updateNoteMutation,
+  reanalyzeMutation,
   compact = false,
 }: ApplicationDetailContentProps) {
   const gridCols = compact ? 'grid-cols-3' : 'grid-cols-2';
@@ -372,6 +376,19 @@ function ApplicationDetailContent({
           <Download className="h-3.5 w-3.5" />
           Télécharger CV
         </button>
+        <button
+          onClick={() => handleReanalyze(application)}
+          disabled={reanalyzeMutation.isPending}
+          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 font-medium rounded-lg transition-colors disabled:opacity-50"
+          title="Relancer l'analyse IA (matching + qualité CV)"
+        >
+          {reanalyzeMutation.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="h-3.5 w-3.5" />
+          )}
+          Re-analyser
+        </button>
         <p className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[150px]">
           {application.cv_filename}
         </p>
@@ -491,6 +508,20 @@ export default function JobPostingDetails() {
     },
   });
 
+  // Reanalyze application (matching + CV quality)
+  const reanalyzeMutation = useMutation({
+    mutationFn: (applicationId: string) => hrApi.reanalyzeApplication(applicationId),
+    onSuccess: (updatedApplication) => {
+      refetchApplications();
+      setSelectedApplication(updatedApplication);
+    },
+  });
+
+  // Handle reanalyze
+  const handleReanalyze = (application: JobApplication) => {
+    reanalyzeMutation.mutate(application.id);
+  };
+
   // Download CV
   const handleDownloadCv = async (application: JobApplication) => {
     try {
@@ -550,14 +581,14 @@ export default function JobPostingDetails() {
     setExpandedRowId(null);
   };
 
-  // Mark as viewed without opening modal (for bulk action)
-  const handleMarkAsViewed = async (application: JobApplication) => {
-    if (application.status !== 'nouveau') return;
+  // Mark as read without opening modal (for bulk action)
+  const handleMarkAsRead = async (application: JobApplication) => {
+    if (application.is_read) return;
     try {
       await hrApi.getApplication(application.id, true);
       refetchApplications();
     } catch (error) {
-      console.error('Error marking as viewed:', error);
+      console.error('Error marking as read:', error);
     }
   };
 
@@ -959,16 +990,21 @@ export default function JobPostingDetails() {
                         }`}
                       >
                         <td className="py-2 px-3">
-                          <div>
-                            <p className="font-medium text-gray-900 dark:text-white">
-                              {application.full_name}
-                            </p>
-                            <p className="text-gray-500 dark:text-gray-400">
-                              {application.job_title}
-                            </p>
-                            <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                              {application.email}
-                            </p>
+                          <div className="flex items-start gap-2">
+                            {!application.is_read && (
+                              <span className="mt-1.5 w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" title="Non lu" />
+                            )}
+                            <div>
+                              <p className="font-medium text-gray-900 dark:text-white">
+                                {application.full_name}
+                              </p>
+                              <p className="text-gray-500 dark:text-gray-400">
+                                {application.job_title}
+                              </p>
+                              <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                                {application.email}
+                              </p>
+                            </div>
                           </div>
                         </td>
                         <td className="py-2 px-3">
@@ -1112,11 +1148,11 @@ export default function JobPostingDetails() {
                             >
                               <Download className="h-4 w-4" />
                             </button>
-                            {application.status === 'nouveau' && (
+                            {!application.is_read && (
                               <button
-                                onClick={() => handleMarkAsViewed(application)}
+                                onClick={() => handleMarkAsRead(application)}
                                 className="p-1.5 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
-                                title="Marquer comme vu"
+                                title="Marquer comme lu"
                               >
                                 <CheckCircle className="h-4 w-4" />
                               </button>
@@ -1153,8 +1189,10 @@ export default function JobPostingDetails() {
                                 handleStatusChange={handleStatusChange}
                                 handleNoteUpdate={handleNoteUpdate}
                                 handleDownloadCv={handleDownloadCv}
+                                handleReanalyze={handleReanalyze}
                                 updateStatusMutation={updateStatusMutation}
                                 updateNoteMutation={updateNoteMutation}
+                                reanalyzeMutation={reanalyzeMutation}
                                 compact
                               />
                             </div>
@@ -1194,8 +1232,10 @@ export default function JobPostingDetails() {
               handleStatusChange={handleStatusChange}
               handleNoteUpdate={handleNoteUpdate}
               handleDownloadCv={handleDownloadCv}
+              handleReanalyze={handleReanalyze}
               updateStatusMutation={updateStatusMutation}
               updateNoteMutation={updateNoteMutation}
+              reanalyzeMutation={reanalyzeMutation}
             />
           </div>
         </div>
@@ -1231,8 +1271,10 @@ export default function JobPostingDetails() {
               handleStatusChange={handleStatusChange}
               handleNoteUpdate={handleNoteUpdate}
               handleDownloadCv={handleDownloadCv}
+              handleReanalyze={handleReanalyze}
               updateStatusMutation={updateStatusMutation}
               updateNoteMutation={updateNoteMutation}
+              reanalyzeMutation={reanalyzeMutation}
             />
           </div>
         </>
@@ -1261,8 +1303,10 @@ export default function JobPostingDetails() {
             handleStatusChange={handleStatusChange}
             handleNoteUpdate={handleNoteUpdate}
             handleDownloadCv={handleDownloadCv}
+            handleReanalyze={handleReanalyze}
             updateStatusMutation={updateStatusMutation}
             updateNoteMutation={updateNoteMutation}
+            reanalyzeMutation={reanalyzeMutation}
             compact
           />
         </div>
