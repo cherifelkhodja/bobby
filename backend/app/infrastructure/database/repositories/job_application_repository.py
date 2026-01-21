@@ -146,22 +146,75 @@ class JobApplicationRepository:
         skip: int = 0,
         limit: int = 100,
         status: Optional[ApplicationStatus] = None,
-        sort_by_score: bool = True,
+        employment_status: Optional[str] = None,
+        availability: Optional[str] = None,
+        sort_by: str = "score",  # score, tjm, salary, date
+        sort_order: str = "desc",  # asc, desc
     ) -> list[JobApplication]:
-        """List applications for a job posting with optional status filter."""
+        """List applications for a job posting with optional filters and sorting.
+
+        Args:
+            posting_id: Job posting UUID
+            skip: Number of records to skip
+            limit: Maximum number of records
+            status: Filter by application status
+            employment_status: Filter by employment status (freelance, employee, both)
+            availability: Filter by availability (asap, 1_month, 2_months, 3_months, more_3_months)
+            sort_by: Sort field (score, tjm, salary, date)
+            sort_order: Sort direction (asc, desc)
+        """
         query = select(JobApplicationModel).where(
             JobApplicationModel.job_posting_id == posting_id
         )
         if status:
             query = query.where(JobApplicationModel.status == str(status))
+        if employment_status:
+            query = query.where(JobApplicationModel.employment_status == employment_status)
+        if availability:
+            query = query.where(JobApplicationModel.availability == availability)
 
-        if sort_by_score:
-            query = query.order_by(
-                JobApplicationModel.matching_score.desc().nullslast(),
-                JobApplicationModel.created_at.desc(),
+        # Build sort expression
+        if sort_by == "tjm":
+            # Sort by tjm_desired, fallback to tjm_current
+            sort_col = func.coalesce(
+                JobApplicationModel.tjm_desired,
+                JobApplicationModel.tjm_current,
             )
+        elif sort_by == "salary":
+            # Sort by salary_desired, fallback to salary_current
+            sort_col = func.coalesce(
+                JobApplicationModel.salary_desired,
+                JobApplicationModel.salary_current,
+            )
+        elif sort_by == "date":
+            sort_col = JobApplicationModel.created_at
         else:
-            query = query.order_by(JobApplicationModel.created_at.desc())
+            # Default: sort by score
+            sort_col = JobApplicationModel.matching_score
+
+        # Apply sort order
+        if sort_order == "asc":
+            if sort_by == "score":
+                query = query.order_by(
+                    sort_col.asc().nullslast(),
+                    JobApplicationModel.created_at.desc(),
+                )
+            else:
+                query = query.order_by(
+                    sort_col.asc().nullslast(),
+                    JobApplicationModel.created_at.desc(),
+                )
+        else:
+            if sort_by == "score":
+                query = query.order_by(
+                    sort_col.desc().nullslast(),
+                    JobApplicationModel.created_at.desc(),
+                )
+            else:
+                query = query.order_by(
+                    sort_col.desc().nullslast(),
+                    JobApplicationModel.created_at.desc(),
+                )
 
         query = query.offset(skip).limit(limit)
         result = await self.session.execute(query)
@@ -185,13 +238,19 @@ class JobApplicationRepository:
         self,
         posting_id: UUID,
         status: Optional[ApplicationStatus] = None,
+        employment_status: Optional[str] = None,
+        availability: Optional[str] = None,
     ) -> int:
-        """Count applications for a job posting with optional status filter."""
+        """Count applications for a job posting with optional filters."""
         query = select(func.count(JobApplicationModel.id)).where(
             JobApplicationModel.job_posting_id == posting_id
         )
         if status:
             query = query.where(JobApplicationModel.status == str(status))
+        if employment_status:
+            query = query.where(JobApplicationModel.employment_status == employment_status)
+        if availability:
+            query = query.where(JobApplicationModel.availability == availability)
         result = await self.session.execute(query)
         return result.scalar() or 0
 

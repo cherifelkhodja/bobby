@@ -202,9 +202,23 @@ class ListApplicationsForPostingUseCase:
         page: int = 1,
         page_size: int = 20,
         status: Optional[ApplicationStatus] = None,
-        sort_by_score: bool = True,
+        employment_status: Optional[str] = None,
+        availability: Optional[str] = None,
+        sort_by: str = "score",
+        sort_order: str = "desc",
     ) -> JobApplicationListReadModel:
-        """List applications for a job posting."""
+        """List applications for a job posting.
+
+        Args:
+            posting_id: Job posting UUID
+            page: Page number (1-indexed)
+            page_size: Number of items per page
+            status: Filter by application status
+            employment_status: Filter by employment status (freelance, employee, both)
+            availability: Filter by availability (asap, 1_month, 2_months, 3_months, more_3_months)
+            sort_by: Sort field (score, tjm, salary, date)
+            sort_order: Sort direction (asc, desc)
+        """
         # Verify posting exists
         posting = await self.job_posting_repository.get_by_id(posting_id)
         if not posting:
@@ -217,11 +231,16 @@ class ListApplicationsForPostingUseCase:
             skip=skip,
             limit=page_size,
             status=status,
-            sort_by_score=sort_by_score,
+            employment_status=employment_status,
+            availability=availability,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
         total = await self.job_application_repository.count_by_posting(
             posting_id=posting_id,
             status=status,
+            employment_status=employment_status,
+            availability=availability,
         )
         stats = await self.job_application_repository.get_stats_by_posting(posting_id)
 

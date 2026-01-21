@@ -245,7 +245,7 @@ export const hrApi = {
   // ========== Applications ==========
 
   /**
-   * Get list of applications for a job posting
+   * Get list of applications for a job posting with filters and sorting
    */
   getApplications: async (
     postingId: string,
@@ -253,7 +253,10 @@ export const hrApi = {
       page?: number;
       page_size?: number;
       status?: ApplicationStatus;
-      sort_by_score?: boolean;
+      employment_status?: string;  // freelance, employee, both
+      availability?: string;       // asap, 1_month, 2_months, 3_months, more_3_months
+      sort_by?: string;            // score, tjm, salary, date
+      sort_order?: string;         // asc, desc
     }
   ): Promise<JobApplicationListResponse> => {
     const response = await apiClient.get<JobApplicationListResponse>(

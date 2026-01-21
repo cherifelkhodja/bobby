@@ -48,12 +48,42 @@ const JOB_POSTING_STATUS_BADGES = {
   },
 };
 
+const EMPLOYMENT_STATUS_OPTIONS = [
+  { value: '', label: 'Tous statuts pro' },
+  { value: 'freelance', label: 'Freelance' },
+  { value: 'employee', label: 'Salarié' },
+  { value: 'both', label: 'Freelance ou Salarié' },
+];
+
+const AVAILABILITY_OPTIONS = [
+  { value: '', label: 'Toutes dispos' },
+  { value: 'asap', label: 'ASAP' },
+  { value: '1_month', label: 'Sous 1 mois' },
+  { value: '2_months', label: 'Sous 2 mois' },
+  { value: '3_months', label: 'Sous 3 mois' },
+  { value: 'more_3_months', label: '+3 mois' },
+];
+
+const SORT_OPTIONS = [
+  { value: 'score', label: 'Score matching' },
+  { value: 'tjm', label: 'TJM' },
+  { value: 'salary', label: 'Salaire' },
+  { value: 'date', label: 'Date candidature' },
+];
+
 export default function JobPostingDetails() {
   const { postingId } = useParams<{ postingId: string }>();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  // Filter state
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | ''>('');
+  const [employmentStatusFilter, setEmploymentStatusFilter] = useState('');
+  const [availabilityFilter, setAvailabilityFilter] = useState('');
+  // Sort state
+  const [sortBy, setSortBy] = useState('score');
+  const [sortOrder, setSortOrder] = useState('desc');
+  // Modal state
   const [selectedApplication, setSelectedApplication] = useState<JobApplication | null>(null);
   const [noteText, setNoteText] = useState('');
   const [newStatus, setNewStatus] = useState<ApplicationStatus | ''>('');
@@ -76,10 +106,14 @@ export default function JobPostingDetails() {
     isLoading: loadingApplications,
     refetch: refetchApplications,
   } = useQuery({
-    queryKey: ['hr-job-applications', postingId, statusFilter],
+    queryKey: ['hr-job-applications', postingId, statusFilter, employmentStatusFilter, availabilityFilter, sortBy, sortOrder],
     queryFn: () =>
       hrApi.getApplications(postingId!, {
         status: statusFilter || undefined,
+        employment_status: employmentStatusFilter || undefined,
+        availability: availabilityFilter || undefined,
+        sort_by: sortBy,
+        sort_order: sortOrder,
         page_size: 100,
       }),
     enabled: !!postingId,
@@ -420,20 +454,73 @@ export default function JobPostingDetails() {
 
       {/* Applications List */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Candidatures</h2>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as ApplicationStatus | '')}
-            className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          >
-            <option value="">Tous les statuts</option>
-            {Object.entries(APPLICATION_STATUS_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Candidatures</h2>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {applicationsData?.total || 0} résultat{(applicationsData?.total || 0) > 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Status filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as ApplicationStatus | '')}
+              className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="">Tous statuts</option>
+              {Object.entries(APPLICATION_STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            {/* Employment status filter */}
+            <select
+              value={employmentStatusFilter}
+              onChange={(e) => setEmploymentStatusFilter(e.target.value)}
+              className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              {EMPLOYMENT_STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            {/* Availability filter */}
+            <select
+              value={availabilityFilter}
+              onChange={(e) => setAvailabilityFilter(e.target.value)}
+              className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              {AVAILABILITY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            {/* Separator */}
+            <span className="text-gray-300 dark:text-gray-600">|</span>
+            {/* Sort */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  Tri: {opt.label}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+              className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600"
+              title={sortOrder === 'desc' ? 'Décroissant' : 'Croissant'}
+            >
+              {sortOrder === 'desc' ? '↓' : '↑'}
+            </button>
+          </div>
         </div>
 
         {loadingApplications ? (
@@ -446,60 +533,60 @@ export default function JobPostingDetails() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900/50">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     Candidat
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     TJM
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     Disponibilité
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     Matching
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     Statut
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="text-right py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {applicationsData?.items.map((application) => (
                   <tr
                     key={application.id}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                   >
-                    <td className="px-6 py-4">
+                    <td className="py-2 px-3">
                       <div>
                         <p className="font-medium text-gray-900 dark:text-white">
                           {application.full_name}
                         </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-gray-500 dark:text-gray-400">
                           {application.job_title}
                         </p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500">
                           {application.email}
                         </p>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="py-2 px-3">
                       <p className="text-gray-900 dark:text-white">{application.tjm_range}</p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="py-2 px-3">
                       <p className="text-gray-900 dark:text-white">
                         {application.availability_display || application.availability || '-'}
                       </p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="py-2 px-3">
                       {application.matching_score !== null ? (
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium ${getMatchingScoreColor(
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getMatchingScoreColor(
                             application.matching_score
                           )}`}
                         >
@@ -509,16 +596,16 @@ export default function JobPostingDetails() {
                         <span className="text-gray-500 dark:text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="py-2 px-3">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
                           APPLICATION_STATUS_COLORS[application.status as ApplicationStatus]
                         }`}
                       >
                         {APPLICATION_STATUS_LABELS[application.status as ApplicationStatus]}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="py-2 px-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleDownloadCv(application)}

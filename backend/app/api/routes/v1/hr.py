@@ -856,11 +856,14 @@ async def list_applications_for_posting(
     app_settings: AppSettings,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    status: Optional[str] = Query(None),
-    sort_by_score: bool = Query(True),
+    status: Optional[str] = Query(None, description="Filter by application status"),
+    employment_status: Optional[str] = Query(None, description="Filter by employment status (freelance, employee, both)"),
+    availability: Optional[str] = Query(None, description="Filter by availability (asap, 1_month, 2_months, 3_months, more_3_months)"),
+    sort_by: str = Query("score", description="Sort field (score, tjm, salary, date)"),
+    sort_order: str = Query("desc", description="Sort direction (asc, desc)"),
     authorization: str = Header(default=""),
 ):
-    """List applications for a job posting."""
+    """List applications for a job posting with filters and sorting."""
     await require_hr_access(db, authorization)
 
     job_posting_repo = JobPostingRepository(db)
@@ -881,7 +884,10 @@ async def list_applications_for_posting(
             page=page,
             page_size=page_size,
             status=status_enum,
-            sort_by_score=sort_by_score,
+            employment_status=employment_status,
+            availability=availability,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
     except JobPostingNotFoundError:
         raise HTTPException(status_code=404, detail="Annonce non trouvée")
