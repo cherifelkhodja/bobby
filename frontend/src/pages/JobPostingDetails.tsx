@@ -694,20 +694,20 @@ export default function JobPostingDetails() {
       )}
 
       {/* Applications List */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-visible">
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 relative z-10">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Candidatures</h2>
             <span className="text-xs text-gray-500 dark:text-gray-400">
               {applicationsData?.total || 0} résultat{(applicationsData?.total || 0) > 1 ? 's' : ''}
             </span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 relative">
             {/* Status filter */}
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as ApplicationStatus | '')}
-              className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="filter-select"
             >
               <option value="">Tous statuts</option>
               {Object.entries(APPLICATION_STATUS_LABELS).map(([value, label]) => (
@@ -720,7 +720,7 @@ export default function JobPostingDetails() {
             <select
               value={employmentStatusFilter}
               onChange={(e) => setEmploymentStatusFilter(e.target.value)}
-              className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="filter-select"
             >
               {EMPLOYMENT_STATUS_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -732,7 +732,7 @@ export default function JobPostingDetails() {
             <select
               value={availabilityFilter}
               onChange={(e) => setAvailabilityFilter(e.target.value)}
-              className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="filter-select"
             >
               {AVAILABILITY_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -746,7 +746,7 @@ export default function JobPostingDetails() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="filter-select"
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
