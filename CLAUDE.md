@@ -141,25 +141,12 @@ class UserRole(str, Enum):
 ## Key Features Implemented
 
 ### 1. BoondManager Integration
-- **Client**: `backend/app/infrastructure/boond/client.py`
-- Fetch opportunities, resources (employees), agencies
-- Resource filtering by state (0=Sortie, 1=En cours, 2=Intercontrat, 3=Arrivée prochaine, 7=Sortie prochaine)
-- Resource type to role mapping:
-  - Types 0, 1, 10 → `user` (Consultant)
-  - Type 2 → `commercial`
-  - Types 5, 6 → `rh` (RH, Direction RH)
-- Retry logic (3 attempts, exponential backoff)
-- Basic auth, timeout 5s
+> **Détails complets** : `docs/api/boondmanager.md`
 
-**Methods**:
-- `get_opportunities()` - Fetch all opportunities
-- `get_opportunity(external_id)` - Get single opportunity
-- `get_resources()` - Fetch employees (pagination 500 max)
-- `get_manager_opportunities(manager_id)` - For commercials
-- `get_hr_manager_opportunities(manager_id)` - For HR recruitment
-- `create_candidate(candidate)` - Create candidate
-- `create_positioning(candidate_id, opportunity_id)` - Create positioning
-- `health_check()` - Simple GET /candidates ping
+- **Client** : `backend/app/infrastructure/boond/client.py`
+- Fetch opportunities, resources, agencies
+- Create candidates and positionings
+- Retry logic (3 attempts, exponential backoff)
 
 ### 2. Invitation System
 - Admin invites users from BoondManager resources list
@@ -293,9 +280,11 @@ Generate quotations for Thales using BoondManager data and Excel templates.
 - `sow_reference`, `object_of_need` - SOW info
 
 ### 9. HR Recruitment (Turnover-IT Integration)
+> **API Turnover-IT** : `docs/api/turnoverit.md`
+
 Full HR recruitment feature for publishing job postings and managing applications.
 
-**Access**: admin, rh (HR routes), public (application form)
+**Access** : admin, rh (HR routes), public (application form)
 
 **Features**:
 - View opportunities from BoondManager (admin: all, rh: HR manager filtered)
@@ -1007,38 +996,15 @@ interface BoondResource {
 }
 ```
 
-## BoondManager Hardcoded Values
+## BoondManager Integration
 
-```python
-RESOURCE_TYPE_NAMES = {
-    0: "Consultant",
-    1: "Consultant",
-    2: "Commercial",
-    5: "RH",
-    6: "Direction RH",
-    10: "Consultant",
-}
+> **Voir `docs/api/boondmanager.md`** pour les détails complets (endpoints, mapping, hardcoded values).
 
-AGENCY_NAMES = {
-    1: "Gemini",
-    5: "Craftmania",
-}
+**Client** : `backend/app/infrastructure/boond/client.py`
 
-RESOURCE_STATE_NAMES = {
-    0: "Sortie",
-    1: "En cours",
-    2: "Intercontrat",
-    3: "Arrivée prochaine",
-    7: "Sortie prochaine",
-}
-
-ACTIVE_OPPORTUNITY_STATES = [0, 5, 6, 7, 10]
-# 0: Piste identifiée
-# 5: En cours
-# 6: Récurrent
-# 7: AO ouvert
-# 10: Besoin en avant de phase
-```
+**Mapping rapide** :
+- Resource types 0, 1, 10 → `user` | Type 2 → `commercial` | Types 5, 6 → `rh`
+- States : 0=Sortie, 1=En cours, 2=Intercontrat, 3=Arrivée prochaine, 7=Sortie prochaine
 
 ## Common Commands
 
@@ -1138,84 +1104,6 @@ dependencies = [
 }
 ```
 
-## Technical Debt
+## Technical Debt & Changelog
 
-### Google Gemini SDK Migration
-- **Current**: `google-generativeai` (deprecated)
-- **Target**: `google-genai`
-- **Files**: `gemini_client.py`, `gemini_anonymizer.py`, `gemini_matcher.py`
-- **Priority**: Medium
-- **Reference**: https://github.com/google-gemini/deprecated-generative-ai-python
-
-## Architectural Patterns
-
-1. **Layered Architecture**: API → Use Cases → Domain → Infrastructure
-2. **Repository Pattern**: Data access abstraction
-3. **Value Objects**: Strongly-typed enums (UserRole, CooptationStatus, etc.)
-4. **Dependency Injection**: Factory functions, type hints
-5. **Async/Await**: Fully async with asyncio, httpx, aioboto3
-6. **CQRS-like**: Read models separate from domain entities
-7. **Domain-Driven Design**: Rich entities with business logic
-8. **Event-driven**: Email notifications for events
-
-## Recent Changes Log
-
-### 2026-01-19
-- Updated CLAUDE.md with comprehensive documentation
-
-### 2026-01-18
-**Security Hardening Implementation**:
-- Added rate limiting with slowapi and Redis backend
-- Added security headers middleware (HSTS, CSP, X-Frame-Options, etc.)
-- Implemented Row Level Security (RLS) on PostgreSQL tables
-- Added structured audit logging for security events
-
-**Files created**:
-- `backend/app/api/middleware/rate_limiter.py`
-- `backend/app/api/middleware/security_headers.py`
-- `backend/app/api/middleware/rls_context.py`
-- `backend/app/infrastructure/audit/logger.py`
-- `backend/alembic/versions/010_add_row_level_security.py`
-- `backend/alembic/versions/011_add_turnoverit_skills_table.py`
-- `backend/alembic/versions/012_add_app_settings_table.py`
-- `backend/alembic/versions/013_add_turnoverit_skills_table.py`
-
-### 2026-01-17
-**HR Opportunities from BoondManager**:
-- Changed HR opportunity listing to fetch from BoondManager API
-- Admin: ALL opportunities, RH: HR manager filtered
-- Added Boond state display with colored badges
-- Added efficient batch lookup for job posting status
-
-**HR Feature Review & Quality**:
-- Added comprehensive backend tests
-- Added frontend tests
-- Added E2E tests
-- Updated dependencies
-
-### 2026-01-15
-**Published Opportunities Feature**:
-- Created migration for published_opportunities table
-- Added AI anonymization with Gemini
-- Created dedicated detail page
-- Added cooptation support from detail page
-
-**Quotation Generator Fixes**:
-- Fixed Redis serialization
-- Fixed template PDF collision
-- Fixed background task garbage collection
-- Added delete quotation functionality
-
-### 2026-01-14
-- Added phone number support
-- Added user details modal in Admin
-- Fixed CV Transformer "none:" prefix
-- Added state filter to BoondManager resources
-- Added delete user functionality
-
-### 2026-01-13
-- Added CV Transformer feature
-- Added BoondManager resources endpoint
-- Redesigned InvitationsTab
-- Added dark mode support
-- Created `rh` role
+> **Voir `MEMORY.md`** pour la dette technique, les ADRs et l'historique complet des changements.
