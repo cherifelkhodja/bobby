@@ -6,7 +6,7 @@
  * - For RH users: Shows only opportunities where they are HR manager
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -18,6 +18,14 @@ import {
   TrendingUp,
   AlertCircle,
   Pencil,
+  ChevronDown,
+  ChevronRight,
+  MapPin,
+  Calendar,
+  Building2,
+  User,
+  FileText,
+  ExternalLink,
 } from 'lucide-react';
 import { hrApi } from '../api/hr';
 import { Card } from '../components/ui/Card';
@@ -58,11 +66,23 @@ export default function HRDashboard() {
   const [stateFilter, setStateFilter] = useState<number | 'all'>('all');
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [postingFilter, setPostingFilter] = useState<string>('all');
+  const [expandedOpportunityId, setExpandedOpportunityId] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['hr-opportunities'],
     queryFn: () => hrApi.getOpportunities(),
   });
+
+  // Fetch expanded opportunity details
+  const { data: opportunityDetail, isLoading: isLoadingDetail } = useQuery({
+    queryKey: ['hr-opportunity-detail', expandedOpportunityId],
+    queryFn: () => hrApi.getOpportunityDetail(expandedOpportunityId!),
+    enabled: !!expandedOpportunityId,
+  });
+
+  const toggleExpand = (opportunityId: string) => {
+    setExpandedOpportunityId(prev => prev === opportunityId ? null : opportunityId);
+  };
 
   // Calculate stats and available filters
   const { stats, availableStates, availableClients } = useMemo(() => {
@@ -344,26 +364,46 @@ export default function HRDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {filteredItems.map((opportunity) => (
-                  <tr
-                    key={opportunity.id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
-                  >
-                    <td className="py-2 px-3">
-                      <div>
-                        <a
-                          href={`https://ui.boondmanager.com/#opportunity/${opportunity.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
-                        >
-                          {opportunity.title}
-                        </a>
-                        <p className="text-gray-500 dark:text-gray-400 font-mono text-[11px]">
-                          {opportunity.reference}
-                        </p>
-                      </div>
-                    </td>
+                {filteredItems.map((opportunity) => {
+                  const isExpanded = expandedOpportunityId === opportunity.id;
+                  return (
+                    <Fragment key={opportunity.id}>
+                      <tr
+                        className={`transition-colors ${
+                          isExpanded
+                            ? 'bg-blue-50 dark:bg-blue-900/20'
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-800/30'
+                        }`}
+                      >
+                        <td className="py-2 px-3">
+                          <div className="flex items-start gap-2">
+                            <button
+                              onClick={() => toggleExpand(opportunity.id)}
+                              className="mt-0.5 p-0.5 text-gray-400 dark:text-gray-500"
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </button>
+                            <div>
+                              <button
+                                onClick={() => toggleExpand(opportunity.id)}
+                                className={`font-medium text-left ${
+                                  isExpanded
+                                    ? 'text-blue-700 dark:text-blue-300'
+                                    : 'text-gray-900 dark:text-gray-100'
+                                }`}
+                              >
+                                {opportunity.title}
+                              </button>
+                              <p className="text-gray-500 dark:text-gray-400 font-mono text-[11px]">
+                                {opportunity.reference}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
                     <td className="py-2 px-3 text-gray-600 dark:text-gray-400">
                       {opportunity.client_name || '-'}
                     </td>
@@ -438,7 +478,110 @@ export default function HRDashboard() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  {/* Expanded details row */}
+                  {isExpanded && (
+                    <tr className="bg-blue-50/50 dark:bg-blue-900/10">
+                      <td colSpan={6} className="p-0">
+                        <div className="border-l-4 border-blue-500 p-4">
+                          {isLoadingDetail ? (
+                            <div className="flex items-center justify-center py-4">
+                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                              <span className="ml-2 text-sm text-gray-500">Chargement...</span>
+                            </div>
+                          ) : opportunityDetail ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Left column - Main info */}
+                              <div className="space-y-3">
+                                {opportunityDetail.description && (
+                                  <div>
+                                    <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                      <FileText className="h-3.5 w-3.5" />
+                                      Description
+                                    </div>
+                                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line line-clamp-4">
+                                      {opportunityDetail.description}
+                                    </p>
+                                  </div>
+                                )}
+                                {opportunityDetail.criteria && (
+                                  <div>
+                                    <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                      <FileText className="h-3.5 w-3.5" />
+                                      Critères
+                                    </div>
+                                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line line-clamp-4">
+                                      {opportunityDetail.criteria}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                              {/* Right column - Metadata */}
+                              <div className="space-y-2 text-sm">
+                                {opportunityDetail.place && (
+                                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                                    <MapPin className="h-4 w-4 text-gray-400" />
+                                    <span>{opportunityDetail.place}</span>
+                                  </div>
+                                )}
+                                {(opportunityDetail.start_date || opportunityDetail.end_date) && (
+                                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                                    <Calendar className="h-4 w-4 text-gray-400" />
+                                    <span>
+                                      {opportunityDetail.start_date && new Date(opportunityDetail.start_date).toLocaleDateString('fr-FR')}
+                                      {opportunityDetail.start_date && opportunityDetail.end_date && ' → '}
+                                      {opportunityDetail.end_date && new Date(opportunityDetail.end_date).toLocaleDateString('fr-FR')}
+                                      {opportunityDetail.duration && ` (${opportunityDetail.duration} jours)`}
+                                    </span>
+                                  </div>
+                                )}
+                                {opportunityDetail.company_name && (
+                                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                                    <Building2 className="h-4 w-4 text-gray-400" />
+                                    <span>{opportunityDetail.company_name}</span>
+                                  </div>
+                                )}
+                                {opportunityDetail.manager_name && (
+                                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                                    <User className="h-4 w-4 text-gray-400" />
+                                    <span>Responsable: {opportunityDetail.manager_name}</span>
+                                  </div>
+                                )}
+                                {opportunityDetail.contact_name && (
+                                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                                    <User className="h-4 w-4 text-gray-400" />
+                                    <span>Contact: {opportunityDetail.contact_name}</span>
+                                  </div>
+                                )}
+                                {opportunityDetail.expertise_area && (
+                                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                                    <Briefcase className="h-4 w-4 text-gray-400" />
+                                    <span>{opportunityDetail.expertise_area}</span>
+                                  </div>
+                                )}
+                                {/* Link to BoondManager */}
+                                <div className="pt-2">
+                                  <a
+                                    href={`https://ui.boondmanager.com/#opportunity/${opportunity.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400"
+                                  >
+                                    <ExternalLink className="h-3 w-3" />
+                                    Voir sur BoondManager
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500">Aucun détail disponible</p>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
