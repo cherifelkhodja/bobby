@@ -2,16 +2,19 @@
  * JobPostingDetails - Page to view and manage a job posting and its applications.
  */
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   Loader2,
   AlertCircle,
   ExternalLink,
   Send,
   XCircle,
+  X,
   Eye,
   Download,
   Building2,
@@ -24,6 +27,10 @@ import {
   Trash2,
   RefreshCw,
   Pencil,
+  Layout,
+  Columns,
+  PanelRight,
+  Square,
 } from 'lucide-react';
 import { hrApi } from '../api/hr';
 import {
@@ -71,6 +78,222 @@ const SORT_OPTIONS = [
   { value: 'date', label: 'Date candidature' },
 ];
 
+// Display modes for application details
+type DisplayMode = 'modal' | 'drawer' | 'split' | 'inline';
+
+const DISPLAY_MODE_OPTIONS: { value: DisplayMode; label: string; icon: typeof Layout }[] = [
+  { value: 'modal', label: 'Pop-up', icon: Square },
+  { value: 'drawer', label: 'Panel latéral', icon: PanelRight },
+  { value: 'split', label: 'Vue split', icon: Columns },
+  { value: 'inline', label: 'Expansion', icon: Layout },
+];
+
+// Shared component for application detail content
+interface ApplicationDetailContentProps {
+  application: JobApplication;
+  newStatus: ApplicationStatus | '';
+  setNewStatus: (status: ApplicationStatus | '') => void;
+  noteText: string;
+  setNoteText: (text: string) => void;
+  handleStatusChange: () => void;
+  handleNoteUpdate: (application: JobApplication) => void;
+  handleDownloadCv: (application: JobApplication) => void;
+  updateStatusMutation: { isPending: boolean };
+  updateNoteMutation: { isPending: boolean };
+  compact?: boolean;
+}
+
+function ApplicationDetailContent({
+  application,
+  newStatus,
+  setNewStatus,
+  noteText,
+  setNoteText,
+  handleStatusChange,
+  handleNoteUpdate,
+  handleDownloadCv,
+  updateStatusMutation,
+  updateNoteMutation,
+  compact = false,
+}: ApplicationDetailContentProps) {
+  const gridCols = compact ? 'grid-cols-3' : 'grid-cols-2';
+  const padding = compact ? 'p-4' : 'p-6';
+  const gap = compact ? 'gap-3' : 'gap-4';
+  const spacing = compact ? 'space-y-4' : 'space-y-6';
+
+  return (
+    <div className={`${padding} ${spacing}`}>
+      {/* Contact Info */}
+      <div className={`grid ${gridCols} ${gap}`}>
+        <div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white">{application.email}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Téléphone</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white">{application.phone}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Poste</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white">{application.job_title}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Statut pro</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white">
+            {application.employment_status_display || '-'}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">TJM</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white">
+            {application.tjm_range || '-'}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Salaire</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white">
+            {application.salary_range || '-'}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Disponibilité</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white">
+            {application.availability_display || application.availability || '-'}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Anglais</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white">
+            {application.english_level_display || '-'}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Reçue le</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white">
+            {new Date(application.created_at).toLocaleDateString('fr-FR')}
+          </p>
+        </div>
+      </div>
+
+      {/* Matching Details */}
+      {application.matching_details && (
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+            <h4 className="text-sm font-medium text-gray-900 dark:text-white">Analyse</h4>
+            <span
+              className={`ml-auto px-2 py-0.5 rounded-full text-xs font-medium ${getMatchingScoreColor(
+                application.matching_score ?? 0
+              )}`}
+            >
+              {application.matching_score}%
+            </span>
+          </div>
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+            {application.matching_details.summary}
+          </p>
+          {application.matching_details.strengths.length > 0 && (
+            <div className="mb-2">
+              <p className="text-xs font-medium text-green-700 dark:text-green-400 mb-1">
+                Points forts
+              </p>
+              <ul className="list-disc list-inside text-xs text-gray-600 dark:text-gray-400">
+                {application.matching_details.strengths.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {application.matching_details.gaps.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-orange-700 dark:text-orange-400 mb-1">
+                Attention
+              </p>
+              <ul className="list-disc list-inside text-xs text-gray-600 dark:text-gray-400">
+                {application.matching_details.gaps.map((g, i) => (
+                  <li key={i}>{g}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Status Change */}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Changer le statut
+        </label>
+        <div className="flex gap-2">
+          <select
+            value={newStatus}
+            onChange={(e) => setNewStatus(e.target.value as ApplicationStatus)}
+            className="flex-1 px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          >
+            {Object.entries(APPLICATION_STATUS_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleStatusChange}
+            disabled={updateStatusMutation.isPending || newStatus === application.status}
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors inline-flex items-center gap-1"
+          >
+            {updateStatusMutation.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <CheckCircle className="h-3.5 w-3.5" />
+            )}
+            OK
+          </button>
+        </div>
+      </div>
+
+      {/* Notes */}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Notes
+        </label>
+        <textarea
+          value={noteText}
+          onChange={(e) => setNoteText(e.target.value)}
+          placeholder="Notes sur ce candidat..."
+          rows={compact ? 2 : 3}
+          className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+        />
+        <button
+          onClick={() => handleNoteUpdate(application)}
+          disabled={updateNoteMutation.isPending || noteText === (application.notes || '')}
+          className="mt-1 px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white text-sm font-medium rounded-lg transition-colors inline-flex items-center gap-1"
+        >
+          {updateNoteMutation.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Edit2 className="h-3.5 w-3.5" />
+          )}
+          Sauvegarder
+        </button>
+      </div>
+
+      {/* CV Download */}
+      <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+        <button
+          onClick={() => handleDownloadCv(application)}
+          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium rounded-lg transition-colors"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Télécharger CV
+        </button>
+        <p className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[150px]">
+          {application.cv_filename}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function JobPostingDetails() {
   const { postingId } = useParams<{ postingId: string }>();
   const queryClient = useQueryClient();
@@ -83,8 +306,11 @@ export default function JobPostingDetails() {
   // Sort state
   const [sortBy, setSortBy] = useState('score');
   const [sortOrder, setSortOrder] = useState('desc');
-  // Modal state
+  // Display mode state
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('drawer');
+  // Detail view state
   const [selectedApplication, setSelectedApplication] = useState<JobApplication | null>(null);
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
   const [newStatus, setNewStatus] = useState<ApplicationStatus | ''>('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -206,6 +432,12 @@ export default function JobPostingDetails() {
     try {
       // Call API with markViewed=true to auto-transition from NOUVEAU to EN_COURS
       const updatedApplication = await hrApi.getApplication(application.id, true);
+
+      // Handle inline expansion mode differently
+      if (displayMode === 'inline') {
+        setExpandedRowId(expandedRowId === application.id ? null : application.id);
+      }
+
       setSelectedApplication(updatedApplication);
       setNewStatus(updatedApplication.status as ApplicationStatus);
       setNoteText(updatedApplication.notes || '');
@@ -213,10 +445,19 @@ export default function JobPostingDetails() {
       refetchApplications();
     } catch (error) {
       // Fallback to local data if API fails
+      if (displayMode === 'inline') {
+        setExpandedRowId(expandedRowId === application.id ? null : application.id);
+      }
       setSelectedApplication(application);
       setNewStatus(application.status as ApplicationStatus);
       setNoteText(application.notes || '');
     }
+  };
+
+  // Close detail view
+  const handleCloseDetail = () => {
+    setSelectedApplication(null);
+    setExpandedRowId(null);
   };
 
   // Mark as viewed without opening modal (for bulk action)
@@ -520,6 +761,32 @@ export default function JobPostingDetails() {
             >
               {sortOrder === 'desc' ? '↓' : '↑'}
             </button>
+            {/* Separator */}
+            <span className="text-gray-300 dark:text-gray-600">|</span>
+            {/* Display mode selector */}
+            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded p-0.5">
+              {DISPLAY_MODE_OPTIONS.map((opt) => {
+                const Icon = opt.icon;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => {
+                      setDisplayMode(opt.value);
+                      if (opt.value !== 'inline') setExpandedRowId(null);
+                      if (opt.value === 'inline') setSelectedApplication(null);
+                    }}
+                    className={`p-1 rounded transition-colors ${
+                      displayMode === opt.value
+                        ? 'bg-white dark:bg-gray-600 shadow-sm text-blue-600 dark:text-blue-400'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                    title={opt.label}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -557,286 +824,237 @@ export default function JobPostingDetails() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {applicationsData?.items.map((application) => (
-                  <tr
-                    key={application.id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                  >
-                    <td className="py-2 px-3">
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-white">
-                          {application.full_name}
-                        </p>
-                        <p className="text-gray-500 dark:text-gray-400">
-                          {application.job_title}
-                        </p>
-                        <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                          {application.email}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="py-2 px-3">
-                      <p className="text-gray-900 dark:text-white">{application.tjm_range}</p>
-                    </td>
-                    <td className="py-2 px-3">
-                      <p className="text-gray-900 dark:text-white">
-                        {application.availability_display || application.availability || '-'}
-                      </p>
-                    </td>
-                    <td className="py-2 px-3">
-                      {application.matching_score !== null ? (
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getMatchingScoreColor(
-                            application.matching_score
-                          )}`}
-                        >
-                          {application.matching_score}%
-                        </span>
-                      ) : (
-                        <span className="text-gray-500 dark:text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="py-2 px-3">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          APPLICATION_STATUS_COLORS[application.status as ApplicationStatus]
+                {applicationsData?.items.map((application) => {
+                  const isExpanded = displayMode === 'inline' && expandedRowId === application.id;
+                  return (
+                    <React.Fragment key={application.id}>
+                      <tr
+                        className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                          isExpanded ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                         }`}
                       >
-                        {APPLICATION_STATUS_LABELS[application.status as ApplicationStatus]}
-                      </span>
-                    </td>
-                    <td className="py-2 px-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleDownloadCv(application)}
-                          className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                          title="Télécharger CV"
-                        >
-                          <Download className="h-4 w-4" />
-                        </button>
-                        {application.status === 'nouveau' && (
-                          <button
-                            onClick={() => handleMarkAsViewed(application)}
-                            className="p-1.5 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
-                            title="Marquer comme vu"
+                        <td className="py-2 px-3">
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {application.full_name}
+                            </p>
+                            <p className="text-gray-500 dark:text-gray-400">
+                              {application.job_title}
+                            </p>
+                            <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                              {application.email}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="py-2 px-3">
+                          <p className="text-gray-900 dark:text-white">{application.tjm_range}</p>
+                        </td>
+                        <td className="py-2 px-3">
+                          <p className="text-gray-900 dark:text-white">
+                            {application.availability_display || application.availability || '-'}
+                          </p>
+                        </td>
+                        <td className="py-2 px-3">
+                          {application.matching_score !== null ? (
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getMatchingScoreColor(
+                                application.matching_score
+                              )}`}
+                            >
+                              {application.matching_score}%
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 dark:text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                              APPLICATION_STATUS_COLORS[application.status as ApplicationStatus]
+                            }`}
                           >
-                            <CheckCircle className="h-4 w-4" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleOpenApplication(application)}
-                          className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                          title="Voir détails"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                            {APPLICATION_STATUS_LABELS[application.status as ApplicationStatus]}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleDownloadCv(application)}
+                              className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                              title="Télécharger CV"
+                            >
+                              <Download className="h-4 w-4" />
+                            </button>
+                            {application.status === 'nouveau' && (
+                              <button
+                                onClick={() => handleMarkAsViewed(application)}
+                                className="p-1.5 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
+                                title="Marquer comme vu"
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleOpenApplication(application)}
+                              className={`p-1.5 rounded-lg transition-colors ${
+                                isExpanded
+                                  ? 'text-blue-700 bg-blue-100 dark:text-blue-300 dark:bg-blue-800/30'
+                                  : 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                              }`}
+                              title={displayMode === 'inline' ? (isExpanded ? 'Fermer' : 'Ouvrir') : 'Voir détails'}
+                            >
+                              {displayMode === 'inline' ? (
+                                isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {/* Inline expansion row */}
+                      {isExpanded && selectedApplication && selectedApplication.id === application.id && (
+                        <tr className="bg-blue-50/50 dark:bg-blue-900/10">
+                          <td colSpan={6} className="p-0">
+                            <div className="border-l-4 border-blue-500">
+                              <ApplicationDetailContent
+                                application={selectedApplication}
+                                newStatus={newStatus}
+                                setNewStatus={setNewStatus}
+                                noteText={noteText}
+                                setNoteText={setNoteText}
+                                handleStatusChange={handleStatusChange}
+                                handleNoteUpdate={handleNoteUpdate}
+                                handleDownloadCv={handleDownloadCv}
+                                updateStatusMutation={updateStatusMutation}
+                                updateNoteMutation={updateNoteMutation}
+                                compact
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {/* Application Detail Modal */}
-      {selectedApplication && (
+      {/* Application Detail - Modal Mode */}
+      {selectedApplication && displayMode === 'modal' && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between sticky top-0 bg-white dark:bg-gray-800 z-10">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {selectedApplication.full_name}
               </h3>
               <button
-                onClick={() => setSelectedApplication(null)}
+                onClick={handleCloseDetail}
                 className="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
               >
-                <XCircle className="h-5 w-5" />
+                <X className="h-5 w-5" />
               </button>
             </div>
-
-            <div className="p-6 space-y-6">
-              {/* Contact Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Email</p>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {selectedApplication.email}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Téléphone</p>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {selectedApplication.phone}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Poste</p>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {selectedApplication.job_title}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Statut professionnel</p>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {selectedApplication.employment_status_display || '-'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">TJM</p>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {selectedApplication.tjm_range || '-'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Salaire</p>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {selectedApplication.salary_range || '-'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Disponibilité</p>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {selectedApplication.availability_display || selectedApplication.availability || '-'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Niveau d'anglais</p>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {selectedApplication.english_level_display || '-'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Candidature reçue</p>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {new Date(selectedApplication.created_at).toLocaleDateString('fr-FR')}
-                  </p>
-                </div>
-              </div>
-
-              {/* Matching Details */}
-              {selectedApplication.matching_details && (
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <FileText className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                    <h4 className="font-medium text-gray-900 dark:text-white">Analyse du profil</h4>
-                    <span
-                      className={`ml-auto px-2.5 py-0.5 rounded-full text-sm font-medium ${getMatchingScoreColor(
-                        selectedApplication.matching_score ?? 0
-                      )}`}
-                    >
-                      {selectedApplication.matching_score}%
-                    </span>
-                  </div>
-                  <p className="text-gray-700 dark:text-gray-300 mb-3">
-                    {selectedApplication.matching_details.summary}
-                  </p>
-                  {selectedApplication.matching_details.strengths.length > 0 && (
-                    <div className="mb-2">
-                      <p className="text-sm font-medium text-green-700 dark:text-green-400 mb-1">
-                        Points forts
-                      </p>
-                      <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400">
-                        {selectedApplication.matching_details.strengths.map((s, i) => (
-                          <li key={i}>{s}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {selectedApplication.matching_details.gaps.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium text-orange-700 dark:text-orange-400 mb-1">
-                        Points d'attention
-                      </p>
-                      <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400">
-                        {selectedApplication.matching_details.gaps.map((g, i) => (
-                          <li key={i}>{g}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Status Change */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Changer le statut
-                </label>
-                <div className="flex gap-2">
-                  <select
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value as ApplicationStatus)}
-                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    {Object.entries(APPLICATION_STATUS_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={handleStatusChange}
-                    disabled={
-                      updateStatusMutation.isPending ||
-                      newStatus === selectedApplication.status
-                    }
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors inline-flex items-center gap-2"
-                  >
-                    {updateStatusMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <CheckCircle className="h-4 w-4" />
-                    )}
-                    Appliquer
-                  </button>
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Notes internes
-                </label>
-                <textarea
-                  value={noteText}
-                  onChange={(e) => setNoteText(e.target.value)}
-                  placeholder="Ajouter des notes sur ce candidat..."
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-                <button
-                  onClick={() => handleNoteUpdate(selectedApplication)}
-                  disabled={updateNoteMutation.isPending || noteText === (selectedApplication.notes || '')}
-                  className="mt-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white font-medium rounded-lg transition-colors inline-flex items-center gap-2"
-                >
-                  {updateNoteMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Edit2 className="h-4 w-4" />
-                  )}
-                  Sauvegarder
-                </button>
-              </div>
-
-              {/* CV Download */}
-              <div className="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-                <button
-                  onClick={() => handleDownloadCv(selectedApplication)}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium rounded-lg transition-colors"
-                >
-                  <Download className="h-4 w-4" />
-                  Télécharger le CV
-                </button>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {selectedApplication.cv_filename}
-                </p>
-              </div>
-            </div>
+            <ApplicationDetailContent
+              application={selectedApplication}
+              newStatus={newStatus}
+              setNewStatus={setNewStatus}
+              noteText={noteText}
+              setNoteText={setNoteText}
+              handleStatusChange={handleStatusChange}
+              handleNoteUpdate={handleNoteUpdate}
+              handleDownloadCv={handleDownloadCv}
+              updateStatusMutation={updateStatusMutation}
+              updateNoteMutation={updateNoteMutation}
+            />
           </div>
         </div>
       )}
+
+      {/* Application Detail - Drawer Mode */}
+      {selectedApplication && displayMode === 'drawer' && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/30 z-40"
+            onClick={handleCloseDetail}
+          />
+          {/* Drawer */}
+          <div className="fixed inset-y-0 right-0 w-full max-w-xl bg-white dark:bg-gray-800 shadow-xl z-50 overflow-y-auto animate-slide-in-right">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between sticky top-0 bg-white dark:bg-gray-800 z-10">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {selectedApplication.full_name}
+              </h3>
+              <button
+                onClick={handleCloseDetail}
+                className="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <ApplicationDetailContent
+              application={selectedApplication}
+              newStatus={newStatus}
+              setNewStatus={setNewStatus}
+              noteText={noteText}
+              setNoteText={setNoteText}
+              handleStatusChange={handleStatusChange}
+              handleNoteUpdate={handleNoteUpdate}
+              handleDownloadCv={handleDownloadCv}
+              updateStatusMutation={updateStatusMutation}
+              updateNoteMutation={updateNoteMutation}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Application Detail - Split View */}
+      {selectedApplication && displayMode === 'split' && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow mt-4">
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+              Détails : {selectedApplication.full_name}
+            </h3>
+            <button
+              onClick={handleCloseDetail}
+              className="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <ApplicationDetailContent
+            application={selectedApplication}
+            newStatus={newStatus}
+            setNewStatus={setNewStatus}
+            noteText={noteText}
+            setNoteText={setNoteText}
+            handleStatusChange={handleStatusChange}
+            handleNoteUpdate={handleNoteUpdate}
+            handleDownloadCv={handleDownloadCv}
+            updateStatusMutation={updateStatusMutation}
+            updateNoteMutation={updateNoteMutation}
+            compact
+          />
+        </div>
+      )}
+
+      {/* CSS for drawer animation */}
+      <style>{`
+        @keyframes slide-in-right {
+          from {
+            transform: translateX(100%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+        .animate-slide-in-right {
+          animation: slide-in-right 0.2s ease-out;
+        }
+      `}</style>
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
