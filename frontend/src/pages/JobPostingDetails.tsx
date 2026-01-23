@@ -1031,14 +1031,17 @@ export default function JobPostingDetails() {
                       >
                         <td className="py-2 px-3">
                           <div>
-                            <p className={`font-medium ${isUnread ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-white'}`}>
+                            <button
+                              onClick={() => handleOpenApplication(application)}
+                              className={`font-medium text-left ${isUnread ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-white'}`}
+                            >
                               {application.full_name}
                               {isUnread && (
                                 <span className="ml-1.5 inline-flex items-center px-1 py-px rounded text-[7px] font-semibold bg-blue-500 text-white uppercase align-middle">
                                   new
                                 </span>
                               )}
-                            </p>
+                            </button>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
                               {application.job_title}
                             </p>
