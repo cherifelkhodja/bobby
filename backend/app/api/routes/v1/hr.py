@@ -642,6 +642,7 @@ async def list_job_postings(
 async def get_job_posting(
     posting_id: str,
     db: DbSession,
+    boond_client: Boond,
     authorization: str = Header(default=""),
 ):
     """Get job posting details."""
@@ -651,6 +652,19 @@ async def get_job_posting(
     opportunity_repo = OpportunityRepository(db)
     job_application_repo = JobApplicationRepository(db)
     user_repo = UserRepository(db)
+
+    # Enrich opportunity with client_name from Boond if missing
+    posting = await job_posting_repo.get_by_id(UUID(posting_id))
+    if posting:
+        opportunity = await opportunity_repo.get_by_id(posting.opportunity_id)
+        if opportunity and not opportunity.client_name and opportunity.external_id:
+            try:
+                boond_detail = await boond_client.get_opportunity_information(opportunity.external_id)
+                if boond_detail and boond_detail.get("company_name"):
+                    opportunity.client_name = boond_detail["company_name"]
+                    await opportunity_repo.save(opportunity)
+            except Exception:
+                pass  # Don't fail if Boond is unreachable
 
     use_case = GetJobPostingUseCase(
         job_posting_repository=job_posting_repo,
