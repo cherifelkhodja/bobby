@@ -6,6 +6,7 @@ interface BadgeProps {
   status?: CooptationStatus;
   variant?: BadgeVariant;
   children?: React.ReactNode;
+  className?: string;
 }
 
 const statusConfig: Record<
@@ -42,7 +43,7 @@ const variantClasses: Record<BadgeVariant, string> = {
   error: 'bg-error-light text-error-dark dark:bg-error-dark/20 dark:text-error',
 };
 
-export function Badge({ status, variant, children }: BadgeProps) {
+export function Badge({ status, variant, children, className: extraClassName }: BadgeProps) {
   let className: string;
   let label: string | undefined;
 
@@ -56,7 +57,7 @@ export function Badge({ status, variant, children }: BadgeProps) {
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${className}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${className} ${extraClassName || ''}`}
     >
       {children || label}
     </span>

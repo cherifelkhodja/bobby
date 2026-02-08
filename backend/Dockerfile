@@ -46,7 +46,8 @@ RUN pip install --no-cache-dir \
     "PyPDF2>=3.0.0" \
     "aioboto3>=12.0.0" \
     "boto3>=1.34.0" \
-    "slowapi>=0.1.9"
+    "slowapi>=0.1.9" \
+    "anthropic>=0.40.0"
 
 # Copy application code
 COPY . .

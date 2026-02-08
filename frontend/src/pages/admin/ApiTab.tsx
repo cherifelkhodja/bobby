@@ -5,7 +5,7 @@
  * Also manages Turnover-IT skills synchronization.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   RefreshCw,
@@ -25,7 +25,7 @@ import {
 import { toast } from 'sonner';
 
 import { apiClient } from '../../api/client';
-import { adminApi, type CvAiSettings, type CvAiTestResponse } from '../../api/admin';
+import { adminApi, type CvAiSettings, type CvAiTestResponse, type CvAiProviderInfo, type CvAiModelInfo } from '../../api/admin';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -176,24 +176,26 @@ export function ApiTab() {
   // CV AI Settings
   const {
     data: cvAiData,
-    isLoading: isLoadingCvAi,
-  } = useQuery({
+  } = useQuery<CvAiSettings>({
     queryKey: ['cv-ai-settings'],
     queryFn: adminApi.getCvAiSettings,
-    onSuccess: (data: CvAiSettings) => {
-      setCvAiProvider(data.current_provider);
-      setCvAiModel(data.current_model);
-    },
-  } as any);
+  });
 
   // Initialize state from fetched data
+  useEffect(() => {
+    if (cvAiData) {
+      setCvAiProvider(cvAiData.current_provider);
+      setCvAiModel(cvAiData.current_model);
+    }
+  }, [cvAiData]);
+
   const currentModels = cvAiProvider === 'claude'
     ? (cvAiData?.available_models_claude || [])
     : (cvAiData?.available_models_gemini || []);
 
   const saveCvAiMutation = useMutation({
     mutationFn: () => adminApi.setCvAiProvider(cvAiProvider, cvAiModel),
-    onSuccess: (data) => {
+    onSuccess: () => {
       toast.success(`Provider IA CV mis à jour: ${cvAiProvider} / ${cvAiModel}`);
       queryClient.invalidateQueries({ queryKey: ['cv-ai-settings'] });
     },
@@ -389,7 +391,7 @@ export function ApiTab() {
             </p>
           </div>
           {cvAiData && (
-            <Badge variant="info" className="ml-auto">
+            <Badge variant="primary" className="ml-auto">
               {cvAiData.current_provider === 'claude' ? 'Claude' : 'Gemini'} actif
             </Badge>
           )}
@@ -416,7 +418,7 @@ export function ApiTab() {
               }}
               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             >
-              {cvAiData?.available_providers?.map((p) => (
+              {cvAiData?.available_providers?.map((p: CvAiProviderInfo) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
@@ -442,7 +444,7 @@ export function ApiTab() {
               }}
               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             >
-              {currentModels.map((m) => (
+              {currentModels.map((m: CvAiModelInfo) => (
                 <option key={m.id} value={m.id}>
                   {m.name}{m.description ? ` - ${m.description}` : ''}
                 </option>

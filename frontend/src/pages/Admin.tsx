@@ -5,4 +5,4 @@
  * The actual implementation is in ./admin/index.tsx
  */
 
-export { Admin } from './admin';
+export { Admin } from './admin/index';
