@@ -1,5 +1,11 @@
 """FastAPI application entry point."""
 
+import warnings
+
+# Suppress FutureWarning from deprecated google-generativeai package
+# TODO: Migrate to google.genai (new SDK) to remove this suppression
+warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
+
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
