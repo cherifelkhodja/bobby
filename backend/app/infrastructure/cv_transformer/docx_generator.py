@@ -97,6 +97,13 @@ class DocxGenerator:
         langues_formatees = self._formater_langues(resume_competences.get("langues") or [])
         resume_competences["langues_formatees"] = langues_formatees
 
+        # Clean None values in experiences
+        for exp in experiences:
+            for key in ("contexte", "environnement_technique"):
+                val = exp.get(key)
+                if val is None or str(val).strip().lower() in ("none", "null"):
+                    exp[key] = ""
+
         # Add page breaks between experiences
         experiences_avec_sauts = self._preparer_experiences_avec_sauts_de_page(experiences)
 
