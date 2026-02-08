@@ -208,6 +208,7 @@ def get_settings() -> Settings:
             "S3_SECRET_KEY": "S3_SECRET_KEY",
             "JWT_SECRET": "JWT_SECRET",
             "ADMIN_PASSWORD": "ADMIN_PASSWORD",
+            "ANTHROPIC_API_KEY": "ANTHROPIC_API_KEY",
             "SMTP_USER": "SMTP_USER",
             "SMTP_PASSWORD": "SMTP_PASSWORD",
         }
