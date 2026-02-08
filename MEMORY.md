@@ -12,7 +12,7 @@
 ### Stack technique
 - **Backend** : Python 3.12, FastAPI, SQLAlchemy async, PostgreSQL, Redis
 - **Frontend** : React 18, TypeScript, Vite, TailwindCSS, Zustand
-- **IA** : Google Gemini (transformation CV, anonymisation, matching)
+- **IA** : Google Gemini (anonymisation, matching) + Claude Sonnet 4.5 / Gemini (transformation CV, configurable)
 - **Déploiement** : Railway (Docker)
 
 ---
@@ -26,7 +26,7 @@
 | Système d'invitations | ✅ Done | Depuis ressources Boond |
 | Panel Admin | ✅ Done | Users, invitations, Boond, templates |
 | Dark Mode | ✅ Done | System/Light/Dark |
-| CV Transformer | ✅ Done | PDF/DOCX → Word avec Gemini |
+| CV Transformer | ✅ Done | PDF/DOCX → Word, multi-provider (Gemini/Claude) |
 | Opportunités publiées | ✅ Done | Anonymisation IA |
 | Quotation Generator (Thales) | ✅ Done | Excel + PDF merge |
 | Recrutement RH | ✅ Done | Turnover-IT, matching IA |
@@ -52,8 +52,15 @@
 
 ### ADR-003 : Google Gemini pour l'IA
 - **Date** : 2024-12
-- **Décision** : Utiliser Google Gemini pour transformation CV, anonymisation, matching
+- **Décision** : Utiliser Google Gemini pour anonymisation et matching
 - **Raison** : Coût, qualité, facilité d'intégration
+
+### ADR-006 : Multi-provider IA pour CV Transformer (Gemini + Claude)
+- **Date** : 2026-02
+- **Décision** : Permettre le choix entre Gemini et Claude Sonnet 4.5 pour la transformation CV
+- **Raison** : Claude Sonnet 4.5 produit des résultats plus fidèles (dates correctes, pas d'invention, meilleure extraction)
+- **Architecture** : Port `CvDataExtractorPort` avec 2 adapters (`GeminiClient`, `AnthropicClient`), sélection runtime via `app_settings`
+- **Prompt** : v5 optimisé pour extraction fidèle ("reproduire exactement", pas de transformation)
 
 ### ADR-004 : JWT avec Refresh Token
 - **Date** : 2025-01
@@ -132,6 +139,19 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-02-08
+- **feat(cv-transformer)**: Intégration Claude Sonnet 4.5 comme provider IA alternatif
+  - Nouveau client `AnthropicClient` implémentant `CvDataExtractorPort` (architecture hexagonale)
+  - Prompt v5 optimisé pour extraction fidèle des données CV
+  - Sélection dynamique du provider (Gemini/Claude) depuis l'admin panel
+  - 3 nouveaux endpoints admin : `GET/POST /admin/cv-ai/settings`, `POST /admin/cv-ai/test`
+  - Interface admin : carte "IA pour Transformation CV" avec sélecteur provider/modèle + test
+  - Settings DB : `cv_ai_provider`, `cv_ai_model_claude`
+  - Modèles disponibles : Claude Sonnet 4.5 (recommandé), Claude Haiku 4.5 (rapide)
+  - Dépendance ajoutée : `anthropic>=0.40.0`
+  - Fichiers créés : `anthropic_client.py`
+  - Fichiers modifiés : `config.py`, `pyproject.toml`, `app_settings_service.py`, `cv_transformer.py` (route), `admin.py` (route + schemas), `ApiTab.tsx`, `admin.ts`
 
 ### 2026-01-21
 - **feat(hr)**: Statut professionnel dynamique selon type de contrat

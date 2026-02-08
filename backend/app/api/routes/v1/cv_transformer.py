@@ -20,6 +20,7 @@ from app.dependencies import AppSettings, AppSettingsSvc, DbSession
 from app.domain.value_objects import UserRole
 from app.infrastructure.audit import audit_logger
 from app.infrastructure.cv_transformer import (
+    AnthropicClient,
     DocxGenerator,
     DocxTextExtractor,
     GeminiClient,
@@ -193,16 +194,33 @@ async def transform_cv(
     Upload a PDF or DOCX file and receive a formatted Word document back.
     Rate limited to 10 transformations per hour (expensive operation).
     """
-    import sys
     print(f"[CV Transform] Request received: template={template_name}, filename={file.filename}", flush=True)
 
     user_id = await require_transformer_access(db, authorization)
     ip_address = request.client.host if request.client else None
     print(f"[CV Transform] User authenticated: {user_id}", flush=True)
 
-    # Get configured Gemini model from database settings
-    gemini_model = await app_settings_svc.get_gemini_model_cv()
-    print(f"[CV Transform] Using Gemini model: {gemini_model}", flush=True)
+    # Get AI provider and model from database settings
+    cv_provider = await app_settings_svc.get_cv_ai_provider()
+
+    if cv_provider == "claude":
+        if not app_settings.ANTHROPIC_API_KEY:
+            raise HTTPException(
+                status_code=500,
+                detail="Clé API Anthropic non configurée. Contactez l'administrateur.",
+            )
+        ai_model = await app_settings_svc.get_cv_ai_model_claude()
+        data_extractor = AnthropicClient(app_settings)
+    else:
+        if not app_settings.GEMINI_API_KEY:
+            raise HTTPException(
+                status_code=500,
+                detail="Clé API Gemini non configurée. Contactez l'administrateur.",
+            )
+        ai_model = await app_settings_svc.get_gemini_model_cv()
+        data_extractor = GeminiClient(app_settings)
+
+    print(f"[CV Transform] Using provider: {cv_provider}, model: {ai_model}", flush=True)
 
     # Validate file type
     if not file.filename:
@@ -228,17 +246,9 @@ async def transform_cv(
     if len(content) == 0:
         raise HTTPException(status_code=400, detail="Fichier vide")
 
-    # Check Gemini API key
-    if not app_settings.GEMINI_API_KEY:
-        raise HTTPException(
-            status_code=500,
-            detail="Service d'IA non configuré. Contactez l'administrateur.",
-        )
-
     # Create services and use case (Dependency Injection with ports)
     template_repo = CvTemplateRepository(db)
     log_repo = CvTransformationLogRepository(db)
-    gemini_client = GeminiClient(app_settings)
     docx_generator = DocxGenerator()
     pdf_extractor = PdfTextExtractor()
     docx_extractor = DocxTextExtractor()
@@ -246,7 +256,7 @@ async def transform_cv(
     use_case = TransformCvUseCase(
         template_repository=template_repo,
         log_repository=log_repo,
-        data_extractor=gemini_client,
+        data_extractor=data_extractor,
         document_generator=docx_generator,
         pdf_text_extractor=pdf_extractor,
         docx_text_extractor=docx_extractor,
@@ -259,7 +269,7 @@ async def transform_cv(
             template_name=template_name,
             file_content=content,
             filename=file.filename,
-            gemini_model=gemini_model,
+            gemini_model=ai_model,
         )
         print(f"[CV Transform] Success: generated {len(output_content)} bytes", flush=True)
 

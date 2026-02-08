@@ -12,6 +12,9 @@ from app.api.schemas.admin import (
     BoondResourcesListResponse,
     BoondStatusResponse,
     ChangeRoleRequest,
+    CvAiSetProviderRequest,
+    CvAiSettingsResponse,
+    CvAiTestResponse,
     GeminiSetModelRequest,
     GeminiSettingsResponse,
     GeminiTestResponse,
@@ -52,7 +55,11 @@ from app.infrastructure.boond.client import BoondClient
 from app.infrastructure.cache.redis import CacheService
 from app.infrastructure.database.models import TurnoverITSkillModel, TurnoverITSkillsMetadataModel
 from app.infrastructure.database.repositories import OpportunityRepository, UserRepository
-from app.infrastructure.settings import AVAILABLE_GEMINI_MODELS
+from app.infrastructure.settings import (
+    AVAILABLE_CLAUDE_MODELS,
+    AVAILABLE_CV_AI_PROVIDERS,
+    AVAILABLE_GEMINI_MODELS,
+)
 from app.infrastructure.turnoverit.client import TurnoverITClient
 from sqlalchemy import select, delete
 
@@ -437,6 +444,172 @@ async def test_gemini_model(
         response_time_ms=result["response_time_ms"],
         message=result["message"],
     )
+
+
+# =============================================================================
+# CV AI Provider Settings Endpoints
+# =============================================================================
+
+
+@router.get("/cv-ai/settings", response_model=CvAiSettingsResponse)
+async def get_cv_ai_settings(
+    admin_id: AdminUser,
+    settings_svc: AppSettingsSvc,
+):
+    """Get CV AI provider settings (admin only)."""
+    current_provider = await settings_svc.get_cv_ai_provider()
+
+    if current_provider == "claude":
+        current_model = await settings_svc.get_cv_ai_model_claude()
+    else:
+        current_model = await settings_svc.get_gemini_model_cv()
+
+    return CvAiSettingsResponse(
+        current_provider=current_provider,
+        current_model=current_model,
+        available_providers=[
+            {"id": p["id"], "name": p["name"]} for p in AVAILABLE_CV_AI_PROVIDERS
+        ],
+        available_models_gemini=[
+            {"id": m["id"], "name": m["name"], "description": m.get("description", "")}
+            for m in AVAILABLE_GEMINI_MODELS
+        ],
+        available_models_claude=[
+            {"id": m["id"], "name": m["name"], "description": m.get("description", "")}
+            for m in AVAILABLE_CLAUDE_MODELS
+        ],
+    )
+
+
+@router.post("/cv-ai/settings", response_model=CvAiSettingsResponse)
+async def set_cv_ai_provider(
+    request: CvAiSetProviderRequest,
+    admin_id: AdminUser,
+    settings_svc: AppSettingsSvc,
+):
+    """Set CV AI provider and model (admin only)."""
+    # Validate provider
+    valid_providers = [p["id"] for p in AVAILABLE_CV_AI_PROVIDERS]
+    if request.provider not in valid_providers:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Provider invalide. Providers disponibles: {', '.join(valid_providers)}",
+        )
+
+    # Validate model for the selected provider
+    if request.provider == "claude":
+        valid_models = [m["id"] for m in AVAILABLE_CLAUDE_MODELS]
+    else:
+        valid_models = [m["id"] for m in AVAILABLE_GEMINI_MODELS]
+
+    if request.model not in valid_models:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Modèle invalide pour {request.provider}. Modèles disponibles: {', '.join(valid_models)}",
+        )
+
+    # Save provider
+    await settings_svc.set("cv_ai_provider", request.provider, admin_id)
+
+    # Save model for the selected provider
+    if request.provider == "claude":
+        await settings_svc.set("cv_ai_model_claude", request.model, admin_id)
+    else:
+        await settings_svc.set("gemini_model_cv", request.model, admin_id)
+
+    return CvAiSettingsResponse(
+        current_provider=request.provider,
+        current_model=request.model,
+        available_providers=[
+            {"id": p["id"], "name": p["name"]} for p in AVAILABLE_CV_AI_PROVIDERS
+        ],
+        available_models_gemini=[
+            {"id": m["id"], "name": m["name"], "description": m.get("description", "")}
+            for m in AVAILABLE_GEMINI_MODELS
+        ],
+        available_models_claude=[
+            {"id": m["id"], "name": m["name"], "description": m.get("description", "")}
+            for m in AVAILABLE_CLAUDE_MODELS
+        ],
+    )
+
+
+@router.post("/cv-ai/test", response_model=CvAiTestResponse)
+async def test_cv_ai_provider(
+    request: CvAiSetProviderRequest,
+    admin_id: AdminUser,
+    settings: AppSettings,
+):
+    """Test a CV AI provider/model (admin only)."""
+    import time
+
+    start = time.time()
+
+    try:
+        if request.provider == "claude":
+            if not settings.ANTHROPIC_API_KEY:
+                return CvAiTestResponse(
+                    success=False,
+                    provider=request.provider,
+                    model=request.model,
+                    response_time_ms=0,
+                    message="ANTHROPIC_API_KEY non configurée",
+                )
+
+            from anthropic import Anthropic
+
+            client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+            response = client.messages.create(
+                model=request.model,
+                max_tokens=50,
+                messages=[{"role": "user", "content": "Réponds uniquement 'OK'."}],
+            )
+            text = response.content[0].text if response.content else ""
+            elapsed = int((time.time() - start) * 1000)
+
+            return CvAiTestResponse(
+                success=True,
+                provider=request.provider,
+                model=request.model,
+                response_time_ms=elapsed,
+                message=f"Claude fonctionne. Réponse: {text.strip()[:100]}",
+            )
+
+        else:
+            if not settings.GEMINI_API_KEY:
+                return CvAiTestResponse(
+                    success=False,
+                    provider=request.provider,
+                    model=request.model,
+                    response_time_ms=0,
+                    message="GEMINI_API_KEY non configurée",
+                )
+
+            import google.generativeai as genai
+
+            genai.configure(api_key=settings.GEMINI_API_KEY)
+            model = genai.GenerativeModel(request.model)
+            response = model.generate_content("Réponds uniquement 'OK'.")
+            text = response.text if response.text else ""
+            elapsed = int((time.time() - start) * 1000)
+
+            return CvAiTestResponse(
+                success=True,
+                provider=request.provider,
+                model=request.model,
+                response_time_ms=elapsed,
+                message=f"Gemini fonctionne. Réponse: {text.strip()[:100]}",
+            )
+
+    except Exception as e:
+        elapsed = int((time.time() - start) * 1000)
+        return CvAiTestResponse(
+            success=False,
+            provider=request.provider,
+            model=request.model,
+            response_time_ms=elapsed,
+            message=f"Erreur: {str(e)[:200]}",
+        )
 
 
 # =============================================================================

@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     # Google Gemini API
     GEMINI_API_KEY: str = ""
 
+    # Anthropic Claude API
+    ANTHROPIC_API_KEY: str = ""
+
     # Turnover-IT API
     TURNOVERIT_API_KEY: str = ""
     TURNOVERIT_API_URL: str = "https://api.turnover-it.com/jobconnect/v2"

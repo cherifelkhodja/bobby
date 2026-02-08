@@ -184,6 +184,53 @@ class GeminiTestResponse(BaseModel):
 
 
 # =============================================================================
+# CV AI Provider Settings Schemas
+# =============================================================================
+
+
+class CvAiProviderInfo(BaseModel):
+    """AI provider info."""
+
+    id: str
+    name: str
+
+
+class CvAiModelInfo(BaseModel):
+    """AI model info."""
+
+    id: str
+    name: str
+    description: str = ""
+
+
+class CvAiSettingsResponse(BaseModel):
+    """CV AI settings response."""
+
+    current_provider: str
+    current_model: str
+    available_providers: list[CvAiProviderInfo]
+    available_models_gemini: list[CvAiModelInfo]
+    available_models_claude: list[CvAiModelInfo]
+
+
+class CvAiSetProviderRequest(BaseModel):
+    """Request to set CV AI provider and model."""
+
+    provider: str = Field(..., description="AI provider: 'gemini' or 'claude'")
+    model: str = Field(..., description="Model ID for the selected provider")
+
+
+class CvAiTestResponse(BaseModel):
+    """Response from CV AI provider test."""
+
+    success: bool
+    provider: str
+    model: str
+    response_time_ms: int
+    message: str
+
+
+# =============================================================================
 # Turnover-IT Skills Schemas
 # =============================================================================
 

@@ -1,5 +1,6 @@
 """CV Transformer infrastructure services."""
 
+from app.infrastructure.cv_transformer.anthropic_client import AnthropicClient
 from app.infrastructure.cv_transformer.docx_generator import DocxGenerator
 from app.infrastructure.cv_transformer.extractors import (
     DocxTextExtractor,
@@ -10,6 +11,7 @@ from app.infrastructure.cv_transformer.extractors import (
 from app.infrastructure.cv_transformer.gemini_client import GeminiClient
 
 __all__ = [
+    "AnthropicClient",
     "DocxGenerator",
     "DocxTextExtractor",
     "extract_text_from_docx",

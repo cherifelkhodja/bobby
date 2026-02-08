@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_SETTINGS = {
     "gemini_model": "gemini-2.0-flash",
     "gemini_model_cv": "gemini-2.0-flash",
+    "cv_ai_provider": "gemini",
+    "cv_ai_model_claude": "claude-sonnet-4-5-20250929",
 }
 
 # Available Gemini models
@@ -25,6 +27,18 @@ AVAILABLE_GEMINI_MODELS = [
     {"id": "gemini-2.0-flash-lite", "name": "Gemini 2.0 Flash Lite", "description": "Lighter version, faster"},
     {"id": "gemini-1.5-flash", "name": "Gemini 1.5 Flash", "description": "Previous generation, stable"},
     {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro", "description": "More capable, slower"},
+]
+
+# Available CV AI providers
+AVAILABLE_CV_AI_PROVIDERS = [
+    {"id": "gemini", "name": "Google Gemini"},
+    {"id": "claude", "name": "Anthropic Claude"},
+]
+
+# Available Claude models for CV transformation
+AVAILABLE_CLAUDE_MODELS = [
+    {"id": "claude-sonnet-4-5-20250929", "name": "Claude Sonnet 4.5", "description": "Recommandé pour CV"},
+    {"id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5", "description": "Plus rapide, moins précis"},
 ]
 
 
@@ -163,6 +177,25 @@ class AppSettingsService:
             The Gemini model ID.
         """
         return await self.get("gemini_model_cv", "gemini-2.0-flash") or "gemini-2.0-flash"
+
+    async def get_cv_ai_provider(self) -> str:
+        """Get the AI provider to use for CV transformation.
+
+        Returns:
+            The provider ID ("gemini" or "claude").
+        """
+        return await self.get("cv_ai_provider", "gemini") or "gemini"
+
+    async def get_cv_ai_model_claude(self) -> str:
+        """Get the Claude model to use for CV transformation.
+
+        Returns:
+            The Claude model ID.
+        """
+        return (
+            await self.get("cv_ai_model_claude", "claude-sonnet-4-5-20250929")
+            or "claude-sonnet-4-5-20250929"
+        )
 
     def clear_cache(self) -> None:
         """Clear the settings cache."""

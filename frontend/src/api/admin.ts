@@ -61,6 +61,33 @@ export interface GeminiTestResponse {
   message: string;
 }
 
+export interface CvAiProviderInfo {
+  id: string;
+  name: string;
+}
+
+export interface CvAiModelInfo {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface CvAiSettings {
+  current_provider: string;
+  current_model: string;
+  available_providers: CvAiProviderInfo[];
+  available_models_gemini: CvAiModelInfo[];
+  available_models_claude: CvAiModelInfo[];
+}
+
+export interface CvAiTestResponse {
+  success: boolean;
+  provider: string;
+  model: string;
+  response_time_ms: number;
+  message: string;
+}
+
 export interface TurnoverITSkill {
   name: string;
   slug: string;
@@ -181,6 +208,22 @@ export const adminApi = {
 
   testGeminiModel: async (model: string): Promise<GeminiTestResponse> => {
     const response = await apiClient.post<GeminiTestResponse>('/admin/gemini/test', { model });
+    return response.data;
+  },
+
+  // CV AI provider settings
+  getCvAiSettings: async (): Promise<CvAiSettings> => {
+    const response = await apiClient.get<CvAiSettings>('/admin/cv-ai/settings');
+    return response.data;
+  },
+
+  setCvAiProvider: async (provider: string, model: string): Promise<CvAiSettings> => {
+    const response = await apiClient.post<CvAiSettings>('/admin/cv-ai/settings', { provider, model });
+    return response.data;
+  },
+
+  testCvAi: async (provider: string, model: string): Promise<CvAiTestResponse> => {
+    const response = await apiClient.post<CvAiTestResponse>('/admin/cv-ai/test', { provider, model });
     return response.data;
   },
 
