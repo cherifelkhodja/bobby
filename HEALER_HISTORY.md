@@ -6,6 +6,35 @@ Historique des corrections automatiques effectuées par le Railway Healer.
 > Ne pas modifier manuellement.
 
 ---
+## 📅 08/02/2026 18:35:00
+
+| | |
+|---|---|
+| **Service** | backend + frontend |
+| **Environment** | production |
+| **Status** | ✅ Réparé (intervention manuelle) |
+
+### Erreur détectée
+```
+Backend: Healthcheck /api/v1/health/live timeout (1m40s) — le service ne démarre jamais
+Frontend: Build failed — 14 erreurs TypeScript dans src/pages/admin/ApiTab.tsx
+```
+
+### Analyse
+Le commit `4a9a290` (feat: add Claude Sonnet 4.5 as alternative AI provider) a ajouté `anthropic>=0.40.0` dans `pyproject.toml` mais pas dans le Dockerfile (qui utilise une liste `pip install` manuelle). L'import `anthropic` échouait au démarrage → app ne démarre jamais → healthcheck timeout. Côté frontend, le même commit introduisait des erreurs TS : `useQuery` non typé (`as any`), `onSuccess` deprecated (React Query v5), `Badge variant="info"` inexistant, paramètres implicitement `any`. En bonus, un import circulaire `Admin.tsx` → `./admin` sur macOS (case-insensitive FS) cassait aussi le build Vite.
+
+Le healer auto n'a pas pu intervenir car **Tailscale Funnel était désactivé** — les webhooks Railway n'atteignaient pas le serveur healer. Funnel réactivé dans la foulée.
+
+### Correction appliquée
+- `backend/Dockerfile` : ajout `"anthropic>=0.40.0"` dans la liste pip install
+- `frontend/src/pages/admin/ApiTab.tsx` : typage `useQuery<CvAiSettings>`, remplacement `onSuccess` par `useEffect`, suppression variables inutilisées, types explicites, `variant="primary"`
+- `frontend/src/components/ui/Badge.tsx` : ajout prop `className`
+- `frontend/src/pages/Admin.tsx` : import `./admin/index` au lieu de `./admin`
+
+### Commit
+`80904b6`
+
+---
 ## 📅 08/02/2026 14:30:00
 
 | | |
