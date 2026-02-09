@@ -10,6 +10,7 @@ Application de cooptation pour ESN (Entreprise de Services du Numérique) avec i
 ### ⚠️ RÈGLE OBLIGATOIRE
 **Avant chaque tâche** : Consulter `MEMORY.md` pour comprendre le contexte.
 **Après chaque modification significative** : Mettre à jour `MEMORY.md` (changelog + sections concernées).
+**AUTOMATIQUE** : La mise à jour de `MEMORY.md` doit être faite **automatiquement** à la fin de chaque tâche significative, sans attendre que l'utilisateur le demande. Ne jamais considérer une tâche comme terminée tant que `MEMORY.md` n'a pas été mis à jour.
 
 ### Quand mettre à jour MEMORY.md
 - ✅ Nouvelle fonctionnalité ajoutée
