@@ -49,6 +49,9 @@ RUN pip install --no-cache-dir \
     "slowapi>=0.1.9" \
     "anthropic>=0.40.0"
 
+# Bust cache when code changes
+ARG CACHEBUST=1
+
 # Copy application code
 COPY . .
 
@@ -61,4 +64,4 @@ ENV PORT=8000
 EXPOSE $PORT
 
 # Production command - run migrations then start server
-CMD alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]
