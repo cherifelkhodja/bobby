@@ -196,7 +196,7 @@ describe('hrApi', () => {
 
       const result = await hrApi.getApplication('app-123');
 
-      expect(apiClient.get).toHaveBeenCalledWith('/hr/applications/app-123');
+      expect(apiClient.get).toHaveBeenCalledWith('/hr/applications/app-123', { params: { mark_viewed: false } });
       expect(result.id).toBe('app-123');
     });
   });
@@ -294,9 +294,13 @@ describe('publicApplicationApi', () => {
         email: 'jean@example.com',
         phone: '+33612345678',
         job_title: 'Dev Python',
-        tjm_min: 400,
-        tjm_max: 500,
-        availability_date: '2024-03-01',
+        availability: 'immediate',
+        employment_status: 'freelance',
+        english_level: 'B2',
+        tjm_current: 400,
+        tjm_desired: 500,
+        salary_current: null,
+        salary_desired: null,
         cv: cvFile,
       });
 
