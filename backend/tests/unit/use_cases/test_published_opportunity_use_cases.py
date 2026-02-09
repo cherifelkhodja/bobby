@@ -46,7 +46,7 @@ class TestAnonymizeOpportunityUseCase:
         }
 
         # Simulate use case
-        result = mock_anonymizer.anonymize(
+        result = await mock_anonymizer.anonymize(
             boond_opportunity["attributes"]["title"],
             boond_opportunity["attributes"]["description"],
         )
@@ -64,7 +64,7 @@ class TestAnonymizeOpportunityUseCase:
             "skills": ["Python", "FastAPI", "PostgreSQL", "Docker"],
         }
 
-        result = mock_anonymizer.anonymize("title", "description")
+        result = await mock_anonymizer.anonymize("title", "description")
 
         assert "Python" in result["skills"]
         assert "FastAPI" in result["skills"]

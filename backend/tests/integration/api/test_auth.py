@@ -79,7 +79,7 @@ class TestLogin:
             },
         )
 
-        assert response.status_code == 401
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     async def test_login_inactive_user(

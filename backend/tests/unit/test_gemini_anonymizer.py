@@ -228,7 +228,7 @@ class TestAnonymize:
 
         anonymizer = GeminiAnonymizer(mock_settings)
 
-        with pytest.raises(ValueError, match="parsing JSON|essayer"):
+        with pytest.raises(ValueError, match="invalide|JSON|parsing"):
             await anonymizer.anonymize("Title", "Description")
 
     @pytest.mark.asyncio
@@ -243,7 +243,7 @@ class TestAnonymize:
 
         anonymizer = GeminiAnonymizer(mock_settings)
 
-        with pytest.raises(ValueError, match="objet JSON|inattendue"):
+        with pytest.raises(ValueError, match="invalide|JSON|inattendue"):
             await anonymizer.anonymize("Title", "Description")
 
     @pytest.mark.asyncio

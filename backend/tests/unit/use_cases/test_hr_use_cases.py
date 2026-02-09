@@ -206,6 +206,7 @@ class TestCreateJobPostingUseCase:
             title="Dev Python Senior",
             reference="REF-001",
             client_name="Client A",
+            external_id="BOOND-123",
         )
         user = MagicMock(full_name="Jean Admin")
 
@@ -312,8 +313,21 @@ class TestPublishJobPostingUseCase:
             description="D" * 500,
             qualifications="Q" * 150,
             location_country="France",
+            location_region=None,
+            location_postal_code=None,
+            location_city=None,
+            location_key=None,
             contract_types=[ContractType.FREELANCE],
             skills=["Python"],
+            experience_level=None,
+            remote=None,
+            start_date=None,
+            duration_months=None,
+            salary_min_annual=None,
+            salary_max_annual=None,
+            salary_min_daily=None,
+            salary_max_daily=None,
+            employer_overview=None,
             application_token="test-token",
             created_by=uuid4(),
             created_at=datetime.utcnow(),
@@ -413,7 +427,7 @@ class TestSubmitApplicationUseCase:
         mock_deps["job_application_repo"].save.side_effect = mock_save
 
         with patch(
-            "app.application.use_cases.job_applications.extract_text_from_bytes",
+            "app.infrastructure.cv_transformer.extractors.extract_text_from_bytes",
             return_value="CV text",
         ):
             command = SubmitApplicationCommand(
@@ -530,13 +544,35 @@ class TestUpdateApplicationStatusUseCase:
             email="jean@example.com",
             phone="+33612345678",
             job_title="Dev",
+            civility=None,
+            # New fields
+            availability="1_month",
+            availability_display="Sous 1 mois",
+            employment_status="freelance",
+            employment_status_display="Freelance",
+            english_level="professional",
+            english_level_display="Professionnel",
             tjm_current=400.0,
             tjm_desired=500.0,
-            availability="1_month",
+            salary_current=None,
+            salary_desired=None,
+            salary_range="N/A",
+            # Legacy fields
+            tjm_min=None,
+            tjm_max=None,
+            availability_date=None,
+            # Matching & quality
             matching_score=75,
             matching_details=None,
+            cv_quality_score=None,
+            cv_quality=None,
+            # State
+            is_read=False,
             notes=None,
             boond_candidate_id=None,
+            boond_sync_error=None,
+            boond_synced_at=None,
+            boond_sync_status="not_applicable",
             status_history=[],
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),

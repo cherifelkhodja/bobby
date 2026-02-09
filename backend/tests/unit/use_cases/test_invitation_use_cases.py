@@ -258,7 +258,7 @@ class TestAcceptInvitationUseCase:
 
         use_case = AcceptInvitationUseCase(**mock_repositories)
 
-        with patch("app.application.use_cases.invitations.hash_password", return_value="hashed"):
+        with patch("app.infrastructure.security.password.hash_password", return_value="hashed"):
             result = await use_case.execute(
                 AcceptInvitationCommand(
                     token="test-token",
