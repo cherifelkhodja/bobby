@@ -50,7 +50,7 @@ class TestListCooptations:
             external_id=f"OPP-{uuid4().hex[:8]}",
             title="Test Opportunity",
             reference="REF-0001",
-            is_open=True,
+            is_active=True,
         )
         db_session.add(opportunity)
 
@@ -101,7 +101,7 @@ class TestListCooptations:
                 external_id=f"OPP-{uuid4().hex[:8]}",
                 title=f"Opportunity {i}",
                 reference=f"REF-{i:04d}",
-                is_open=True,
+                is_active=True,
             )
             db_session.add(opportunity)
 
@@ -165,7 +165,7 @@ class TestListCooptations:
             external_id=f"OPP-{uuid4().hex[:8]}",
             title="Test Opportunity",
             reference="REF-0001",
-            is_open=True,
+            is_active=True,
         )
         db_session.add(opportunity)
 
@@ -247,7 +247,7 @@ class TestCreateCooptation:
             external_id=f"OPP-{uuid4().hex[:8]}",
             title="Test Opportunity for Cooptation",
             reference="REF-COOP-001",
-            is_open=True,
+            is_active=True,
         )
         db_session.add(opportunity)
         await db_session.commit()
@@ -308,7 +308,7 @@ class TestCreateCooptation:
             external_id=f"OPP-{uuid4().hex[:8]}",
             title="Test Opportunity",
             reference="REF-0001",
-            is_open=True,
+            is_active=True,
         )
         db_session.add(opportunity)
         await db_session.commit()
@@ -384,7 +384,7 @@ class TestGetCooptation:
             external_id=f"OPP-{uuid4().hex[:8]}",
             title="Test Opportunity",
             reference="REF-0001",
-            is_open=True,
+            is_active=True,
         )
         db_session.add(opportunity)
 
@@ -450,7 +450,7 @@ class TestUpdateCooptationStatus:
             external_id=f"OPP-{uuid4().hex[:8]}",
             title="Test Opportunity",
             reference="REF-0001",
-            is_open=True,
+            is_active=True,
         )
         db_session.add(opportunity)
 
@@ -498,7 +498,7 @@ class TestUpdateCooptationStatus:
             external_id=f"OPP-{uuid4().hex[:8]}",
             title="Test Opportunity",
             reference="REF-0001",
-            is_open=True,
+            is_active=True,
         )
         db_session.add(opportunity)
 
@@ -546,7 +546,7 @@ class TestUpdateCooptationStatus:
             external_id=f"OPP-{uuid4().hex[:8]}",
             title="Test Opportunity",
             reference="REF-0001",
-            is_open=True,
+            is_active=True,
         )
         db_session.add(opportunity)
 
