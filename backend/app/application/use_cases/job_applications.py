@@ -47,17 +47,17 @@ class SubmitApplicationCommand:
     email: str
     phone: str  # Format international +33...
     job_title: str
-    civility: Optional[str] = None  # M, Mme
     availability: str  # asap, 1_month, 2_months, 3_months, more_3_months
     employment_status: str  # freelance, employee, both
     english_level: str  # notions, intermediate, professional, fluent, bilingual
-    tjm_current: Optional[float]  # For freelance/both
-    tjm_desired: Optional[float]  # For freelance/both
-    salary_current: Optional[float]  # For employee/both
-    salary_desired: Optional[float]  # For employee/both
     cv_content: bytes
     cv_filename: str
     cv_content_type: str
+    civility: Optional[str] = None  # M, Mme
+    tjm_current: Optional[float] = None  # For freelance/both
+    tjm_desired: Optional[float] = None  # For freelance/both
+    salary_current: Optional[float] = None  # For employee/both
+    salary_desired: Optional[float] = None  # For employee/both
 
 
 class SubmitApplicationUseCase:

@@ -7,6 +7,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
+# Bust cache when source changes
+ARG CACHEBUST=1
+
 # Copy source and build
 COPY . .
 
@@ -33,4 +36,3 @@ EXPOSE 80
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]
-# Trigger rebuild 1768324314

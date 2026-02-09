@@ -6,7 +6,7 @@ Historique des corrections automatiques effectuées par le Railway Healer.
 > Ne pas modifier manuellement.
 
 ---
-## 📅 09/02/2026 — Auto-Heal
+## 📅 09/02/2026 — Auto-Heal #4 : dataclass field ordering
 
 | | |
 |---|---|
@@ -17,17 +17,69 @@ Historique des corrections automatiques effectuées par le Railway Healer.
 ### Erreur détectée
 ```
 TypeError: non-default argument 'availability' follows default argument
-File: backend/app/domain/entities/job_application.py, line 134 (JobApplication dataclass)
+  File "/app/app/application/use_cases/job_applications.py", line 40, in SubmitApplicationCommand
 ```
 
 ### Analyse
-Dans le dataclass `JobApplication`, le champ `civility: Optional[str] = None` (avec valeur par défaut) était placé **avant** trois champs sans valeur par défaut (`availability`, `employment_status`, `english_level`). Python interdit les champs sans défaut après un champ avec défaut dans un `@dataclass`. L'erreur se produisait au moment de l'import du module, empêchant Alembic puis uvicorn de démarrer → healthcheck timeout → déploiement échoué.
+Dans le dataclass `SubmitApplicationCommand`, le champ `civility: Optional[str] = None` avait une valeur par défaut, mais les champs suivants (`availability`, `employment_status`, `english_level`, `tjm_current`, etc.) n'en avaient pas. Python interdit les champs sans défaut après un champ avec défaut → `TypeError` au chargement du module → uvicorn crash → healthcheck timeout → déploiement échoué.
 
 ### Correction appliquée
-Déplacement de `civility: Optional[str] = None` **après** les trois champs requis (`availability`, `employment_status`, `english_level`) dans le dataclass `JobApplication` pour respecter l'ordre Python : champs sans défaut d'abord, champs avec défaut ensuite.
+Réorganisation des champs : champs requis sans défaut placés avant les champs optionnels. Ajout de `= None` aux champs `Optional[float]`. Tous les appelants utilisent des keyword arguments → pas d'impact.
 
 ### Commit
 *(voir ci-dessous)*
+
+---
+## 📅 09/02/2026 — Crash #3 : Docker cache périmé
+
+| | |
+|---|---|
+| **Service** | backend |
+| **Environment** | production |
+| **Status** | ✅ Réparé (intervention manuelle) |
+
+### Erreur détectée
+```
+Container failed to start
+(toutes les layers Docker "cached" y compris COPY . .)
+```
+
+### Analyse
+Malgré les commits de fix poussés sur `origin/main`, Railway servait un cache Docker périmé. Le layer `COPY . .` restait "cached", donc le container démarrait avec l'ancien code (migration 019 cassée). Le healer auto a tenté 5 corrections sans succès car le problème était côté build, pas côté code. De plus, le healer a corrompu le git staging area (tous les fichiers marqués "deleted").
+
+### Correction appliquée
+- Ajout `ARG CACHEBUST=1` avant `COPY . .` dans le Dockerfile pour casser le cache Docker
+- Conversion `CMD` en format JSON (corrige warning `JSONArgsRecommended`)
+- Nettoyage migration 019 : constructeurs `sa.Text()` / `sa.DateTime()` avec parenthèses
+- `git reset HEAD` pour réparer le staging area corrompu
+
+### Commit
+`b3447d7`
+
+---
+## 📅 09/02/2026 — Crash #2 : Alembic revision chain cassée
+
+| | |
+|---|---|
+| **Service** | backend |
+| **Environment** | production |
+| **Status** | ✅ Réparé (healer auto) |
+
+### Erreur détectée
+```
+KeyError: '018'
+UserWarning: Revision 018 referenced from 018 -> 019 (head),
+Add civility and Boond sync tracking fields to job_applications. is not present
+```
+
+### Analyse
+Migration `019_add_civility_and_boond_sync.py` avait `down_revision = '018'` (ID court) au lieu de `down_revision = '018_simplify_application_status'` (ID complet). Alembic ne pouvait pas résoudre la chaîne de révisions → `KeyError: '018'` → `alembic upgrade head` échoue → app ne démarre pas → 5 déploiements échoués consécutifs.
+
+### Correction appliquée
+Fix des revision IDs : `revision = '019_add_civility_and_boond_sync'` et `down_revision = '018_simplify_application_status'`.
+
+### Commit
+`79a75a9`
 
 ---
 
