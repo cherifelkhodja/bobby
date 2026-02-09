@@ -584,11 +584,13 @@ async def test_cv_ai_provider(
                     message="GEMINI_API_KEY non configurée",
                 )
 
-            import google.generativeai as genai
+            from google import genai
 
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            model = genai.GenerativeModel(request.model)
-            response = model.generate_content("Réponds uniquement 'OK'.")
+            client = genai.Client(api_key=settings.GEMINI_API_KEY)
+            response = await client.aio.models.generate_content(
+                model=request.model,
+                contents="Réponds uniquement 'OK'.",
+            )
             text = response.text if response.text else ""
             elapsed = int((time.time() - start) * 1000)
 

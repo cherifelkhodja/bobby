@@ -14,7 +14,6 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import {
   ChevronLeft,
   Loader2,
@@ -37,59 +36,16 @@ import {
   type TurnoverITPlace,
 } from '../api/hr';
 import { getErrorMessage } from '../api/client';
-
-// Validation schema
-const createJobPostingSchema = z.object({
-  title: z
-    .string()
-    .min(5, 'Le titre doit contenir au moins 5 caractères')
-    .max(100, 'Le titre ne peut pas dépasser 100 caractères'),
-  description: z
-    .string()
-    .min(500, 'La description doit contenir au moins 500 caractères')
-    .max(3000, 'La description ne peut pas dépasser 3000 caractères'),
-  qualifications: z
-    .string()
-    .min(150, 'Les qualifications doivent contenir au moins 150 caractères')
-    .max(3000, 'Les qualifications ne peuvent pas dépasser 3000 caractères'),
-  experience_level: z.string().optional(),
-  remote: z.string().optional(),
-  start_date: z.string().optional(),
-  duration_months: z.coerce.number().int().positive().optional().or(z.literal('')),
-  salary_min_annual: z.coerce.number().positive().optional().or(z.literal('')),
-  salary_max_annual: z.coerce.number().positive().optional().or(z.literal('')),
-  salary_min_daily: z.coerce.number().positive().optional().or(z.literal('')),
-  salary_max_daily: z.coerce.number().positive().optional().or(z.literal('')),
-  employer_overview: z.string().optional(),
-});
-
-type CreateJobPostingFormData = z.infer<typeof createJobPostingSchema>;
+import { jobPostingSchema, type JobPostingFormData } from '../schemas/jobPosting';
+import {
+  CONTRACT_TYPES,
+  SALARY_CONTRACT_TYPES,
+  TJM_CONTRACT_TYPES,
+  REMOTE_POLICIES,
+  EXPERIENCE_LEVELS,
+} from '../constants/hr';
 
 type ViewStep = 'loading' | 'ready' | 'anonymizing' | 'form' | 'saving' | 'publishing' | 'error';
-
-const CONTRACT_TYPES = [
-  { value: 'PERMANENT', label: 'CDI' },
-  { value: 'TEMPORARY', label: 'CDD' },
-  { value: 'FREELANCE', label: 'Freelance' },
-];
-
-// Contract types that enable salary fields (annual)
-const SALARY_CONTRACT_TYPES = ['PERMANENT', 'TEMPORARY'];
-// Contract types that enable TJM fields (daily rate)
-const TJM_CONTRACT_TYPES = ['FREELANCE'];
-
-const REMOTE_POLICIES = [
-  { value: 'NONE', label: 'Pas de télétravail' },
-  { value: 'PARTIAL', label: 'Télétravail partiel' },
-  { value: 'FULL', label: '100% télétravail' },
-];
-
-const EXPERIENCE_LEVELS = [
-  { value: 'JUNIOR', label: 'Junior (0-2 ans)' },
-  { value: 'INTERMEDIATE', label: 'Intermédiaire (2-5 ans)' },
-  { value: 'SENIOR', label: 'Senior (5-10 ans)' },
-  { value: 'EXPERT', label: 'Expert (+10 ans)' },
-];
 
 export default function CreateJobPosting() {
   const { oppId } = useParams<{ oppId: string }>();
@@ -134,8 +90,8 @@ export default function CreateJobPosting() {
     formState: { errors },
     watch,
     reset,
-  } = useForm<CreateJobPostingFormData>({
-    resolver: zodResolver(createJobPostingSchema),
+  } = useForm<JobPostingFormData>({
+    resolver: zodResolver(jobPostingSchema),
     defaultValues: {
       title: '',
       description: '',
@@ -266,7 +222,7 @@ export default function CreateJobPosting() {
 
   // Save mutation - creates or updates draft
   const saveMutation = useMutation({
-    mutationFn: async (data: CreateJobPostingFormData) => {
+    mutationFn: async (data: JobPostingFormData) => {
       if (!oppId) throw new Error('ID opportunité manquant');
       if (selectedContractTypes.length === 0) {
         throw new Error('Sélectionnez au moins un type de contrat');
@@ -365,7 +321,7 @@ export default function CreateJobPosting() {
 
   // Publish mutation - saves and publishes to Turnover-IT
   const publishMutation = useMutation({
-    mutationFn: async (data: CreateJobPostingFormData) => {
+    mutationFn: async (data: JobPostingFormData) => {
       if (!oppId) throw new Error('ID opportunité manquant');
       if (selectedContractTypes.length === 0) {
         throw new Error('Sélectionnez au moins un type de contrat');
@@ -470,12 +426,12 @@ export default function CreateJobPosting() {
     anonymizeMutation.mutate();
   };
 
-  const onSaveDraft = (data: CreateJobPostingFormData) => {
+  const onSaveDraft = (data: JobPostingFormData) => {
     setStep('saving');
     saveMutation.mutate(data);
   };
 
-  const onPublish = (data: CreateJobPostingFormData) => {
+  const onPublish = (data: JobPostingFormData) => {
     setStep('publishing');
     publishMutation.mutate(data);
   };
