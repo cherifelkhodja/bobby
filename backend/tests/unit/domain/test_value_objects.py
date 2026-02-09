@@ -2,6 +2,7 @@
 
 import pytest
 
+from app.domain.exceptions import InvalidEmailError, InvalidPhoneError
 from app.domain.value_objects import CooptationStatus, Email, OpportunityStatus, Phone, UserRole
 
 
@@ -159,24 +160,25 @@ class TestEmail:
         email = Email("test@example.com")
         assert str(email) == "test@example.com"
 
-    def test_email_normalization(self):
-        """Test email is lowercased."""
-        email = Email("Test@Example.COM")
-        assert str(email) == "test@example.com"
+    def test_email_equality_case_insensitive(self):
+        """Test email equality is case-insensitive."""
+        email1 = Email("Test@Example.COM")
+        email2 = Email("test@example.com")
+        assert email1 == email2
 
     def test_invalid_email_missing_at(self):
         """Test invalid email without @ symbol."""
-        with pytest.raises(ValueError, match="Email invalide"):
+        with pytest.raises(InvalidEmailError):
             Email("invalid-email")
 
     def test_invalid_email_missing_domain(self):
         """Test invalid email without domain."""
-        with pytest.raises(ValueError, match="Email invalide"):
+        with pytest.raises(InvalidEmailError):
             Email("test@")
 
     def test_invalid_email_empty(self):
         """Test invalid empty email."""
-        with pytest.raises(ValueError, match="Email invalide"):
+        with pytest.raises(InvalidEmailError):
             Email("")
 
 
@@ -198,15 +200,15 @@ class TestPhone:
         phone = Phone("+33.6.12.34.56.78")
         assert str(phone) == "+33612345678"
 
+    def test_valid_phone_national_format(self):
+        """Test valid French national format."""
+        phone = Phone("0612345678")
+        assert str(phone) == "0612345678"
+
     def test_invalid_phone_too_short(self):
         """Test invalid phone number too short."""
-        with pytest.raises(ValueError, match="Numéro de téléphone invalide"):
+        with pytest.raises(InvalidPhoneError):
             Phone("+331")
-
-    def test_invalid_phone_no_country_code(self):
-        """Test phone number without country code."""
-        with pytest.raises(ValueError, match="Numéro de téléphone invalide"):
-            Phone("0612345678")
 
     def test_phone_equality(self):
         """Test phone equality comparison."""

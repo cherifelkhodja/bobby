@@ -1,6 +1,6 @@
 """Tests for HR feature use cases (job postings and applications)."""
 
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -350,7 +350,7 @@ class TestPublishJobPostingUseCase:
         posting = MagicMock(id=uuid4(), status=JobPostingStatus.PUBLISHED)
         mock_deps["job_posting_repo"].get_by_id.return_value = posting
 
-        with pytest.raises(ValueError, match="cannot publish"):
+        with pytest.raises(ValueError, match="Cannot publish"):
             await use_case.execute(posting.id)
 
     @pytest.mark.asyncio
@@ -423,9 +423,11 @@ class TestSubmitApplicationUseCase:
                 email="jean@example.com",
                 phone="+33612345678",
                 job_title="Dev Python",
-                tjm_min=400,
-                tjm_max=500,
-                availability_date=date.today() + timedelta(days=30),
+                availability="1_month",
+                employment_status="freelance",
+                english_level="professional",
+                tjm_current=450.0,
+                tjm_desired=500.0,
                 cv_content=b"PDF content",
                 cv_filename="cv.pdf",
                 cv_content_type="application/pdf",
@@ -452,9 +454,9 @@ class TestSubmitApplicationUseCase:
             email="jean@example.com",
             phone="+33612345678",
             job_title="Dev",
-            tjm_min=400,
-            tjm_max=500,
-            availability_date=date.today(),
+            availability="asap",
+            employment_status="freelance",
+            english_level="intermediate",
             cv_content=b"PDF",
             cv_filename="cv.pdf",
             cv_content_type="application/pdf",
@@ -478,9 +480,9 @@ class TestSubmitApplicationUseCase:
             email="jean@example.com",
             phone="+33612345678",
             job_title="Dev",
-            tjm_min=400,
-            tjm_max=500,
-            availability_date=date.today(),
+            availability="asap",
+            employment_status="freelance",
+            english_level="intermediate",
             cv_content=b"PDF",
             cv_filename="cv.pdf",
             cv_content_type="application/pdf",
@@ -520,7 +522,7 @@ class TestUpdateApplicationStatusUseCase:
         application = MagicMock(
             id=app_id,
             job_posting_id=uuid4(),
-            status=ApplicationStatus.NOUVEAU,
+            status=ApplicationStatus.EN_COURS,
             cv_s3_key="cvs/key.pdf",
             cv_filename="cv.pdf",
             first_name="Jean",
@@ -528,9 +530,9 @@ class TestUpdateApplicationStatusUseCase:
             email="jean@example.com",
             phone="+33612345678",
             job_title="Dev",
-            tjm_min=400,
-            tjm_max=500,
-            availability_date=date.today(),
+            tjm_current=400.0,
+            tjm_desired=500.0,
+            availability="1_month",
             matching_score=75,
             matching_details=None,
             notes=None,
@@ -575,14 +577,14 @@ class TestUpdateApplicationStatusUseCase:
     @pytest.mark.asyncio
     async def test_update_status_invalid_transition(self, use_case, mock_deps):
         """Should raise error on invalid status transition."""
-        application = MagicMock(status=ApplicationStatus.NOUVEAU)
+        application = MagicMock(status=ApplicationStatus.EN_COURS)
         application.change_status = MagicMock(return_value=False)
 
         mock_deps["job_application_repo"].get_by_id.return_value = application
 
         command = UpdateApplicationStatusCommand(
             application_id=uuid4(),
-            new_status=ApplicationStatus.ACCEPTE,
+            new_status=ApplicationStatus.VALIDE,
             changed_by=uuid4(),
         )
 

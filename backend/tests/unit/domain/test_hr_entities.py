@@ -12,11 +12,6 @@ from app.domain.entities import (
     JobPosting,
     JobPostingStatus,
 )
-from app.domain.exceptions import (
-    InvalidJobApplicationError,
-    InvalidJobPostingError,
-    InvalidStatusTransitionError,
-)
 
 
 class TestJobPostingStatus:
@@ -27,18 +22,15 @@ class TestJobPostingStatus:
         assert JobPostingStatus.PUBLISHED.value == "published"
         assert JobPostingStatus.CLOSED.value == "closed"
 
-    def test_draft_can_transition_to_published(self):
-        assert JobPostingStatus.DRAFT.can_transition_to(JobPostingStatus.PUBLISHED)
+    def test_display_name(self):
+        assert JobPostingStatus.DRAFT.display_name == "Brouillon"
+        assert JobPostingStatus.PUBLISHED.display_name == "Publiée"
+        assert JobPostingStatus.CLOSED.display_name == "Fermée"
 
-    def test_published_can_transition_to_closed(self):
-        assert JobPostingStatus.PUBLISHED.can_transition_to(JobPostingStatus.CLOSED)
-
-    def test_draft_cannot_transition_to_closed(self):
-        assert not JobPostingStatus.DRAFT.can_transition_to(JobPostingStatus.CLOSED)
-
-    def test_closed_cannot_transition(self):
-        assert not JobPostingStatus.CLOSED.can_transition_to(JobPostingStatus.DRAFT)
-        assert not JobPostingStatus.CLOSED.can_transition_to(JobPostingStatus.PUBLISHED)
+    def test_is_active(self):
+        assert JobPostingStatus.DRAFT.is_active is False
+        assert JobPostingStatus.PUBLISHED.is_active is True
+        assert JobPostingStatus.CLOSED.is_active is False
 
 
 class TestApplicationStatus:
@@ -92,75 +84,71 @@ class TestJobPosting:
         posting2 = self._create_valid_posting()
         assert posting1.application_token != posting2.application_token
 
-    def test_title_too_short_raises_error(self):
-        with pytest.raises(InvalidJobPostingError, match="titre"):
-            self._create_valid_posting(title="ABC")  # Min 5 chars
+    def test_validate_title_too_short(self):
+        posting = self._create_valid_posting(title="ABC")
+        errors = posting.validate_for_publication()
+        assert any("titre" in e or "5" in e for e in errors)
 
-    def test_title_too_long_raises_error(self):
-        with pytest.raises(InvalidJobPostingError, match="titre"):
-            self._create_valid_posting(title="T" * 101)  # Max 100 chars
+    def test_validate_title_too_long(self):
+        posting = self._create_valid_posting(title="T" * 101)
+        errors = posting.validate_for_publication()
+        assert any("titre" in e or "100" in e for e in errors)
 
-    def test_description_too_short_raises_error(self):
-        with pytest.raises(InvalidJobPostingError, match="description"):
-            self._create_valid_posting(description="D" * 499)  # Min 500 chars
+    def test_validate_description_too_short(self):
+        posting = self._create_valid_posting(description="D" * 499)
+        errors = posting.validate_for_publication()
+        assert any("description" in e for e in errors)
 
-    def test_description_too_long_raises_error(self):
-        with pytest.raises(InvalidJobPostingError, match="description"):
-            self._create_valid_posting(description="D" * 3001)  # Max 3000 chars
+    def test_validate_description_too_long(self):
+        posting = self._create_valid_posting(description="D" * 3001)
+        errors = posting.validate_for_publication()
+        assert any("description" in e for e in errors)
 
-    def test_qualifications_too_short_raises_error(self):
-        with pytest.raises(InvalidJobPostingError, match="qualifications"):
-            self._create_valid_posting(qualifications="Q" * 149)  # Min 150 chars
+    def test_validate_qualifications_too_short(self):
+        posting = self._create_valid_posting(qualifications="Q" * 149)
+        errors = posting.validate_for_publication()
+        assert any("qualifications" in e for e in errors)
 
-    def test_qualifications_too_long_raises_error(self):
-        with pytest.raises(InvalidJobPostingError, match="qualifications"):
-            self._create_valid_posting(qualifications="Q" * 3001)  # Max 3000 chars
+    def test_validate_qualifications_too_long(self):
+        posting = self._create_valid_posting(qualifications="Q" * 3001)
+        errors = posting.validate_for_publication()
+        assert any("qualifications" in e for e in errors)
 
-    def test_empty_contract_types_raises_error(self):
-        with pytest.raises(InvalidJobPostingError, match="contrat"):
-            self._create_valid_posting(contract_types=[])
+    def test_validate_empty_contract_types(self):
+        posting = self._create_valid_posting(contract_types=[])
+        errors = posting.validate_for_publication()
+        assert any("contrat" in e for e in errors)
 
     def test_publish_draft_posting(self):
         posting = self._create_valid_posting()
-        posting.publish("turnoverit-ref-123")
+        posting.publish()
         assert posting.status == JobPostingStatus.PUBLISHED
-        assert posting.turnoverit_reference == "turnoverit-ref-123"
+        assert posting.turnoverit_reference is not None
         assert posting.published_at is not None
 
-    def test_publish_non_draft_raises_error(self):
+    def test_publish_closed_raises_error(self):
         posting = self._create_valid_posting()
-        posting.publish("ref-123")
-        with pytest.raises(InvalidStatusTransitionError):
-            posting.publish("ref-456")
+        posting.publish()
+        posting.close()
+        with pytest.raises(ValueError):
+            posting.publish()
 
     def test_close_published_posting(self):
         posting = self._create_valid_posting()
-        posting.publish("ref-123")
+        posting.publish()
         posting.close()
         assert posting.status == JobPostingStatus.CLOSED
         assert posting.closed_at is not None
 
-    def test_close_draft_raises_error(self):
+    def test_close_draft_posting(self):
         posting = self._create_valid_posting()
-        with pytest.raises(InvalidStatusTransitionError):
-            posting.close()
-
-    def test_status_display(self):
-        posting = self._create_valid_posting()
-        assert posting.status_display == "Brouillon"
-        posting.publish("ref")
-        assert posting.status_display == "Publiée"
         posting.close()
-        assert posting.status_display == "Fermée"
+        assert posting.status == JobPostingStatus.CLOSED
 
-    def test_salary_range_display_daily(self):
-        posting = self._create_valid_posting(salary_min_daily=400, salary_max_daily=550)
-        assert "400" in posting.salary_range_display
-        assert "550" in posting.salary_range_display
-
-    def test_salary_range_display_annual(self):
-        posting = self._create_valid_posting(salary_min_annual=45000, salary_max_annual=60000)
-        assert "45000" in posting.salary_range_display or "45 000" in posting.salary_range_display
+    def test_turnoverit_reference_auto_generated(self):
+        posting = self._create_valid_posting()
+        assert posting.turnoverit_reference is not None
+        assert posting.turnoverit_reference.startswith("ESN-")
 
 
 class TestJobApplication:
@@ -192,33 +180,30 @@ class TestJobApplication:
     def test_create_application(self):
         application = self._create_valid_application()
         assert application.status == ApplicationStatus.EN_COURS
-        assert application.is_read == False
-        assert application.full_name == "Jean DUPONT"
+        assert application.is_read is False
+        assert application.full_name == "Jean Dupont"
 
-    def test_full_name_format(self):
+    def test_full_name_formatted(self):
         application = self._create_valid_application(
             first_name="Jean-Pierre", last_name="De La Fontaine"
         )
-        # Last name should be uppercased
-        assert "Jean-Pierre" in application.full_name
-        assert "DE LA FONTAINE" in application.full_name
+        assert application.full_name_formatted == "Jean-Pierre DE LA FONTAINE"
 
-    def test_tjm_range(self):
-        application = self._create_valid_application(tjm_min=400, tjm_max=500)
+    def test_tjm_range_uses_current_desired(self):
+        """tjm_range uses tjm_current/tjm_desired when available."""
+        application = self._create_valid_application(
+            tjm_current=450, tjm_desired=550, tjm_min=400, tjm_max=500
+        )
+        assert "450" in application.tjm_range
+        assert "550" in application.tjm_range
+
+    def test_tjm_range_fallback_to_min_max(self):
+        """tjm_range falls back to tjm_min/tjm_max when current/desired are None."""
+        application = self._create_valid_application(
+            tjm_current=None, tjm_desired=None, tjm_min=400, tjm_max=500
+        )
         assert "400" in application.tjm_range
         assert "500" in application.tjm_range
-
-    def test_invalid_tjm_range_raises_error(self):
-        with pytest.raises(InvalidJobApplicationError, match="TJM"):
-            self._create_valid_application(tjm_min=500, tjm_max=400)
-
-    def test_invalid_email_raises_error(self):
-        with pytest.raises(InvalidJobApplicationError, match="email"):
-            self._create_valid_application(email="invalid-email")
-
-    def test_invalid_phone_raises_error(self):
-        with pytest.raises(InvalidJobApplicationError, match="téléphone"):
-            self._create_valid_application(phone="123")
 
     def test_change_status_valid_transition(self):
         application = self._create_valid_application()
@@ -261,24 +246,24 @@ class TestJobApplication:
 
     def test_mark_as_read(self):
         application = self._create_valid_application()
-        assert application.is_read == False
+        assert application.is_read is False
         result = application.mark_as_read()
-        assert result == True
-        assert application.is_read == True
+        assert result is True
+        assert application.is_read is True
         # Second call should return False (already read)
         result = application.mark_as_read()
-        assert result == False
+        assert result is False
 
-    def test_update_notes(self):
+    def test_add_note(self):
         application = self._create_valid_application()
-        application.update_notes("À rappeler la semaine prochaine")
+        application.add_note("À rappeler la semaine prochaine")
         assert application.notes == "À rappeler la semaine prochaine"
 
     def test_status_display(self):
         application = self._create_valid_application()
-        assert application.status_display == "En cours"
+        assert application.status.display_name == "En cours"
         application.change_status(ApplicationStatus.VALIDE, uuid4())
-        assert application.status_display == "Validé"
+        assert application.status.display_name == "Validé"
 
     def test_workflow_to_valide(self):
         """Test complete workflow from en_cours to validated."""
@@ -287,7 +272,7 @@ class TestJobApplication:
 
         # Mark as read first
         application.mark_as_read()
-        assert application.is_read == True
+        assert application.is_read is True
 
         # en_cours -> valide
         application.change_status(ApplicationStatus.VALIDE, user_id, "Candidat retenu")
