@@ -29,6 +29,7 @@ export const STATE_NAMES: Record<number, string> = {
 export const PREDEFINED_TEMPLATES = [
   { name: 'gemini', displayName: 'Template Gemini', description: 'Format standard Gemini Consulting' },
   { name: 'craftmania', displayName: 'Template Craftmania', description: 'Format standard Craftmania' },
+  { name: 'test', displayName: 'Template X', description: 'Template de test pour essais' },
 ] as const;
 
 export const QUOTATION_TEMPLATES = [

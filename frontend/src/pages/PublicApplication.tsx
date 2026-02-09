@@ -126,6 +126,7 @@ const ENGLISH_LEVELS = [
 
 // Validation schema
 const applicationSchema = z.object({
+  civility: z.enum(['M', 'Mme']).optional(),
   first_name: z.string().min(1, 'Le prénom est requis').max(100),
   last_name: z.string().min(1, 'Le nom est requis').max(100),
   email: z.string().email('Email invalide'),
@@ -308,6 +309,7 @@ export default function PublicApplication() {
         email: data.email,
         phone: data.phone,
         job_title: data.job_title,
+        civility: data.civility,
         availability: data.availability,
         employment_status: employmentStatus,
         english_level: data.english_level,
@@ -520,6 +522,33 @@ export default function PublicApplication() {
           )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Civility */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Civilité
+              </label>
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="M"
+                    {...register('civility')}
+                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  />
+                  <span className="text-sm text-gray-900 dark:text-white">M.</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="Mme"
+                    {...register('civility')}
+                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  />
+                  <span className="text-sm text-gray-900 dark:text-white">Mme</span>
+                </label>
+              </div>
+            </div>
+
             {/* Name Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>

@@ -956,6 +956,7 @@ async def update_application_status(
     application_id: str,
     db: DbSession,
     app_settings: AppSettings,
+    boond_client: Boond,
     request: UpdateApplicationStatusRequest,
     authorization: str = Header(default=""),
 ):
@@ -972,6 +973,7 @@ async def update_application_status(
         job_posting_repository=job_posting_repo,
         user_repository=user_repo,
         s3_client=s3_client,
+        boond_client=boond_client,
     )
 
     try:

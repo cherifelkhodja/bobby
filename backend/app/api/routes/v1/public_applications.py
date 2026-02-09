@@ -96,6 +96,7 @@ async def submit_application(
     email: str = Form(...),
     phone: str = Form(..., min_length=1, max_length=30),
     job_title: str = Form(..., min_length=1, max_length=200),
+    civility: Optional[str] = Form(None),
     availability: str = Form(...),
     employment_status: str = Form(...),
     english_level: str = Form(...),
@@ -125,6 +126,13 @@ async def submit_application(
         raise HTTPException(
             status_code=400,
             detail="Numéro de téléphone invalide. Utilisez le format international (+33...)",
+        )
+
+    # Validate civility
+    if civility and civility not in {"M", "Mme"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Civilité invalide. Valeurs acceptées: M, Mme",
         )
 
     # Validate enum fields
@@ -223,6 +231,7 @@ async def submit_application(
             email=email.strip().lower(),
             phone=phone,
             job_title=job_title.strip(),
+            civility=civility,
             availability=availability,
             employment_status=employment_status,
             english_level=english_level,

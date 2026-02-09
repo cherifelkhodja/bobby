@@ -47,6 +47,7 @@ class SubmitApplicationCommand:
     email: str
     phone: str  # Format international +33...
     job_title: str
+    civility: Optional[str] = None  # M, Mme
     availability: str  # asap, 1_month, 2_months, 3_months, more_3_months
     employment_status: str  # freelance, employee, both
     english_level: str  # notions, intermediate, professional, fluent, bilingual
@@ -221,6 +222,7 @@ Qualifications requises:
             email=command.email.lower(),
             phone=command.phone,
             job_title=command.job_title,
+            civility=command.civility,
             availability=command.availability,
             employment_status=command.employment_status,
             english_level=command.english_level,
@@ -359,6 +361,7 @@ class ListApplicationsForPostingUseCase:
             email=application.email,
             phone=application.phone,
             job_title=application.job_title,
+            civility=application.civility,
             # New fields
             availability=application.availability,
             availability_display=application.availability_display,
@@ -389,6 +392,9 @@ class ListApplicationsForPostingUseCase:
             status_history=status_history,
             notes=application.notes,
             boond_candidate_id=application.boond_candidate_id,
+            boond_sync_error=application.boond_sync_error,
+            boond_synced_at=application.boond_synced_at,
+            boond_sync_status=application.boond_sync_status,
             created_at=application.created_at,
             updated_at=application.updated_at,
         )
@@ -603,6 +609,7 @@ class GetApplicationUseCase:
             email=application.email,
             phone=application.phone,
             job_title=application.job_title,
+            civility=application.civility,
             # New fields
             availability=application.availability,
             availability_display=application.availability_display,
@@ -633,6 +640,9 @@ class GetApplicationUseCase:
             status_history=status_history,
             notes=application.notes,
             boond_candidate_id=application.boond_candidate_id,
+            boond_sync_error=application.boond_sync_error,
+            boond_synced_at=application.boond_synced_at,
+            boond_sync_status=application.boond_sync_status,
             created_at=application.created_at,
             updated_at=application.updated_at,
         )
@@ -657,11 +667,13 @@ class UpdateApplicationStatusUseCase:
         job_posting_repository: JobPostingRepository,
         user_repository: UserRepository,
         s3_client: S3StorageClient,
+        boond_client: Optional[BoondClient] = None,
     ) -> None:
         self.job_application_repository = job_application_repository
         self.job_posting_repository = job_posting_repository
         self.user_repository = user_repository
         self.s3_client = s3_client
+        self.boond_client = boond_client
 
     async def execute(self, command: UpdateApplicationStatusCommand) -> JobApplicationReadModel:
         """Update application status."""
@@ -683,6 +695,44 @@ class UpdateApplicationStatusUseCase:
             )
 
         saved = await self.job_application_repository.save(application)
+
+        # Auto-create candidate in Boond when validated
+        if (
+            command.new_status == ApplicationStatus.VALIDE
+            and not application.boond_candidate_id
+            and self.boond_client
+        ):
+            try:
+                from app.domain.entities import Candidate
+                from app.domain.value_objects import Email, Phone
+
+                candidate = Candidate(
+                    email=Email(application.email),
+                    first_name=application.first_name,
+                    last_name=application.last_name,
+                    civility=application.civility or "M",
+                    phone=Phone(application.phone) if application.phone else None,
+                    daily_rate=application.tjm_desired or application.tjm_current or application.tjm_max,
+                    note=(
+                        f"Candidature validée - {application.job_title}\n"
+                        f"TJM: {application.tjm_range}\n"
+                        f"Disponibilité: {application.availability_display}"
+                    ),
+                )
+                external_id = await self.boond_client.create_candidate(candidate)
+                saved.boond_candidate_id = external_id
+                saved.boond_synced_at = datetime.utcnow()
+                saved.boond_sync_error = None
+            except Exception as e:
+                saved.boond_sync_error = str(e)
+                import structlog
+                structlog.get_logger(__name__).error(
+                    "boond_auto_sync_failed",
+                    application_id=str(application.id),
+                    error=str(e),
+                )
+            # Re-save with Boond sync result
+            saved = await self.job_application_repository.save(saved)
 
         # Get posting title
         posting = await self.job_posting_repository.get_by_id(application.job_posting_id)
@@ -744,6 +794,7 @@ class UpdateApplicationStatusUseCase:
             email=application.email,
             phone=application.phone,
             job_title=application.job_title,
+            civility=application.civility,
             # New fields
             availability=application.availability,
             availability_display=application.availability_display,
@@ -774,6 +825,9 @@ class UpdateApplicationStatusUseCase:
             status_history=status_history,
             notes=application.notes,
             boond_candidate_id=application.boond_candidate_id,
+            boond_sync_error=application.boond_sync_error,
+            boond_synced_at=application.boond_synced_at,
+            boond_sync_status=application.boond_sync_status,
             created_at=application.created_at,
             updated_at=application.updated_at,
         )
@@ -854,6 +908,7 @@ class UpdateApplicationNoteUseCase:
             email=application.email,
             phone=application.phone,
             job_title=application.job_title,
+            civility=application.civility,
             # New fields
             availability=application.availability,
             availability_display=application.availability_display,
@@ -884,6 +939,9 @@ class UpdateApplicationNoteUseCase:
             status_history=status_history,
             notes=application.notes,
             boond_candidate_id=application.boond_candidate_id,
+            boond_sync_error=application.boond_sync_error,
+            boond_synced_at=application.boond_synced_at,
+            boond_sync_status=application.boond_sync_status,
             created_at=application.created_at,
             updated_at=application.updated_at,
         )
@@ -921,19 +979,29 @@ class CreateCandidateInBoondUseCase:
             email=Email(application.email),
             first_name=application.first_name,
             last_name=application.last_name,
-            civility="M",  # Default, could be improved
+            civility=application.civility or "M",
             phone=Phone(application.phone) if application.phone else None,
-            daily_rate=application.tjm_max,
-            note=f"Candidature via formulaire public\nTJM: {application.tjm_min}€ - {application.tjm_max}€\nDisponibilité: {application.availability_date}\nPoste: {application.job_title}",
+            daily_rate=application.tjm_desired or application.tjm_current or application.tjm_max,
+            note=(
+                f"Candidature via formulaire public\n"
+                f"TJM: {application.tjm_range}\n"
+                f"Disponibilité: {application.availability_display}\n"
+                f"Poste: {application.job_title}"
+            ),
         )
 
         # Create in Boond
         try:
             external_id = await self.boond_client.create_candidate(candidate)
             application.boond_candidate_id = external_id
+            application.boond_synced_at = datetime.utcnow()
+            application.boond_sync_error = None
             application.updated_at = datetime.utcnow()
             saved = await self.job_application_repository.save(application)
         except Exception as e:
+            application.boond_sync_error = str(e)
+            application.updated_at = datetime.utcnow()
+            await self.job_application_repository.save(application)
             raise ValueError(f"Failed to create candidate in BoondManager: {str(e)}")
 
         posting = await self.job_posting_repository.get_by_id(application.job_posting_id)
@@ -983,6 +1051,7 @@ class CreateCandidateInBoondUseCase:
             email=application.email,
             phone=application.phone,
             job_title=application.job_title,
+            civility=application.civility,
             # New fields
             availability=application.availability,
             availability_display=application.availability_display,
@@ -1013,6 +1082,9 @@ class CreateCandidateInBoondUseCase:
             status_history=status_history,
             notes=application.notes,
             boond_candidate_id=application.boond_candidate_id,
+            boond_sync_error=application.boond_sync_error,
+            boond_synced_at=application.boond_synced_at,
+            boond_sync_status=application.boond_sync_status,
             created_at=application.created_at,
             updated_at=application.updated_at,
         )
@@ -1176,6 +1248,7 @@ Qualifications requises:
             email=application.email,
             phone=application.phone,
             job_title=application.job_title,
+            civility=application.civility,
             availability=application.availability,
             availability_display=application.availability_display,
             employment_status=application.employment_status,
@@ -1204,6 +1277,9 @@ Qualifications requises:
             status_history=status_history,
             notes=application.notes,
             boond_candidate_id=application.boond_candidate_id,
+            boond_sync_error=application.boond_sync_error,
+            boond_synced_at=application.boond_synced_at,
+            boond_sync_status=application.boond_sync_status,
             created_at=application.created_at,
             updated_at=application.updated_at,
         )

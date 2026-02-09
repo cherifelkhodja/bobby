@@ -311,6 +311,10 @@ class JobApplicationReadModel(BaseModel):
     status_history: list[StatusChangeReadModel] = []
     notes: Optional[str] = None
     boond_candidate_id: Optional[str] = None
+    boond_sync_error: Optional[str] = None
+    boond_synced_at: Optional[datetime] = None
+    boond_sync_status: str = "not_applicable"
+    civility: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

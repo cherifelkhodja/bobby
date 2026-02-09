@@ -147,6 +147,7 @@ class JobApplication:
     email: str
     phone: str  # International format +33...
     job_title: str  # Titre poste souhaité
+    civility: Optional[str] = None  # M, Mme
 
     # Availability and status
     availability: str  # asap, 1_month, 2_months, 3_months, more_3_months
@@ -186,6 +187,8 @@ class JobApplication:
 
     # BoondManager integration
     boond_candidate_id: Optional[str] = None
+    boond_sync_error: Optional[str] = None
+    boond_synced_at: Optional[datetime] = None
 
     # Legacy fields (kept for backward compatibility, may be null)
     tjm_min: Optional[float] = None
@@ -284,6 +287,24 @@ class JobApplication:
     def is_created_in_boond(self) -> bool:
         """Check if candidate was created in BoondManager."""
         return self.boond_candidate_id is not None
+
+    @property
+    def boond_sync_status(self) -> str:
+        """Get Boond sync status for display.
+
+        Returns:
+            'synced' if candidate exists in Boond,
+            'error' if sync failed,
+            'pending' if validated but not yet synced,
+            'not_applicable' otherwise.
+        """
+        if self.boond_candidate_id:
+            return "synced"
+        if self.boond_sync_error:
+            return "error"
+        if self.status == ApplicationStatus.VALIDE:
+            return "pending"
+        return "not_applicable"
 
     def set_matching_score(self, score: int, details: dict[str, Any]) -> None:
         """Set matching score and details from AI analysis.
@@ -397,6 +418,7 @@ class JobApplication:
             "email": self.email,
             "phone": self.phone,
             "title": self.job_title,
+            "civility": self.civility or "M",
             "dailyRate": daily_rate,
             "availability": self.availability_display,
             "englishLevel": self.english_level_display,

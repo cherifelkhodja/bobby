@@ -412,6 +412,9 @@ class JobApplicationModel(Base):
     status_history: Mapped[Optional[list]] = mapped_column(JSON, nullable=True, default=list)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     boond_candidate_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    civility: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    boond_sync_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    boond_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

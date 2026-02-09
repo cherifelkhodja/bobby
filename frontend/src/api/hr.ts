@@ -328,6 +328,16 @@ export const hrApi = {
   },
 
   /**
+   * Retry Boond candidate creation for an application that failed to sync
+   */
+  retryBoondSync: async (applicationId: string): Promise<JobApplication> => {
+    const response = await apiClient.post<JobApplication>(
+      `/hr/applications/${applicationId}/create-in-boond`
+    );
+    return response.data;
+  },
+
+  /**
    * Re-run AI analyses (matching + CV quality) for an application
    */
   reanalyzeApplication: async (applicationId: string): Promise<JobApplication> => {
@@ -361,6 +371,7 @@ export const publicApplicationApi = {
       email: string;
       phone: string;
       job_title: string;
+      civility?: string;
       availability: string;
       employment_status: string;
       english_level: string;
@@ -377,6 +388,9 @@ export const publicApplicationApi = {
     formData.append('email', data.email);
     formData.append('phone', data.phone);
     formData.append('job_title', data.job_title);
+    if (data.civility) {
+      formData.append('civility', data.civility);
+    }
     formData.append('availability', data.availability);
     formData.append('employment_status', data.employment_status);
     formData.append('english_level', data.english_level);

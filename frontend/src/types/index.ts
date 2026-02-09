@@ -658,7 +658,11 @@ export interface JobApplication {
   status: ApplicationStatus;
   status_display: string;
   notes: string | null;
+  civility: string | null;
   boond_candidate_id: string | null;
+  boond_sync_error: string | null;
+  boond_synced_at: string | null;
+  boond_sync_status: 'synced' | 'error' | 'pending' | 'not_applicable';
   status_history: StatusChange[];
   created_at: string;
   updated_at: string;

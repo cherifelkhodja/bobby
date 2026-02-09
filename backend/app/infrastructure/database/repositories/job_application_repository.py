@@ -69,6 +69,7 @@ class JobApplicationRepository:
             model.email = application.email
             model.phone = application.phone
             model.job_title = application.job_title
+            model.civility = application.civility
             # New fields
             model.availability = application.availability
             model.employment_status = application.employment_status
@@ -93,6 +94,8 @@ class JobApplicationRepository:
             model.status_history = application.status_history
             model.notes = application.notes
             model.boond_candidate_id = application.boond_candidate_id
+            model.boond_sync_error = application.boond_sync_error
+            model.boond_synced_at = application.boond_synced_at
             model.updated_at = datetime.utcnow()
         else:
             model = JobApplicationModel(
@@ -103,6 +106,7 @@ class JobApplicationRepository:
                 email=application.email,
                 phone=application.phone,
                 job_title=application.job_title,
+                civility=application.civility,
                 # New fields
                 availability=application.availability,
                 employment_status=application.employment_status,
@@ -127,6 +131,8 @@ class JobApplicationRepository:
                 status_history=application.status_history,
                 notes=application.notes,
                 boond_candidate_id=application.boond_candidate_id,
+                boond_sync_error=application.boond_sync_error,
+                boond_synced_at=application.boond_synced_at,
                 created_at=application.created_at,
                 updated_at=application.updated_at,
             )
@@ -316,6 +322,7 @@ class JobApplicationRepository:
             email=model.email,
             phone=model.phone,
             job_title=model.job_title,
+            civility=model.civility,
             # New fields
             availability=model.availability or "asap",
             employment_status=model.employment_status or "freelance",
@@ -340,6 +347,8 @@ class JobApplicationRepository:
             status_history=model.status_history or [],
             notes=model.notes,
             boond_candidate_id=model.boond_candidate_id,
+            boond_sync_error=model.boond_sync_error,
+            boond_synced_at=model.boond_synced_at,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )

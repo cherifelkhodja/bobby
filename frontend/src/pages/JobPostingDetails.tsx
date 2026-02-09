@@ -119,9 +119,11 @@ interface ApplicationDetailContentProps {
   handleNoteUpdate: (application: JobApplication) => void;
   handleDownloadCv: (application: JobApplication) => void;
   handleReanalyze: (application: JobApplication) => void;
+  handleRetryBoondSync: (application: JobApplication) => void;
   updateStatusMutation: { isPending: boolean };
   updateNoteMutation: { isPending: boolean };
   reanalyzeMutation: { isPending: boolean };
+  retryBoondMutation: { isPending: boolean };
   compact?: boolean;
 }
 
@@ -135,9 +137,11 @@ function ApplicationDetailContent({
   handleNoteUpdate,
   handleDownloadCv,
   handleReanalyze,
+  handleRetryBoondSync,
   updateStatusMutation,
   updateNoteMutation,
   reanalyzeMutation,
+  retryBoondMutation,
   compact = false,
 }: ApplicationDetailContentProps) {
   const gridCols = compact ? 'grid-cols-3' : 'grid-cols-2';
@@ -368,6 +372,59 @@ function ApplicationDetailContent({
         </button>
       </div>
 
+      {/* Boond Sync Status - only for validated applications */}
+      {application.status === 'valide' && (
+        <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 dark:text-gray-400">BoondManager :</span>
+              {application.boond_sync_status === 'synced' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                  <CheckCircle className="h-3 w-3" />
+                  Synchronisé
+                </span>
+              )}
+              {application.boond_sync_status === 'error' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                  <AlertCircle className="h-3 w-3" />
+                  Erreur
+                </span>
+              )}
+              {application.boond_sync_status === 'pending' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
+                  <Loader2 className="h-3 w-3" />
+                  En attente
+                </span>
+              )}
+              {application.boond_candidate_id && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  ID: {application.boond_candidate_id}
+                </span>
+              )}
+            </div>
+            {application.boond_sync_status === 'error' && (
+              <button
+                onClick={() => handleRetryBoondSync(application)}
+                disabled={retryBoondMutation.isPending}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {retryBoondMutation.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3" />
+                )}
+                Réessayer
+              </button>
+            )}
+          </div>
+          {application.boond_sync_error && (
+            <p className="text-xs text-red-600 dark:text-red-400 mt-1 truncate" title={application.boond_sync_error}>
+              {application.boond_sync_error}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* CV Download */}
       <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
         <button
@@ -521,6 +578,23 @@ export default function JobPostingDetails() {
   // Handle reanalyze
   const handleReanalyze = (application: JobApplication) => {
     reanalyzeMutation.mutate(application.id);
+  };
+
+  // Retry Boond sync
+  const retryBoondMutation = useMutation({
+    mutationFn: (applicationId: string) => hrApi.retryBoondSync(applicationId),
+    onSuccess: (updatedApplication) => {
+      toast.success('Candidat créé dans BoondManager');
+      refetchApplications();
+      setSelectedApplication(updatedApplication);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Échec de la synchronisation BoondManager');
+    },
+  });
+
+  const handleRetryBoondSync = (application: JobApplication) => {
+    retryBoondMutation.mutate(application.id);
   };
 
   // Download CV
@@ -1282,9 +1356,11 @@ export default function JobPostingDetails() {
                                 handleNoteUpdate={handleNoteUpdate}
                                 handleDownloadCv={handleDownloadCv}
                                 handleReanalyze={handleReanalyze}
+                                handleRetryBoondSync={handleRetryBoondSync}
                                 updateStatusMutation={updateStatusMutation}
                                 updateNoteMutation={updateNoteMutation}
                                 reanalyzeMutation={reanalyzeMutation}
+                                retryBoondMutation={retryBoondMutation}
                                 compact
                               />
                             </div>
@@ -1325,9 +1401,11 @@ export default function JobPostingDetails() {
               handleNoteUpdate={handleNoteUpdate}
               handleDownloadCv={handleDownloadCv}
               handleReanalyze={handleReanalyze}
+              handleRetryBoondSync={handleRetryBoondSync}
               updateStatusMutation={updateStatusMutation}
               updateNoteMutation={updateNoteMutation}
               reanalyzeMutation={reanalyzeMutation}
+              retryBoondMutation={retryBoondMutation}
             />
           </div>
         </div>
@@ -1364,9 +1442,11 @@ export default function JobPostingDetails() {
               handleNoteUpdate={handleNoteUpdate}
               handleDownloadCv={handleDownloadCv}
               handleReanalyze={handleReanalyze}
+              handleRetryBoondSync={handleRetryBoondSync}
               updateStatusMutation={updateStatusMutation}
               updateNoteMutation={updateNoteMutation}
               reanalyzeMutation={reanalyzeMutation}
+              retryBoondMutation={retryBoondMutation}
             />
           </div>
         </>
@@ -1396,9 +1476,11 @@ export default function JobPostingDetails() {
             handleNoteUpdate={handleNoteUpdate}
             handleDownloadCv={handleDownloadCv}
             handleReanalyze={handleReanalyze}
+            handleRetryBoondSync={handleRetryBoondSync}
             updateStatusMutation={updateStatusMutation}
             updateNoteMutation={updateNoteMutation}
             reanalyzeMutation={reanalyzeMutation}
+            retryBoondMutation={retryBoondMutation}
             compact
           />
         </div>
