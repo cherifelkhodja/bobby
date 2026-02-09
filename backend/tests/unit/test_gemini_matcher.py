@@ -13,7 +13,6 @@ import pytest
 from app.domain.exceptions import CvMatchingError
 from app.infrastructure.matching.gemini_matcher import GeminiMatchingService
 
-
 # ============================================================================
 # Fixtures
 # ============================================================================

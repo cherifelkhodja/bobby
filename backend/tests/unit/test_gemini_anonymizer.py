@@ -16,7 +16,6 @@ from app.infrastructure.anonymizer.gemini_anonymizer import (
     GeminiAnonymizer,
 )
 
-
 # ============================================================================
 # Fixtures
 # ============================================================================
