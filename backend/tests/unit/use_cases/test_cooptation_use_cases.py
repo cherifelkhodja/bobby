@@ -195,7 +195,7 @@ class TestCreateCooptationUseCase:
     ):
         """Test cooptation uses existing candidate if found."""
         opportunity = create_mock_opportunity()
-        existing_candidate = create_mock_candidate()
+        existing_candidate = create_mock_candidate(external_id="ext-123")
         user = create_mock_user()
 
         mock_repositories["opportunity_repository"].get_by_id = AsyncMock(return_value=opportunity)
@@ -225,7 +225,7 @@ class TestCreateCooptationUseCase:
 
         await use_case.execute(command)
 
-        # Should not create new candidate
+        # Should not create new candidate (existing candidate already has external_id)
         mock_repositories["candidate_repository"].save.assert_not_called()
 
 

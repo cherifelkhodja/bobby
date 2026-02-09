@@ -13,7 +13,6 @@ import pytest
 
 from app.infrastructure.cv_transformer.gemini_client import GeminiClient
 
-
 # ============================================================================
 # Fixtures
 # ============================================================================

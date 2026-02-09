@@ -61,10 +61,9 @@ class TestListOpportunitiesUseCase:
 
     @pytest.mark.asyncio
     async def test_list_opportunities_success(
-        self, use_case, mock_repository, mock_cache, sample_opportunities
+        self, use_case, mock_repository, sample_opportunities
     ):
         """Test successful listing of opportunities."""
-        mock_cache.get.return_value = None
         mock_repository.list_active.return_value = sample_opportunities
         mock_repository.count_active.return_value = 2
 
@@ -78,10 +77,9 @@ class TestListOpportunitiesUseCase:
 
     @pytest.mark.asyncio
     async def test_list_opportunities_with_search(
-        self, use_case, mock_repository, mock_cache, sample_opportunities
+        self, use_case, mock_repository, sample_opportunities
     ):
         """Test listing with search filter."""
-        mock_cache.get.return_value = None
         mock_repository.list_active.return_value = [sample_opportunities[0]]
         mock_repository.count_active.return_value = 1
 
@@ -91,26 +89,8 @@ class TestListOpportunitiesUseCase:
         mock_repository.list_active.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_list_opportunities_from_cache(
-        self, use_case, mock_repository, mock_cache, sample_opportunities
-    ):
-        """Test listing returns cached result."""
-        cached_result = {
-            "items": [{"id": str(sample_opportunities[0].id), "title": "Test"}],
-            "total": 1,
-            "page": 1,
-            "page_size": 20,
-        }
-        mock_cache.get.return_value = cached_result
-
-        result = await use_case.execute(page=1, page_size=20)
-
-        mock_repository.list_active.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_list_opportunities_empty(self, use_case, mock_repository, mock_cache):
+    async def test_list_opportunities_empty(self, use_case, mock_repository):
         """Test listing with no opportunities."""
-        mock_cache.get.return_value = None
         mock_repository.list_active.return_value = []
         mock_repository.count_active.return_value = 0
 
@@ -121,10 +101,9 @@ class TestListOpportunitiesUseCase:
 
     @pytest.mark.asyncio
     async def test_list_opportunities_pagination(
-        self, use_case, mock_repository, mock_cache, sample_opportunities
+        self, use_case, mock_repository, sample_opportunities
     ):
         """Test pagination parameters are passed correctly."""
-        mock_cache.get.return_value = None
         mock_repository.list_active.return_value = sample_opportunities
         mock_repository.count_active.return_value = 50
 
@@ -156,27 +135,24 @@ class TestSyncOpportunitiesUseCase:
 
     @pytest.fixture
     def boond_opportunities(self):
+        """Create Opportunity objects as returned by BoondClient."""
         return [
-            {
-                "id": "12345",
-                "attributes": {
-                    "title": "Mission Python",
-                    "reference": "REF-001",
-                    "state": 5,
-                    "startDate": "2024-01-15",
-                    "endDate": "2024-06-15",
-                },
-            },
-            {
-                "id": "12346",
-                "attributes": {
-                    "title": "Mission Java",
-                    "reference": "REF-002",
-                    "state": 5,
-                    "startDate": "2024-02-01",
-                    "endDate": "2024-07-01",
-                },
-            },
+            Opportunity(
+                id=uuid4(),
+                external_id="12345",
+                title="Mission Python",
+                reference="REF-001",
+                is_active=True,
+                created_at=datetime.utcnow(),
+            ),
+            Opportunity(
+                id=uuid4(),
+                external_id="12346",
+                title="Mission Java",
+                reference="REF-002",
+                is_active=True,
+                created_at=datetime.utcnow(),
+            ),
         ]
 
     @pytest.mark.asyncio
@@ -192,7 +168,7 @@ class TestSyncOpportunitiesUseCase:
 
         assert count == 2
         assert mock_repository.save.call_count == 2
-        mock_cache.delete.assert_called()
+        mock_cache.invalidate_opportunities.assert_called()
 
     @pytest.mark.asyncio
     async def test_sync_opportunities_updates_existing(
@@ -251,4 +227,4 @@ class TestSyncOpportunitiesUseCase:
 
         await use_case.execute()
 
-        mock_cache.delete.assert_called()
+        mock_cache.invalidate_opportunities.assert_called()

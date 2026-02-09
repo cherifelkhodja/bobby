@@ -46,7 +46,7 @@ class TestAnonymizeOpportunityUseCase:
         }
 
         # Simulate use case
-        result = mock_anonymizer.anonymize(
+        result = await mock_anonymizer.anonymize(
             boond_opportunity["attributes"]["title"],
             boond_opportunity["attributes"]["description"],
         )
@@ -64,7 +64,7 @@ class TestAnonymizeOpportunityUseCase:
             "skills": ["Python", "FastAPI", "PostgreSQL", "Docker"],
         }
 
-        result = mock_anonymizer.anonymize("title", "description")
+        result = await mock_anonymizer.anonymize("title", "description")
 
         assert "Python" in result["skills"]
         assert "FastAPI" in result["skills"]
@@ -126,9 +126,9 @@ class TestPublishOpportunityUseCase:
         )
         mock_repository.save.return_value = opp
 
-        result = mock_repository.save(opp)
+        result = await mock_repository.save(opp)
 
-        assert result.return_value.end_date is not None
+        assert result.end_date is not None
 
 
 class TestListPublishedOpportunitiesUseCase:

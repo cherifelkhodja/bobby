@@ -3,8 +3,7 @@
 from uuid import uuid4
 
 from app.domain.entities import Candidate, Cooptation, Opportunity
-from app.domain.value_objects import CooptationStatus
-from app.domain.value_objects.contact import Email
+from app.domain.value_objects import CooptationStatus, Email
 
 
 def create_candidate(**kwargs) -> Candidate:

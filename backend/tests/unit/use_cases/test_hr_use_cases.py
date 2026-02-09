@@ -1,6 +1,6 @@
 """Tests for HR feature use cases (job postings and applications)."""
 
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -206,6 +206,7 @@ class TestCreateJobPostingUseCase:
             title="Dev Python Senior",
             reference="REF-001",
             client_name="Client A",
+            external_id="BOOND-123",
         )
         user = MagicMock(full_name="Jean Admin")
 
@@ -312,8 +313,21 @@ class TestPublishJobPostingUseCase:
             description="D" * 500,
             qualifications="Q" * 150,
             location_country="France",
+            location_region=None,
+            location_postal_code=None,
+            location_city=None,
+            location_key=None,
             contract_types=[ContractType.FREELANCE],
             skills=["Python"],
+            experience_level=None,
+            remote=None,
+            start_date=None,
+            duration_months=None,
+            salary_min_annual=None,
+            salary_max_annual=None,
+            salary_min_daily=None,
+            salary_max_daily=None,
+            employer_overview=None,
             application_token="test-token",
             created_by=uuid4(),
             created_at=datetime.utcnow(),
@@ -350,7 +364,7 @@ class TestPublishJobPostingUseCase:
         posting = MagicMock(id=uuid4(), status=JobPostingStatus.PUBLISHED)
         mock_deps["job_posting_repo"].get_by_id.return_value = posting
 
-        with pytest.raises(ValueError, match="cannot publish"):
+        with pytest.raises(ValueError, match="Cannot publish"):
             await use_case.execute(posting.id)
 
     @pytest.mark.asyncio
@@ -413,7 +427,7 @@ class TestSubmitApplicationUseCase:
         mock_deps["job_application_repo"].save.side_effect = mock_save
 
         with patch(
-            "app.application.use_cases.job_applications.extract_text_from_bytes",
+            "app.infrastructure.cv_transformer.extractors.extract_text_from_bytes",
             return_value="CV text",
         ):
             command = SubmitApplicationCommand(
@@ -423,9 +437,11 @@ class TestSubmitApplicationUseCase:
                 email="jean@example.com",
                 phone="+33612345678",
                 job_title="Dev Python",
-                tjm_min=400,
-                tjm_max=500,
-                availability_date=date.today() + timedelta(days=30),
+                availability="1_month",
+                employment_status="freelance",
+                english_level="professional",
+                tjm_current=450.0,
+                tjm_desired=500.0,
                 cv_content=b"PDF content",
                 cv_filename="cv.pdf",
                 cv_content_type="application/pdf",
@@ -452,9 +468,9 @@ class TestSubmitApplicationUseCase:
             email="jean@example.com",
             phone="+33612345678",
             job_title="Dev",
-            tjm_min=400,
-            tjm_max=500,
-            availability_date=date.today(),
+            availability="asap",
+            employment_status="freelance",
+            english_level="intermediate",
             cv_content=b"PDF",
             cv_filename="cv.pdf",
             cv_content_type="application/pdf",
@@ -478,9 +494,9 @@ class TestSubmitApplicationUseCase:
             email="jean@example.com",
             phone="+33612345678",
             job_title="Dev",
-            tjm_min=400,
-            tjm_max=500,
-            availability_date=date.today(),
+            availability="asap",
+            employment_status="freelance",
+            english_level="intermediate",
             cv_content=b"PDF",
             cv_filename="cv.pdf",
             cv_content_type="application/pdf",
@@ -520,7 +536,7 @@ class TestUpdateApplicationStatusUseCase:
         application = MagicMock(
             id=app_id,
             job_posting_id=uuid4(),
-            status=ApplicationStatus.NOUVEAU,
+            status=ApplicationStatus.EN_COURS,
             cv_s3_key="cvs/key.pdf",
             cv_filename="cv.pdf",
             first_name="Jean",
@@ -528,13 +544,35 @@ class TestUpdateApplicationStatusUseCase:
             email="jean@example.com",
             phone="+33612345678",
             job_title="Dev",
-            tjm_min=400,
-            tjm_max=500,
-            availability_date=date.today(),
+            civility=None,
+            # New fields
+            availability="1_month",
+            availability_display="Sous 1 mois",
+            employment_status="freelance",
+            employment_status_display="Freelance",
+            english_level="professional",
+            english_level_display="Professionnel",
+            tjm_current=400.0,
+            tjm_desired=500.0,
+            salary_current=None,
+            salary_desired=None,
+            salary_range="N/A",
+            # Legacy fields
+            tjm_min=None,
+            tjm_max=None,
+            availability_date=None,
+            # Matching & quality
             matching_score=75,
             matching_details=None,
+            cv_quality_score=None,
+            cv_quality=None,
+            # State
+            is_read=False,
             notes=None,
             boond_candidate_id=None,
+            boond_sync_error=None,
+            boond_synced_at=None,
+            boond_sync_status="not_applicable",
             status_history=[],
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
@@ -575,14 +613,14 @@ class TestUpdateApplicationStatusUseCase:
     @pytest.mark.asyncio
     async def test_update_status_invalid_transition(self, use_case, mock_deps):
         """Should raise error on invalid status transition."""
-        application = MagicMock(status=ApplicationStatus.NOUVEAU)
+        application = MagicMock(status=ApplicationStatus.EN_COURS)
         application.change_status = MagicMock(return_value=False)
 
         mock_deps["job_application_repo"].get_by_id.return_value = application
 
         command = UpdateApplicationStatusCommand(
             application_id=uuid4(),
-            new_status=ApplicationStatus.ACCEPTE,
+            new_status=ApplicationStatus.VALIDE,
             changed_by=uuid4(),
         )
 

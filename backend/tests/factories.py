@@ -57,7 +57,7 @@ class UserFactory:
             email=Email(email),
             first_name=first_name,
             last_name=last_name,
-            hashed_password=hash_password(password),
+            password_hash=hash_password(password),
             role=role,
             is_verified=is_verified,
             is_active=is_active,
@@ -154,7 +154,7 @@ class OpportunityFactory:
         location: str | None = "Paris",
         start_date: datetime | None = None,
         end_date: datetime | None = None,
-        is_open: bool = True,
+        is_active: bool = True,
         **kwargs,
     ) -> Opportunity:
         """Create an Opportunity entity."""
@@ -181,7 +181,7 @@ class OpportunityFactory:
             start_date=start_date,
             end_date=end_date,
             response_deadline=kwargs.get("response_deadline"),
-            is_open=is_open,
+            is_active=is_active,
             is_shared=kwargs.get("is_shared", True),
             owner_id=kwargs.get("owner_id"),
             synced_at=kwargs.get("synced_at", datetime.utcnow()),

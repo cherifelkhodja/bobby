@@ -239,7 +239,7 @@ class TestUserRepository:
             )
             await repository.save(user)
 
-        count = await repository.count_all()
+        count = await repository.count()
 
         assert count == 3
 

@@ -26,7 +26,7 @@ class TestUpdateUserUseCase:
             email=Email("test@example.com"),
             first_name="John",
             last_name="Doe",
-            hashed_password="hashed_password",
+            password_hash="hashed_password",
             role=UserRole.USER,
             is_active=True,
             is_verified=True,
@@ -42,10 +42,10 @@ class TestUpdateUserUseCase:
         sample_user.last_name = "Smith"
         mock_repository.save.return_value = sample_user
 
-        result = mock_repository.save(sample_user)
+        result = await mock_repository.save(sample_user)
 
-        assert result.return_value.first_name == "Jane"
-        assert result.return_value.last_name == "Smith"
+        assert result.first_name == "Jane"
+        assert result.last_name == "Smith"
 
     @pytest.mark.asyncio
     async def test_update_user_not_found(self, mock_repository):
@@ -64,9 +64,9 @@ class TestUpdateUserUseCase:
         sample_user.phone = "+33612345678"
         mock_repository.save.return_value = sample_user
 
-        result = mock_repository.save(sample_user)
+        result = await mock_repository.save(sample_user)
 
-        assert result.return_value.phone == "+33612345678"
+        assert result.phone == "+33612345678"
 
 
 class TestActivateUserUseCase:
@@ -83,7 +83,7 @@ class TestActivateUserUseCase:
             email=Email("inactive@example.com"),
             first_name="Inactive",
             last_name="User",
-            hashed_password="hashed_password",
+            password_hash="hashed_password",
             role=UserRole.USER,
             is_active=False,
             is_verified=True,
@@ -108,7 +108,7 @@ class TestActivateUserUseCase:
             email=Email("active@example.com"),
             first_name="Active",
             last_name="User",
-            hashed_password="hashed_password",
+            password_hash="hashed_password",
             role=UserRole.USER,
             is_active=True,
             is_verified=True,
@@ -135,7 +135,7 @@ class TestDeactivateUserUseCase:
             email=Email("active@example.com"),
             first_name="Active",
             last_name="User",
-            hashed_password="hashed_password",
+            password_hash="hashed_password",
             role=UserRole.USER,
             is_active=True,
             is_verified=True,
@@ -160,7 +160,7 @@ class TestDeactivateUserUseCase:
             email=Email("admin@example.com"),
             first_name="Admin",
             last_name="User",
-            hashed_password="hashed_password",
+            password_hash="hashed_password",
             role=UserRole.ADMIN,
             is_active=True,
             is_verified=True,
@@ -189,7 +189,7 @@ class TestChangeUserRoleUseCase:
             email=Email("user@example.com"),
             first_name="Test",
             last_name="User",
-            hashed_password="hashed_password",
+            password_hash="hashed_password",
             role=UserRole.USER,
             is_active=True,
             is_verified=True,
@@ -241,7 +241,7 @@ class TestDeleteUserUseCase:
             email=Email("delete@example.com"),
             first_name="Delete",
             last_name="Me",
-            hashed_password="hashed_password",
+            password_hash="hashed_password",
             role=UserRole.USER,
             is_active=True,
             is_verified=True,
@@ -276,7 +276,7 @@ class TestDeleteUserUseCase:
             email=Email("admin@example.com"),
             first_name="Admin",
             last_name="User",
-            hashed_password="hashed_password",
+            password_hash="hashed_password",
             role=UserRole.ADMIN,
             is_active=True,
             is_verified=True,
@@ -305,7 +305,7 @@ class TestListUsersUseCase:
                 email=Email("user1@example.com"),
                 first_name="User",
                 last_name="One",
-                hashed_password="hash",
+                password_hash="hash",
                 role=UserRole.USER,
                 is_active=True,
                 is_verified=True,
@@ -316,7 +316,7 @@ class TestListUsersUseCase:
                 email=Email("user2@example.com"),
                 first_name="User",
                 last_name="Two",
-                hashed_password="hash",
+                password_hash="hash",
                 role=UserRole.COMMERCIAL,
                 is_active=True,
                 is_verified=True,
