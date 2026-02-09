@@ -14,8 +14,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "019"
-down_revision = "018"
+revision = "019_add_civility_and_boond_sync"
+down_revision = "018_simplify_application_status"
 branch_labels = None
 depends_on = None
 
