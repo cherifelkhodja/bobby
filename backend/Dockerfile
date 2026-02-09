@@ -49,8 +49,8 @@ RUN pip install --no-cache-dir \
     "slowapi>=0.1.9" \
     "anthropic>=0.40.0"
 
-# Bust cache when code changes
-ARG CACHEBUST=1
+# Force fresh copy - change this value to bust Docker cache
+RUN echo "build-20260209-v3"
 
 # Copy application code
 COPY . .

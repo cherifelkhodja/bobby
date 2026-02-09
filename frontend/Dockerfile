@@ -7,8 +7,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# Bust cache when source changes
-ARG CACHEBUST=1
+# Force fresh copy - change this value to bust Docker cache
+RUN echo "build-20260209-v3"
 
 # Copy source and build
 COPY . .
@@ -21,8 +21,8 @@ RUN npm run build
 # Production stage with nginx
 FROM nginx:alpine
 
-# Bust stage-1 cache
-ARG CACHEBUST_STAGE=1
+# Force stage-1 rebuild
+RUN echo "stage1-20260209-v3"
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
