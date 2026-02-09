@@ -147,12 +147,13 @@ class JobApplication:
     email: str
     phone: str  # International format +33...
     job_title: str  # Titre poste souhaité
-    civility: Optional[str] = None  # M, Mme
 
     # Availability and status
     availability: str  # asap, 1_month, 2_months, 3_months, more_3_months
     employment_status: str  # freelance, employee, both
     english_level: str  # notions, intermediate, professional, fluent, bilingual
+
+    civility: Optional[str] = None  # M, Mme
 
     # Salary fields (conditional based on employment_status)
     tjm_current: Optional[float] = None  # Freelance: TJM actuel

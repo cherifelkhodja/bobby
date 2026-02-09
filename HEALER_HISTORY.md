@@ -6,27 +6,28 @@ Historique des corrections automatiques effectuées par le Railway Healer.
 > Ne pas modifier manuellement.
 
 ---
-## 📅 08/02/2026 19:28:28
+## 📅 09/02/2026 — Auto-Heal
 
 | | |
 |---|---|
-| **Service** | test-service |
-| **Environment** | test |
+| **Service** | backend |
+| **Environment** | production |
 | **Status** | ✅ Réparé |
 
 ### Erreur détectée
 ```
-Test error simulation
+TypeError: non-default argument 'availability' follows default argument
+File: backend/app/domain/entities/job_application.py, line 134 (JobApplication dataclass)
 ```
 
 ### Analyse
-Ceci est un test du système de healer
+Dans le dataclass `JobApplication`, le champ `civility: Optional[str] = None` (avec valeur par défaut) était placé **avant** trois champs sans valeur par défaut (`availability`, `employment_status`, `english_level`). Python interdit les champs sans défaut après un champ avec défaut dans un `@dataclass`. L'erreur se produisait au moment de l'import du module, empêchant Alembic puis uvicorn de démarrer → healthcheck timeout → déploiement échoué.
 
 ### Correction appliquée
-Aucune correction (test)
+Déplacement de `civility: Optional[str] = None` **après** les trois champs requis (`availability`, `employment_status`, `english_level`) dans le dataclass `JobApplication` pour respecter l'ordre Python : champs sans défaut d'abord, champs avec défaut ensuite.
 
 ### Commit
-`test-000`
+*(voir ci-dessous)*
 
 ---
 
