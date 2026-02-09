@@ -6,6 +6,36 @@ Historique des corrections automatiques effectuées par le Railway Healer.
 > Ne pas modifier manuellement.
 
 ---
+## 📅 09/02/2026 — Auto-Heal #5 : frontend container failed to start (nginx)
+
+| | |
+|---|---|
+| **Service** | frontend |
+| **Environment** | production |
+| **Status** | ✅ Réparé |
+
+### Erreur détectée
+```
+Container failed to start
+Failed to create deployment.
+```
+6 déploiements frontend FAILED consécutifs (depuis 13:44). Build OK, image push OK, mais le container crash immédiatement au démarrage sans produire de logs runtime.
+
+### Analyse
+Le Dockerfile frontend utilisait `FROM nginx:alpine` (tag non pinné) avec un **custom entrypoint** (`docker-entrypoint.sh`) qui faisait `envsubst '${PORT}'` manuellement puis `exec nginx`. La dernière image `nginx:alpine` (probablement mise à jour entre le 08/02 et le 09/02) a changé le comportement interne de l'entrypoint officiel. Notre custom entrypoint remplaçait `/docker-entrypoint.sh` (le même chemin que l'officiel), ce qui supprimait l'initialisation critique faite par nginx (création de temp dirs, exécution des scripts dans `/docker-entrypoint.d/`). Résultat : nginx ne pouvait pas démarrer et le container crashait silencieusement.
+
+### Correction appliquée
+Migration vers le mécanisme de templates officiel de nginx Docker :
+- **Pin** `nginx:1.27-alpine` (stabilité)
+- **Template** : `nginx.conf` copié dans `/etc/nginx/templates/default.conf.template` (nginx exécute automatiquement `envsubst` au démarrage)
+- **`NGINX_ENVSUBST_FILTER=^PORT$`** : protège les variables nginx internes (`$uri`, etc.) de la substitution
+- **Suppression** du custom `docker-entrypoint.sh` et de `ENTRYPOINT` override — utilise l'entrypoint officiel nginx
+- `ENV PORT=80` comme fallback
+
+### Commit
+*(voir ci-dessous)*
+
+---
 ## 📅 09/02/2026 — Auto-Heal #4 : dataclass field ordering
 
 | | |
