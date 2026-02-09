@@ -29,17 +29,9 @@ import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
+import { getErrorMessage } from '../api/client';
 
 type Step = 'upload' | 'preview' | 'generating' | 'complete';
-
-// Helper to extract error message from unknown error
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error && typeof error === 'object' && 'response' in error) {
-    const response = (error as { response?: { data?: { detail?: string } } }).response;
-    return response?.data?.detail || fallback;
-  }
-  return fallback;
-}
 
 export function QuotationGenerator() {
   const [step, setStep] = useState<Step>('upload');

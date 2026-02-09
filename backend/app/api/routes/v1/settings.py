@@ -258,13 +258,15 @@ async def _test_gemini(
         )
 
     try:
-        import google.generativeai as genai
+        from google import genai
 
-        genai.configure(api_key=api_key)
-        gemini_model = genai.GenerativeModel(model)
+        client = genai.Client(api_key=api_key)
 
         # Simple test prompt
-        response = gemini_model.generate_content("Réponds uniquement 'OK'")
+        response = await client.aio.models.generate_content(
+            model=model,
+            contents="Réponds uniquement 'OK'",
+        )
 
         if response and response.text:
             return ApiKeyTestResult(

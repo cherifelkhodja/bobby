@@ -420,13 +420,15 @@ async def test_gemini_api(
         )
 
     try:
-        import google.generativeai as genai
+        from google import genai
 
-        genai.configure(api_key=app_settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-2.5-flash-lite")
+        client = genai.Client(api_key=app_settings.GEMINI_API_KEY)
 
-        # Simple test prompt
-        response = model.generate_content("Réponds uniquement 'OK' si tu fonctionnes.")
+        # Simple test prompt using native async
+        response = await client.aio.models.generate_content(
+            model="gemini-2.5-flash-lite",
+            contents="Réponds uniquement 'OK' si tu fonctionnes.",
+        )
 
         if response.text:
             return GeminiTestResponse(

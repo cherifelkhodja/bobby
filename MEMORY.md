@@ -12,7 +12,7 @@
 ### Stack technique
 - **Backend** : Python 3.12, FastAPI, SQLAlchemy async, PostgreSQL, Redis
 - **Frontend** : React 18, TypeScript, Vite, TailwindCSS, Zustand
-- **IA** : Google Gemini (anonymisation, matching) + Claude Sonnet 4.5 / Gemini (transformation CV, configurable)
+- **IA** : Google Gemini via `google-genai` SDK (anonymisation, matching) + Claude Sonnet 4.5 / Gemini (transformation CV, configurable)
 - **Déploiement** : Railway (Docker)
 
 ---
@@ -62,6 +62,17 @@
 - **Architecture** : Port `CvDataExtractorPort` avec 2 adapters (`GeminiClient`, `AnthropicClient`), sélection runtime via `app_settings`
 - **Prompt** : v5 optimisé pour extraction fidèle ("reproduire exactement", pas de transformation)
 
+### ADR-007 : Migration google-generativeai vers google-genai
+- **Date** : 2026-02
+- **Décision** : Migrer de `google-generativeai` (deprecated) vers `google-genai` (nouveau SDK officiel)
+- **Raison** : L'ancien SDK est deprecated depuis novembre 2025, le nouveau offre le support async natif et l'accès aux dernières fonctionnalités
+- **Changements** :
+  - `import google.generativeai as genai` → `from google import genai`
+  - `genai.configure(api_key=...)` → `client = genai.Client(api_key=...)`
+  - `genai.GenerativeModel(model)` + `asyncio.to_thread(model.generate_content, ...)` → `await client.aio.models.generate_content(model=..., contents=...)`
+  - `genai.GenerationConfig(...)` → `types.GenerateContentConfig(...)`
+  - `system_instruction` passé dans `config=` au lieu du constructeur du modèle
+
 ### ADR-004 : JWT avec Refresh Token
 - **Date** : 2025-01
 - **Décision** : Access token 30min, refresh token 7 jours
@@ -79,7 +90,6 @@
 | Problème | Impact | Workaround | Priorité |
 |----------|--------|------------|----------|
 | Rate limit Boond non documenté | Faible | Retry avec backoff | Low |
-| Gemini SDK deprecated | Medium | Fonctionne encore | Medium |
 
 ---
 
@@ -87,23 +97,14 @@
 
 | Élément | Description | Priorité |
 |---------|-------------|----------|
-| Google Gemini SDK | Migration `google-generativeai` → `google-genai` | Medium |
 | Tests E2E | Couverture à améliorer | Medium |
-
-### Détails dette Gemini SDK
-- **Current** : `google-generativeai` (deprecated)
-- **Target** : `google-genai`
-- **Fichiers à migrer** :
-  - `backend/app/infrastructure/cv_transformer/gemini_client.py`
-  - `backend/app/infrastructure/anonymizer/gemini_anonymizer.py`
-  - `backend/app/infrastructure/matching/gemini_matcher.py`
-- **Référence** : https://github.com/google-gemini/deprecated-generative-ai-python
+| Gros composants frontend | HRDashboard.tsx (771 LOC), MyBoondOpportunities.tsx (768 LOC) | Low |
+| Accessibilité | ARIA labels manquants sur certains composants | Low |
 
 ---
 
 ## Prochaines étapes
 
-- [ ] Migration SDK Gemini
 - [ ] Améliorer couverture tests E2E
 - [ ] Dashboard analytics cooptations
 - [ ] Notifications push
@@ -139,6 +140,26 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-02-09
+- **refactor(frontend)**: Refactoring majeur pour éliminer la duplication et respecter SRP
+  - **Constantes partagées** : Création `constants/hr.ts` centralisant toutes les constantes HR (CONTRACT_TYPES, REMOTE_POLICIES, EXPERIENCE_LEVELS, JOB_POSTING_STATUS_BADGES, AVAILABILITY_OPTIONS, ENGLISH_LEVELS, DISPLAY_MODE_OPTIONS)
+  - **Schéma partagé** : Création `schemas/jobPosting.ts` avec schéma Zod unique utilisé par CreateJobPosting et EditJobPosting (suppression duplication)
+  - **Composant extrait** : `ApplicationDetailContent` extrait de JobPostingDetails.tsx (1729 LOC) vers `components/hr/ApplicationDetailContent.tsx`
+  - **Hook extrait** : `useFormCache` extrait de PublicApplication.tsx (985 LOC) vers `hooks/useFormCache.ts` — hook générique réutilisable pour cache formulaire localStorage avec TTL
+  - **ThemeProvider simplifié** : Suppression de la duplication `getSystemTheme()`/`getStoredTheme()` entre ThemeProvider.tsx et useTheme.ts — ThemeProvider délègue maintenant tout au hook
+  - **getErrorMessage unifié** : Suppression de la copie locale dans QuotationGenerator.tsx, utilisation de la version partagée depuis `api/client.ts` (avec paramètre fallback optionnel ajouté)
+  - **Tests ajoutés** : 27 tests (useFormCache: 8 tests, constants/hr: 19 tests)
+  - **Fichiers créés** : `constants/hr.ts`, `schemas/jobPosting.ts`, `components/hr/ApplicationDetailContent.tsx`, `hooks/useFormCache.ts`, `hooks/useFormCache.test.ts`, `constants/hr.test.ts`
+  - **Fichiers refactorés** : `CreateJobPosting.tsx`, `EditJobPosting.tsx`, `JobPostingDetails.tsx`, `PublicApplication.tsx`, `QuotationGenerator.tsx`, `ThemeProvider.tsx`, `api/client.ts`
+- **refactor(gemini)**: Migration SDK `google-generativeai` (deprecated) vers `google-genai` (nouveau SDK officiel)
+  - Remplacement du pattern global `genai.configure()` par des instances `genai.Client(api_key=...)`
+  - Suppression de `asyncio.to_thread()` au profit de `client.aio.models.generate_content()` (async natif)
+  - `genai.GenerationConfig` remplacé par `types.GenerateContentConfig` (inclut `system_instruction`)
+  - Suppression du filtre `FutureWarning` dans `main.py` (plus nécessaire)
+  - Dépendance `google-generativeai>=0.8.3` remplacée par `google-genai>=1.0.0` (pyproject.toml + Dockerfile)
+  - Fichiers modifiés : `gemini_client.py`, `gemini_anonymizer.py`, `job_posting_anonymizer.py`, `gemini_matcher.py`, `settings.py`, `cv_transformer.py`, `admin.py`, `main.py`, `pyproject.toml`, `Dockerfile`
+  - Interfaces et signatures de fonctions inchangées (migration interne uniquement)
 
 ### 2026-02-08
 - **feat(cv-transformer)**: Intégration Claude Sonnet 4.5 comme provider IA alternatif
