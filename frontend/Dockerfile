@@ -21,6 +21,9 @@ RUN npm run build
 # Production stage with nginx
 FROM nginx:alpine
 
+# Bust stage-1 cache
+ARG CACHEBUST_STAGE=1
+
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
