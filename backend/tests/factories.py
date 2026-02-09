@@ -351,7 +351,7 @@ class JobApplicationFactory:
         email: str | None = None,
         first_name: str = "Jean",
         last_name: str = "Candidat",
-        status: ApplicationStatus = ApplicationStatus.NOUVEAU,
+        status: ApplicationStatus = ApplicationStatus.EN_COURS,
         **kwargs,
     ) -> JobApplication:
         """Create a JobApplication entity."""
