@@ -403,7 +403,6 @@ class JobApplicationModel(Base):
     __table_args__ = (
         Index("ix_job_applications_job_posting_id", "job_posting_id"),
         Index("ix_job_applications_email_posting", "email", "job_posting_id"),
-        Index("ix_job_applications_status", "status"),
     )
 
 
