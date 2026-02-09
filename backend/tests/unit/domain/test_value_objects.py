@@ -2,8 +2,7 @@
 
 import pytest
 
-from app.domain.value_objects import CooptationStatus, OpportunityStatus, UserRole
-from app.domain.value_objects.contact import Email, Phone
+from app.domain.value_objects import CooptationStatus, Email, OpportunityStatus, Phone, UserRole
 
 
 class TestUserRole:
