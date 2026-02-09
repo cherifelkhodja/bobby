@@ -42,10 +42,10 @@ class TestUpdateUserUseCase:
         sample_user.last_name = "Smith"
         mock_repository.save.return_value = sample_user
 
-        result = mock_repository.save(sample_user)
+        result = await mock_repository.save(sample_user)
 
-        assert result.return_value.first_name == "Jane"
-        assert result.return_value.last_name == "Smith"
+        assert result.first_name == "Jane"
+        assert result.last_name == "Smith"
 
     @pytest.mark.asyncio
     async def test_update_user_not_found(self, mock_repository):
@@ -64,9 +64,9 @@ class TestUpdateUserUseCase:
         sample_user.phone = "+33612345678"
         mock_repository.save.return_value = sample_user
 
-        result = mock_repository.save(sample_user)
+        result = await mock_repository.save(sample_user)
 
-        assert result.return_value.phone == "+33612345678"
+        assert result.phone == "+33612345678"
 
 
 class TestActivateUserUseCase:

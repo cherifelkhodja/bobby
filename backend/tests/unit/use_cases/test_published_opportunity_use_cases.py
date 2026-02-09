@@ -126,9 +126,9 @@ class TestPublishOpportunityUseCase:
         )
         mock_repository.save.return_value = opp
 
-        result = mock_repository.save(opp)
+        result = await mock_repository.save(opp)
 
-        assert result.return_value.end_date is not None
+        assert result.end_date is not None
 
 
 class TestListPublishedOpportunitiesUseCase:
