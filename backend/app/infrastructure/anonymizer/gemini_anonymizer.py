@@ -5,13 +5,13 @@ internal project names, and proprietary information while preserving
 technical skills and job context.
 """
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass
 from typing import Any
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from app.config import Settings
 
@@ -95,15 +95,15 @@ class GeminiAnonymizer:
             settings: Application settings containing the API key.
         """
         self.settings = settings
-        self._configured = False
+        self._client: genai.Client | None = None
 
-    def _configure(self) -> None:
-        """Configure the Gemini API with credentials."""
-        if not self._configured:
+    def _get_client(self) -> genai.Client:
+        """Get or create the Gemini API client."""
+        if self._client is None:
             if not self.settings.GEMINI_API_KEY:
                 raise ValueError("GEMINI_API_KEY n'est pas configurée")
-            genai.configure(api_key=self.settings.GEMINI_API_KEY)
-            self._configured = True
+            self._client = genai.Client(api_key=self.settings.GEMINI_API_KEY)
+        return self._client
 
     async def test_model(self, model_name: str) -> dict:
         """Test a Gemini model with a simple prompt.
@@ -117,17 +117,16 @@ class GeminiAnonymizer:
         Raises:
             ValueError: If the test fails.
         """
-        self._configure()
+        client = self._get_client()
 
         import time
 
         start_time = time.time()
 
         try:
-            model = genai.GenerativeModel(model_name)
-            response = await asyncio.to_thread(
-                model.generate_content,
-                'Réponds uniquement avec le JSON suivant: {"status": "ok"}',
+            response = await client.aio.models.generate_content(
+                model=model_name,
+                contents='Réponds uniquement avec le JSON suivant: {"status": "ok"}',
             )
             elapsed = time.time() - start_time
 
@@ -171,27 +170,25 @@ class GeminiAnonymizer:
         Raises:
             ValueError: If the API key is not configured or anonymization fails.
         """
-        self._configure()
+        client = self._get_client()
 
         model_to_use = model_name or self.DEFAULT_MODEL
         logger.info(f"Using Gemini model: {model_to_use}")
 
         try:
-            # Configure model with JSON response format
-            model = genai.GenerativeModel(
-                model_to_use,
-                generation_config=genai.GenerationConfig(
-                    response_mime_type="application/json",
-                ),
-            )
-
             prompt = ANONYMIZATION_PROMPT.format(
                 title=title,
                 description=description or "Pas de description disponible",
             )
 
-            # Use asyncio.to_thread to avoid blocking the event loop
-            response = await asyncio.to_thread(model.generate_content, prompt)
+            # Use native async support from the new SDK
+            response = await client.aio.models.generate_content(
+                model=model_to_use,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                ),
+            )
 
             # Extract text from response with fallback methods
             response_text = self._extract_response_text(response)
@@ -243,10 +240,6 @@ class GeminiAnonymizer:
 
     def _extract_response_text(self, response: Any) -> str | None:
         """Extract text from Gemini response with multiple fallback methods.
-
-        The deprecated google-generativeai SDK can throw KeyError when
-        accessing response.text on newer models. This method provides
-        fallback mechanisms to extract the text content.
 
         Args:
             response: The GenerateContentResponse from Gemini.

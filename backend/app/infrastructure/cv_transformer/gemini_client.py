@@ -3,12 +3,12 @@
 Implements CvDataExtractorPort for dependency inversion.
 """
 
-import asyncio
 import json
 import logging
 from typing import Any
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from app.config import Settings
 from app.infrastructure.cv_transformer.prompts import CV_EXTRACTION_PROMPT
@@ -31,15 +31,15 @@ class GeminiClient:
             settings: Application settings containing the API key.
         """
         self.settings = settings
-        self._configured = False
+        self._client: genai.Client | None = None
 
-    def _configure(self) -> None:
-        """Configure the Gemini API with credentials."""
-        if not self._configured:
+    def _get_client(self) -> genai.Client:
+        """Get or create the Gemini API client."""
+        if self._client is None:
             if not self.settings.GEMINI_API_KEY:
                 raise ValueError("GEMINI_API_KEY n'est pas configurée")
-            genai.configure(api_key=self.settings.GEMINI_API_KEY)
-            self._configured = True
+            self._client = genai.Client(api_key=self.settings.GEMINI_API_KEY)
+        return self._client
 
     async def extract_cv_data(
         self,
@@ -58,23 +58,22 @@ class GeminiClient:
         Raises:
             ValueError: If the API key is not configured or extraction fails.
         """
-        self._configure()
+        client = self._get_client()
 
         model_to_use = model_name or self.DEFAULT_MODEL
         logger.info(f"Using Gemini model for CV extraction: {model_to_use}")
 
         try:
-            model = genai.GenerativeModel(
-                model_to_use,
-                generation_config=genai.GenerationConfig(
+            prompt = CV_EXTRACTION_PROMPT + "\n\nTEXTE DU CV A ANALYSER :\n\n" + cv_text
+
+            # Use native async support from the new SDK
+            response = await client.aio.models.generate_content(
+                model=model_to_use,
+                contents=prompt,
+                config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                 ),
             )
-
-            prompt = CV_EXTRACTION_PROMPT + "\n\nTEXTE DU CV A ANALYSER :\n\n" + cv_text
-
-            # Use asyncio.to_thread to avoid blocking the event loop
-            response = await asyncio.to_thread(model.generate_content, prompt)
 
             # Extract text with fallback methods
             response_text = self._extract_response_text(response)

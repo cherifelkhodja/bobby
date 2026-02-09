@@ -5,7 +5,6 @@ for Turnover-IT publication format, matching skills from the
 Turnover-IT nomenclature.
 """
 
-import asyncio
 import json
 import logging
 import traceback
@@ -13,7 +12,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from difflib import SequenceMatcher
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -137,16 +137,16 @@ class JobPostingAnonymizer:
         self.settings = settings
         self.db_session = db_session
         self.turnoverit_client = turnoverit_client or TurnoverITClient(settings)
-        self._configured = False
+        self._client: genai.Client | None = None
         self._skills_cache: list[dict[str, str]] | None = None
 
-    def _configure(self) -> None:
-        """Configure the Gemini API with credentials."""
-        if not self._configured:
+    def _get_client(self) -> genai.Client:
+        """Get or create the Gemini API client."""
+        if self._client is None:
             if not self.settings.GEMINI_API_KEY:
                 raise ValueError("GEMINI_API_KEY n'est pas configurée")
-            genai.configure(api_key=self.settings.GEMINI_API_KEY)
-            self._configured = True
+            self._client = genai.Client(api_key=self.settings.GEMINI_API_KEY)
+        return self._client
 
     async def ensure_skills_synced(self) -> None:
         """Ensure skills are synced from Turnover-IT to database.
@@ -323,7 +323,7 @@ class JobPostingAnonymizer:
         Raises:
             ValueError: If anonymization fails.
         """
-        self._configure()
+        client = self._get_client()
 
         # Ensure skills are synced
         await self.ensure_skills_synced()
@@ -340,13 +340,6 @@ class JobPostingAnonymizer:
         logger.info(f"Available skills for matching: {len(turnoverit_skills)}")
 
         try:
-            model = genai.GenerativeModel(
-                model_to_use,
-                generation_config=genai.GenerationConfig(
-                    response_mime_type="application/json",
-                ),
-            )
-
             prompt = JOB_POSTING_ANONYMIZATION_PROMPT.format(
                 title=title,
                 client_name=client_name or "Non spécifié",
@@ -354,7 +347,14 @@ class JobPostingAnonymizer:
                 available_skills=skills_list_str or "Aucune liste de compétences disponible",
             )
 
-            response = await asyncio.to_thread(model.generate_content, prompt)
+            # Use native async support from the new SDK
+            response = await client.aio.models.generate_content(
+                model=model_to_use,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                ),
+            )
 
             # Extract response text
             response_text = self._extract_response_text(response)

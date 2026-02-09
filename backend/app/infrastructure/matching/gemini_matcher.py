@@ -4,12 +4,12 @@ Uses Google Gemini AI to analyze CV text against job requirements
 and calculate a matching score with detailed analysis.
 """
 
-import asyncio
 import json
 import logging
 from typing import Any
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from pydantic import BaseModel, Field
 
 from app.config import Settings
@@ -430,15 +430,15 @@ class GeminiMatchingService:
             settings: Application settings containing Gemini API key.
         """
         self.api_key = settings.GEMINI_API_KEY
-        self._configured = False
+        self._client: genai.Client | None = None
 
-    def _configure(self) -> None:
-        """Configure Gemini API if not already done."""
-        if not self._configured:
+    def _get_client(self) -> genai.Client:
+        """Get or create the Gemini API client."""
+        if self._client is None:
             if not self.api_key:
                 raise CvMatchingError("Clé API Gemini non configurée")
-            genai.configure(api_key=self.api_key)
-            self._configured = True
+            self._client = genai.Client(api_key=self.api_key)
+        return self._client
 
     def _is_configured(self) -> bool:
         """Check if service is properly configured."""
@@ -478,7 +478,7 @@ class GeminiMatchingService:
             return self._default_result_enhanced()
 
         try:
-            self._configure()
+            client = self._get_client()
 
             # Truncate inputs to avoid token limits
             cv_text_truncated = cv_text[:10000] if cv_text else ""
@@ -502,17 +502,14 @@ class GeminiMatchingService:
                 required_skills=skills_str,
             )
 
-            # Use flash model with system instruction
-            model = genai.GenerativeModel(
-                "gemini-2.5-flash-lite",
-                system_instruction=MATCHING_SYSTEM_PROMPT,
-            )
-
-            # Run synchronous API in thread pool with enhanced config
-            response = await asyncio.to_thread(
-                model.generate_content,
-                user_prompt,
-                generation_config=genai.GenerationConfig(**self.ENHANCED_GENERATION_CONFIG),
+            # Use native async support from the new SDK with enhanced config
+            response = await client.aio.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=MATCHING_SYSTEM_PROMPT,
+                    **self.ENHANCED_GENERATION_CONFIG,
+                ),
             )
 
             if not response.text:
@@ -561,7 +558,7 @@ class GeminiMatchingService:
             return self._default_result()
 
         try:
-            self._configure()
+            client = self._get_client()
 
             # Truncate inputs to avoid token limits
             cv_text_truncated = cv_text[:10000] if cv_text else ""
@@ -576,14 +573,11 @@ class GeminiMatchingService:
                 job_description=job_desc_truncated,
             )
 
-            # Use flash model for faster response
-            model = genai.GenerativeModel("gemini-2.5-flash-lite")
-
-            # Run synchronous API in thread pool with enhanced config for better consistency
-            response = await asyncio.to_thread(
-                model.generate_content,
-                prompt,
-                generation_config=genai.GenerationConfig(
+            # Use native async support from the new SDK
+            response = await client.aio.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=prompt,
+                config=types.GenerateContentConfig(
                     temperature=0.1,  # Lower temperature for more consistent results
                     max_output_tokens=1000,
                 ),
@@ -640,7 +634,7 @@ class GeminiMatchingService:
             return self._default_cv_quality_result()
 
         try:
-            self._configure()
+            client = self._get_client()
 
             # Truncate input to avoid token limits
             cv_text_truncated = cv_text[:12000] if cv_text else ""
@@ -652,17 +646,14 @@ class GeminiMatchingService:
             # Build user prompt
             user_prompt = CV_QUALITY_USER_PROMPT.format(cv_text=cv_text_truncated)
 
-            # Use flash model with system instruction
-            model = genai.GenerativeModel(
-                "gemini-2.5-flash-lite",
-                system_instruction=CV_QUALITY_SYSTEM_PROMPT,
-            )
-
-            # Run synchronous API in thread pool with enhanced config
-            response = await asyncio.to_thread(
-                model.generate_content,
-                user_prompt,
-                generation_config=genai.GenerationConfig(**self.ENHANCED_GENERATION_CONFIG),
+            # Use native async support from the new SDK with enhanced config
+            response = await client.aio.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=CV_QUALITY_SYSTEM_PROMPT,
+                    **self.ENHANCED_GENERATION_CONFIG,
+                ),
             )
 
             if not response.text:
@@ -1023,12 +1014,11 @@ class GeminiMatchingService:
             return False
 
         try:
-            self._configure()
+            client = self._get_client()
             # Simple test to verify API key is valid
-            model = genai.GenerativeModel("gemini-2.5-flash-lite")
-            await asyncio.to_thread(
-                model.count_tokens,
-                "test",
+            await client.aio.models.count_tokens(
+                model="gemini-2.5-flash-lite",
+                contents="test",
             )
             return True
         except Exception as e:

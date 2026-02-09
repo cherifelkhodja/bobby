@@ -82,10 +82,10 @@ export interface ApiError {
   detail: string;
 }
 
-export function getErrorMessage(error: unknown): string {
+export function getErrorMessage(error: unknown, fallback = 'Une erreur est survenue'): string {
   if (axios.isAxiosError(error)) {
     const apiError = error.response?.data as ApiError | undefined;
-    return apiError?.detail || error.message || 'Une erreur est survenue';
+    return apiError?.detail || error.message || fallback;
   }
-  return 'Une erreur est survenue';
+  return fallback;
 }

@@ -12,7 +12,6 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import {
   ChevronLeft,
   Loader2,
@@ -27,72 +26,17 @@ import {
   type TurnoverITPlace,
 } from '../api/hr';
 import { getErrorMessage } from '../api/client';
-
-// Validation schema
-const editJobPostingSchema = z.object({
-  title: z
-    .string()
-    .min(5, 'Le titre doit contenir au moins 5 caractères')
-    .max(100, 'Le titre ne peut pas dépasser 100 caractères'),
-  description: z
-    .string()
-    .min(500, 'La description doit contenir au moins 500 caractères')
-    .max(3000, 'La description ne peut pas dépasser 3000 caractères'),
-  qualifications: z
-    .string()
-    .min(150, 'Les qualifications doivent contenir au moins 150 caractères')
-    .max(3000, 'Les qualifications ne peuvent pas dépasser 3000 caractères'),
-  experience_level: z.string().optional(),
-  remote: z.string().optional(),
-  start_date: z.string().optional(),
-  duration_months: z.coerce.number().int().positive().optional().or(z.literal('')),
-  salary_min_annual: z.coerce.number().positive().optional().or(z.literal('')),
-  salary_max_annual: z.coerce.number().positive().optional().or(z.literal('')),
-  salary_min_daily: z.coerce.number().positive().optional().or(z.literal('')),
-  salary_max_daily: z.coerce.number().positive().optional().or(z.literal('')),
-  employer_overview: z.string().optional(),
-});
-
-type EditJobPostingFormData = z.infer<typeof editJobPostingSchema>;
+import { jobPostingSchema, type JobPostingFormData } from '../schemas/jobPosting';
+import {
+  CONTRACT_TYPES,
+  SALARY_CONTRACT_TYPES,
+  TJM_CONTRACT_TYPES,
+  REMOTE_POLICIES,
+  EXPERIENCE_LEVELS,
+  JOB_POSTING_STATUS_BADGES,
+} from '../constants/hr';
 
 type ViewStep = 'loading' | 'form' | 'saving' | 'publishing' | 'error';
-
-const STATUS_BADGES: Record<string, { label: string; color: string }> = {
-  draft: {
-    label: 'Brouillon',
-    color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
-  },
-  published: {
-    label: 'Publiée',
-    color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
-  },
-  closed: {
-    label: 'Fermée',
-    color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
-  },
-};
-
-const CONTRACT_TYPES = [
-  { value: 'PERMANENT', label: 'CDI' },
-  { value: 'TEMPORARY', label: 'CDD' },
-  { value: 'FREELANCE', label: 'Freelance' },
-];
-
-const SALARY_CONTRACT_TYPES = ['PERMANENT', 'TEMPORARY'];
-const TJM_CONTRACT_TYPES = ['FREELANCE'];
-
-const REMOTE_POLICIES = [
-  { value: 'NONE', label: 'Pas de télétravail' },
-  { value: 'PARTIAL', label: 'Télétravail partiel' },
-  { value: 'FULL', label: '100% télétravail' },
-];
-
-const EXPERIENCE_LEVELS = [
-  { value: 'JUNIOR', label: 'Junior (0-2 ans)' },
-  { value: 'INTERMEDIATE', label: 'Intermédiaire (2-5 ans)' },
-  { value: 'SENIOR', label: 'Senior (5-10 ans)' },
-  { value: 'EXPERT', label: 'Expert (+10 ans)' },
-];
 
 export default function EditJobPosting() {
   const { postingId } = useParams<{ postingId: string }>();
@@ -131,8 +75,8 @@ export default function EditJobPosting() {
     formState: { errors },
     watch,
     reset,
-  } = useForm<EditJobPostingFormData>({
-    resolver: zodResolver(editJobPostingSchema),
+  } = useForm<JobPostingFormData>({
+    resolver: zodResolver(jobPostingSchema),
     defaultValues: {
       title: '',
       description: '',
@@ -282,7 +226,7 @@ export default function EditJobPosting() {
 
   // Save mutation - updates draft
   const saveMutation = useMutation({
-    mutationFn: async (data: EditJobPostingFormData) => {
+    mutationFn: async (data: JobPostingFormData) => {
       if (!postingId) throw new Error('ID annonce manquant');
       if (selectedContractTypes.length === 0) {
         throw new Error('Sélectionnez au moins un type de contrat');
@@ -366,7 +310,7 @@ export default function EditJobPosting() {
 
   // Publish mutation
   const publishMutation = useMutation({
-    mutationFn: async (data: EditJobPostingFormData) => {
+    mutationFn: async (data: JobPostingFormData) => {
       if (!postingId) throw new Error('ID annonce manquant');
       if (selectedContractTypes.length === 0) {
         throw new Error('Sélectionnez au moins un type de contrat');
@@ -448,12 +392,12 @@ export default function EditJobPosting() {
     },
   });
 
-  const onSaveDraft = (data: EditJobPostingFormData) => {
+  const onSaveDraft = (data: JobPostingFormData) => {
     setStep('saving');
     saveMutation.mutate(data);
   };
 
-  const onPublish = (data: EditJobPostingFormData) => {
+  const onPublish = (data: JobPostingFormData) => {
     setStep('publishing');
     publishMutation.mutate(data);
   };
@@ -566,9 +510,9 @@ export default function EditJobPosting() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             {posting?.status === 'draft' ? "Modifier le brouillon" : "Modifier l'annonce"}
           </h1>
-          {posting?.status && STATUS_BADGES[posting.status] && (
-            <span className={`px-2 py-1 text-sm rounded-full ${STATUS_BADGES[posting.status].color}`}>
-              {STATUS_BADGES[posting.status].label}
+          {posting?.status && JOB_POSTING_STATUS_BADGES[posting.status] && (
+            <span className={`px-2 py-1 text-sm rounded-full ${JOB_POSTING_STATUS_BADGES[posting.status].color}`}>
+              {JOB_POSTING_STATUS_BADGES[posting.status].label}
             </span>
           )}
         </div>

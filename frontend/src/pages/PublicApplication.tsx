@@ -8,62 +8,6 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-
-// Cache duration: 48 hours in milliseconds
-const CACHE_DURATION_MS = 48 * 60 * 60 * 1000;
-
-interface CachedFormDataValues extends Partial<ApplicationFormData> {
-  employment_status?: string;
-}
-
-interface CachedFormData {
-  data: CachedFormDataValues;
-  timestamp: number;
-}
-
-function getCacheKey(token: string): string {
-  return `bobby_application_form_${token}`;
-}
-
-function loadCachedFormData(token: string): CachedFormDataValues | null {
-  try {
-    const cached = localStorage.getItem(getCacheKey(token));
-    if (!cached) return null;
-
-    const parsed: CachedFormData = JSON.parse(cached);
-    const now = Date.now();
-
-    // Check if cache is expired (48h)
-    if (now - parsed.timestamp > CACHE_DURATION_MS) {
-      localStorage.removeItem(getCacheKey(token));
-      return null;
-    }
-
-    return parsed.data;
-  } catch {
-    return null;
-  }
-}
-
-function saveCachedFormData(token: string, data: CachedFormDataValues): void {
-  try {
-    const cacheEntry: CachedFormData = {
-      data,
-      timestamp: Date.now(),
-    };
-    localStorage.setItem(getCacheKey(token), JSON.stringify(cacheEntry));
-  } catch {
-    // Ignore localStorage errors (quota exceeded, etc.)
-  }
-}
-
-function clearCachedFormData(token: string): void {
-  try {
-    localStorage.removeItem(getCacheKey(token));
-  } catch {
-    // Ignore errors
-  }
-}
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import {
@@ -79,50 +23,16 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { publicApplicationApi } from '../api/hr';
-
-// Availability options
-const AVAILABILITY_OPTIONS = [
-  { value: 'asap', label: 'ASAP (immédiat)' },
-  { value: '1_month', label: 'Sous 1 mois' },
-  { value: '2_months', label: 'Sous 2 mois' },
-  { value: '3_months', label: 'Sous 3 mois' },
-  { value: 'more_3_months', label: 'Plus de 3 mois' },
-];
-
-// Employment status - no longer dropdown, using checkboxes
-// Contract types that allow employee status (CDI/CDD)
-const EMPLOYEE_CONTRACT_TYPES = ['PERMANENT', 'FIXED-TERM'];
-// Contract types that allow freelance status
-const FREELANCE_CONTRACT_TYPES = ['FREELANCE', 'INTERCONTRACT'];
-
-// English level options with descriptions
-const ENGLISH_LEVELS = [
-  {
-    value: 'notions',
-    label: 'Notions',
-    description: 'Vocabulaire basique, phrases simples. Peut comprendre des consignes écrites.',
-  },
-  {
-    value: 'intermediate',
-    label: 'Intermédiaire (B1)',
-    description: 'Peut comprendre les points essentiels et se débrouiller dans la plupart des situations.',
-  },
-  {
-    value: 'professional',
-    label: 'Professionnel (B2)',
-    description: 'Peut communiquer avec aisance dans un contexte professionnel. Réunions, emails, présentations.',
-  },
-  {
-    value: 'fluent',
-    label: 'Courant (C1)',
-    description: 'Expression fluide et spontanée. Peut utiliser la langue de façon efficace en contexte social et professionnel.',
-  },
-  {
-    value: 'bilingual',
-    label: 'Bilingue (C2)',
-    description: 'Maîtrise parfaite équivalente à un natif. Peut comprendre et s\'exprimer sans effort.',
-  },
-];
+import { useFormCache } from '../hooks/useFormCache';
+import {
+  AVAILABILITY_OPTIONS,
+  ENGLISH_LEVELS,
+  EMPLOYEE_CONTRACT_TYPES,
+  FREELANCE_CONTRACT_TYPES,
+  CONTRACT_TYPE_LABELS,
+  REMOTE_LABELS,
+  EXPERIENCE_LABELS,
+} from '../constants/hr';
 
 // Validation schema
 const applicationSchema = z.object({
@@ -136,36 +46,14 @@ const applicationSchema = z.object({
     .refine((val) => isValidPhoneNumber(val || ''), 'Numéro de téléphone invalide'),
   job_title: z.string().min(1, 'Le titre du poste est requis').max(200),
   availability: z.string().min(1, 'La disponibilité est requise'),
-  // employment_status is handled separately via checkboxes
   english_level: z.string().min(1, "Le niveau d'anglais est requis"),
-  // Freelance fields (optional based on status)
   tjm_current: z.number().min(0).optional().nullable(),
   tjm_desired: z.number().min(0).optional().nullable(),
-  // Employee fields (optional based on status)
   salary_current: z.number().min(0).optional().nullable(),
   salary_desired: z.number().min(0).optional().nullable(),
 });
 
 type ApplicationFormData = z.infer<typeof applicationSchema>;
-
-const CONTRACT_TYPE_LABELS: Record<string, string> = {
-  PERMANENT: 'CDI',
-  TEMPORARY: 'CDD',
-  FREELANCE: 'Freelance',
-};
-
-const REMOTE_LABELS: Record<string, string> = {
-  NONE: 'Pas de télétravail',
-  PARTIAL: 'Télétravail partiel',
-  FULL: '100% télétravail',
-};
-
-const EXPERIENCE_LABELS: Record<string, string> = {
-  JUNIOR: 'Junior (0-2 ans)',
-  INTERMEDIATE: 'Intermédiaire (2-5 ans)',
-  SENIOR: 'Senior (5-10 ans)',
-  EXPERT: 'Expert (+10 ans)',
-};
 
 export default function PublicApplication() {
   const { token } = useParams<{ token: string }>();
@@ -173,15 +61,13 @@ export default function PublicApplication() {
   const [submitted, setSubmitted] = useState(false);
   const [submissionMessage, setSubmissionMessage] = useState('');
   const [showEnglishTooltip, setShowEnglishTooltip] = useState<string | null>(null);
-  const [hasCachedData, setHasCachedData] = useState(false);
-  // Employment status checkboxes
   const [isFreelance, setIsFreelance] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false);
-  // Track if checkboxes have been initialized to prevent resetting on re-renders
   const checkboxesInitializedRef = useRef(false);
 
-  // Load cached form data
-  const cachedData = token ? loadCachedFormData(token) : null;
+  // Form cache (persists data across page reloads for 48h)
+  const formCache = useFormCache<Record<string, unknown>>(token, 'bobby_application_form');
+  const cachedData = formCache.load();
 
   // Fetch job posting info
   const { data: posting, isLoading, error } = useQuery({
@@ -200,17 +86,17 @@ export default function PublicApplication() {
   } = useForm<ApplicationFormData>({
     resolver: zodResolver(applicationSchema),
     defaultValues: {
-      first_name: cachedData?.first_name || '',
-      last_name: cachedData?.last_name || '',
-      email: cachedData?.email || '',
-      phone: cachedData?.phone || '',
-      job_title: cachedData?.job_title || '',
-      availability: cachedData?.availability || '',
-      english_level: cachedData?.english_level || '',
-      tjm_current: cachedData?.tjm_current ?? undefined,
-      tjm_desired: cachedData?.tjm_desired ?? undefined,
-      salary_current: cachedData?.salary_current ?? undefined,
-      salary_desired: cachedData?.salary_desired ?? undefined,
+      first_name: (cachedData?.first_name as string) || '',
+      last_name: (cachedData?.last_name as string) || '',
+      email: (cachedData?.email as string) || '',
+      phone: (cachedData?.phone as string) || '',
+      job_title: (cachedData?.job_title as string) || '',
+      availability: (cachedData?.availability as string) || '',
+      english_level: (cachedData?.english_level as string) || '',
+      tjm_current: (cachedData?.tjm_current as number) ?? undefined,
+      tjm_desired: (cachedData?.tjm_desired as number) ?? undefined,
+      salary_current: (cachedData?.salary_current as number) ?? undefined,
+      salary_desired: (cachedData?.salary_desired as number) ?? undefined,
     },
   });
 
@@ -220,22 +106,17 @@ export default function PublicApplication() {
 
   // Initialize checkboxes from cached data or posting (only once)
   useEffect(() => {
-    // Skip if already initialized to prevent resetting user selections
     if (checkboxesInitializedRef.current) return;
-    // Wait until posting is loaded to know which options are available
     if (!posting) return;
 
-    if (cachedData?.employment_status) {
-      const statuses = cachedData.employment_status.split(',');
+    const cachedStatus = cachedData?.employment_status as string | undefined;
+    if (cachedStatus) {
+      const statuses = cachedStatus.split(',');
       setIsFreelance(statuses.includes('freelance') && allowsFreelance);
       setIsEmployee(statuses.includes('employee') && allowsEmployee);
     } else {
-      // Auto-select if only one option available
-      if (allowsFreelance && !allowsEmployee) {
-        setIsFreelance(true);
-      } else if (allowsEmployee && !allowsFreelance) {
-        setIsEmployee(true);
-      }
+      if (allowsFreelance && !allowsEmployee) setIsFreelance(true);
+      else if (allowsEmployee && !allowsFreelance) setIsEmployee(true);
     }
     checkboxesInitializedRef.current = true;
   }, [posting, cachedData, allowsEmployee, allowsFreelance]);
@@ -243,32 +124,19 @@ export default function PublicApplication() {
   // Watch all form values for caching
   const watchedValues = watch();
 
-  // Show cache indicator on mount if data was restored
-  useEffect(() => {
-    if (cachedData && Object.keys(cachedData).some(k => cachedData[k as keyof typeof cachedData])) {
-      setHasCachedData(true);
-      // Hide indicator after 5 seconds
-      const timer = setTimeout(() => setHasCachedData(false), 5000);
-      return () => clearTimeout(timer);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Save form data to cache on changes (debounced)
   const saveToCache = useCallback(() => {
     if (token && !submitted) {
-      // Build employment_status from checkboxes for caching
       const statuses: string[] = [];
       if (isFreelance) statuses.push('freelance');
       if (isEmployee) statuses.push('employee');
-      const employmentStatus = statuses.join(',');
 
-      saveCachedFormData(token, {
+      formCache.save({
         ...watchedValues,
-        employment_status: employmentStatus,
+        employment_status: statuses.join(','),
       });
     }
-  }, [token, watchedValues, submitted, isFreelance, isEmployee]);
+  }, [token, watchedValues, submitted, isFreelance, isEmployee, formCache]);
 
   useEffect(() => {
     const timer = setTimeout(saveToCache, 500);
@@ -325,9 +193,7 @@ export default function PublicApplication() {
       setSubmitted(true);
       setSubmissionMessage(result.message);
       // Clear cached form data on successful submission
-      if (token) {
-        clearCachedFormData(token);
-      }
+      formCache.clear();
     },
     onError: (error: Error) => {
       setSubmissionMessage(error.message || 'Une erreur est survenue');
@@ -513,7 +379,7 @@ export default function PublicApplication() {
           </h2>
 
           {/* Cache restoration indicator */}
-          {hasCachedData && (
+          {formCache.hasCachedData && (
             <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2">
               <Check className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               <p className="text-sm text-blue-800 dark:text-blue-300">
