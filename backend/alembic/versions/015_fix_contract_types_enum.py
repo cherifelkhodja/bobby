@@ -16,7 +16,6 @@ This migration:
 
 from alembic import op
 
-
 # revision identifiers
 revision = "015_fix_contract_types_enum"
 down_revision = "014_add_location_key"

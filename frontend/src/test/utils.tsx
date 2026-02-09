@@ -26,6 +26,7 @@ interface AllProvidersProps {
   children: React.ReactNode;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 function AllProviders({ children }: AllProvidersProps): JSX.Element {
   const queryClient = createTestQueryClient();
 
@@ -44,6 +45,7 @@ function customRender(
 }
 
 // Re-export everything
+// eslint-disable-next-line react-refresh/only-export-components
 export * from '@testing-library/react';
 export { customRender as render };
 

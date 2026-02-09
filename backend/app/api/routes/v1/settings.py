@@ -1,9 +1,8 @@
 """Settings API routes for managing external service configurations."""
 
+import httpx
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
-from typing import Optional
-import httpx
 
 from app.api.dependencies import AdminUser
 from app.config import settings
@@ -13,40 +12,44 @@ router = APIRouter()
 
 class ApiKeyTest(BaseModel):
     """Request model for testing an API key."""
+
     service: str  # turnoverit, s3, gemini
-    api_key: Optional[str] = None
+    api_key: str | None = None
     # S3 specific
-    endpoint_url: Optional[str] = None
-    access_key: Optional[str] = None
-    secret_key: Optional[str] = None
-    bucket_name: Optional[str] = None
-    region: Optional[str] = None
+    endpoint_url: str | None = None
+    access_key: str | None = None
+    secret_key: str | None = None
+    bucket_name: str | None = None
+    region: str | None = None
     # Gemini specific
-    model: Optional[str] = None
+    model: str | None = None
 
 
 class ApiKeyTestResult(BaseModel):
     """Response model for API key test."""
+
     success: bool
     message: str
-    details: Optional[dict] = None
+    details: dict | None = None
 
 
 class ServiceStatus(BaseModel):
     """Status of a configured service."""
+
     service: str
     configured: bool
-    masked_key: Optional[str] = None
+    masked_key: str | None = None
 
 
 class ServicesStatusResponse(BaseModel):
     """Response with all services status."""
+
     services: list[ServiceStatus]
     secrets_source: str = "environment"  # "environment" or "aws"
     aws_secrets_enabled: bool = False
 
 
-def mask_key(key: Optional[str]) -> Optional[str]:
+def mask_key(key: str | None) -> str | None:
     """Mask an API key for display, showing only first 4 and last 4 chars."""
     if not key or len(key) < 12:
         return "****" if key else None
@@ -135,7 +138,7 @@ async def test_api_key(
         )
 
 
-async def _test_turnoverit(api_key: Optional[str]) -> ApiKeyTestResult:
+async def _test_turnoverit(api_key: str | None) -> ApiKeyTestResult:
     """Test Turnover-IT API connection."""
     if not api_key:
         return ApiKeyTestResult(
@@ -184,11 +187,11 @@ async def _test_turnoverit(api_key: Optional[str]) -> ApiKeyTestResult:
 
 
 async def _test_s3(
-    endpoint_url: Optional[str],
-    access_key: Optional[str],
-    secret_key: Optional[str],
-    bucket_name: Optional[str],
-    region: Optional[str],
+    endpoint_url: str | None,
+    access_key: str | None,
+    secret_key: str | None,
+    bucket_name: str | None,
+    region: str | None,
 ) -> ApiKeyTestResult:
     """Test S3 storage connection."""
     # endpoint_url is optional (empty for native AWS S3)
@@ -220,7 +223,11 @@ async def _test_s3(
             return ApiKeyTestResult(
                 success=True,
                 message=f"Connexion S3 réussie ({provider}, bucket: {bucket_name})",
-                details={"bucket": bucket_name, "endpoint": endpoint_url or "AWS S3", "region": region},
+                details={
+                    "bucket": bucket_name,
+                    "endpoint": endpoint_url or "AWS S3",
+                    "region": region,
+                },
             )
     except Exception as e:
         error_msg = str(e)
@@ -240,7 +247,9 @@ async def _test_s3(
         )
 
 
-async def _test_gemini(api_key: Optional[str], model: str = "gemini-2.5-flash-lite") -> ApiKeyTestResult:
+async def _test_gemini(
+    api_key: str | None, model: str = "gemini-2.5-flash-lite"
+) -> ApiKeyTestResult:
     """Test Google Gemini API connection."""
     if not api_key:
         return ApiKeyTestResult(
@@ -322,7 +331,7 @@ async def _test_boond() -> ApiKeyTestResult:
         )
 
 
-async def _test_resend(api_key: Optional[str]) -> ApiKeyTestResult:
+async def _test_resend(api_key: str | None) -> ApiKeyTestResult:
     """Test Resend API connection."""
     if not api_key:
         return ApiKeyTestResult(

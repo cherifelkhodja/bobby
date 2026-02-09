@@ -1,7 +1,6 @@
 """CV Template repository implementation."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -17,7 +16,7 @@ class CvTemplateRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_id(self, template_id: UUID) -> Optional[CvTemplate]:
+    async def get_by_id(self, template_id: UUID) -> CvTemplate | None:
         """Get template by ID."""
         result = await self.session.execute(
             select(CvTemplateModel).where(CvTemplateModel.id == template_id)
@@ -25,7 +24,7 @@ class CvTemplateRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def get_by_name(self, name: str) -> Optional[CvTemplate]:
+    async def get_by_name(self, name: str) -> CvTemplate | None:
         """Get template by unique name."""
         result = await self.session.execute(
             select(CvTemplateModel).where(CvTemplateModel.name == name)
@@ -87,9 +86,7 @@ class CvTemplateRepository:
 
     async def list_all(self) -> list[CvTemplate]:
         """List all templates (including inactive)."""
-        result = await self.session.execute(
-            select(CvTemplateModel).order_by(CvTemplateModel.name)
-        )
+        result = await self.session.execute(select(CvTemplateModel).order_by(CvTemplateModel.name))
         return [self._to_entity(m) for m in result.scalars().all()]
 
     def _to_entity(self, model: CvTemplateModel) -> CvTemplate:

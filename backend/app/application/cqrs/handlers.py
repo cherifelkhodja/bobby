@@ -4,8 +4,8 @@ CQRS handler registry and example handlers.
 Provides global command and query buses with registration utilities.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional, Type
 from uuid import UUID
 
 from .base import (
@@ -23,8 +23,8 @@ query_bus = QueryBus()
 
 
 def register_command_handler(
-    command_type: Type[Command],
-) -> Callable[[Type[CommandHandler]], Type[CommandHandler]]:
+    command_type: type[Command],
+) -> Callable[[type[CommandHandler]], type[CommandHandler]]:
     """
     Decorator to register a command handler.
 
@@ -35,7 +35,7 @@ def register_command_handler(
                 ...
     """
 
-    def decorator(handler_class: Type[CommandHandler]) -> Type[CommandHandler]:
+    def decorator(handler_class: type[CommandHandler]) -> type[CommandHandler]:
         # Create instance and register
         # Note: In production, you'd use dependency injection here
         handler = handler_class()
@@ -46,8 +46,8 @@ def register_command_handler(
 
 
 def register_query_handler(
-    query_type: Type[Query],
-) -> Callable[[Type[QueryHandler]], Type[QueryHandler]]:
+    query_type: type[Query],
+) -> Callable[[type[QueryHandler]], type[QueryHandler]]:
     """
     Decorator to register a query handler.
 
@@ -58,7 +58,7 @@ def register_query_handler(
                 ...
     """
 
-    def decorator(handler_class: Type[QueryHandler]) -> Type[QueryHandler]:
+    def decorator(handler_class: type[QueryHandler]) -> type[QueryHandler]:
         handler = handler_class()
         query_bus.register(query_type, handler)
         return handler_class
@@ -79,11 +79,11 @@ class CreateCooptationCommand(Command):
     coopter_id: UUID
     candidate_name: str
     candidate_email: str
-    candidate_phone: Optional[str] = None
-    candidate_linkedin: Optional[str] = None
-    candidate_cv_url: Optional[str] = None
-    candidate_daily_rate: Optional[int] = None
-    comment: Optional[str] = None
+    candidate_phone: str | None = None
+    candidate_linkedin: str | None = None
+    candidate_cv_url: str | None = None
+    candidate_daily_rate: int | None = None
+    comment: str | None = None
 
 
 @dataclass(frozen=True)
@@ -93,7 +93,7 @@ class UpdateCooptationStatusCommand(Command):
     cooptation_id: UUID
     new_status: str
     updated_by: UUID
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -110,14 +110,14 @@ class ListUserCooptationsQuery(Query):
     user_id: UUID
     page: int = 1
     page_size: int = 20
-    status: Optional[str] = None
+    status: str | None = None
 
 
 @dataclass(frozen=True)
 class GetCooptationStatsQuery(Query):
     """Query to get cooptation statistics."""
 
-    user_id: Optional[UUID] = None  # None = all users (admin only)
+    user_id: UUID | None = None  # None = all users (admin only)
 
 
 # =============================================================================
@@ -136,11 +136,11 @@ class CooptationDTO:
     coopter_name: str
     candidate_name: str
     candidate_email: str
-    candidate_phone: Optional[str]
+    candidate_phone: str | None
     status: str
     status_display: str
     submitted_at: str
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
 
 
 @dataclass

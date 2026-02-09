@@ -1,7 +1,8 @@
 """Redis cache implementation."""
 
 import json
-from typing import Any, AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from redis.asyncio import Redis
 
@@ -26,11 +27,11 @@ class CacheService:
     def __init__(self, redis: Redis) -> None:
         self.redis = redis
 
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         """Get value from cache."""
         return await self.redis.get(key)
 
-    async def get_json(self, key: str) -> Optional[Any]:
+    async def get_json(self, key: str) -> Any | None:
         """Get JSON value from cache."""
         value = await self.redis.get(key)
         if value:
@@ -66,15 +67,13 @@ class CacheService:
         return 0
 
     # Opportunity caching helpers
-    async def get_opportunities(self) -> Optional[list[dict[str, Any]]]:
+    async def get_opportunities(self) -> list[dict[str, Any]] | None:
         """Get cached opportunities."""
         return await self.get_json(self.OPPORTUNITIES_KEY)
 
     async def set_opportunities(self, opportunities: list[dict[str, Any]]) -> bool:
         """Cache opportunities."""
-        return await self.set_json(
-            self.OPPORTUNITIES_KEY, opportunities, self.OPPORTUNITIES_TTL
-        )
+        return await self.set_json(self.OPPORTUNITIES_KEY, opportunities, self.OPPORTUNITIES_TTL)
 
     async def invalidate_opportunities(self) -> bool:
         """Invalidate opportunities cache."""
@@ -97,7 +96,10 @@ class CacheService:
 
     async def get_gemini_model(self) -> str:
         """Get configured Gemini model."""
-        return await self.get_setting(self.GEMINI_MODEL_KEY, self.DEFAULT_GEMINI_MODEL) or self.DEFAULT_GEMINI_MODEL
+        return (
+            await self.get_setting(self.GEMINI_MODEL_KEY, self.DEFAULT_GEMINI_MODEL)
+            or self.DEFAULT_GEMINI_MODEL
+        )
 
     async def set_gemini_model(self, model: str) -> bool:
         """Set Gemini model."""

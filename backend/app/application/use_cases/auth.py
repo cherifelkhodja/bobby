@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional
 from uuid import UUID
 
 from app.application.read_models.user import UserReadModel
@@ -11,7 +10,6 @@ from app.domain.exceptions import (
     InvalidCredentialsError,
     InvalidTokenError,
     UserAlreadyExistsError,
-    UserNotFoundError,
     UserNotVerifiedError,
 )
 from app.domain.value_objects import Email, UserRole
@@ -44,7 +42,7 @@ class RegisterCommand:
     password: str
     first_name: str
     last_name: str
-    boond_resource_id: Optional[str] = None
+    boond_resource_id: str | None = None
 
 
 @dataclass

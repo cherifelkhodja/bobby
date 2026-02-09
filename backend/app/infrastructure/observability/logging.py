@@ -9,16 +9,14 @@ import logging
 import sys
 from contextvars import ContextVar
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 # Context variable for correlation ID
-correlation_id_var: ContextVar[Optional[str]] = ContextVar(
-    "correlation_id", default=None
-)
+correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
 
 # Context variable for user ID
-user_id_var: ContextVar[Optional[str]] = ContextVar("user_id", default=None)
+user_id_var: ContextVar[str | None] = ContextVar("user_id", default=None)
 
 
 def get_correlation_id() -> str:
@@ -126,9 +124,7 @@ class StructuredLogger:
     def __init__(self, name: str):
         self._logger = logging.getLogger(name)
 
-    def _log(
-        self, level: int, message: str, exc_info: bool = False, **kwargs: Any
-    ) -> None:
+    def _log(self, level: int, message: str, exc_info: bool = False, **kwargs: Any) -> None:
         """Internal logging method with context injection."""
         extra = {
             "correlation_id": get_correlation_id(),

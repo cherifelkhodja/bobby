@@ -1,11 +1,10 @@
 """Rate limiting middleware using slowapi with Redis backend."""
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app.config import settings
 
@@ -59,7 +58,9 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Res
         },
         headers={
             "Retry-After": str(exc.detail),
-            "X-RateLimit-Limit": request.state.view_rate_limit if hasattr(request.state, "view_rate_limit") else "unknown",
+            "X-RateLimit-Limit": request.state.view_rate_limit
+            if hasattr(request.state, "view_rate_limit")
+            else "unknown",
         },
     )
 

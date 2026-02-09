@@ -4,13 +4,13 @@ Observability infrastructure.
 Provides logging, metrics, and tracing capabilities.
 """
 
-from .logging import configure_logging, get_logger, StructuredLogger
 from .health import HealthChecker, HealthStatus
+from .logging import StructuredLogger, configure_logging, get_logger
 from .metrics import MetricsCollector, metrics
 from .middleware import (
-    RequestLoggingMiddleware,
-    MetricsMiddleware,
     CorrelationIdMiddleware,
+    MetricsMiddleware,
+    RequestLoggingMiddleware,
 )
 
 __all__ = [

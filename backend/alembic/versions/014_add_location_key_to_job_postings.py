@@ -9,9 +9,9 @@ and consistency when publishing job postings.
 The key uniquely identifies a location (e.g., "fr~ile-de-france~paris~").
 """
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers
 revision = "014_add_location_key"

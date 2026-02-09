@@ -1,7 +1,6 @@
 """ERP port interface for quotation creation in BoondManager."""
 
 from abc import ABC, abstractmethod
-from typing import Protocol
 
 from app.quotation_generator.domain.entities import Quotation
 

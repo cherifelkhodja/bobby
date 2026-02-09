@@ -4,8 +4,7 @@ import logging
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +26,7 @@ class PostgresTemplateRepository(TemplateRepositoryPort):
     def __init__(
         self,
         session: AsyncSession,
-        temp_dir: Optional[Path] = None,
+        temp_dir: Path | None = None,
     ) -> None:
         """Initialize repository.
 
@@ -39,7 +38,7 @@ class PostgresTemplateRepository(TemplateRepositoryPort):
         self.temp_dir = temp_dir or Path(tempfile.gettempdir())
         self._temp_files: dict[str, Path] = {}
 
-    async def get_template(self, name: str) -> Optional[bytes]:
+    async def get_template(self, name: str) -> bytes | None:
         """Retrieve a template by name.
 
         Args:
@@ -65,7 +64,7 @@ class PostgresTemplateRepository(TemplateRepositoryPort):
         name: str,
         content: bytes,
         display_name: str,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> None:
         """Save or update a template.
 
@@ -174,7 +173,7 @@ class PostgresTemplateRepository(TemplateRepositoryPort):
         )
         return result.scalar_one_or_none() is not None
 
-    async def get_template_path(self, name: str) -> Optional[Path]:
+    async def get_template_path(self, name: str) -> Path | None:
         """Get filesystem path for a template.
 
         This creates a temporary file with the template content

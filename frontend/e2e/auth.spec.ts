@@ -58,7 +58,7 @@ test.describe('Authenticated User', () => {
     await page.goto('/login');
   });
 
-  test('should persist session after page reload', async ({ page, context }) => {
+  test('should persist session after page reload', async ({ page: _page, context: _context }) => {
     // This test would require a valid test user
     // Skip for now as it requires backend setup
     test.skip();

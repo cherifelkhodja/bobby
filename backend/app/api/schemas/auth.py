@@ -1,8 +1,6 @@
 """Authentication schemas."""
 
-from typing import Optional
-
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class RegisterRequest(BaseModel):
@@ -12,7 +10,7 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8, max_length=100)
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
-    boond_resource_id: Optional[str] = None
+    boond_resource_id: str | None = None
 
 
 class LoginRequest(BaseModel):

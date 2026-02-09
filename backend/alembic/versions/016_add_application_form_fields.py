@@ -14,9 +14,9 @@ New fields:
 Legacy fields (tjm_min, tjm_max, availability_date) are made nullable for backward compatibility.
 """
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "016_add_application_form_fields"

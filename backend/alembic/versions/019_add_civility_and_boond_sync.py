@@ -10,9 +10,9 @@ Changes:
 - Add boond_synced_at timestamp for last sync
 """
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "019_add_civility_and_boond_sync"

@@ -2,7 +2,6 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
 from uuid import UUID
 
 from app.quotation_generator.domain.exceptions import (
@@ -55,9 +54,7 @@ class DownloadBatchUseCase:
         # Check if batch is complete
         status = progress.get("status")
         if status not in [BatchStatus.COMPLETED.value, BatchStatus.PARTIAL.value]:
-            raise DownloadNotReadyError(
-                f"Batch is not ready for download. Status: {status}"
-            )
+            raise DownloadNotReadyError(f"Batch is not ready for download. Status: {status}")
 
         # Get merged PDF path
         pdf_path_str = progress.get("merged_pdf_path")
@@ -95,9 +92,7 @@ class DownloadBatchUseCase:
         # Check if batch is complete
         status = progress.get("status")
         if status not in [BatchStatus.COMPLETED.value, BatchStatus.PARTIAL.value]:
-            raise DownloadNotReadyError(
-                f"Batch is not ready for download. Status: {status}"
-            )
+            raise DownloadNotReadyError(f"Batch is not ready for download. Status: {status}")
 
         # Get ZIP path
         zip_path_str = progress.get("zip_file_path")

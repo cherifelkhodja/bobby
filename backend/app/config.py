@@ -120,20 +120,20 @@ class Settings(BaseSettings):
 
         # Add localhost for development
         if not self.is_production:
-            origins.extend([
-                "http://localhost:3012",
-                "http://127.0.0.1:3012",
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-            ])
+            origins.extend(
+                [
+                    "http://localhost:3012",
+                    "http://127.0.0.1:3012",
+                    "http://localhost:5173",
+                    "http://127.0.0.1:5173",
+                ]
+            )
 
         # Add additional origins from CORS_ORIGINS
         if self.CORS_ORIGINS:
-            origins.extend([
-                origin.strip()
-                for origin in self.CORS_ORIGINS.split(",")
-                if origin.strip()
-            ])
+            origins.extend(
+                [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+            )
 
         return list(set(origins))  # Remove duplicates
 
@@ -163,7 +163,11 @@ def _load_aws_secrets() -> dict[str, Any]:
         secret_key = os.getenv("AWS_SECRET_ACCESS_KEY") or os.getenv("S3_SECRET_KEY")
 
         print(f"[CONFIG] Loading from AWS Secrets Manager: {secret_name} in {region}")
-        print(f"[CONFIG] Using access key: {access_key[:8]}..." if access_key else "[CONFIG] No access key!")
+        print(
+            f"[CONFIG] Using access key: {access_key[:8]}..."
+            if access_key
+            else "[CONFIG] No access key!"
+        )
 
         secrets = load_secrets_from_aws(
             region_name=region,

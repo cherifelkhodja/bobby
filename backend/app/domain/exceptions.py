@@ -71,9 +71,7 @@ class CooptationNotFoundError(DomainError):
     """Raised when a cooptation is not found."""
 
     def __init__(self, identifier: str = "") -> None:
-        message = (
-            f"Cooptation not found: {identifier}" if identifier else "Cooptation not found"
-        )
+        message = f"Cooptation not found: {identifier}" if identifier else "Cooptation not found"
         super().__init__(message)
 
 
@@ -144,9 +142,7 @@ class JobApplicationNotFoundError(DomainError):
 
     def __init__(self, identifier: str = "") -> None:
         message = (
-            f"Candidature non trouvée: {identifier}"
-            if identifier
-            else "Candidature non trouvée"
+            f"Candidature non trouvée: {identifier}" if identifier else "Candidature non trouvée"
         )
         super().__init__(message)
 

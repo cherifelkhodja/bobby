@@ -1,8 +1,8 @@
 """Structured audit logging for security-sensitive operations."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -85,13 +85,13 @@ class AuditLogger:
         action: AuditAction,
         resource: AuditResource,
         *,
-        user_id: Optional[UUID] = None,
-        resource_id: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
-        details: Optional[dict[str, Any]] = None,
+        user_id: UUID | None = None,
+        resource_id: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+        details: dict[str, Any] | None = None,
         success: bool = True,
-        error_message: Optional[str] = None,
+        error_message: str | None = None,
     ) -> None:
         """Log an audit event.
 
@@ -109,7 +109,7 @@ class AuditLogger:
         event_data = {
             "action": action.value,
             "resource": resource.value,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "success": success,
         }
 
@@ -138,8 +138,8 @@ class AuditLogger:
         self,
         user_id: UUID,
         email: str,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
     ) -> None:
         """Log successful login."""
         self.log(
@@ -155,8 +155,8 @@ class AuditLogger:
         self,
         email: str,
         reason: str,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
     ) -> None:
         """Log failed login attempt."""
         self.log(
@@ -175,7 +175,7 @@ class AuditLogger:
         target_user_id: UUID,
         old_role: str,
         new_role: str,
-        ip_address: Optional[str] = None,
+        ip_address: str | None = None,
     ) -> None:
         """Log role change event."""
         self.log(
@@ -192,7 +192,7 @@ class AuditLogger:
         admin_id: UUID,
         deleted_user_id: UUID,
         deleted_email: str,
-        ip_address: Optional[str] = None,
+        ip_address: str | None = None,
     ) -> None:
         """Log user deletion event."""
         self.log(
@@ -210,8 +210,8 @@ class AuditLogger:
         filename: str,
         template: str,
         success: bool,
-        ip_address: Optional[str] = None,
-        error_message: Optional[str] = None,
+        ip_address: str | None = None,
+        error_message: str | None = None,
     ) -> None:
         """Log CV transformation event."""
         self.log(
@@ -227,8 +227,8 @@ class AuditLogger:
     def log_rate_limit_exceeded(
         self,
         endpoint: str,
-        ip_address: Optional[str] = None,
-        user_id: Optional[UUID] = None,
+        ip_address: str | None = None,
+        user_id: UUID | None = None,
     ) -> None:
         """Log rate limit exceeded event."""
         self.log(
@@ -244,10 +244,10 @@ class AuditLogger:
     def log_unauthorized_access(
         self,
         endpoint: str,
-        required_role: Optional[str] = None,
-        user_role: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        user_id: Optional[UUID] = None,
+        required_role: str | None = None,
+        user_role: str | None = None,
+        ip_address: str | None = None,
+        user_id: UUID | None = None,
     ) -> None:
         """Log unauthorized access attempt."""
         self.log(

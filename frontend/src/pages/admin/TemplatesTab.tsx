@@ -46,8 +46,9 @@ export function TemplatesTab() {
       queryClient.invalidateQueries({ queryKey: ['cv-templates'] });
       setUploadingTemplate(null);
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Erreur lors de l\'upload');
+    onError: (error: unknown) => {
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      toast.error(axiosError.response?.data?.detail || 'Erreur lors de l\'upload');
       setUploadingTemplate(null);
     },
   });
@@ -66,8 +67,9 @@ export function TemplatesTab() {
       queryClient.invalidateQueries({ queryKey: ['quotation-templates'] });
       setUploadingTemplate(null);
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Erreur lors de l\'upload');
+    onError: (error: unknown) => {
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      toast.error(axiosError.response?.data?.detail || 'Erreur lors de l\'upload');
       setUploadingTemplate(null);
     },
   });

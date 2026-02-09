@@ -5,10 +5,11 @@ Provides secure audit logging for sensitive actions.
 """
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 from uuid import UUID, uuid4
 
 from app.infrastructure.observability.logging import get_logger
@@ -73,16 +74,16 @@ class AuditEvent:
     id: UUID = field(default_factory=uuid4)
     event_type: AuditEventType = AuditEventType.LOGIN_SUCCESS
     timestamp: datetime = field(default_factory=datetime.utcnow)
-    user_id: Optional[str] = None
-    user_email: Optional[str] = None
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    resource_type: Optional[str] = None
-    resource_id: Optional[str] = None
-    action: Optional[str] = None
+    user_id: str | None = None
+    user_email: str | None = None
+    ip_address: str | None = None
+    user_agent: str | None = None
+    resource_type: str | None = None
+    resource_id: str | None = None
+    action: str | None = None
     details: dict[str, Any] = field(default_factory=dict)
     success: bool = True
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for logging/storage."""
@@ -127,7 +128,7 @@ class AuditLogger:
 
     def __init__(
         self,
-        persist_func: Optional[Callable[[AuditEvent], None]] = None,
+        persist_func: Callable[[AuditEvent], None] | None = None,
     ):
         """
         Initialize the audit logger.
@@ -140,16 +141,16 @@ class AuditLogger:
     def log(
         self,
         event_type: AuditEventType,
-        user_id: Optional[str] = None,
-        user_email: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
-        resource_type: Optional[str] = None,
-        resource_id: Optional[str] = None,
-        action: Optional[str] = None,
-        details: Optional[dict[str, Any]] = None,
+        user_id: str | None = None,
+        user_email: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+        resource_type: str | None = None,
+        resource_id: str | None = None,
+        action: str | None = None,
+        details: dict[str, Any] | None = None,
         success: bool = True,
-        error_message: Optional[str] = None,
+        error_message: str | None = None,
     ) -> AuditEvent:
         """
         Log an audit event.
@@ -215,8 +216,8 @@ class AuditLogger:
         self,
         user_id: str,
         user_email: str,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
     ) -> AuditEvent:
         """Log a successful authentication."""
         return self.log(
@@ -232,8 +233,8 @@ class AuditLogger:
         self,
         email: str,
         reason: str,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
     ) -> AuditEvent:
         """Log a failed authentication attempt."""
         return self.log(
@@ -253,8 +254,8 @@ class AuditLogger:
         resource_type: str,
         resource_id: str,
         action: str,
-        details: Optional[dict[str, Any]] = None,
-        ip_address: Optional[str] = None,
+        details: dict[str, Any] | None = None,
+        ip_address: str | None = None,
     ) -> AuditEvent:
         """Log a resource change event."""
         return self.log(

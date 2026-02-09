@@ -82,7 +82,7 @@ describe('hrApi', () => {
       const mockResponse = { data: { id: 'posting-123', ...postingData } };
       vi.mocked(apiClient.post).mockResolvedValue(mockResponse);
 
-      const result = await hrApi.createJobPosting(postingData as any);
+      const result = await hrApi.createJobPosting(postingData as unknown);
 
       expect(apiClient.post).toHaveBeenCalledWith('/hr/job-postings', postingData);
       expect(result.id).toBe('posting-123');

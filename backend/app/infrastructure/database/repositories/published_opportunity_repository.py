@@ -1,10 +1,9 @@
 """Published Opportunity repository implementation."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import func, select, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities import PublishedOpportunity
@@ -18,17 +17,15 @@ class PublishedOpportunityRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_id(self, opportunity_id: UUID) -> Optional[PublishedOpportunity]:
+    async def get_by_id(self, opportunity_id: UUID) -> PublishedOpportunity | None:
         """Get published opportunity by ID."""
         result = await self.session.execute(
-            select(PublishedOpportunityModel).where(
-                PublishedOpportunityModel.id == opportunity_id
-            )
+            select(PublishedOpportunityModel).where(PublishedOpportunityModel.id == opportunity_id)
         )
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def get_by_boond_id(self, boond_id: str) -> Optional[PublishedOpportunity]:
+    async def get_by_boond_id(self, boond_id: str) -> PublishedOpportunity | None:
         """Get published opportunity by Boond opportunity ID."""
         result = await self.session.execute(
             select(PublishedOpportunityModel).where(
@@ -50,9 +47,7 @@ class PublishedOpportunityRepository:
     async def save(self, opportunity: PublishedOpportunity) -> PublishedOpportunity:
         """Save published opportunity (create or update)."""
         result = await self.session.execute(
-            select(PublishedOpportunityModel).where(
-                PublishedOpportunityModel.id == opportunity.id
-            )
+            select(PublishedOpportunityModel).where(PublishedOpportunityModel.id == opportunity.id)
         )
         model = result.scalar_one_or_none()
 
@@ -90,9 +85,7 @@ class PublishedOpportunityRepository:
     async def delete(self, opportunity_id: UUID) -> bool:
         """Delete published opportunity by ID."""
         result = await self.session.execute(
-            select(PublishedOpportunityModel).where(
-                PublishedOpportunityModel.id == opportunity_id
-            )
+            select(PublishedOpportunityModel).where(PublishedOpportunityModel.id == opportunity_id)
         )
         model = result.scalar_one_or_none()
         if model:
@@ -104,7 +97,7 @@ class PublishedOpportunityRepository:
         self,
         skip: int = 0,
         limit: int = 100,
-        search: Optional[str] = None,
+        search: str | None = None,
     ) -> list[PublishedOpportunity]:
         """List published opportunities visible to consultants."""
         query = select(PublishedOpportunityModel).where(
@@ -120,13 +113,13 @@ class PublishedOpportunityRepository:
                 )
             )
 
-        query = query.offset(skip).limit(limit).order_by(
-            PublishedOpportunityModel.created_at.desc()
+        query = (
+            query.offset(skip).limit(limit).order_by(PublishedOpportunityModel.created_at.desc())
         )
         result = await self.session.execute(query)
         return [self._to_entity(m) for m in result.scalars().all()]
 
-    async def count_published(self, search: Optional[str] = None) -> int:
+    async def count_published(self, search: str | None = None) -> int:
         """Count published opportunities."""
         query = select(func.count(PublishedOpportunityModel.id)).where(
             PublishedOpportunityModel.status == str(OpportunityStatus.PUBLISHED)
@@ -163,9 +156,7 @@ class PublishedOpportunityRepository:
 
     async def get_published_boond_ids(self) -> set[str]:
         """Get set of all Boond opportunity IDs that have been published."""
-        result = await self.session.execute(
-            select(PublishedOpportunityModel.boond_opportunity_id)
-        )
+        result = await self.session.execute(select(PublishedOpportunityModel.boond_opportunity_id))
         return {row[0] for row in result.all()}
 
     def _to_entity(self, model: PublishedOpportunityModel) -> PublishedOpportunity:

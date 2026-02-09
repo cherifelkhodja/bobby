@@ -1,7 +1,6 @@
 """Business Lead repository implementation."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -18,7 +17,7 @@ class BusinessLeadRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_id(self, lead_id: UUID) -> Optional[BusinessLead]:
+    async def get_by_id(self, lead_id: UUID) -> BusinessLead | None:
         """Get business lead by ID."""
         result = await self.session.execute(
             select(BusinessLeadModel).where(BusinessLeadModel.id == lead_id)
@@ -138,7 +137,7 @@ class BusinessLeadRepository:
         self,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[BusinessLeadStatus] = None,
+        status: BusinessLeadStatus | None = None,
     ) -> list[BusinessLead]:
         """List all business leads with optional status filter."""
         query = select(BusinessLeadModel)
@@ -162,9 +161,7 @@ class BusinessLeadRepository:
     async def count_by_status(self, status: BusinessLeadStatus) -> int:
         """Count business leads by status."""
         result = await self.session.execute(
-            select(func.count(BusinessLeadModel.id)).where(
-                BusinessLeadModel.status == str(status)
-            )
+            select(func.count(BusinessLeadModel.id)).where(BusinessLeadModel.status == str(status))
         )
         return result.scalar() or 0
 

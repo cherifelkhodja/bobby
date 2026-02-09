@@ -1,4 +1,4 @@
-import { test, expect, TEST_USERS, OpportunitiesPage } from './fixtures';
+import { test, expect, TEST_USERS } from './fixtures';
 
 /**
  * Cooptation flow E2E tests.

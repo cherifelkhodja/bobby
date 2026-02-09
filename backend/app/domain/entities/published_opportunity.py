@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID, uuid4
 
 from app.domain.value_objects.status import OpportunityStatus
@@ -17,9 +17,9 @@ class PublishedOpportunity:
     description: str
     published_by: UUID
     skills: list[str] = field(default_factory=list)
-    original_title: Optional[str] = None
-    original_data: Optional[dict[str, Any]] = None
-    end_date: Optional[date] = None
+    original_title: str | None = None
+    original_data: dict[str, Any] | None = None
+    end_date: date | None = None
     status: OpportunityStatus = OpportunityStatus.PUBLISHED
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=datetime.utcnow)

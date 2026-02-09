@@ -1,9 +1,9 @@
 """Read models for UI (CQRS light)."""
 
 from app.application.read_models.cooptation import (
+    CooptationListReadModel,
     CooptationReadModel,
     CooptationStatsReadModel,
-    CooptationListReadModel,
 )
 from app.application.read_models.hr import (
     ApplicationSubmissionResultReadModel,
@@ -18,8 +18,8 @@ from app.application.read_models.hr import (
     StatusChangeReadModel,
 )
 from app.application.read_models.opportunity import (
-    OpportunityReadModel,
     OpportunityListReadModel,
+    OpportunityReadModel,
 )
 from app.application.read_models.user import UserReadModel
 

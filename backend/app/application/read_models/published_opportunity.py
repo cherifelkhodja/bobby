@@ -1,7 +1,6 @@
 """Published opportunity read models."""
 
 from datetime import date, datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -14,15 +13,15 @@ class BoondOpportunityReadModel(BaseModel):
     id: str
     title: str
     reference: str
-    description: Optional[str] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    company_name: Optional[str] = None
-    state: Optional[int] = None
-    state_name: Optional[str] = None
-    state_color: Optional[str] = None
-    manager_id: Optional[str] = None
-    manager_name: Optional[str] = None
+    description: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    company_name: str | None = None
+    state: int | None = None
+    state_name: str | None = None
+    state_color: str | None = None
+    manager_id: str | None = None
+    manager_name: str | None = None
     is_published: bool = False
 
 
@@ -34,26 +33,26 @@ class BoondOpportunityDetailReadModel(BaseModel):
     id: str
     title: str
     reference: str
-    description: Optional[str] = None
-    criteria: Optional[str] = None
-    expertise_area: Optional[str] = None
-    place: Optional[str] = None
-    duration: Optional[int] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    closing_date: Optional[str] = None
-    answer_date: Optional[str] = None
-    company_id: Optional[str] = None
-    company_name: Optional[str] = None
-    manager_id: Optional[str] = None
-    manager_name: Optional[str] = None
-    contact_id: Optional[str] = None
-    contact_name: Optional[str] = None
-    agency_id: Optional[str] = None
-    agency_name: Optional[str] = None
-    state: Optional[int] = None
-    state_name: Optional[str] = None
-    state_color: Optional[str] = None
+    description: str | None = None
+    criteria: str | None = None
+    expertise_area: str | None = None
+    place: str | None = None
+    duration: int | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    closing_date: str | None = None
+    answer_date: str | None = None
+    company_id: str | None = None
+    company_name: str | None = None
+    manager_id: str | None = None
+    manager_name: str | None = None
+    contact_id: str | None = None
+    contact_name: str | None = None
+    agency_id: str | None = None
+    agency_name: str | None = None
+    state: int | None = None
+    state_name: str | None = None
+    state_color: str | None = None
     is_published: bool = False
 
 
@@ -88,7 +87,7 @@ class PublishedOpportunityReadModel(BaseModel):
     title: str
     description: str
     skills: list[str] = []
-    end_date: Optional[date] = None
+    end_date: date | None = None
     status: str
     status_display: str
     created_at: datetime

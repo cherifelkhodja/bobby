@@ -1,8 +1,7 @@
 """Money value object for handling monetary amounts."""
 
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Union
+from decimal import ROUND_HALF_UP, Decimal
 
 
 @dataclass(frozen=True)
@@ -72,13 +71,13 @@ class Money:
             raise ValueError(f"Currency mismatch: {self.currency} vs {other.currency}")
         return Money(amount=self.amount - other.amount, currency=self.currency)
 
-    def __mul__(self, factor: Union[int, float, Decimal]) -> "Money":
+    def __mul__(self, factor: int | float | Decimal) -> "Money":
         """Multiply Money by a factor."""
         if isinstance(factor, (int, float)):
             factor = Decimal(str(factor))
         return Money(amount=self.amount * factor, currency=self.currency)
 
-    def __rmul__(self, factor: Union[int, float, Decimal]) -> "Money":
+    def __rmul__(self, factor: int | float | Decimal) -> "Money":
         """Right multiply Money by a factor."""
         return self.__mul__(factor)
 

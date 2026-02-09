@@ -21,7 +21,7 @@ Example usage:
 """
 
 from abc import ABC, abstractmethod
-from typing import Protocol, TypeVar, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from .ports.repositories import (
     CandidateRepositoryPort,

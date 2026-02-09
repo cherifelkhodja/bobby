@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Optional
 
 from app.quotation_generator.domain.value_objects import Money
 

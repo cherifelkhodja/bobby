@@ -90,8 +90,9 @@ test.describe('HR Dashboard', () => {
       const plusButton = page.locator('button').filter({ has: page.locator('svg') });
 
       // At least one action should be visible
-      const hasCreateAction = await createButton.first().isVisible().catch(() => false) ||
-                               await plusButton.first().isVisible().catch(() => false);
+      // Check if any action button is visible (result not needed, just verify page loads)
+      void (await createButton.first().isVisible().catch(() => false) ||
+                               await plusButton.first().isVisible().catch(() => false));
 
       // Just verify the page loads correctly
       expect(true).toBe(true);
@@ -256,7 +257,7 @@ test.describe('Applications Management', () => {
 
     // Look for score badges (if applications exist)
     const scoreBadges = page.locator('[class*="bg-green"], [class*="bg-orange"], [class*="bg-red"]');
-    const count = await scoreBadges.count();
+    await scoreBadges.count();
 
     // Just verify page loads - badges depend on data
     expect(true).toBe(true);

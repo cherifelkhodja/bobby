@@ -1,13 +1,9 @@
 """Authentication endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, Request
 
 from app.api.middleware.rate_limiter import (
     limiter,
-    rate_limit_forgot_password,
-    rate_limit_login,
-    rate_limit_register,
 )
 from app.api.schemas.auth import (
     ForgotPasswordRequest,
@@ -30,9 +26,8 @@ from app.application.use_cases.auth import (
     ResetPasswordUseCase,
     VerifyEmailUseCase,
 )
-from app.config import Settings
 from app.dependencies import AppSettings, DbSession
-from app.infrastructure.audit import audit_logger, AuditAction, AuditResource
+from app.infrastructure.audit import AuditAction, AuditResource, audit_logger
 from app.infrastructure.database.repositories import UserRepository
 from app.infrastructure.email.sender import EmailService
 

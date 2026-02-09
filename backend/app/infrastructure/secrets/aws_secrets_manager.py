@@ -71,6 +71,7 @@ class AWSSecretsManager:
             else:
                 # Binary secret - decode as JSON
                 import base64
+
                 decoded = base64.b64decode(response["SecretBinary"]).decode("utf-8")
                 self._secrets_cache = json.loads(decoded)
 

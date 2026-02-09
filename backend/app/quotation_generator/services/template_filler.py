@@ -4,10 +4,9 @@ import io
 import logging
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from openpyxl import load_workbook
-from openpyxl.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
 from app.quotation_generator.domain.entities import Quotation
@@ -30,7 +29,7 @@ class TemplateFillerService:
         self,
         template_content: bytes,
         quotation: Quotation,
-        boond_reference: Optional[str] = None,
+        boond_reference: str | None = None,
     ) -> bytes:
         """Fill an Excel template with quotation data.
 
@@ -61,9 +60,7 @@ class TemplateFillerService:
             workbook.save(output)
             output.seek(0)
 
-            logger.info(
-                f"Filled template for quotation {quotation.resource_trigramme}"
-            )
+            logger.info(f"Filled template for quotation {quotation.resource_trigramme}")
             return output.getvalue()
 
         except Exception as e:
@@ -75,7 +72,7 @@ class TemplateFillerService:
         template_path: Path,
         quotation: Quotation,
         output_path: Path,
-        boond_reference: Optional[str] = None,
+        boond_reference: str | None = None,
     ) -> Path:
         """Fill template file and save to output path.
 
@@ -125,6 +122,7 @@ class TemplateFillerService:
         Returns:
             Text with placeholders replaced.
         """
+
         def replace_match(match: re.Match) -> str:
             variable_name = match.group(1)
             value = context.get(variable_name, "")
@@ -156,14 +154,12 @@ class TemplateFillerService:
 
         except Exception as e:
             logger.error(f"Failed to extract template variables: {e}")
-            raise TemplateFillerError(
-                f"Failed to extract variables: {str(e)}"
-            ) from e
+            raise TemplateFillerError(f"Failed to extract variables: {str(e)}") from e
 
     def validate_template(
         self,
         template_content: bytes,
-        required_variables: Optional[list[str]] = None,
+        required_variables: list[str] | None = None,
     ) -> dict[str, Any]:
         """Validate a template and return analysis.
 
@@ -194,9 +190,7 @@ class TemplateFillerService:
                 if missing:
                     result["missing_variables"] = sorted(missing)
                     result["is_valid"] = False
-                    result["errors"].append(
-                        f"Missing required variables: {', '.join(missing)}"
-                    )
+                    result["errors"].append(f"Missing required variables: {', '.join(missing)}")
 
         except Exception as e:
             result["is_valid"] = False

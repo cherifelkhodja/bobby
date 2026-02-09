@@ -5,7 +5,7 @@ Provides request logging, metrics collection, and correlation ID tracking.
 """
 
 import time
-from typing import Callable
+from collections.abc import Callable
 from uuid import uuid4
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -13,7 +13,6 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from .logging import (
-    get_correlation_id,
     get_logger,
     set_correlation_id,
     set_user_context,
@@ -38,9 +37,7 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
 
     HEADER_NAME = "X-Correlation-ID"
 
-    async def dispatch(
-        self, request: Request, call_next: Callable
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Get or generate correlation ID
         correlation_id = request.headers.get(self.HEADER_NAME)
         if not correlation_id:
@@ -68,9 +65,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     # Paths to exclude from logging
     EXCLUDE_PATHS = {"/health", "/metrics", "/favicon.ico"}
 
-    async def dispatch(
-        self, request: Request, call_next: Callable
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Skip logging for excluded paths
         if request.url.path in self.EXCLUDE_PATHS:
             return await call_next(request)
@@ -133,9 +128,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
     # Paths to exclude from metrics
     EXCLUDE_PATHS = {"/health", "/metrics", "/favicon.ico"}
 
-    async def dispatch(
-        self, request: Request, call_next: Callable
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Skip metrics for excluded paths
         if request.url.path in self.EXCLUDE_PATHS:
             return await call_next(request)
@@ -214,9 +207,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     Includes CSP, X-Frame-Options, and other security headers.
     """
 
-    async def dispatch(
-        self, request: Request, call_next: Callable
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
         response = await call_next(request)
 
         # Add security headers
@@ -254,9 +245,7 @@ class UserContextMiddleware(BaseHTTPMiddleware):
     Sets the user ID in the logging context for correlation.
     """
 
-    async def dispatch(
-        self, request: Request, call_next: Callable
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Try to extract user from request state (set by auth dependency)
         user = getattr(request.state, "user", None)
         if user and hasattr(user, "id"):

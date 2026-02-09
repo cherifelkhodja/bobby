@@ -6,12 +6,11 @@ import warnings
 # TODO: Migrate to google.genai (new SDK) to remove this suppression
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.api.middleware.correlation import CorrelationIdMiddleware
@@ -33,11 +32,11 @@ from app.api.routes.v1 import (
     settings_router,
     users_router,
 )
-from app.quotation_generator.api import router as quotation_generator_router
 from app.config import settings
 from app.infrastructure.database.connection import engine
 from app.infrastructure.database.seed import seed_admin_user
 from app.infrastructure.logging import configure_logging
+from app.quotation_generator.api import router as quotation_generator_router
 
 
 @asynccontextmanager
@@ -96,9 +95,15 @@ app.include_router(cooptations_router, prefix="/api/v1/cooptations", tags=["Coop
 app.include_router(invitations_router, prefix="/api/v1/invitations", tags=["Invitations"])
 app.include_router(cv_transformer_router, prefix="/api/v1/cv-transformer", tags=["CV Transformer"])
 app.include_router(cv_generator_router, prefix="/api/v1/cv-generator", tags=["CV Generator Beta"])
-app.include_router(published_opportunities_router, prefix="/api/v1/published-opportunities", tags=["Published Opportunities"])
+app.include_router(
+    published_opportunities_router,
+    prefix="/api/v1/published-opportunities",
+    tags=["Published Opportunities"],
+)
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(hr_router, prefix="/api/v1/hr", tags=["HR"])
-app.include_router(public_applications_router, prefix="/api/v1/postuler", tags=["Public Applications"])
+app.include_router(
+    public_applications_router, prefix="/api/v1/postuler", tags=["Public Applications"]
+)
 app.include_router(settings_router, prefix="/api/v1/settings", tags=["Settings"])
 app.include_router(quotation_generator_router, prefix="/api/v1", tags=["Quotation Generator"])

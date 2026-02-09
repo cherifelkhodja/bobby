@@ -1,20 +1,17 @@
 """User endpoints."""
 
-from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.user import (
     ChangePasswordRequest,
     UpdateUserRequest,
     UserResponse,
 )
-from app.dependencies import AppSettings, DbSession
-from app.domain.exceptions import InvalidCredentialsError, UserNotFoundError
+from app.dependencies import DbSession
 from app.infrastructure.database.repositories import UserRepository
-from app.infrastructure.security.jwt import decode_token, TokenPayload
+from app.infrastructure.security.jwt import decode_token
 from app.infrastructure.security.password import hash_password, verify_password
 
 router = APIRouter()

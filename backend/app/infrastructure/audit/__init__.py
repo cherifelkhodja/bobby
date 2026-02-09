@@ -1,10 +1,10 @@
 """Audit logging module."""
 
 from app.infrastructure.audit.logger import (
-    AuditLogger,
-    audit_logger,
     AuditAction,
+    AuditLogger,
     AuditResource,
+    audit_logger,
 )
 
 __all__ = [

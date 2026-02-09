@@ -2,8 +2,8 @@
 
 from app.infrastructure.boond.client import BoondClient
 from app.infrastructure.boond.dtos import (
-    BoondOpportunityDTO,
     BoondCandidateDTO,
+    BoondOpportunityDTO,
     BoondPositioningDTO,
 )
 from app.infrastructure.boond.mappers import (

@@ -1,6 +1,5 @@
 """CV Transformation Log repository implementation."""
 
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import func, select

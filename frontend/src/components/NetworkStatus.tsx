@@ -68,6 +68,7 @@ export function NetworkStatus() {
 /**
  * useNetworkStatus - Hook to get network status
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useNetworkStatus() {
   const [isOnline, setIsOnline] = useState(
     typeof navigator !== 'undefined' ? navigator.onLine : true

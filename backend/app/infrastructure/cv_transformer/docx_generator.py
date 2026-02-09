@@ -87,10 +87,12 @@ class DocxGenerator:
         techniques_list = []
         if isinstance(resume_competences.get("techniques"), dict):
             for category, values in resume_competences["techniques"].items():
-                techniques_list.append({
-                    "categorie": category,
-                    "valeurs": values,
-                })
+                techniques_list.append(
+                    {
+                        "categorie": category,
+                        "valeurs": values,
+                    }
+                )
         resume_competences["techniques_list"] = techniques_list
 
         # Format languages with bold (e.g., "Français : Natif" -> Français bold, rest normal)
@@ -130,7 +132,7 @@ class DocxGenerator:
             if " : " in langue:
                 parties = langue.split(" : ", 1)
                 rt.add(parties[0], bold=True)  # Language name in bold
-                rt.add(f" : {parties[1]}")     # Level in normal
+                rt.add(f" : {parties[1]}")  # Level in normal
             else:
                 rt.add(langue, bold=True)
             langues_formatees.append(rt)
@@ -163,11 +165,13 @@ class DocxGenerator:
                     annee = ""
                 # Create display string: "2015: Master" or just "Master" if no year
                 display = f"{annee}: {libelle}" if annee else libelle
-                cleaned["diplomes"].append({
-                    "annee": annee,
-                    "libelle": libelle,
-                    "display": display,
-                })
+                cleaned["diplomes"].append(
+                    {
+                        "annee": annee,
+                        "libelle": libelle,
+                        "display": display,
+                    }
+                )
 
         for cert in formations.get("certifications") or []:
             if isinstance(cert, dict):
@@ -181,11 +185,13 @@ class DocxGenerator:
                     annee = ""
                 # Create display string: "2020: AWS" or just "AWS" if no year
                 display = f"{annee}: {libelle}" if annee else libelle
-                cleaned["certifications"].append({
-                    "annee": annee,
-                    "libelle": libelle,
-                    "display": display,
-                })
+                cleaned["certifications"].append(
+                    {
+                        "annee": annee,
+                        "libelle": libelle,
+                        "display": display,
+                    }
+                )
 
         return cleaned
 
@@ -205,7 +211,7 @@ class DocxGenerator:
             exp_copy = experience.copy() if isinstance(experience, dict) else {}
             if index < total - 1:  # No page break after the last experience
                 rt = RichText()
-                rt.add('\f')  # Form feed character = page break
+                rt.add("\f")  # Form feed character = page break
                 exp_copy["saut_de_page"] = rt
             else:
                 exp_copy["saut_de_page"] = ""

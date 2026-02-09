@@ -1,8 +1,7 @@
 """Job application use cases for HR feature."""
 
 from dataclasses import dataclass
-from datetime import date, datetime
-from typing import Optional
+from datetime import datetime
 from uuid import UUID
 
 from app.application.read_models.hr import (
@@ -53,11 +52,11 @@ class SubmitApplicationCommand:
     cv_content: bytes
     cv_filename: str
     cv_content_type: str
-    civility: Optional[str] = None  # M, Mme
-    tjm_current: Optional[float] = None  # For freelance/both
-    tjm_desired: Optional[float] = None  # For freelance/both
-    salary_current: Optional[float] = None  # For employee/both
-    salary_desired: Optional[float] = None  # For employee/both
+    civility: str | None = None  # M, Mme
+    tjm_current: float | None = None  # For freelance/both
+    tjm_desired: float | None = None  # For freelance/both
+    salary_current: float | None = None  # For employee/both
+    salary_desired: float | None = None  # For employee/both
 
 
 class SubmitApplicationUseCase:
@@ -75,7 +74,9 @@ class SubmitApplicationUseCase:
         self.s3_client = s3_client
         self.matching_service = matching_service
 
-    async def execute(self, command: SubmitApplicationCommand) -> ApplicationSubmissionResultReadModel:
+    async def execute(
+        self, command: SubmitApplicationCommand
+    ) -> ApplicationSubmissionResultReadModel:
         """Submit application with CV upload and matching."""
         # Get job posting by token
         posting = await self.job_posting_repository.get_by_token(command.application_token)
@@ -100,8 +101,9 @@ class SubmitApplicationUseCase:
 
         # Upload CV to S3 with formatted name: "Prenom NOM - date.ext"
         import os
+
         file_ext = os.path.splitext(command.cv_filename)[1].lower()  # .pdf or .docx
-        upload_date = datetime.utcnow().strftime('%Y%m%d')
+        upload_date = datetime.utcnow().strftime("%Y%m%d")
         formatted_name = f"{command.first_name} {command.last_name.upper()}"
         cv_display_name = f"{formatted_name} - {upload_date}{file_ext}"
         cv_s3_key = f"cvs/{posting.id}/{cv_display_name}"
@@ -123,6 +125,7 @@ class SubmitApplicationUseCase:
         cv_text = None
         try:
             from app.infrastructure.cv_transformer.extractors import extract_text_from_bytes
+
             cv_text = extract_text_from_bytes(command.cv_content, command.cv_filename)
         except Exception:
             # Continue without text extraction
@@ -163,7 +166,9 @@ Qualifications requises:
                     "3_months": "Sous 3 mois",
                     "more_3_months": "Plus de 3 mois",
                 }
-                availability_display = availability_map.get(command.availability, command.availability)
+                availability_display = availability_map.get(
+                    command.availability, command.availability
+                )
 
                 # Run both evaluations in parallel
                 matching_task = self.matching_service.calculate_match_enhanced(
@@ -186,7 +191,9 @@ Qualifications requises:
                 # Process matching result
                 matching_result = results[0]
                 if not isinstance(matching_result, Exception):
-                    matching_score = matching_result.get("score_global", matching_result.get("score", 0))
+                    matching_score = matching_result.get(
+                        "score_global", matching_result.get("score", 0)
+                    )
                     # Store full enhanced matching details
                     matching_details = {
                         "score": matching_score,
@@ -196,12 +203,20 @@ Qualifications requises:
                         "competences_manquantes": matching_result.get("competences_manquantes", []),
                         "points_forts": matching_result.get("points_forts", []),
                         "points_vigilance": matching_result.get("points_vigilance", []),
-                        "synthese": matching_result.get("synthese", matching_result.get("summary", "")),
+                        "synthese": matching_result.get(
+                            "synthese", matching_result.get("summary", "")
+                        ),
                         "recommandation": matching_result.get("recommandation", {}),
                         # Legacy fields for backward compatibility
-                        "strengths": matching_result.get("strengths", matching_result.get("points_forts", [])),
-                        "gaps": matching_result.get("gaps", matching_result.get("competences_manquantes", [])),
-                        "summary": matching_result.get("summary", matching_result.get("synthese", "")),
+                        "strengths": matching_result.get(
+                            "strengths", matching_result.get("points_forts", [])
+                        ),
+                        "gaps": matching_result.get(
+                            "gaps", matching_result.get("competences_manquantes", [])
+                        ),
+                        "summary": matching_result.get(
+                            "summary", matching_result.get("synthese", "")
+                        ),
                     }
 
                 # Process CV quality result
@@ -266,9 +281,9 @@ class ListApplicationsForPostingUseCase:
         posting_id: UUID,
         page: int = 1,
         page_size: int = 20,
-        status: Optional[ApplicationStatus] = None,
-        employment_status: Optional[str] = None,
-        availability: Optional[str] = None,
+        status: ApplicationStatus | None = None,
+        employment_status: str | None = None,
+        availability: str | None = None,
         sort_by: str = "score",
         sort_order: str = "desc",
     ) -> JobApplicationListReadModel:
@@ -334,8 +349,8 @@ class ListApplicationsForPostingUseCase:
     def _to_read_model(
         self,
         application: JobApplication,
-        posting_title: Optional[str] = None,
-        cv_download_url: Optional[str] = None,
+        posting_title: str | None = None,
+        cv_download_url: str | None = None,
     ) -> JobApplicationReadModel:
         status_history = [
             StatusChangeReadModel(
@@ -401,8 +416,8 @@ class ListApplicationsForPostingUseCase:
 
 
 def _build_matching_details_model(
-    matching_details: Optional[dict],
-) -> Optional[MatchingDetailsReadModel]:
+    matching_details: dict | None,
+) -> MatchingDetailsReadModel | None:
     """Build MatchingDetailsReadModel from matching details dict.
 
     Handles both legacy and enhanced matching result formats.
@@ -449,8 +464,8 @@ def _build_matching_details_model(
 
 
 def _build_cv_quality_model(
-    cv_quality: Optional[dict],
-) -> Optional[CvQualityReadModel]:
+    cv_quality: dict | None,
+) -> CvQualityReadModel | None:
     """Build CvQualityReadModel from cv_quality dict.
 
     Converts the raw CV quality evaluation result into a structured read model.
@@ -465,46 +480,66 @@ def _build_cv_quality_model(
 
         # Stabilite missions
         stabilite = dn.get("stabilite_missions", {})
-        stabilite_model = StabilityScoreReadModel(
-            note=stabilite.get("note", 0),
-            max=stabilite.get("max", 8),
-            duree_moyenne_mois=stabilite.get("duree_moyenne_mois", 0),
-            commentaire=stabilite.get("commentaire", ""),
-        ) if stabilite else None
+        stabilite_model = (
+            StabilityScoreReadModel(
+                note=stabilite.get("note", 0),
+                max=stabilite.get("max", 8),
+                duree_moyenne_mois=stabilite.get("duree_moyenne_mois", 0),
+                commentaire=stabilite.get("commentaire", ""),
+            )
+            if stabilite
+            else None
+        )
 
         # Qualite comptes
         comptes = dn.get("qualite_comptes", {})
-        comptes_model = AccountQualityScoreReadModel(
-            note=comptes.get("note", 0),
-            max=comptes.get("max", 6),
-            comptes_identifies=comptes.get("comptes_identifies", []),
-            commentaire=comptes.get("commentaire", ""),
-        ) if comptes else None
+        comptes_model = (
+            AccountQualityScoreReadModel(
+                note=comptes.get("note", 0),
+                max=comptes.get("max", 6),
+                comptes_identifies=comptes.get("comptes_identifies", []),
+                commentaire=comptes.get("commentaire", ""),
+            )
+            if comptes
+            else None
+        )
 
         # Parcours scolaire
         parcours = dn.get("parcours_scolaire", {})
-        parcours_model = EducationScoreReadModel(
-            note=parcours.get("note", 0),
-            max=parcours.get("max", 4),
-            formations_identifiees=parcours.get("formations_identifiees", []),
-            commentaire=parcours.get("commentaire", ""),
-        ) if parcours else None
+        parcours_model = (
+            EducationScoreReadModel(
+                note=parcours.get("note", 0),
+                max=parcours.get("max", 4),
+                formations_identifiees=parcours.get("formations_identifiees", []),
+                commentaire=parcours.get("commentaire", ""),
+            )
+            if parcours
+            else None
+        )
 
         # Continuite parcours
         continuite = dn.get("continuite_parcours", {})
-        continuite_model = ContinuityScoreReadModel(
-            note=continuite.get("note", 0),
-            max=continuite.get("max", 4),
-            trous_identifies=continuite.get("trous_identifies", []),
-            commentaire=continuite.get("commentaire", ""),
-        ) if continuite else None
+        continuite_model = (
+            ContinuityScoreReadModel(
+                note=continuite.get("note", 0),
+                max=continuite.get("max", 4),
+                trous_identifies=continuite.get("trous_identifies", []),
+                commentaire=continuite.get("commentaire", ""),
+            )
+            if continuite
+            else None
+        )
 
         # Bonus/malus
         bonus = dn.get("bonus_malus", {})
-        bonus_model = BonusMalusReadModel(
-            valeur=bonus.get("valeur", 0),
-            raisons=bonus.get("raisons", []),
-        ) if bonus else None
+        bonus_model = (
+            BonusMalusReadModel(
+                valeur=bonus.get("valeur", 0),
+                raisons=bonus.get("raisons", []),
+            )
+            if bonus
+            else None
+        )
 
         details_notes_model = CvQualityDetailsNotesReadModel(
             stabilite_missions=stabilite_model,
@@ -543,7 +578,7 @@ class GetApplicationUseCase:
         self,
         application_id: UUID,
         mark_viewed: bool = False,
-        viewed_by: Optional[UUID] = None,
+        viewed_by: UUID | None = None,
     ) -> JobApplicationReadModel:
         """Get application by ID.
 
@@ -582,8 +617,8 @@ class GetApplicationUseCase:
     def _to_read_model(
         self,
         application: JobApplication,
-        posting_title: Optional[str] = None,
-        cv_download_url: Optional[str] = None,
+        posting_title: str | None = None,
+        cv_download_url: str | None = None,
     ) -> JobApplicationReadModel:
         status_history = [
             StatusChangeReadModel(
@@ -655,7 +690,7 @@ class UpdateApplicationStatusCommand:
     application_id: UUID
     new_status: ApplicationStatus
     changed_by: UUID
-    comment: Optional[str] = None
+    comment: str | None = None
 
 
 class UpdateApplicationStatusUseCase:
@@ -667,7 +702,7 @@ class UpdateApplicationStatusUseCase:
         job_posting_repository: JobPostingRepository,
         user_repository: UserRepository,
         s3_client: S3StorageClient,
-        boond_client: Optional[BoondClient] = None,
+        boond_client: BoondClient | None = None,
     ) -> None:
         self.job_application_repository = job_application_repository
         self.job_posting_repository = job_posting_repository
@@ -712,7 +747,9 @@ class UpdateApplicationStatusUseCase:
                     last_name=application.last_name,
                     civility=application.civility or "M",
                     phone=Phone(application.phone) if application.phone else None,
-                    daily_rate=application.tjm_desired or application.tjm_current or application.tjm_max,
+                    daily_rate=application.tjm_desired
+                    or application.tjm_current
+                    or application.tjm_max,
                     note=(
                         f"Candidature validée - {application.job_title}\n"
                         f"TJM: {application.tjm_range}\n"
@@ -726,6 +763,7 @@ class UpdateApplicationStatusUseCase:
             except Exception as e:
                 saved.boond_sync_error = str(e)
                 import structlog
+
                 structlog.get_logger(__name__).error(
                     "boond_auto_sync_failed",
                     application_id=str(application.id),
@@ -756,8 +794,8 @@ class UpdateApplicationStatusUseCase:
     async def _to_read_model(
         self,
         application: JobApplication,
-        posting_title: Optional[str] = None,
-        cv_download_url: Optional[str] = None,
+        posting_title: str | None = None,
+        cv_download_url: str | None = None,
     ) -> JobApplicationReadModel:
         # Enrich status history with user names
         status_history = []
@@ -766,6 +804,7 @@ class UpdateApplicationStatusUseCase:
             changed_by_id = sh.get("changed_by")
             if changed_by_id:
                 from uuid import UUID
+
                 user = await self.user_repository.get_by_id(UUID(changed_by_id))
                 if user:
                     changed_by_name = user.full_name
@@ -881,8 +920,8 @@ class UpdateApplicationNoteUseCase:
     def _to_read_model(
         self,
         application: JobApplication,
-        posting_title: Optional[str] = None,
-        cv_download_url: Optional[str] = None,
+        posting_title: str | None = None,
+        cv_download_url: str | None = None,
     ) -> JobApplicationReadModel:
         status_history = [
             StatusChangeReadModel(
@@ -1024,8 +1063,8 @@ class CreateCandidateInBoondUseCase:
     def _to_read_model(
         self,
         application: JobApplication,
-        posting_title: Optional[str] = None,
-        cv_download_url: Optional[str] = None,
+        posting_title: str | None = None,
+        cv_download_url: str | None = None,
     ) -> JobApplicationReadModel:
         status_history = [
             StatusChangeReadModel(
@@ -1180,7 +1219,9 @@ Qualifications requises:
             # Process matching result
             matching_result = results[0]
             if not isinstance(matching_result, Exception):
-                matching_score = matching_result.get("score_global", matching_result.get("score", 0))
+                matching_score = matching_result.get(
+                    "score_global", matching_result.get("score", 0)
+                )
                 application.matching_score = matching_score
                 application.matching_details = {
                     "score": matching_score,
@@ -1192,8 +1233,12 @@ Qualifications requises:
                     "points_vigilance": matching_result.get("points_vigilance", []),
                     "synthese": matching_result.get("synthese", matching_result.get("summary", "")),
                     "recommandation": matching_result.get("recommandation", {}),
-                    "strengths": matching_result.get("strengths", matching_result.get("points_forts", [])),
-                    "gaps": matching_result.get("gaps", matching_result.get("competences_manquantes", [])),
+                    "strengths": matching_result.get(
+                        "strengths", matching_result.get("points_forts", [])
+                    ),
+                    "gaps": matching_result.get(
+                        "gaps", matching_result.get("competences_manquantes", [])
+                    ),
                     "summary": matching_result.get("summary", matching_result.get("synthese", "")),
                 }
 
@@ -1221,8 +1266,8 @@ Qualifications requises:
     def _to_read_model(
         self,
         application: JobApplication,
-        posting_title: Optional[str] = None,
-        cv_download_url: Optional[str] = None,
+        posting_title: str | None = None,
+        cv_download_url: str | None = None,
     ) -> JobApplicationReadModel:
         status_history = [
             StatusChangeReadModel(

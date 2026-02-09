@@ -67,7 +67,9 @@ class TestUserRepository:
         assert retrieved.id == sample_user.id
 
     @pytest.mark.asyncio
-    async def test_get_by_email_case_insensitive(self, repository: UserRepository, sample_user: User):
+    async def test_get_by_email_case_insensitive(
+        self, repository: UserRepository, sample_user: User
+    ):
         """Test email lookup is case insensitive."""
         await repository.save(sample_user)
 

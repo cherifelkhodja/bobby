@@ -1,6 +1,5 @@
 """Integration tests for CooptationRepository."""
 
-from datetime import datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -67,7 +66,9 @@ class TestCooptationRepository:
         return await candidate_repo.save(candidate)
 
     @pytest_asyncio.fixture
-    async def opportunity(self, opportunity_repo: OpportunityRepository, submitter: User) -> Opportunity:
+    async def opportunity(
+        self, opportunity_repo: OpportunityRepository, submitter: User
+    ) -> Opportunity:
         """Create an opportunity."""
         opp = Opportunity(
             title="Test Opportunity",
@@ -181,24 +182,28 @@ class TestCooptationRepository:
     ):
         """Test listing cooptations by submitter."""
         # Create another submitter
-        other_submitter = await user_repo.save(User(
-            email=Email(f"other-{uuid4().hex[:8]}@example.com"),
-            first_name="Other",
-            last_name="User",
-            password_hash="hashed",
-            role=UserRole.USER,
-            is_verified=True,
-            is_active=True,
-        ))
+        other_submitter = await user_repo.save(
+            User(
+                email=Email(f"other-{uuid4().hex[:8]}@example.com"),
+                first_name="Other",
+                last_name="User",
+                password_hash="hashed",
+                role=UserRole.USER,
+                is_verified=True,
+                is_active=True,
+            )
+        )
 
         # Create cooptations for first submitter
         for i in range(3):
-            cand = await candidate_repo.save(Candidate(
-                email=Email(f"cand{i}-{uuid4().hex[:8]}@example.com"),
-                first_name=f"Cand{i}",
-                last_name="Test",
-                civility="M",
-            ))
+            cand = await candidate_repo.save(
+                Candidate(
+                    email=Email(f"cand{i}-{uuid4().hex[:8]}@example.com"),
+                    first_name=f"Cand{i}",
+                    last_name="Test",
+                    civility="M",
+                )
+            )
             coopt = Cooptation(
                 candidate=cand,
                 opportunity=opportunity,
@@ -207,12 +212,14 @@ class TestCooptationRepository:
             await repository.save(coopt)
 
         # Create cooptation for other submitter
-        other_cand = await candidate_repo.save(Candidate(
-            email=Email(f"other-cand-{uuid4().hex[:8]}@example.com"),
-            first_name="Other",
-            last_name="Candidate",
-            civility="M",
-        ))
+        other_cand = await candidate_repo.save(
+            Candidate(
+                email=Email(f"other-cand-{uuid4().hex[:8]}@example.com"),
+                first_name="Other",
+                last_name="Candidate",
+                civility="M",
+            )
+        )
         other_coopt = Cooptation(
             candidate=other_cand,
             opportunity=opportunity,
@@ -245,12 +252,14 @@ class TestCooptationRepository:
         ]
 
         for i, status in enumerate(statuses):
-            cand = await candidate_repo.save(Candidate(
-                email=Email(f"status{i}-{uuid4().hex[:8]}@example.com"),
-                first_name=f"Status{i}",
-                last_name="Test",
-                civility="M",
-            ))
+            cand = await candidate_repo.save(
+                Candidate(
+                    email=Email(f"status{i}-{uuid4().hex[:8]}@example.com"),
+                    first_name=f"Status{i}",
+                    last_name="Test",
+                    civility="M",
+                )
+            )
             coopt = Cooptation(
                 candidate=cand,
                 opportunity=opportunity,
@@ -279,12 +288,14 @@ class TestCooptationRepository:
         # Create cooptations
         for i in range(5):
             status = CooptationStatus.PENDING if i < 3 else CooptationStatus.ACCEPTED
-            cand = await candidate_repo.save(Candidate(
-                email=Email(f"count{i}-{uuid4().hex[:8]}@example.com"),
-                first_name=f"Count{i}",
-                last_name="Test",
-                civility="M",
-            ))
+            cand = await candidate_repo.save(
+                Candidate(
+                    email=Email(f"count{i}-{uuid4().hex[:8]}@example.com"),
+                    first_name=f"Count{i}",
+                    last_name="Test",
+                    civility="M",
+                )
+            )
             coopt = Cooptation(
                 candidate=cand,
                 opportunity=opportunity,
@@ -402,12 +413,14 @@ class TestCooptationRepository:
         idx = 0
         for status, count in status_distribution.items():
             for _ in range(count):
-                cand = await candidate_repo.save(Candidate(
-                    email=Email(f"stats{idx}-{uuid4().hex[:8]}@example.com"),
-                    first_name=f"Stats{idx}",
-                    last_name="Test",
-                    civility="M",
-                ))
+                cand = await candidate_repo.save(
+                    Candidate(
+                        email=Email(f"stats{idx}-{uuid4().hex[:8]}@example.com"),
+                        first_name=f"Stats{idx}",
+                        last_name="Test",
+                        civility="M",
+                    )
+                )
                 coopt = Cooptation(
                     candidate=cand,
                     opportunity=opportunity,

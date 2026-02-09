@@ -3,10 +3,8 @@
 from datetime import datetime, timedelta
 from uuid import uuid4
 
-import pytest
-
 from app.domain.entities import Candidate, Cooptation, Opportunity, User
-from app.domain.value_objects import CooptationStatus, Email, Phone, UserRole
+from app.domain.value_objects import CooptationStatus, Email, UserRole
 
 
 class TestUser:

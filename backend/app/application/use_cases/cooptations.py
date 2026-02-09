@@ -1,7 +1,6 @@
 """Cooptation use cases."""
 
 from dataclasses import dataclass
-from typing import Optional
 from uuid import UUID
 
 from app.application.read_models.cooptation import (
@@ -38,9 +37,9 @@ class CreateCooptationCommand:
     candidate_last_name: str
     candidate_email: str
     candidate_civility: str = "M"
-    candidate_phone: Optional[str] = None
-    candidate_daily_rate: Optional[float] = None
-    candidate_note: Optional[str] = None
+    candidate_phone: str | None = None
+    candidate_daily_rate: float | None = None
+    candidate_note: str | None = None
 
 
 class CreateCooptationUseCase:
@@ -212,8 +211,8 @@ class ListCooptationsUseCase:
         self,
         page: int = 1,
         page_size: int = 20,
-        submitter_id: Optional[UUID] = None,
-        status: Optional[CooptationStatus] = None,
+        submitter_id: UUID | None = None,
+        status: CooptationStatus | None = None,
     ) -> CooptationListReadModel:
         """List cooptations with pagination and filters."""
         skip = (page - 1) * page_size
@@ -360,7 +359,7 @@ class UpdateCooptationStatusUseCase:
         cooptation_id: UUID,
         new_status: CooptationStatus,
         changed_by: UUID,
-        comment: Optional[str] = None,
+        comment: str | None = None,
     ) -> CooptationReadModel:
         """Update cooptation status."""
         cooptation = await self.cooptation_repository.get_by_id(cooptation_id)
@@ -374,9 +373,7 @@ class UpdateCooptationStatusUseCase:
         )
 
         if not success:
-            raise ValueError(
-                f"Invalid status transition from {cooptation.status} to {new_status}"
-            )
+            raise ValueError(f"Invalid status transition from {cooptation.status} to {new_status}")
 
         saved = await self.cooptation_repository.save(cooptation)
 
@@ -434,7 +431,7 @@ class GetCooptationStatsUseCase:
     def __init__(self, cooptation_repository: CooptationRepository) -> None:
         self.cooptation_repository = cooptation_repository
 
-    async def execute(self, submitter_id: Optional[UUID] = None) -> CooptationStatsReadModel:
+    async def execute(self, submitter_id: UUID | None = None) -> CooptationStatsReadModel:
         """Get cooptation statistics."""
         if submitter_id:
             stats = await self.cooptation_repository.get_stats_by_submitter(submitter_id)

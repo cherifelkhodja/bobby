@@ -1,15 +1,16 @@
 """FastAPI dependency injection."""
 
-from typing import Annotated, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Annotated
 
 from fastapi import Depends
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
+from app.infrastructure.boond.client import BoondClient
 from app.infrastructure.cache.redis import get_redis_client
 from app.infrastructure.database.connection import get_async_session
-from app.infrastructure.boond.client import BoondClient
 from app.infrastructure.service_factory import ServiceFactory
 from app.infrastructure.settings import AppSettingsService
 

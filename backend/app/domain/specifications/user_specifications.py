@@ -4,8 +4,6 @@ User-related specifications.
 Business rules for filtering and validating users.
 """
 
-from typing import Optional
-
 from ..entities import User
 from ..value_objects import UserRole
 from .base import Specification
@@ -97,9 +95,9 @@ class UserNameContainsSpecification(Specification[User]):
     def is_satisfied_by(self, user: User) -> bool:
         search = self._search_term
         return (
-            search in user.first_name.lower() or
-            search in user.last_name.lower() or
-            search in user.full_name.lower()
+            search in user.first_name.lower()
+            or search in user.last_name.lower()
+            or search in user.full_name.lower()
         )
 
 
@@ -109,7 +107,7 @@ class CanPerformActionSpecification(Specification[User]):
     Used for authorization checks.
     """
 
-    def __init__(self, action: str, resource: Optional[str] = None):
+    def __init__(self, action: str, resource: str | None = None):
         self._action = action
         self._resource = resource
 
@@ -151,21 +149,20 @@ class ActiveAndVerifiedSpecification(Specification[User]):
         self._verified = IsVerifiedUserSpecification()
 
     def is_satisfied_by(self, user: User) -> bool:
-        return (
-            self._active.is_satisfied_by(user) and
-            self._verified.is_satisfied_by(user)
-        )
+        return self._active.is_satisfied_by(user) and self._verified.is_satisfied_by(user)
 
 
 class StaffUserSpecification(Specification[User]):
     """Specification for staff users (admin, rh, commercial)."""
 
     def __init__(self):
-        self._roles = HasAnyRoleSpecification([
-            UserRole.ADMIN,
-            UserRole.RH,
-            UserRole.COMMERCIAL,
-        ])
+        self._roles = HasAnyRoleSpecification(
+            [
+                UserRole.ADMIN,
+                UserRole.RH,
+                UserRole.COMMERCIAL,
+            ]
+        )
 
     def is_satisfied_by(self, user: User) -> bool:
         return self._roles.is_satisfied_by(user)

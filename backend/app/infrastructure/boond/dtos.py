@@ -1,7 +1,6 @@
 """BoondManager Data Transfer Objects."""
 
 from datetime import date
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -12,21 +11,21 @@ class BoondOpportunityDTO(BaseModel):
     id: int
     title: str
     reference: str = Field(default="")
-    startDate: Optional[date] = None
-    endDate: Optional[date] = None
-    responseDeadline: Optional[date] = None
-    averageDailyRate: Optional[float] = None
-    managerFirstName: Optional[str] = None
-    managerLastName: Optional[str] = None
-    managerEmail: Optional[str] = None
-    clientName: Optional[str] = None
-    description: Optional[str] = None
-    skills: Optional[list[str]] = None
-    location: Optional[str] = None
-    state: Optional[int] = None
+    startDate: date | None = None
+    endDate: date | None = None
+    responseDeadline: date | None = None
+    averageDailyRate: float | None = None
+    managerFirstName: str | None = None
+    managerLastName: str | None = None
+    managerEmail: str | None = None
+    clientName: str | None = None
+    description: str | None = None
+    skills: list[str] | None = None
+    location: str | None = None
+    state: int | None = None
 
     @property
-    def manager_full_name(self) -> Optional[str]:
+    def manager_full_name(self) -> str | None:
         """Get manager full name."""
         if self.managerFirstName and self.managerLastName:
             return f"{self.managerFirstName} {self.managerLastName}"
@@ -40,9 +39,9 @@ class BoondCandidateDTO(BaseModel):
     firstName: str
     lastName: str
     email: str
-    civility: Optional[str] = None
-    phone1: Optional[str] = None
-    state: Optional[int] = None
+    civility: str | None = None
+    phone1: str | None = None
+    state: int | None = None
 
 
 class BoondPositioningDTO(BaseModel):
@@ -51,7 +50,7 @@ class BoondPositioningDTO(BaseModel):
     id: int
     candidateId: int
     opportunityId: int
-    state: Optional[int] = None
+    state: int | None = None
 
 
 class BoondCreateCandidateRequest(BaseModel):
@@ -60,8 +59,8 @@ class BoondCreateCandidateRequest(BaseModel):
     firstName: str
     lastName: str
     email: str
-    civility: Optional[str] = "M"
-    phone1: Optional[str] = None
+    civility: str | None = "M"
+    phone1: str | None = None
     state: int = 1
 
 

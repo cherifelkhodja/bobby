@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID, uuid4
 
 
@@ -63,8 +63,8 @@ class StatusChange:
     from_status: str
     to_status: str
     changed_at: datetime
-    changed_by: Optional[UUID] = None
-    comment: Optional[str] = None
+    changed_by: UUID | None = None
+    comment: str | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON storage."""
@@ -153,28 +153,28 @@ class JobApplication:
     employment_status: str  # freelance, employee, both
     english_level: str  # notions, intermediate, professional, fluent, bilingual
 
-    civility: Optional[str] = None  # M, Mme
+    civility: str | None = None  # M, Mme
 
     # Salary fields (conditional based on employment_status)
-    tjm_current: Optional[float] = None  # Freelance: TJM actuel
-    tjm_desired: Optional[float] = None  # Freelance: TJM souhaité
-    salary_current: Optional[float] = None  # Employee: Salaire actuel
-    salary_desired: Optional[float] = None  # Employee: Salaire souhaité
+    tjm_current: float | None = None  # Freelance: TJM actuel
+    tjm_desired: float | None = None  # Freelance: TJM souhaité
+    salary_current: float | None = None  # Employee: Salaire actuel
+    salary_desired: float | None = None  # Employee: Salaire souhaité
 
     # CV storage
     cv_s3_key: str = ""  # S3/MinIO storage key
     cv_filename: str = ""  # Original filename
 
     # CV text extraction (for matching)
-    cv_text: Optional[str] = None
+    cv_text: str | None = None
 
     # AI matching results
-    matching_score: Optional[int] = None  # 0-100
-    matching_details: Optional[dict[str, Any]] = None
+    matching_score: int | None = None  # 0-100
+    matching_details: dict[str, Any] | None = None
 
     # CV Quality evaluation results (/20)
-    cv_quality_score: Optional[float] = None  # 0-20
-    cv_quality: Optional[dict[str, Any]] = None
+    cv_quality_score: float | None = None  # 0-20
+    cv_quality: dict[str, Any] | None = None
 
     # Read/unread state (separate from status workflow)
     is_read: bool = False
@@ -184,17 +184,17 @@ class JobApplication:
     status_history: list[dict] = field(default_factory=list)
 
     # RH notes
-    notes: Optional[str] = None
+    notes: str | None = None
 
     # BoondManager integration
-    boond_candidate_id: Optional[str] = None
-    boond_sync_error: Optional[str] = None
-    boond_synced_at: Optional[datetime] = None
+    boond_candidate_id: str | None = None
+    boond_sync_error: str | None = None
+    boond_synced_at: datetime | None = None
 
     # Legacy fields (kept for backward compatibility, may be null)
-    tjm_min: Optional[float] = None
-    tjm_max: Optional[float] = None
-    availability_date: Optional[date] = None
+    tjm_min: float | None = None
+    tjm_max: float | None = None
+    availability_date: date | None = None
 
     # Audit fields
     id: UUID = field(default_factory=uuid4)
@@ -278,7 +278,7 @@ class JobApplication:
         return self.matching_score is not None
 
     @property
-    def matching_result(self) -> Optional[MatchingResult]:
+    def matching_result(self) -> MatchingResult | None:
         """Get matching result as structured object."""
         if not self.matching_details:
             return None
@@ -333,8 +333,8 @@ class JobApplication:
     def change_status(
         self,
         new_status: ApplicationStatus,
-        changed_by: Optional[UUID] = None,
-        comment: Optional[str] = None,
+        changed_by: UUID | None = None,
+        comment: str | None = None,
     ) -> bool:
         """Change application status with validation.
 

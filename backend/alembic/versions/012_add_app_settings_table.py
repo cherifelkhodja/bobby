@@ -8,9 +8,9 @@ This table stores runtime application settings that can be modified
 from the admin panel, like the Gemini model to use.
 """
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers
 revision = "012_add_app_settings_table"
@@ -27,7 +27,12 @@ def upgrade() -> None:
         sa.Column("key", sa.String(100), nullable=False, unique=True),
         sa.Column("value", sa.Text(), nullable=True),
         sa.Column("description", sa.String(255), nullable=True),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now()),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            onupdate=sa.func.now(),
+        ),
         sa.Column("updated_by", sa.UUID(), sa.ForeignKey("users.id"), nullable=True),
     )
 

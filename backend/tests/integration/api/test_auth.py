@@ -2,10 +2,8 @@
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database.models import UserModel
-from tests.conftest import get_auth_headers
 
 
 class TestLogin:

@@ -7,11 +7,11 @@ for better scalability and maintainability.
 
 from .base import (
     Command,
-    Query,
-    CommandHandler,
-    QueryHandler,
     CommandBus,
+    CommandHandler,
+    Query,
     QueryBus,
+    QueryHandler,
 )
 from .handlers import (
     command_bus,

@@ -1,7 +1,6 @@
 """HR feature read models for job postings and applications."""
 
 from datetime import date, datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -17,22 +16,22 @@ class OpportunityForHRReadModel(BaseModel):
     id: str  # Boond opportunity ID
     title: str
     reference: str
-    client_name: Optional[str] = None
-    description: Optional[str] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    client_name: str | None = None
+    description: str | None = None
+    start_date: date | None = None
+    end_date: date | None = None
     # Manager info
-    manager_name: Optional[str] = None
-    hr_manager_name: Optional[str] = None
+    manager_name: str | None = None
+    hr_manager_name: str | None = None
     # State info from Boond
-    state: Optional[int] = None
-    state_name: Optional[str] = None
-    state_color: Optional[str] = None
+    state: int | None = None
+    state_name: str | None = None
+    state_color: str | None = None
     # Job posting info (from local database)
     has_job_posting: bool = False
-    job_posting_id: Optional[str] = None
-    job_posting_status: Optional[str] = None
-    job_posting_status_display: Optional[str] = None
+    job_posting_id: str | None = None
+    job_posting_status: str | None = None
+    job_posting_status_display: str | None = None
     applications_count: int = 0
     new_applications_count: int = 0
 
@@ -80,17 +79,18 @@ class MatchingDetailsReadModel(BaseModel):
     summary: str = ""
 
     # Enhanced fields
-    score_global: Optional[int] = None
-    scores_details: Optional[ScoresDetailsReadModel] = None
+    score_global: int | None = None
+    scores_details: ScoresDetailsReadModel | None = None
     competences_matchees: list[str] = []
     competences_manquantes: list[str] = []
     points_forts: list[str] = []
     points_vigilance: list[str] = []
     synthese: str = ""
-    recommandation: Optional[MatchingRecommendationReadModel] = None
+    recommandation: MatchingRecommendationReadModel | None = None
 
 
 # ============== CV Quality Evaluation Models ==============
+
 
 class StabilityScoreReadModel(BaseModel):
     """Mission stability score details."""
@@ -150,11 +150,11 @@ class CvQualityDetailsNotesReadModel(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    stabilite_missions: Optional[StabilityScoreReadModel] = None
-    qualite_comptes: Optional[AccountQualityScoreReadModel] = None
-    parcours_scolaire: Optional[EducationScoreReadModel] = None
-    continuite_parcours: Optional[ContinuityScoreReadModel] = None
-    bonus_malus: Optional[BonusMalusReadModel] = None
+    stabilite_missions: StabilityScoreReadModel | None = None
+    qualite_comptes: AccountQualityScoreReadModel | None = None
+    parcours_scolaire: EducationScoreReadModel | None = None
+    continuite_parcours: ContinuityScoreReadModel | None = None
+    bonus_malus: BonusMalusReadModel | None = None
 
 
 class CvQualityReadModel(BaseModel):
@@ -165,7 +165,7 @@ class CvQualityReadModel(BaseModel):
     niveau_experience: str  # JUNIOR, CONFIRME, SENIOR
     annees_experience: float = 0
     note_globale: float  # 0-20
-    details_notes: Optional[CvQualityDetailsNotesReadModel] = None
+    details_notes: CvQualityDetailsNotesReadModel | None = None
     points_forts: list[str] = []
     points_faibles: list[str] = []
     synthese: str = ""
@@ -179,41 +179,41 @@ class JobPostingReadModel(BaseModel):
 
     id: str
     opportunity_id: str
-    boond_opportunity_id: Optional[str] = None  # Boond external ID for API calls
-    opportunity_title: Optional[str] = None
-    opportunity_reference: Optional[str] = None
-    client_name: Optional[str] = None
+    boond_opportunity_id: str | None = None  # Boond external ID for API calls
+    opportunity_title: str | None = None
+    opportunity_reference: str | None = None
+    client_name: str | None = None
     title: str
     description: str
     qualifications: str
     location_country: str
-    location_region: Optional[str] = None
-    location_postal_code: Optional[str] = None
-    location_city: Optional[str] = None
-    location_key: Optional[str] = None  # Turnover-IT location key
+    location_region: str | None = None
+    location_postal_code: str | None = None
+    location_city: str | None = None
+    location_key: str | None = None  # Turnover-IT location key
     contract_types: list[str]
     skills: list[str]
-    experience_level: Optional[str] = None
-    remote: Optional[str] = None
-    start_date: Optional[date] = None
-    duration_months: Optional[int] = None
-    salary_min_annual: Optional[float] = None
-    salary_max_annual: Optional[float] = None
-    salary_min_daily: Optional[float] = None
-    salary_max_daily: Optional[float] = None
-    employer_overview: Optional[str] = None
+    experience_level: str | None = None
+    remote: str | None = None
+    start_date: date | None = None
+    duration_months: int | None = None
+    salary_min_annual: float | None = None
+    salary_max_annual: float | None = None
+    salary_min_daily: float | None = None
+    salary_max_daily: float | None = None
+    employer_overview: str | None = None
     status: str
     status_display: str
-    turnoverit_reference: Optional[str] = None
-    turnoverit_public_url: Optional[str] = None
+    turnoverit_reference: str | None = None
+    turnoverit_public_url: str | None = None
     application_token: str
-    application_url: Optional[str] = None
-    created_by: Optional[str] = None
-    created_by_name: Optional[str] = None
+    application_url: str | None = None
+    created_by: str | None = None
+    created_by_name: str | None = None
     created_at: datetime
     updated_at: datetime
-    published_at: Optional[datetime] = None
-    closed_at: Optional[datetime] = None
+    published_at: datetime | None = None
+    closed_at: datetime | None = None
     # Stats
     applications_total: int = 0
     applications_new: int = 0
@@ -239,17 +239,17 @@ class JobPostingPublicReadModel(BaseModel):
     description: str
     qualifications: str
     location_country: str
-    location_region: Optional[str] = None
-    location_city: Optional[str] = None
+    location_region: str | None = None
+    location_city: str | None = None
     contract_types: list[str]
     skills: list[str]
-    experience_level: Optional[str] = None
-    remote: Optional[str] = None
-    start_date: Optional[date] = None
-    duration_months: Optional[int] = None
-    salary_min_daily: Optional[float] = None
-    salary_max_daily: Optional[float] = None
-    employer_overview: Optional[str] = None
+    experience_level: str | None = None
+    remote: str | None = None
+    start_date: date | None = None
+    duration_months: int | None = None
+    salary_min_daily: float | None = None
+    salary_max_daily: float | None = None
+    employer_overview: str | None = None
 
 
 class StatusChangeReadModel(BaseModel):
@@ -260,9 +260,9 @@ class StatusChangeReadModel(BaseModel):
     from_status: str
     to_status: str
     changed_at: datetime
-    changed_by: Optional[str] = None
-    changed_by_name: Optional[str] = None
-    comment: Optional[str] = None
+    changed_by: str | None = None
+    changed_by_name: str | None = None
+    comment: str | None = None
 
 
 class JobApplicationReadModel(BaseModel):
@@ -272,7 +272,7 @@ class JobApplicationReadModel(BaseModel):
 
     id: str
     job_posting_id: str
-    job_posting_title: Optional[str] = None
+    job_posting_title: str | None = None
     first_name: str
     last_name: str
     full_name: str
@@ -286,35 +286,35 @@ class JobApplicationReadModel(BaseModel):
     employment_status_display: str
     english_level: str
     english_level_display: str
-    tjm_current: Optional[float] = None
-    tjm_desired: Optional[float] = None
-    salary_current: Optional[float] = None
-    salary_desired: Optional[float] = None
+    tjm_current: float | None = None
+    tjm_desired: float | None = None
+    salary_current: float | None = None
+    salary_desired: float | None = None
     tjm_range: str
     salary_range: str
     # Legacy fields (kept for backward compatibility)
-    tjm_min: Optional[float] = None
-    tjm_max: Optional[float] = None
-    availability_date: Optional[date] = None
+    tjm_min: float | None = None
+    tjm_max: float | None = None
+    availability_date: date | None = None
     cv_s3_key: str
     cv_filename: str
-    cv_download_url: Optional[str] = None
-    matching_score: Optional[int] = None
-    matching_details: Optional[MatchingDetailsReadModel] = None
+    cv_download_url: str | None = None
+    matching_score: int | None = None
+    matching_details: MatchingDetailsReadModel | None = None
     # CV Quality evaluation (/20)
-    cv_quality_score: Optional[float] = None
-    cv_quality: Optional[CvQualityReadModel] = None
+    cv_quality_score: float | None = None
+    cv_quality: CvQualityReadModel | None = None
     # Read state (separate from status)
     is_read: bool = False
     status: str
     status_display: str
     status_history: list[StatusChangeReadModel] = []
-    notes: Optional[str] = None
-    boond_candidate_id: Optional[str] = None
-    boond_sync_error: Optional[str] = None
-    boond_synced_at: Optional[datetime] = None
+    notes: str | None = None
+    boond_candidate_id: str | None = None
+    boond_sync_error: str | None = None
+    boond_synced_at: datetime | None = None
     boond_sync_status: str = "not_applicable"
-    civility: Optional[str] = None
+    civility: str | None = None
     created_at: datetime
     updated_at: datetime
 

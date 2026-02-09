@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -71,9 +71,11 @@ class TurnoverITClient:
         headers = self._get_headers()
 
         # Log full request details
-        logger.info(f"=== Turnover-IT CREATE JOB REQUEST ===")
+        logger.info("=== Turnover-IT CREATE JOB REQUEST ===")
         logger.info(f"URL: POST {url}")
-        logger.info(f"Headers: {json.dumps({k: v if k != 'Authorization' else 'Bearer ***' for k, v in headers.items()}, indent=2)}")
+        logger.info(
+            f"Headers: {json.dumps({k: v if k != 'Authorization' else 'Bearer ***' for k, v in headers.items()}, indent=2)}"
+        )
         logger.info(f"Payload:\n{json.dumps(job_payload, indent=2, ensure_ascii=False)}")
 
         try:
@@ -85,7 +87,7 @@ class TurnoverITClient:
                 )
 
                 # Log full response for debugging
-                logger.info(f"=== Turnover-IT RESPONSE ===")
+                logger.info("=== Turnover-IT RESPONSE ===")
                 logger.info(f"Status: {response.status_code}")
                 logger.info(f"Body: {response.text}")
 
@@ -357,7 +359,7 @@ class TurnoverITClient:
             logger.error(f"Failed to fetch places: {e}")
             return []
 
-    async def get_skills(self, search: Optional[str] = None) -> list[dict[str, str]]:
+    async def get_skills(self, search: str | None = None) -> list[dict[str, str]]:
         """Get available skills from Turnover-IT.
 
         Args:
@@ -418,7 +420,9 @@ class TurnoverITClient:
                     )
 
                     if response.status_code != 200:
-                        logger.warning(f"Failed to fetch skills page {page}: {response.status_code}")
+                        logger.warning(
+                            f"Failed to fetch skills page {page}: {response.status_code}"
+                        )
                         break
 
                     data = response.json()
@@ -428,10 +432,12 @@ class TurnoverITClient:
                         break
 
                     for skill in members:
-                        all_skills.append({
-                            "name": skill.get("name", ""),
-                            "slug": skill.get("slug", ""),
-                        })
+                        all_skills.append(
+                            {
+                                "name": skill.get("name", ""),
+                                "slug": skill.get("slug", ""),
+                            }
+                        )
 
                     # Check if there's a next page
                     view = data.get("hydra:view", {})
@@ -471,7 +477,7 @@ class TurnoverITClient:
             logger.warning(f"Turnover-IT health check failed: {e}")
             return False
 
-    async def get_job(self, reference: str) -> Optional[dict[str, Any]]:
+    async def get_job(self, reference: str) -> dict[str, Any] | None:
         """Get a job posting from Turnover-IT.
 
         Args:

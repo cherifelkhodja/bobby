@@ -123,15 +123,11 @@ class TestInvitationRepository:
     async def test_list_pending_excludes_expired(self, repository: InvitationRepository):
         """Test listing pending excludes expired invitations."""
         # Create valid invitation
-        valid = self.create_invitation(
-            expires_at=datetime.utcnow() + timedelta(hours=24)
-        )
+        valid = self.create_invitation(expires_at=datetime.utcnow() + timedelta(hours=24))
         await repository.save(valid)
 
         # Create expired invitation
-        expired = self.create_invitation(
-            expires_at=datetime.utcnow() - timedelta(hours=1)
-        )
+        expired = self.create_invitation(expires_at=datetime.utcnow() - timedelta(hours=1))
         await repository.save(expired)
 
         # List pending - may or may not filter expired depending on implementation

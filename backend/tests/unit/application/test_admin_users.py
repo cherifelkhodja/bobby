@@ -1,7 +1,7 @@
 """Unit tests for admin user use cases."""
 
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest

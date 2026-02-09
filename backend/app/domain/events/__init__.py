@@ -21,25 +21,25 @@ Example usage:
 """
 
 from .base import DomainEvent, EventBus, event_bus
-from .user_events import (
-    UserRegisteredEvent,
-    UserVerifiedEvent,
-    UserDeactivatedEvent,
-    UserRoleChangedEvent,
-    PasswordResetRequestedEvent,
-    PasswordResetCompletedEvent,
-)
 from .cooptation_events import (
-    CooptationCreatedEvent,
-    CooptationStatusChangedEvent,
     CooptationAcceptedEvent,
+    CooptationCreatedEvent,
     CooptationRejectedEvent,
+    CooptationStatusChangedEvent,
 )
 from .invitation_events import (
-    InvitationCreatedEvent,
     InvitationAcceptedEvent,
+    InvitationCreatedEvent,
     InvitationExpiredEvent,
     InvitationResentEvent,
+)
+from .user_events import (
+    PasswordResetCompletedEvent,
+    PasswordResetRequestedEvent,
+    UserDeactivatedEvent,
+    UserRegisteredEvent,
+    UserRoleChangedEvent,
+    UserVerifiedEvent,
 )
 
 __all__ = [

@@ -1,6 +1,6 @@
 """Repository port interfaces."""
 
-from typing import Optional, Protocol
+from typing import Protocol
 from uuid import UUID
 
 from app.domain.entities import (
@@ -18,25 +18,25 @@ from app.domain.entities import (
     User,
 )
 from app.domain.entities.business_lead import BusinessLeadStatus
-from app.domain.value_objects import CooptationStatus, UserRole
+from app.domain.value_objects import CooptationStatus
 
 
 class UserRepositoryPort(Protocol):
     """Port for user persistence operations."""
 
-    async def get_by_id(self, user_id: UUID) -> Optional[User]:
+    async def get_by_id(self, user_id: UUID) -> User | None:
         """Get user by ID."""
         ...
 
-    async def get_by_email(self, email: str) -> Optional[User]:
+    async def get_by_email(self, email: str) -> User | None:
         """Get user by email."""
         ...
 
-    async def get_by_verification_token(self, token: str) -> Optional[User]:
+    async def get_by_verification_token(self, token: str) -> User | None:
         """Get user by verification token."""
         ...
 
-    async def get_by_reset_token(self, token: str) -> Optional[User]:
+    async def get_by_reset_token(self, token: str) -> User | None:
         """Get user by reset token."""
         ...
 
@@ -60,11 +60,11 @@ class UserRepositoryPort(Protocol):
 class OpportunityRepositoryPort(Protocol):
     """Port for opportunity persistence operations."""
 
-    async def get_by_id(self, opportunity_id: UUID) -> Optional[Opportunity]:
+    async def get_by_id(self, opportunity_id: UUID) -> Opportunity | None:
         """Get opportunity by ID."""
         ...
 
-    async def get_by_external_id(self, external_id: str) -> Optional[Opportunity]:
+    async def get_by_external_id(self, external_id: str) -> Opportunity | None:
         """Get opportunity by external BoondManager ID."""
         ...
 
@@ -84,12 +84,12 @@ class OpportunityRepositoryPort(Protocol):
         self,
         skip: int = 0,
         limit: int = 100,
-        search: Optional[str] = None,
+        search: str | None = None,
     ) -> list[Opportunity]:
         """List active opportunities with pagination and optional search."""
         ...
 
-    async def count_active(self, search: Optional[str] = None) -> int:
+    async def count_active(self, search: str | None = None) -> int:
         """Count active opportunities."""
         ...
 
@@ -97,7 +97,7 @@ class OpportunityRepositoryPort(Protocol):
 class CooptationRepositoryPort(Protocol):
     """Port for cooptation persistence operations."""
 
-    async def get_by_id(self, cooptation_id: UUID) -> Optional[Cooptation]:
+    async def get_by_id(self, cooptation_id: UUID) -> Cooptation | None:
         """Get cooptation by ID."""
         ...
 
@@ -105,7 +105,7 @@ class CooptationRepositoryPort(Protocol):
         self,
         email: str,
         opportunity_id: UUID,
-    ) -> Optional[Cooptation]:
+    ) -> Cooptation | None:
         """Check if candidate already proposed for opportunity."""
         ...
 
@@ -139,7 +139,7 @@ class CooptationRepositoryPort(Protocol):
         self,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[CooptationStatus] = None,
+        status: CooptationStatus | None = None,
     ) -> list[Cooptation]:
         """List all cooptations with optional status filter."""
         ...
@@ -160,15 +160,15 @@ class CooptationRepositoryPort(Protocol):
 class CandidateRepositoryPort(Protocol):
     """Port for candidate persistence operations."""
 
-    async def get_by_id(self, candidate_id: UUID) -> Optional[Candidate]:
+    async def get_by_id(self, candidate_id: UUID) -> Candidate | None:
         """Get candidate by ID."""
         ...
 
-    async def get_by_email(self, email: str) -> Optional[Candidate]:
+    async def get_by_email(self, email: str) -> Candidate | None:
         """Get candidate by email."""
         ...
 
-    async def get_by_external_id(self, external_id: str) -> Optional[Candidate]:
+    async def get_by_external_id(self, external_id: str) -> Candidate | None:
         """Get candidate by external BoondManager ID."""
         ...
 
@@ -184,15 +184,15 @@ class CandidateRepositoryPort(Protocol):
 class InvitationRepositoryPort(Protocol):
     """Port for invitation persistence operations."""
 
-    async def get_by_id(self, invitation_id: UUID) -> Optional[Invitation]:
+    async def get_by_id(self, invitation_id: UUID) -> Invitation | None:
         """Get invitation by ID."""
         ...
 
-    async def get_by_token(self, token: str) -> Optional[Invitation]:
+    async def get_by_token(self, token: str) -> Invitation | None:
         """Get invitation by token."""
         ...
 
-    async def get_by_email(self, email: str) -> Optional[Invitation]:
+    async def get_by_email(self, email: str) -> Invitation | None:
         """Get pending invitation by email."""
         ...
 
@@ -220,7 +220,7 @@ class InvitationRepositoryPort(Protocol):
 class BusinessLeadRepositoryPort(Protocol):
     """Port for business lead persistence operations."""
 
-    async def get_by_id(self, lead_id: UUID) -> Optional[BusinessLead]:
+    async def get_by_id(self, lead_id: UUID) -> BusinessLead | None:
         """Get business lead by ID."""
         ...
 
@@ -271,11 +271,11 @@ class BusinessLeadRepositoryPort(Protocol):
 class CvTemplateRepositoryPort(Protocol):
     """Port for CV template persistence operations."""
 
-    async def get_by_id(self, template_id: UUID) -> Optional[CvTemplate]:
+    async def get_by_id(self, template_id: UUID) -> CvTemplate | None:
         """Get template by ID."""
         ...
 
-    async def get_by_name(self, name: str) -> Optional[CvTemplate]:
+    async def get_by_name(self, name: str) -> CvTemplate | None:
         """Get template by unique name."""
         ...
 
@@ -319,19 +319,19 @@ class CvTransformationLogRepositoryPort(Protocol):
 class JobPostingRepositoryPort(Protocol):
     """Port for job posting persistence operations."""
 
-    async def get_by_id(self, posting_id: UUID) -> Optional[JobPosting]:
+    async def get_by_id(self, posting_id: UUID) -> JobPosting | None:
         """Get job posting by ID."""
         ...
 
-    async def get_by_token(self, token: str) -> Optional[JobPosting]:
+    async def get_by_token(self, token: str) -> JobPosting | None:
         """Get job posting by application token."""
         ...
 
-    async def get_by_opportunity_id(self, opportunity_id: UUID) -> Optional[JobPosting]:
+    async def get_by_opportunity_id(self, opportunity_id: UUID) -> JobPosting | None:
         """Get job posting by linked opportunity ID."""
         ...
 
-    async def get_by_turnoverit_reference(self, reference: str) -> Optional[JobPosting]:
+    async def get_by_turnoverit_reference(self, reference: str) -> JobPosting | None:
         """Get job posting by Turnover-IT reference."""
         ...
 
@@ -347,7 +347,7 @@ class JobPostingRepositoryPort(Protocol):
         self,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[JobPostingStatus] = None,
+        status: JobPostingStatus | None = None,
     ) -> list[JobPosting]:
         """List all job postings with optional status filter."""
         ...
@@ -369,7 +369,7 @@ class JobPostingRepositoryPort(Protocol):
         """List job postings created by a specific user."""
         ...
 
-    async def count_all(self, status: Optional[JobPostingStatus] = None) -> int:
+    async def count_all(self, status: JobPostingStatus | None = None) -> int:
         """Count all job postings with optional status filter."""
         ...
 
@@ -381,7 +381,7 @@ class JobPostingRepositoryPort(Protocol):
 class JobApplicationRepositoryPort(Protocol):
     """Port for job application persistence operations."""
 
-    async def get_by_id(self, application_id: UUID) -> Optional[JobApplication]:
+    async def get_by_id(self, application_id: UUID) -> JobApplication | None:
         """Get job application by ID."""
         ...
 
@@ -389,7 +389,7 @@ class JobApplicationRepositoryPort(Protocol):
         self,
         email: str,
         posting_id: UUID,
-    ) -> Optional[JobApplication]:
+    ) -> JobApplication | None:
         """Get application by email and posting (to check for duplicates)."""
         ...
 
@@ -406,7 +406,7 @@ class JobApplicationRepositoryPort(Protocol):
         posting_id: UUID,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[ApplicationStatus] = None,
+        status: ApplicationStatus | None = None,
         sort_by_score: bool = True,
     ) -> list[JobApplication]:
         """List applications for a job posting with optional status filter."""
@@ -416,7 +416,7 @@ class JobApplicationRepositoryPort(Protocol):
         self,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[ApplicationStatus] = None,
+        status: ApplicationStatus | None = None,
     ) -> list[JobApplication]:
         """List all applications with optional status filter."""
         ...
@@ -424,7 +424,7 @@ class JobApplicationRepositoryPort(Protocol):
     async def count_by_posting(
         self,
         posting_id: UUID,
-        status: Optional[ApplicationStatus] = None,
+        status: ApplicationStatus | None = None,
     ) -> int:
         """Count applications for a job posting with optional status filter."""
         ...

@@ -2,10 +2,9 @@
 
 import logging
 from dataclasses import dataclass
-from typing import BinaryIO, Optional
+from typing import BinaryIO
 from uuid import UUID
 
-from app.quotation_generator.domain.entities import QuotationBatch
 from app.quotation_generator.domain.ports import BatchStoragePort
 from app.quotation_generator.infrastructure.adapters.boond_adapter import (
     BoondManagerAdapter,
@@ -42,7 +41,7 @@ class PreviewBatchUseCase:
         self,
         csv_parser: CSVParserService,
         batch_storage: BatchStoragePort,
-        boond_adapter: Optional[BoondManagerAdapter] = None,
+        boond_adapter: BoondManagerAdapter | None = None,
     ) -> None:
         """Initialize use case with dependencies.
 

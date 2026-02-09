@@ -2,10 +2,11 @@
 Tests for Published Opportunity use cases.
 """
 
-import pytest
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import uuid4
+
+import pytest
 
 from app.domain.entities import PublishedOpportunity
 from app.domain.value_objects import OpportunityStatus

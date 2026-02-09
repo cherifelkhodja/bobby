@@ -2,7 +2,6 @@
 
 import logging
 from datetime import date
-from typing import Optional
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -85,13 +84,13 @@ class BoondManagerAdapter(ERPPort):
 
                 data = response.json()
                 quotation_id = str(data.get("data", {}).get("id"))
-                reference = data.get("data", {}).get("attributes", {}).get(
-                    "reference", quotation.need_title
+                reference = (
+                    data.get("data", {})
+                    .get("attributes", {})
+                    .get("reference", quotation.need_title)
                 )
 
-                logger.info(
-                    f"Created quotation {quotation_id} with reference {reference}"
-                )
+                logger.info(f"Created quotation {quotation_id} with reference {reference}")
                 return quotation_id, reference
 
             except httpx.RequestError as e:
@@ -366,10 +365,12 @@ class BoondManagerAdapter(ERPPort):
                     last_name = attrs.get("lastName", "")
                     name = f"{first_name} {last_name}".strip()
 
-                    contacts.append({
-                        "id": str(contact.get("id")),
-                        "name": name or f"Contact {contact.get('id')}",
-                    })
+                    contacts.append(
+                        {
+                            "id": str(contact.get("id")),
+                            "name": name or f"Contact {contact.get('id')}",
+                        }
+                    )
 
                 logger.info(f"Found {len(contacts)} contacts for company {company_id}")
                 return contacts

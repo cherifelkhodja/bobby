@@ -1,7 +1,6 @@
 """Invitation repository implementation."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -18,7 +17,7 @@ class InvitationRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_id(self, invitation_id: UUID) -> Optional[Invitation]:
+    async def get_by_id(self, invitation_id: UUID) -> Invitation | None:
         """Get invitation by ID."""
         result = await self.session.execute(
             select(InvitationModel).where(InvitationModel.id == invitation_id)
@@ -26,7 +25,7 @@ class InvitationRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def get_by_token(self, token: str) -> Optional[Invitation]:
+    async def get_by_token(self, token: str) -> Invitation | None:
         """Get invitation by token."""
         result = await self.session.execute(
             select(InvitationModel).where(InvitationModel.token == token)
@@ -34,7 +33,7 @@ class InvitationRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def get_by_email(self, email: str) -> Optional[Invitation]:
+    async def get_by_email(self, email: str) -> Invitation | None:
         """Get pending invitation by email."""
         result = await self.session.execute(
             select(InvitationModel).where(

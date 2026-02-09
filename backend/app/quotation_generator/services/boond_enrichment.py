@@ -2,7 +2,6 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -88,9 +87,7 @@ class BoondEnrichmentService:
         wait=wait_exponential(multiplier=1, min=1, max=4),
         reraise=True,
     )
-    async def search_resource_by_name(
-        self, first_name: str, last_name: str
-    ) -> Optional[ResourceInfo]:
+    async def search_resource_by_name(self, first_name: str, last_name: str) -> ResourceInfo | None:
         """Search for a resource by first and last name.
 
         Args:
@@ -130,8 +127,7 @@ class BoondEnrichmentService:
                 if res_first == first_lower and res_last == last_lower:
                     # Build trigramme from initials
                     trigramme = self._build_trigramme(
-                        attrs.get("firstName", ""),
-                        attrs.get("lastName", "")
+                        attrs.get("firstName", ""), attrs.get("lastName", "")
                     )
 
                     return ResourceInfo(
@@ -159,9 +155,7 @@ class BoondEnrichmentService:
         wait=wait_exponential(multiplier=1, min=1, max=4),
         reraise=True,
     )
-    async def get_resource_thales_projects(
-        self, resource_id: str
-    ) -> list[ProjectInfo]:
+    async def get_resource_thales_projects(self, resource_id: str) -> list[ProjectInfo]:
         """Get Thales projects for a resource.
 
         Args:
@@ -234,24 +228,24 @@ class BoondEnrichmentService:
                 # Get company_detail_id from mapping
                 company_detail_id = COMPANY_DETAIL_MAPPING.get(company_id, company_id)
 
-                projects.append(ProjectInfo(
-                    id=str(project.get("id")),
-                    reference=project.get("attributes", {}).get("reference", ""),
-                    opportunity_id=opportunity_id or "",
-                    opportunity_title=opportunity_title,
-                    company_id=company_id,
-                    company_name=company_name,
-                    company_detail_id=company_detail_id,
-                    contact_id=contact_id or "",
-                    contact_name=contact_name,
-                ))
+                projects.append(
+                    ProjectInfo(
+                        id=str(project.get("id")),
+                        reference=project.get("attributes", {}).get("reference", ""),
+                        opportunity_id=opportunity_id or "",
+                        opportunity_title=opportunity_title,
+                        company_id=company_id,
+                        company_name=company_name,
+                        company_detail_id=company_detail_id,
+                        contact_id=contact_id or "",
+                        contact_name=contact_name,
+                    )
+                )
 
             logger.info(f"Found {len(projects)} Thales projects for resource {resource_id}")
             return projects
 
-    async def get_latest_thales_project(
-        self, resource_id: str
-    ) -> Optional[ProjectInfo]:
+    async def get_latest_thales_project(self, resource_id: str) -> ProjectInfo | None:
         """Get the latest Thales project for a resource.
 
         Args:
@@ -271,7 +265,7 @@ class BoondEnrichmentService:
 
     async def enrich_quotation_data(
         self, first_name: str, last_name: str
-    ) -> Optional[EnrichedQuotationData]:
+    ) -> EnrichedQuotationData | None:
         """Enrich quotation data by fetching from BoondManager.
 
         This method:

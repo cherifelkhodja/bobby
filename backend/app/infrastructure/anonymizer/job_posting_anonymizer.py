@@ -10,18 +10,16 @@ import json
 import logging
 import traceback
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from difflib import SequenceMatcher
-from typing import Optional
 
 import google.generativeai as genai
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.infrastructure.database.models import TurnoverITSkillModel, TurnoverITSkillsMetadataModel
 from app.infrastructure.turnoverit.client import TurnoverITClient
-
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +125,7 @@ class JobPostingAnonymizer:
         self,
         settings: Settings,
         db_session: AsyncSession,
-        turnoverit_client: Optional[TurnoverITClient] = None,
+        turnoverit_client: TurnoverITClient | None = None,
     ) -> None:
         """Initialize the job posting anonymizer.
 
@@ -140,7 +138,7 @@ class JobPostingAnonymizer:
         self.db_session = db_session
         self.turnoverit_client = turnoverit_client or TurnoverITClient(settings)
         self._configured = False
-        self._skills_cache: Optional[list[dict[str, str]]] = None
+        self._skills_cache: list[dict[str, str]] | None = None
 
     def _configure(self) -> None:
         """Configure the Gemini API with credentials."""
@@ -168,7 +166,7 @@ class JobPostingAnonymizer:
                 needs_sync = True
             elif not metadata.last_synced_at:
                 needs_sync = True
-            elif datetime.now(timezone.utc) - metadata.last_synced_at > SKILLS_SYNC_INTERVAL:
+            elif datetime.now(UTC) - metadata.last_synced_at > SKILLS_SYNC_INTERVAL:
                 needs_sync = True
             elif metadata.total_skills == 0:
                 needs_sync = True
@@ -212,12 +210,12 @@ class JobPostingAnonymizer:
         metadata = result.scalar_one_or_none()
 
         if metadata:
-            metadata.last_synced_at = datetime.now(timezone.utc)
+            metadata.last_synced_at = datetime.now(UTC)
             metadata.total_skills = len(skills)
         else:
             metadata = TurnoverITSkillsMetadataModel(
                 id=1,
-                last_synced_at=datetime.now(timezone.utc),
+                last_synced_at=datetime.now(UTC),
                 total_skills=len(skills),
             )
             self.db_session.add(metadata)
@@ -298,7 +296,9 @@ class JobPostingAnonymizer:
                 slug = skill_name_to_slug[best_match]
                 if slug not in matched_slugs:
                     matched_slugs.append(slug)
-                    logger.debug(f"Matched '{extracted}' to '{best_match}' (score: {best_score:.2f})")
+                    logger.debug(
+                        f"Matched '{extracted}' to '{best_match}' (score: {best_score:.2f})"
+                    )
 
         return matched_slugs
 
@@ -306,8 +306,8 @@ class JobPostingAnonymizer:
         self,
         title: str,
         description: str,
-        client_name: Optional[str] = None,
-        model_name: Optional[str] = None,
+        client_name: str | None = None,
+        model_name: str | None = None,
     ) -> AnonymizedJobPosting:
         """Anonymize a job posting and structure it for Turnover-IT.
 
@@ -333,10 +333,7 @@ class JobPostingAnonymizer:
 
         # Format skills list for the prompt (name: slug format for clarity)
         # Send ALL skills to Gemini - modern models have large context windows
-        skills_list_str = "\n".join(
-            f"- {s['name']} (slug: {s['slug']})"
-            for s in turnoverit_skills
-        )
+        skills_list_str = "\n".join(f"- {s['name']} (slug: {s['slug']})" for s in turnoverit_skills)
 
         model_to_use = model_name or self.DEFAULT_MODEL
         logger.info(f"Anonymizing job posting with model: {model_to_use}")
@@ -389,10 +386,7 @@ class JobPostingAnonymizer:
 
             # Validate skills are from Turnover-IT nomenclature (use slugs directly)
             valid_slugs = {s["slug"] for s in turnoverit_skills}
-            validated_skills = [
-                skill for skill in selected_skills
-                if skill in valid_slugs
-            ]
+            validated_skills = [skill for skill in selected_skills if skill in valid_slugs]
 
             # Limit to 6 skills maximum
             validated_skills = validated_skills[:6]
@@ -430,25 +424,27 @@ class JobPostingAnonymizer:
                 f"Traceback: {traceback.format_exc()}"
             )
             # Include error type in message for debugging
-            raise ValueError(f"Erreur lors de l'anonymisation ({type(e).__name__}). Veuillez réessayer.")
+            raise ValueError(
+                f"Erreur lors de l'anonymisation ({type(e).__name__}). Veuillez réessayer."
+            )
 
-    def _extract_response_text(self, response) -> Optional[str]:
+    def _extract_response_text(self, response) -> str | None:
         """Extract text from Gemini response with fallback methods."""
         # Method 1: Standard .text property
         try:
-            if hasattr(response, 'text') and response.text:
+            if hasattr(response, "text") and response.text:
                 return response.text
         except (KeyError, ValueError, AttributeError):
             pass
 
         # Method 2: Access candidates directly
         try:
-            if hasattr(response, 'candidates') and response.candidates:
+            if hasattr(response, "candidates") and response.candidates:
                 candidate = response.candidates[0]
-                if hasattr(candidate, 'content') and candidate.content:
-                    if hasattr(candidate.content, 'parts') and candidate.content.parts:
+                if hasattr(candidate, "content") and candidate.content:
+                    if hasattr(candidate.content, "parts") and candidate.content.parts:
                         part = candidate.content.parts[0]
-                        if hasattr(part, 'text') and part.text:
+                        if hasattr(part, "text") and part.text:
                             return part.text
         except (KeyError, IndexError, AttributeError):
             pass
@@ -456,11 +452,11 @@ class JobPostingAnonymizer:
         # Method 3: Try string conversion
         try:
             response_str = str(response)
-            if '{' in response_str and '}' in response_str:
-                start = response_str.find('{')
-                end = response_str.rfind('}')
+            if "{" in response_str and "}" in response_str:
+                start = response_str.find("{")
+                end = response_str.rfind("}")
                 if start != -1 and end > start:
-                    potential_json = response_str[start:end + 1]
+                    potential_json = response_str[start : end + 1]
                     json.loads(potential_json)
                     return potential_json
         except Exception:
@@ -482,10 +478,10 @@ class JobPostingAnonymizer:
 
         response = response.strip()
 
-        start = response.find('{')
-        end = response.rfind('}')
+        start = response.find("{")
+        end = response.rfind("}")
         if start != -1 and end != -1 and end > start:
-            response = response[start:end + 1]
+            response = response[start : end + 1]
         else:
             raise ValueError("Réponse Gemini invalide (pas de JSON trouvé)")
 

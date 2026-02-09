@@ -1,7 +1,6 @@
 """Job Application repository implementation."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -17,7 +16,7 @@ class JobApplicationRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_id(self, application_id: UUID) -> Optional[JobApplication]:
+    async def get_by_id(self, application_id: UUID) -> JobApplication | None:
         """Get job application by ID."""
         result = await self.session.execute(
             select(JobApplicationModel).where(JobApplicationModel.id == application_id)
@@ -29,7 +28,7 @@ class JobApplicationRepository:
         self,
         email: str,
         posting_id: UUID,
-    ) -> Optional[JobApplication]:
+    ) -> JobApplication | None:
         """Get application by email and posting (to check for duplicates)."""
         result = await self.session.execute(
             select(JobApplicationModel).where(
@@ -157,9 +156,9 @@ class JobApplicationRepository:
         posting_id: UUID,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[ApplicationStatus] = None,
-        employment_status: Optional[str] = None,
-        availability: Optional[str] = None,
+        status: ApplicationStatus | None = None,
+        employment_status: str | None = None,
+        availability: str | None = None,
         sort_by: str = "score",  # score, tjm, salary, date
         sort_order: str = "desc",  # asc, desc
     ) -> list[JobApplication]:
@@ -175,17 +174,13 @@ class JobApplicationRepository:
             sort_by: Sort field (score, tjm, salary, date)
             sort_order: Sort direction (asc, desc)
         """
-        query = select(JobApplicationModel).where(
-            JobApplicationModel.job_posting_id == posting_id
-        )
+        query = select(JobApplicationModel).where(JobApplicationModel.job_posting_id == posting_id)
         if status:
             query = query.where(JobApplicationModel.status == str(status))
         if employment_status:
             # Filter by employment_status, handling comma-separated values
             # When filtering by "freelance", match "freelance" and "freelance,employee"
-            query = query.where(
-                JobApplicationModel.employment_status.contains(employment_status)
-            )
+            query = query.where(JobApplicationModel.employment_status.contains(employment_status))
         if availability:
             query = query.where(JobApplicationModel.availability == availability)
 
@@ -240,7 +235,7 @@ class JobApplicationRepository:
         self,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[ApplicationStatus] = None,
+        status: ApplicationStatus | None = None,
     ) -> list[JobApplication]:
         """List all applications with optional status filter."""
         query = select(JobApplicationModel)
@@ -253,9 +248,9 @@ class JobApplicationRepository:
     async def count_by_posting(
         self,
         posting_id: UUID,
-        status: Optional[ApplicationStatus] = None,
-        employment_status: Optional[str] = None,
-        availability: Optional[str] = None,
+        status: ApplicationStatus | None = None,
+        employment_status: str | None = None,
+        availability: str | None = None,
     ) -> int:
         """Count applications for a job posting with optional filters."""
         query = select(func.count(JobApplicationModel.id)).where(
@@ -266,9 +261,7 @@ class JobApplicationRepository:
         if employment_status:
             # Filter by employment_status, handling comma-separated values
             # When filtering by "freelance", match "freelance" and "freelance,employee"
-            query = query.where(
-                JobApplicationModel.employment_status.contains(employment_status)
-            )
+            query = query.where(JobApplicationModel.employment_status.contains(employment_status))
         if availability:
             query = query.where(JobApplicationModel.availability == availability)
         result = await self.session.execute(query)
@@ -342,7 +335,7 @@ class JobApplicationRepository:
             matching_details=model.matching_details,
             cv_quality_score=model.cv_quality_score,
             cv_quality=model.cv_quality,
-            is_read=model.is_read if hasattr(model, 'is_read') else False,
+            is_read=model.is_read if hasattr(model, "is_read") else False,
             status=ApplicationStatus(model.status),
             status_history=model.status_history or [],
             notes=model.notes,

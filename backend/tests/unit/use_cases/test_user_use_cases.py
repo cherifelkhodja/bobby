@@ -2,13 +2,14 @@
 Tests for User use cases.
 """
 
-import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
+import pytest
+
 from app.domain.entities import User
-from app.domain.value_objects import UserRole, Email
+from app.domain.value_objects import Email, UserRole
 
 
 class TestUpdateUserUseCase:

@@ -99,6 +99,7 @@ interface ErrorFallbackProps {
   level: 'page' | 'section' | 'component';
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 function ErrorFallback({
   error,
   errorInfo,

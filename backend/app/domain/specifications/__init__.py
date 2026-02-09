@@ -17,27 +17,27 @@ Example usage:
 """
 
 from .base import (
-    Specification,
     AndSpecification,
-    OrSpecification,
     NotSpecification,
-)
-from .user_specifications import (
-    IsActiveUserSpecification,
-    IsVerifiedUserSpecification,
-    HasRoleSpecification,
-    UserEmailContainsSpecification,
+    OrSpecification,
+    Specification,
 )
 from .cooptation_specifications import (
+    CooptationByOpportunitySpecification,
     CooptationByStatusSpecification,
     CooptationBySubmitterSpecification,
-    CooptationByOpportunitySpecification,
     PendingCooptationsSpecification,
 )
 from .invitation_specifications import (
-    PendingInvitationSpecification,
     ExpiredInvitationSpecification,
     InvitationByEmailSpecification,
+    PendingInvitationSpecification,
+)
+from .user_specifications import (
+    HasRoleSpecification,
+    IsActiveUserSpecification,
+    IsVerifiedUserSpecification,
+    UserEmailContainsSpecification,
 )
 
 __all__ = [

@@ -2,7 +2,6 @@
 
 import secrets
 from datetime import datetime, timedelta
-from typing import Optional
 from uuid import UUID
 
 from jose import JWTError, jwt
@@ -55,7 +54,7 @@ def create_reset_token() -> str:
     return secrets.token_urlsafe(32)
 
 
-def decode_token(token: str, expected_type: Optional[str] = None) -> TokenPayload:
+def decode_token(token: str, expected_type: str | None = None) -> TokenPayload:
     """
     Decode and validate JWT token.
 

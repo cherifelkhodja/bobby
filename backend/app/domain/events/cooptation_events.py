@@ -2,7 +2,6 @@
 Cooptation-related domain events.
 """
 
-from typing import Optional
 from uuid import UUID
 
 from ..value_objects import CooptationStatus
@@ -34,7 +33,7 @@ class CooptationStatusChangedEvent(DomainEvent):
     old_status: CooptationStatus
     new_status: CooptationStatus
     changed_by: UUID
-    comment: Optional[str] = None
+    comment: str | None = None
 
     def __init__(self, **data):
         super().__init__(aggregate_id=data.get("cooptation_id"), **data)
@@ -50,7 +49,7 @@ class CooptationAcceptedEvent(DomainEvent):
     opportunity_title: str
     submitter_id: UUID
     accepted_by: UUID
-    comment: Optional[str] = None
+    comment: str | None = None
 
     def __init__(self, **data):
         super().__init__(aggregate_id=data.get("cooptation_id"), **data)
@@ -66,7 +65,7 @@ class CooptationRejectedEvent(DomainEvent):
     opportunity_title: str
     submitter_id: UUID
     rejected_by: UUID
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
 
     def __init__(self, **data):
         super().__init__(aggregate_id=data.get("cooptation_id"), **data)
@@ -80,7 +79,7 @@ class CooptationMovedToInterviewEvent(DomainEvent):
     candidate_name: str
     opportunity_title: str
     submitter_id: UUID
-    interview_scheduled_at: Optional[str] = None  # ISO format
+    interview_scheduled_at: str | None = None  # ISO format
 
     def __init__(self, **data):
         super().__init__(aggregate_id=data.get("cooptation_id"), **data)

@@ -588,8 +588,9 @@ export default function JobPostingDetails() {
       refetchApplications();
       setSelectedApplication(updatedApplication);
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Échec de la synchronisation BoondManager');
+    onError: (error: unknown) => {
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      toast.error(axiosError.response?.data?.detail || 'Échec de la synchronisation BoondManager');
     },
   });
 
@@ -639,7 +640,7 @@ export default function JobPostingDetails() {
       setNoteText(updatedApplication.notes || '');
       // Refetch to update counts
       refetchApplications();
-    } catch (error) {
+    } catch {
       // Fallback to local data if API fails
       if (displayMode === 'inline') {
         setExpandedRowId(expandedRowId === application.id ? null : application.id);

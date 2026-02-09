@@ -1,29 +1,29 @@
 """API request/response schemas."""
 
 from app.api.schemas.auth import (
+    ForgotPasswordRequest,
     LoginRequest,
     LoginResponse,
-    RegisterRequest,
     RefreshRequest,
-    ForgotPasswordRequest,
+    RegisterRequest,
     ResetPasswordRequest,
     VerifyEmailRequest,
 )
-from app.api.schemas.user import (
-    UserResponse,
-    UpdateUserRequest,
-    ChangePasswordRequest,
+from app.api.schemas.cooptation import (
+    CooptationListResponse,
+    CooptationResponse,
+    CooptationStatsResponse,
+    CreateCooptationRequest,
+    UpdateCooptationStatusRequest,
 )
 from app.api.schemas.opportunity import (
-    OpportunityResponse,
     OpportunityListResponse,
+    OpportunityResponse,
 )
-from app.api.schemas.cooptation import (
-    CreateCooptationRequest,
-    CooptationResponse,
-    CooptationListResponse,
-    UpdateCooptationStatusRequest,
-    CooptationStatsResponse,
+from app.api.schemas.user import (
+    ChangePasswordRequest,
+    UpdateUserRequest,
+    UserResponse,
 )
 
 __all__ = [

@@ -4,9 +4,9 @@ import asyncio
 import logging
 import tempfile
 import zipfile
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional, Set
 from uuid import UUID
 
 from app.quotation_generator.domain.entities import QuotationBatch
@@ -27,7 +27,7 @@ from app.quotation_generator.services.template_filler import TemplateFillerServi
 logger = logging.getLogger(__name__)
 
 # Keep track of background tasks to prevent garbage collection
-_background_tasks: Set[asyncio.Task] = set()
+_background_tasks: set[asyncio.Task] = set()
 
 
 class GenerateBatchUseCase:
@@ -51,7 +51,7 @@ class GenerateBatchUseCase:
         template_repository: TemplateRepositoryPort,
         pdf_converter: PDFConverterPort,
         template_filler: TemplateFillerService,
-        output_dir: Optional[Path] = None,
+        output_dir: Path | None = None,
     ) -> None:
         """Initialize use case with dependencies.
 
@@ -126,16 +126,16 @@ class GenerateBatchUseCase:
                 await self._update_progress(batch)
 
                 # Step 1: Create quotation in BoondManager
-                boond_id, boond_reference = await self.erp_adapter.create_quotation(
-                    quotation
-                )
+                boond_id, boond_reference = await self.erp_adapter.create_quotation(quotation)
 
                 # Step 2: Download BoondManager quotation PDF
                 quotation.mark_as_processing(QuotationStatus.FILLING_TEMPLATE)
                 await self._update_progress(batch)
 
                 boond_pdf_content = await self.erp_adapter.download_quotation_pdf(boond_id)
-                boond_pdf_path = batch_output_dir / f"{quotation.resource_trigramme}_boond_{boond_reference}.pdf"
+                boond_pdf_path = (
+                    batch_output_dir / f"{quotation.resource_trigramme}_boond_{boond_reference}.pdf"
+                )
                 boond_pdf_path.write_bytes(boond_pdf_content)
 
                 # Step 3: Fill template
@@ -154,11 +154,16 @@ class GenerateBatchUseCase:
                 quotation.mark_as_processing(QuotationStatus.CONVERTING_PDF)
                 await self._update_progress(batch)
 
-                template_pdf_path = batch_output_dir / f"{quotation.resource_trigramme}_{boond_reference}_template.pdf"
+                template_pdf_path = (
+                    batch_output_dir
+                    / f"{quotation.resource_trigramme}_{boond_reference}_template.pdf"
+                )
                 await self.pdf_converter.convert_to_pdf(excel_path, template_pdf_path)
 
                 # Step 5: Merge BoondManager PDF + Template PDF
-                merged_pdf_path = batch_output_dir / f"{quotation.resource_trigramme}_{boond_reference}.pdf"
+                merged_pdf_path = (
+                    batch_output_dir / f"{quotation.resource_trigramme}_{boond_reference}.pdf"
+                )
                 await self.pdf_converter.merge_pdfs(
                     [boond_pdf_path, template_pdf_path],
                     merged_pdf_path,
@@ -251,6 +256,7 @@ class GenerateBatchUseCase:
         # If only one PDF, copy it (keep original for individual download)
         if len(pdf_files) == 1:
             import shutil
+
             shutil.copy(pdf_files[0], final_path)
         else:
             # Merge all PDFs into one (keep individual files)
@@ -331,9 +337,7 @@ class StartGenerationUseCase:
 
         # Start generation in background with a fresh use case (new DB session)
         # Keep reference to prevent garbage collection
-        task = asyncio.create_task(
-            self._run_generation(batch_id, template_name)
-        )
+        task = asyncio.create_task(self._run_generation(batch_id, template_name))
         _background_tasks.add(task)
         task.add_done_callback(_background_tasks.discard)
 

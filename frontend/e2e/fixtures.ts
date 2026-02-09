@@ -72,7 +72,7 @@ export { expect } from '@playwright/test';
  * Page object models for common pages.
  */
 export class LoginPage {
-  constructor(private page: any) {}
+  constructor(private page: unknown) {}
 
   async goto() {
     await this.page.goto('/login');
@@ -90,7 +90,7 @@ export class LoginPage {
 }
 
 export class DashboardPage {
-  constructor(private page: any) {}
+  constructor(private page: unknown) {}
 
   async goto() {
     await this.page.goto('/dashboard');
@@ -104,7 +104,7 @@ export class DashboardPage {
 }
 
 export class OpportunitiesPage {
-  constructor(private page: any) {}
+  constructor(private page: unknown) {}
 
   async goto() {
     await this.page.goto('/opportunities');

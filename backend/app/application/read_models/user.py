@@ -1,7 +1,6 @@
 """User read models."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -19,8 +18,8 @@ class UserReadModel(BaseModel):
     role: str
     is_verified: bool
     is_active: bool
-    boond_resource_id: Optional[str] = None
-    manager_boond_id: Optional[str] = None
+    boond_resource_id: str | None = None
+    manager_boond_id: str | None = None
     created_at: datetime
     updated_at: datetime
 

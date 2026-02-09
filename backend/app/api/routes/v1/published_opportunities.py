@@ -1,6 +1,5 @@
 """Published opportunity endpoints."""
 
-from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
@@ -74,10 +73,7 @@ async def list_my_boond_opportunities(
         raise HTTPException(status_code=400, detail=str(e))
 
     return BoondOpportunityListResponse(
-        items=[
-            BoondOpportunityResponse(**item.model_dump())
-            for item in result.items
-        ],
+        items=[BoondOpportunityResponse(**item.model_dump()) for item in result.items],
         total=result.total,
     )
 
@@ -187,7 +183,7 @@ async def list_published_opportunities(
     user_id: CurrentUserId,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    search: Optional[str] = Query(None),
+    search: str | None = Query(None),
 ):
     """List published opportunities.
 
@@ -204,10 +200,7 @@ async def list_published_opportunities(
     )
 
     return PublishedOpportunityListResponse(
-        items=[
-            PublishedOpportunityResponse(**item.model_dump())
-            for item in result.items
-        ],
+        items=[PublishedOpportunityResponse(**item.model_dump()) for item in result.items],
         total=result.total,
         page=result.page,
         page_size=result.page_size,

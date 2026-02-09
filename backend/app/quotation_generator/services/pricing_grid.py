@@ -6,9 +6,8 @@ Provides max GFA (Gross Fixed Amount) lookup based on:
 - Complexity level (Simple, Medium/Intermediate, Complex)
 """
 
-from decimal import Decimal
-from typing import Optional
 import logging
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -148,8 +147,8 @@ class PricingGridService:
         c22_domain: str,
         c22_activity: str,
         complexity: str,
-        region: Optional[str] = None,
-    ) -> Optional[Decimal]:
+        region: str | None = None,
+    ) -> Decimal | None:
         """Look up the max GFA for a given activity, region, and complexity.
 
         Args:
@@ -201,7 +200,7 @@ class PricingGridService:
             return False
         return c22_domain.strip().lower() in {d.lower() for d in SUPPORTED_DOMAINS}
 
-    def _normalize_region(self, region: str) -> Optional[str]:
+    def _normalize_region(self, region: str) -> str | None:
         """Normalize region name to IDF or Région."""
         if not region:
             return DEFAULT_REGION
@@ -213,7 +212,7 @@ class PricingGridService:
             return region
         return DEFAULT_REGION  # Default to IDF if unknown
 
-    def _normalize_complexity(self, complexity: str) -> Optional[str]:
+    def _normalize_complexity(self, complexity: str) -> str | None:
         """Normalize complexity level to Simple, Medium, or Complex."""
         if not complexity:
             return None
@@ -225,7 +224,7 @@ class PricingGridService:
             return complexity
         return None
 
-    def _find_activity(self, activity: str) -> Optional[str]:
+    def _find_activity(self, activity: str) -> str | None:
         """Find the activity code from input.
 
         Supports:

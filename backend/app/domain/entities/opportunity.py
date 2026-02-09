@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Optional
 from uuid import UUID, uuid4
 
 
@@ -13,20 +12,20 @@ class Opportunity:
     title: str
     reference: str
     external_id: str  # BoondManager ID
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    response_deadline: Optional[date] = None
-    budget: Optional[float] = None
-    manager_name: Optional[str] = None
-    manager_email: Optional[str] = None
-    manager_boond_id: Optional[str] = None  # Manager's BoondManager ID
-    client_name: Optional[str] = None
-    description: Optional[str] = None
+    start_date: date | None = None
+    end_date: date | None = None
+    response_deadline: date | None = None
+    budget: float | None = None
+    manager_name: str | None = None
+    manager_email: str | None = None
+    manager_boond_id: str | None = None  # Manager's BoondManager ID
+    client_name: str | None = None
+    description: str | None = None
     skills: list[str] = field(default_factory=list)
-    location: Optional[str] = None
+    location: str | None = None
     is_active: bool = True
     is_shared: bool = False  # Shared for cooptation by commercial
-    owner_id: Optional[UUID] = None  # Commercial who owns this opportunity
+    owner_id: UUID | None = None  # Commercial who owns this opportunity
     id: UUID = field(default_factory=uuid4)
     synced_at: datetime = field(default_factory=datetime.utcnow)
     created_at: datetime = field(default_factory=datetime.utcnow)
@@ -42,7 +41,7 @@ class Opportunity:
         return True
 
     @property
-    def days_until_deadline(self) -> Optional[int]:
+    def days_until_deadline(self) -> int | None:
         """Get days remaining until deadline."""
         if not self.response_deadline:
             return None
@@ -62,11 +61,11 @@ class Opportunity:
     def update_from_sync(
         self,
         title: str,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-        budget: Optional[float] = None,
-        manager_name: Optional[str] = None,
-        manager_boond_id: Optional[str] = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        budget: float | None = None,
+        manager_name: str | None = None,
+        manager_boond_id: str | None = None,
     ) -> None:
         """Update opportunity from BoondManager sync."""
         self.title = title

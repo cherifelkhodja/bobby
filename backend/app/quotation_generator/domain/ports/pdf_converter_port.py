@@ -2,7 +2,6 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
 
 
 class PDFConverterPort(ABC):
@@ -16,7 +15,7 @@ class PDFConverterPort(ABC):
     async def convert_to_pdf(
         self,
         input_path: Path,
-        output_path: Optional[Path] = None,
+        output_path: Path | None = None,
     ) -> Path:
         """Convert a document to PDF.
 

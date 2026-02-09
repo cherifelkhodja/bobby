@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 from uuid import UUID, uuid4
 
 from app.domain.value_objects import Email, UserRole
@@ -19,12 +18,12 @@ class User:
     role: UserRole = UserRole.USER
     is_verified: bool = False
     is_active: bool = True
-    boond_resource_id: Optional[str] = None
-    manager_boond_id: Optional[str] = None  # Manager's BoondManager ID
-    phone: Optional[str] = None  # International format +33...
-    verification_token: Optional[str] = None
-    reset_token: Optional[str] = None
-    reset_token_expires: Optional[datetime] = None
+    boond_resource_id: str | None = None
+    manager_boond_id: str | None = None  # Manager's BoondManager ID
+    phone: str | None = None  # International format +33...
+    verification_token: str | None = None
+    reset_token: str | None = None
+    reset_token_expires: datetime | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)

@@ -28,7 +28,7 @@ class TestInvitationCreation:
     def test_create_invitation_with_defaults(self):
         """Test creating invitation with default values."""
         invitation = create_invitation()
-        
+
         assert str(invitation.email) == "invited@example.com"
         assert invitation.role == UserRole.USER
         assert invitation.token == "test-token-123"
@@ -44,7 +44,7 @@ class TestInvitationCreation:
             first_name="John",
             last_name="Doe",
         )
-        
+
         assert invitation.boond_resource_id == "res-123"
         assert invitation.manager_boond_id == "mgr-456"
         assert invitation.phone == "+33612345678"
@@ -60,7 +60,7 @@ class TestInvitationCreation:
             token="factory-token",
             validity_hours=24,
         )
-        
+
         assert str(invitation.email) == "new@example.com"
         assert invitation.role == UserRole.COMMERCIAL
         # Should expire in approximately 24 hours
@@ -73,30 +73,22 @@ class TestInvitationExpiry:
 
     def test_is_expired_false_for_future_expiry(self):
         """Test is_expired returns False for future expiry."""
-        invitation = create_invitation(
-            expires_at=datetime.utcnow() + timedelta(hours=24)
-        )
+        invitation = create_invitation(expires_at=datetime.utcnow() + timedelta(hours=24))
         assert invitation.is_expired is False
 
     def test_is_expired_true_for_past_expiry(self):
         """Test is_expired returns True for past expiry."""
-        invitation = create_invitation(
-            expires_at=datetime.utcnow() - timedelta(hours=1)
-        )
+        invitation = create_invitation(expires_at=datetime.utcnow() - timedelta(hours=1))
         assert invitation.is_expired is True
 
     def test_hours_until_expiry_returns_correct_hours(self):
         """Test hours_until_expiry returns correct value."""
-        invitation = create_invitation(
-            expires_at=datetime.utcnow() + timedelta(hours=10)
-        )
+        invitation = create_invitation(expires_at=datetime.utcnow() + timedelta(hours=10))
         assert 9 <= invitation.hours_until_expiry <= 10
 
     def test_hours_until_expiry_returns_zero_when_expired(self):
         """Test hours_until_expiry returns 0 when expired."""
-        invitation = create_invitation(
-            expires_at=datetime.utcnow() - timedelta(hours=5)
-        )
+        invitation = create_invitation(expires_at=datetime.utcnow() - timedelta(hours=5))
         assert invitation.hours_until_expiry == 0
 
 
@@ -120,16 +112,14 @@ class TestInvitationAcceptance:
         before = datetime.utcnow()
         invitation.accept()
         after = datetime.utcnow()
-        
+
         assert invitation.accepted_at is not None
         assert before <= invitation.accepted_at <= after
 
     def test_accept_raises_when_expired(self):
         """Test accept() raises ValueError when invitation is expired."""
-        invitation = create_invitation(
-            expires_at=datetime.utcnow() - timedelta(hours=1)
-        )
-        
+        invitation = create_invitation(expires_at=datetime.utcnow() - timedelta(hours=1))
+
         with pytest.raises(ValueError, match="Cannot accept expired invitation"):
             invitation.accept()
 
@@ -137,7 +127,7 @@ class TestInvitationAcceptance:
         """Test accept() raises ValueError when already accepted."""
         invitation = create_invitation()
         invitation.accept()  # First accept
-        
+
         with pytest.raises(ValueError, match="Invitation already accepted"):
             invitation.accept()  # Second accept should fail
 
@@ -147,16 +137,12 @@ class TestInvitationValidity:
 
     def test_is_valid_true_when_not_expired_and_not_accepted(self):
         """Test is_valid returns True for valid invitation."""
-        invitation = create_invitation(
-            expires_at=datetime.utcnow() + timedelta(hours=24)
-        )
+        invitation = create_invitation(expires_at=datetime.utcnow() + timedelta(hours=24))
         assert invitation.is_valid is True
 
     def test_is_valid_false_when_expired(self):
         """Test is_valid returns False when expired."""
-        invitation = create_invitation(
-            expires_at=datetime.utcnow() - timedelta(hours=1)
-        )
+        invitation = create_invitation(expires_at=datetime.utcnow() - timedelta(hours=1))
         assert invitation.is_valid is False
 
     def test_is_valid_false_when_accepted(self):

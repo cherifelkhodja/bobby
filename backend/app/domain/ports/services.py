@@ -1,6 +1,6 @@
 """Service port interfaces for external services."""
 
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 from app.domain.entities import Candidate, Opportunity
 
@@ -12,7 +12,7 @@ class BoondServicePort(Protocol):
         """Fetch opportunities from BoondManager."""
         ...
 
-    async def get_opportunity(self, external_id: str) -> Optional[Opportunity]:
+    async def get_opportunity(self, external_id: str) -> Opportunity | None:
         """Fetch single opportunity from BoondManager."""
         ...
 
@@ -82,7 +82,7 @@ class EmailServicePort(Protocol):
 class CacheServicePort(Protocol):
     """Port for caching operations."""
 
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         """Get value from cache."""
         ...
 
@@ -127,7 +127,7 @@ class CvDataExtractorPort(Protocol):
     async def extract_cv_data(
         self,
         cv_text: str,
-        model_name: Optional[str] = None,
+        model_name: str | None = None,
     ) -> dict[str, Any]:
         """Extract structured CV data from text.
 
@@ -209,7 +209,7 @@ class TurnoverITServicePort(Protocol):
         """
         ...
 
-    async def get_skills(self, search: Optional[str] = None) -> list[dict[str, str]]:
+    async def get_skills(self, search: str | None = None) -> list[dict[str, str]]:
         """Get available skills from Turnover-IT.
 
         Args:

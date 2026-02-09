@@ -4,8 +4,6 @@ SQLAlchemy implementation of the Unit of Work pattern.
 Provides transactional guarantees for database operations.
 """
 
-from typing import Optional
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.unit_of_work import AbstractUnitOfWork

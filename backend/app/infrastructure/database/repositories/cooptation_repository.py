@@ -1,7 +1,6 @@
 """Cooptation repository implementation."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -19,7 +18,7 @@ class CooptationRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_id(self, cooptation_id: UUID) -> Optional[Cooptation]:
+    async def get_by_id(self, cooptation_id: UUID) -> Cooptation | None:
         """Get cooptation by ID with related entities."""
         result = await self.session.execute(
             select(CooptationModel)
@@ -36,7 +35,7 @@ class CooptationRepository:
         self,
         email: str,
         opportunity_id: UUID,
-    ) -> Optional[Cooptation]:
+    ) -> Cooptation | None:
         """Check if candidate already proposed for opportunity."""
         result = await self.session.execute(
             select(CooptationModel)
@@ -156,7 +155,7 @@ class CooptationRepository:
         self,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[CooptationStatus] = None,
+        status: CooptationStatus | None = None,
     ) -> list[Cooptation]:
         """List all cooptations with optional status filter."""
         query = select(CooptationModel).options(
@@ -183,9 +182,7 @@ class CooptationRepository:
     async def count_by_status(self, status: CooptationStatus) -> int:
         """Count cooptations by status."""
         result = await self.session.execute(
-            select(func.count(CooptationModel.id)).where(
-                CooptationModel.status == str(status)
-            )
+            select(func.count(CooptationModel.id)).where(CooptationModel.status == str(status))
         )
         return result.scalar() or 0
 

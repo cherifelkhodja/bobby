@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from app.domain.entities import User
@@ -38,11 +37,11 @@ class UserReadModel:
     last_name: str
     full_name: str
     role: str
-    phone: Optional[str]
+    phone: str | None
     is_verified: bool
     is_active: bool
-    boond_resource_id: Optional[str]
-    manager_boond_id: Optional[str]
+    boond_resource_id: str | None
+    manager_boond_id: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -78,13 +77,13 @@ class UsersListResult:
 class UpdateUserCommand:
     """Command for updating user."""
 
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    phone: Optional[str] = None
-    is_active: Optional[bool] = None
-    role: Optional[str] = None
-    boond_resource_id: Optional[str] = None
-    manager_boond_id: Optional[str] = None
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
+    is_active: bool | None = None
+    role: str | None = None
+    boond_resource_id: str | None = None
+    manager_boond_id: str | None = None
 
 
 VALID_ROLES = {"user", "commercial", "rh", "admin"}

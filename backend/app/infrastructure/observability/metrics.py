@@ -8,7 +8,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from threading import Lock
-from typing import Any, Callable, Optional
+from typing import Any
 
 
 @dataclass
@@ -37,7 +37,7 @@ class Counter:
         self,
         name: str,
         description: str,
-        labels: Optional[list[str]] = None,
+        labels: list[str] | None = None,
     ):
         self.name = name
         self.description = description
@@ -83,7 +83,7 @@ class Gauge:
         self,
         name: str,
         description: str,
-        labels: Optional[list[str]] = None,
+        labels: list[str] | None = None,
     ):
         self.name = name
         self.description = description
@@ -143,15 +143,15 @@ class Histogram:
         self,
         name: str,
         description: str,
-        labels: Optional[list[str]] = None,
-        buckets: Optional[tuple[float, ...]] = None,
+        labels: list[str] | None = None,
+        buckets: tuple[float, ...] | None = None,
     ):
         self.name = name
         self.description = description
         self.label_names = labels or []
         self.buckets = buckets or self.DEFAULT_BUCKETS
         self._counts: dict[tuple, dict[float, int]] = defaultdict(
-            lambda: {b: 0 for b in self.buckets}
+            lambda: dict.fromkeys(self.buckets, 0)
         )
         self._sums: dict[tuple, float] = defaultdict(float)
         self._totals: dict[tuple, int] = defaultdict(int)
@@ -219,7 +219,7 @@ class MetricsCollector:
         self,
         name: str,
         description: str,
-        labels: Optional[list[str]] = None,
+        labels: list[str] | None = None,
     ) -> Counter:
         """Create or get a counter metric."""
         with self._lock:
@@ -231,7 +231,7 @@ class MetricsCollector:
         self,
         name: str,
         description: str,
-        labels: Optional[list[str]] = None,
+        labels: list[str] | None = None,
     ) -> Gauge:
         """Create or get a gauge metric."""
         with self._lock:
@@ -243,8 +243,8 @@ class MetricsCollector:
         self,
         name: str,
         description: str,
-        labels: Optional[list[str]] = None,
-        buckets: Optional[tuple[float, ...]] = None,
+        labels: list[str] | None = None,
+        buckets: tuple[float, ...] | None = None,
     ) -> Histogram:
         """Create or get a histogram metric."""
         with self._lock:
@@ -298,22 +298,14 @@ class MetricsCollector:
         """Export all metrics as JSON."""
         return {
             "counters": {
-                name: [
-                    {"value": mv.value, "labels": mv.labels}
-                    for mv in counter.get_all()
-                ]
+                name: [{"value": mv.value, "labels": mv.labels} for mv in counter.get_all()]
                 for name, counter in self._counters.items()
             },
             "gauges": {
-                name: [
-                    {"value": mv.value, "labels": mv.labels}
-                    for mv in gauge.get_all()
-                ]
+                name: [{"value": mv.value, "labels": mv.labels} for mv in gauge.get_all()]
                 for name, gauge in self._gauges.items()
             },
-            "histograms": {
-                name: hist.get_all() for name, hist in self._histograms.items()
-            },
+            "histograms": {name: hist.get_all() for name, hist in self._histograms.items()},
         }
 
 

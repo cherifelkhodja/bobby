@@ -6,9 +6,6 @@ from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 
-from app.domain.entities import JobPostingStatus, ApplicationStatus
-from app.domain.value_objects import UserRole
-
 
 class TestHROpportunitiesEndpoint:
     """Tests for /hr/opportunities endpoint."""
@@ -31,9 +28,7 @@ class TestHROpportunitiesEndpoint:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_list_opportunities_success(
-        self, client: AsyncClient, auth_headers_admin: dict
-    ):
+    async def test_list_opportunities_success(self, client: AsyncClient, auth_headers_admin: dict):
         """Should return opportunities list for admin."""
         response = await client.get(
             "/api/v1/hr/opportunities",
@@ -101,9 +96,7 @@ class TestJobPostingsEndpoints:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_list_job_postings_success(
-        self, client: AsyncClient, auth_headers_admin: dict
-    ):
+    async def test_list_job_postings_success(self, client: AsyncClient, auth_headers_admin: dict):
         """Should return job postings list."""
         response = await client.get(
             "/api/v1/hr/job-postings",
@@ -127,9 +120,7 @@ class TestJobPostingsEndpoints:
         assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_get_job_posting_not_found(
-        self, client: AsyncClient, auth_headers_admin: dict
-    ):
+    async def test_get_job_posting_not_found(self, client: AsyncClient, auth_headers_admin: dict):
         """Should return 404 for non-existent posting."""
         response = await client.get(
             f"/api/v1/hr/job-postings/{uuid4()}",
@@ -138,9 +129,7 @@ class TestJobPostingsEndpoints:
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_publish_non_draft_fails(
-        self, client: AsyncClient, auth_headers_admin: dict
-    ):
+    async def test_publish_non_draft_fails(self, client: AsyncClient, auth_headers_admin: dict):
         """Should return 400 when trying to publish non-draft."""
         # Non-existent posting will return 404
         response = await client.post(
@@ -150,9 +139,7 @@ class TestJobPostingsEndpoints:
         assert response.status_code in [400, 404]
 
     @pytest.mark.asyncio
-    async def test_close_non_published_fails(
-        self, client: AsyncClient, auth_headers_admin: dict
-    ):
+    async def test_close_non_published_fails(self, client: AsyncClient, auth_headers_admin: dict):
         """Should return 400 when trying to close non-published."""
         response = await client.post(
             f"/api/v1/hr/job-postings/{uuid4()}/close",
@@ -182,9 +169,7 @@ class TestApplicationsEndpoints:
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_get_application_not_found(
-        self, client: AsyncClient, auth_headers_admin: dict
-    ):
+    async def test_get_application_not_found(self, client: AsyncClient, auth_headers_admin: dict):
         """Should return 404 for non-existent application."""
         response = await client.get(
             f"/api/v1/hr/applications/{uuid4()}",
@@ -223,9 +208,7 @@ class TestApplicationsEndpoints:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_get_cv_url_not_found(
-        self, client: AsyncClient, auth_headers_admin: dict
-    ):
+    async def test_get_cv_url_not_found(self, client: AsyncClient, auth_headers_admin: dict):
         """Should return 404 for non-existent application."""
         response = await client.get(
             f"/api/v1/hr/applications/{uuid4()}/cv",
@@ -234,9 +217,7 @@ class TestApplicationsEndpoints:
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_create_in_boond_not_found(
-        self, client: AsyncClient, auth_headers_admin: dict
-    ):
+    async def test_create_in_boond_not_found(self, client: AsyncClient, auth_headers_admin: dict):
         """Should return 404 for non-existent application."""
         response = await client.post(
             f"/api/v1/hr/applications/{uuid4()}/create-in-boond",

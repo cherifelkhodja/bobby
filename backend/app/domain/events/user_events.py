@@ -2,10 +2,7 @@
 User-related domain events.
 """
 
-from typing import Optional
 from uuid import UUID
-
-from pydantic import Field
 
 from ..value_objects import UserRole
 from .base import DomainEvent
@@ -19,7 +16,7 @@ class UserRegisteredEvent(DomainEvent):
     first_name: str
     last_name: str
     role: UserRole
-    invited_by: Optional[UUID] = None
+    invited_by: UUID | None = None
 
     def __init__(self, **data):
         super().__init__(aggregate_id=data.get("user_id"), **data)
@@ -41,7 +38,7 @@ class UserDeactivatedEvent(DomainEvent):
     user_id: UUID
     email: str
     deactivated_by: UUID
-    reason: Optional[str] = None
+    reason: str | None = None
 
     def __init__(self, **data):
         super().__init__(aggregate_id=data.get("user_id"), **data)
@@ -108,8 +105,8 @@ class UserLoginEvent(DomainEvent):
 
     user_id: UUID
     email: str
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
+    ip_address: str | None = None
+    user_agent: str | None = None
 
     def __init__(self, **data):
         super().__init__(aggregate_id=data.get("user_id"), **data)

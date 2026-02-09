@@ -5,7 +5,6 @@ Business rules for filtering and validating cooptations.
 """
 
 from datetime import datetime, timedelta
-from typing import Optional
 from uuid import UUID
 
 from ..entities import Cooptation

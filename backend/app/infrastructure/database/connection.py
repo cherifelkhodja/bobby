@@ -1,7 +1,7 @@
 """Database connection management."""
 
 import logging
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -15,7 +15,11 @@ logger = logging.getLogger(__name__)
 
 # Log the database URL being used (masked for security)
 db_url = settings.async_database_url
-masked_url = db_url.split("@")[0].rsplit(":", 1)[0] + ":***@" + db_url.split("@")[-1] if "@" in db_url else db_url
+masked_url = (
+    db_url.split("@")[0].rsplit(":", 1)[0] + ":***@" + db_url.split("@")[-1]
+    if "@" in db_url
+    else db_url
+)
 logger.info(f"Creating async engine with URL: {masked_url}")
 
 engine = create_async_engine(

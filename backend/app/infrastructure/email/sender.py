@@ -3,12 +3,12 @@
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Optional
 
 import aiosmtplib
 
 try:
     import resend
+
     RESEND_AVAILABLE = True
 except ImportError:
     RESEND_AVAILABLE = False
@@ -61,7 +61,9 @@ class EmailService:
                 "html": html_body,
             }
             response = resend.Emails.send(params)
-            logger.info(f"Email sent via Resend to {to}: {subject} (id: {response.get('id', 'unknown')})")
+            logger.info(
+                f"Email sent via Resend to {to}: {subject} (id: {response.get('id', 'unknown')})"
+            )
             return True
         except Exception as e:
             logger.error(f"Failed to send email via Resend to {to}: {e}")

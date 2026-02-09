@@ -1,12 +1,11 @@
 """Template management use cases."""
 
 import logging
-from typing import Optional
 
 from app.quotation_generator.domain.ports import TemplateRepositoryPort
 from app.quotation_generator.services.template_filler import (
-    TemplateFillerService,
     THALES_PSTF_VARIABLES,
+    TemplateFillerService,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,7 +39,7 @@ class UploadTemplateUseCase:
         name: str,
         content: bytes,
         display_name: str,
-        description: Optional[str] = None,
+        description: str | None = None,
         validate_variables: bool = True,
     ) -> dict:
         """Upload or update a template.
@@ -82,15 +81,11 @@ class UploadTemplateUseCase:
             if not validation["is_valid"]:
                 result["warnings"] = validation["errors"]
                 # Still allow upload with warnings
-                logger.warning(
-                    f"Template {name} has validation warnings: {validation['errors']}"
-                )
+                logger.warning(f"Template {name} has validation warnings: {validation['errors']}")
         else:
             # Just extract variables without validation
             try:
-                result["variables_found"] = self.template_filler.get_template_variables(
-                    content
-                )
+                result["variables_found"] = self.template_filler.get_template_variables(content)
             except Exception as e:
                 result["warnings"].append(f"Could not extract variables: {str(e)}")
 
@@ -137,7 +132,7 @@ class GetTemplateUseCase:
         """
         self.template_repository = template_repository
 
-    async def execute(self, name: str) -> Optional[bytes]:
+    async def execute(self, name: str) -> bytes | None:
         """Get template content.
 
         Args:

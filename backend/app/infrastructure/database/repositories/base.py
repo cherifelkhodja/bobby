@@ -1,7 +1,7 @@
 """Base repository with common functionality."""
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, Optional, List
+from typing import Generic, TypeVar
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -34,7 +34,7 @@ class BaseRepository(ABC, Generic[TEntity, TModel]):
         """Convert domain entity to model."""
         pass
 
-    async def get_by_id(self, entity_id: UUID) -> Optional[TEntity]:
+    async def get_by_id(self, entity_id: UUID) -> TEntity | None:
         """Get entity by ID."""
         result = await self.session.execute(
             select(self.model_class).where(self.model_class.id == entity_id)
@@ -55,15 +55,12 @@ class BaseRepository(ABC, Generic[TEntity, TModel]):
 
     async def count(self) -> int:
         """Count total entities."""
-        result = await self.session.execute(
-            select(func.count(self.model_class.id))
-        )
+        result = await self.session.execute(select(func.count(self.model_class.id)))
         return result.scalar() or 0
 
     async def exists(self, entity_id: UUID) -> bool:
         """Check if entity exists."""
         result = await self.session.execute(
-            select(func.count(self.model_class.id))
-            .where(self.model_class.id == entity_id)
+            select(func.count(self.model_class.id)).where(self.model_class.id == entity_id)
         )
         return (result.scalar() or 0) > 0

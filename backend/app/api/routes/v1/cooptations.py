@@ -1,6 +1,5 @@
 """Cooptation endpoints."""
 
-from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -10,7 +9,6 @@ from app.api.schemas.cooptation import (
     CooptationResponse,
     CooptationStatsResponse,
     CreateCooptationRequest,
-    StatusChangeResponse,
     UpdateCooptationStatusRequest,
 )
 from app.application.use_cases.cooptations import (
@@ -94,7 +92,7 @@ async def list_cooptations(
     db: DbSession,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    status: Optional[str] = Query(None),
+    status: str | None = Query(None),
     authorization: str = Header(default=""),
 ):
     """List all cooptations (admin view)."""

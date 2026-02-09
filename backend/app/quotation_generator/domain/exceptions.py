@@ -1,12 +1,12 @@
 """Domain exceptions for quotation generator."""
 
-from typing import Any, Optional
+from typing import Any
 
 
 class QuotationGeneratorError(Exception):
     """Base exception for quotation generator module."""
 
-    def __init__(self, message: str, details: Optional[dict[str, Any]] = None) -> None:
+    def __init__(self, message: str, details: dict[str, Any] | None = None) -> None:
         """Initialize the exception.
 
         Args:
@@ -71,7 +71,9 @@ class InvalidCSVDataError(CSVParsingError):
         self.field = field
         self.value = value
         self.expected = expected
-        message = f"Row {row_index}: Invalid value '{value}' for field '{field}'. Expected: {expected}"
+        message = (
+            f"Row {row_index}: Invalid value '{value}' for field '{field}'. Expected: {expected}"
+        )
         super().__init__(
             message,
             details={
@@ -113,7 +115,7 @@ class BoondManagerAPIError(QuotationGeneratorError):
         self,
         status_code: int,
         message: str,
-        response_body: Optional[str] = None,
+        response_body: str | None = None,
     ) -> None:
         """Initialize with API error details.
 
@@ -201,7 +203,7 @@ class QuotationGenerationError(QuotationGeneratorError):
         self,
         resource_trigramme: str,
         step: str,
-        original_error: Optional[Exception] = None,
+        original_error: Exception | None = None,
     ) -> None:
         """Initialize with generation error details.
 
@@ -234,7 +236,7 @@ class DownloadNotReadyError(QuotationGeneratorError):
         reason: Reason why download is not ready.
     """
 
-    def __init__(self, message: str, batch_id: Optional[str] = None) -> None:
+    def __init__(self, message: str, batch_id: str | None = None) -> None:
         """Initialize download not ready error.
 
         Args:

@@ -45,9 +45,7 @@ def map_opportunity_to_read_model(opportunity: Opportunity) -> dict:
         "start_date": opportunity.start_date.isoformat() if opportunity.start_date else None,
         "end_date": opportunity.end_date.isoformat() if opportunity.end_date else None,
         "response_deadline": (
-            opportunity.response_deadline.isoformat()
-            if opportunity.response_deadline
-            else None
+            opportunity.response_deadline.isoformat() if opportunity.response_deadline else None
         ),
         "budget": opportunity.budget,
         "manager_name": opportunity.manager_name,

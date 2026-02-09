@@ -6,39 +6,30 @@ from uuid import uuid4
 
 import pytest
 
+from app.application.use_cases.job_applications import (
+    GetApplicationCvUrlUseCase,
+    SubmitApplicationCommand,
+    SubmitApplicationUseCase,
+    UpdateApplicationStatusCommand,
+    UpdateApplicationStatusUseCase,
+)
 from app.application.use_cases.job_postings import (
     CreateJobPostingCommand,
     CreateJobPostingUseCase,
-    GetJobPostingUseCase,
-    ListJobPostingsUseCase,
-    PublishJobPostingUseCase,
-    CloseJobPostingUseCase,
     ListOpenOpportunitiesForHRUseCase,
-)
-from app.application.use_cases.job_applications import (
-    SubmitApplicationCommand,
-    SubmitApplicationUseCase,
-    ListApplicationsForPostingUseCase,
-    UpdateApplicationStatusCommand,
-    UpdateApplicationStatusUseCase,
-    GetApplicationCvUrlUseCase,
+    PublishJobPostingUseCase,
 )
 from app.domain.entities import (
-    JobPosting,
-    JobApplication,
-    JobPostingStatus,
     ApplicationStatus,
     ContractType,
-    Opportunity,
-    User,
+    JobPostingStatus,
 )
 from app.domain.exceptions import (
-    JobPostingNotFoundError,
-    JobApplicationNotFoundError,
-    OpportunityNotFoundError,
     InvalidStatusTransitionError,
+    JobApplicationNotFoundError,
+    JobPostingNotFoundError,
+    OpportunityNotFoundError,
 )
-from app.domain.value_objects import UserRole
 
 
 class TestListOpenOpportunitiesForHRUseCase:
@@ -134,9 +125,7 @@ class TestListOpenOpportunitiesForHRUseCase:
         assert result.items[0].job_posting_id is None
         assert result.items[0].applications_count == 0
 
-        mock_deps["boond_client"].get_manager_opportunities.assert_called_once_with(
-            fetch_all=True
-        )
+        mock_deps["boond_client"].get_manager_opportunities.assert_called_once_with(fetch_all=True)
 
     @pytest.mark.asyncio
     async def test_list_opportunities_requires_boond_id_for_non_admin(self, use_case, mock_deps):
@@ -423,7 +412,10 @@ class TestSubmitApplicationUseCase:
 
         mock_deps["job_application_repo"].save.side_effect = mock_save
 
-        with patch("app.application.use_cases.job_applications.extract_text_from_bytes", return_value="CV text"):
+        with patch(
+            "app.application.use_cases.job_applications.extract_text_from_bytes",
+            return_value="CV text",
+        ):
             command = SubmitApplicationCommand(
                 application_token="test-token",
                 first_name="Jean",

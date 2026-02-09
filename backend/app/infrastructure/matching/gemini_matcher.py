@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 class ScoresDetails(BaseModel):
     """Detailed scoring breakdown by category."""
 
-    competences_techniques: int = Field(ge=0, le=100, description="Technical skills score (50% weight)")
+    competences_techniques: int = Field(
+        ge=0, le=100, description="Technical skills score (50% weight)"
+    )
     experience: int = Field(ge=0, le=100, description="Experience score (25% weight)")
     formation: int = Field(ge=0, le=100, description="Education score (10% weight)")
     soft_skills: int = Field(ge=0, le=100, description="Soft skills score (15% weight)")
@@ -49,6 +51,7 @@ class MatchingResult(BaseModel):
 
 
 # ============== CV Quality Evaluation Models ==============
+
 
 class StabilityScore(BaseModel):
     """Mission stability scoring details."""
@@ -949,7 +952,9 @@ class GeminiMatchingService:
         # Ensure scores_details exists and has all fields
         scores_details = raw_result.get("scores_details", {})
         normalized_scores = {
-            "competences_techniques": max(0, min(100, scores_details.get("competences_techniques", 0))),
+            "competences_techniques": max(
+                0, min(100, scores_details.get("competences_techniques", 0))
+            ),
             "experience": max(0, min(100, scores_details.get("experience", 0))),
             "formation": max(0, min(100, scores_details.get("formation", 0))),
             "soft_skills": max(0, min(100, scores_details.get("soft_skills", 0))),

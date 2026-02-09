@@ -1,31 +1,30 @@
 """Invitation management endpoints."""
 
-from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, EmailStr
 
-from app.dependencies import AppSettings, DbSession
-from app.infrastructure.database.repositories import InvitationRepository, UserRepository
-from app.infrastructure.email.sender import EmailService
-from app.infrastructure.security.jwt import decode_token
+from app.api.schemas.user import UserResponse
 from app.application.use_cases.invitations import (
     AcceptInvitationCommand,
     AcceptInvitationUseCase,
     CreateInvitationCommand,
     CreateInvitationUseCase,
     DeleteInvitationUseCase,
+    InvitationAlreadyAcceptedError,
+    InvitationAlreadyExistsError,
+    InvitationExpiredError,
+    InvitationNotFoundError,
     ListPendingInvitationsUseCase,
     ResendInvitationUseCase,
-    ValidateInvitationUseCase,
-    InvitationAlreadyExistsError,
-    InvitationNotFoundError,
-    InvitationExpiredError,
-    InvitationAlreadyAcceptedError,
     UserAlreadyExistsError,
+    ValidateInvitationUseCase,
 )
-from app.api.schemas.user import UserResponse
+from app.dependencies import AppSettings, DbSession
+from app.infrastructure.database.repositories import InvitationRepository, UserRepository
+from app.infrastructure.email.sender import EmailService
+from app.infrastructure.security.jwt import decode_token
 
 router = APIRouter()
 
@@ -36,11 +35,11 @@ class CreateInvitationRequest(BaseModel):
 
     email: EmailStr
     role: str  # user, commercial, rh, admin
-    boond_resource_id: Optional[str] = None
-    manager_boond_id: Optional[str] = None
-    phone: Optional[str] = None  # International format +33...
-    first_name: Optional[str] = None  # Pre-filled from BoondManager
-    last_name: Optional[str] = None  # Pre-filled from BoondManager
+    boond_resource_id: str | None = None
+    manager_boond_id: str | None = None
+    phone: str | None = None  # International format +33...
+    first_name: str | None = None  # Pre-filled from BoondManager
+    last_name: str | None = None  # Pre-filled from BoondManager
 
 
 class InvitationResponse(BaseModel):
@@ -49,7 +48,7 @@ class InvitationResponse(BaseModel):
     id: UUID
     email: str
     role: str
-    phone: Optional[str] = None
+    phone: str | None = None
     invited_by: UUID
     expires_at: str
     is_expired: bool
@@ -62,9 +61,9 @@ class InvitationValidationResponse(BaseModel):
 
     email: str
     role: str
-    phone: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
+    phone: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
     is_valid: bool
     hours_until_expiry: int
 
@@ -76,7 +75,7 @@ class AcceptInvitationRequest(BaseModel):
     first_name: str
     last_name: str
     password: str
-    phone: Optional[str] = None
+    phone: str | None = None
 
 
 class InvitationsListResponse(BaseModel):

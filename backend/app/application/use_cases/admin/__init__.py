@@ -1,19 +1,19 @@
 """Admin use cases."""
 
-from app.application.use_cases.admin.users import (
-    ListUsersUseCase,
-    GetUserUseCase,
-    UpdateUserUseCase,
-    ChangeUserRoleUseCase,
-    ActivateUserUseCase,
-    DeactivateUserUseCase,
-    DeleteUserUseCase,
-)
 from app.application.use_cases.admin.boond import (
+    GetBoondResourcesUseCase,
     GetBoondStatusUseCase,
     SyncBoondOpportunitiesUseCase,
     TestBoondConnectionUseCase,
-    GetBoondResourcesUseCase,
+)
+from app.application.use_cases.admin.users import (
+    ActivateUserUseCase,
+    ChangeUserRoleUseCase,
+    DeactivateUserUseCase,
+    DeleteUserUseCase,
+    GetUserUseCase,
+    ListUsersUseCase,
+    UpdateUserUseCase,
 )
 
 __all__ = [

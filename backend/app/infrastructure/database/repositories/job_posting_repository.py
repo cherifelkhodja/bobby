@@ -1,7 +1,6 @@
 """Job Posting repository implementation."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -17,7 +16,7 @@ class JobPostingRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_id(self, posting_id: UUID) -> Optional[JobPosting]:
+    async def get_by_id(self, posting_id: UUID) -> JobPosting | None:
         """Get job posting by ID."""
         result = await self.session.execute(
             select(JobPostingModel).where(JobPostingModel.id == posting_id)
@@ -25,7 +24,7 @@ class JobPostingRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def get_by_token(self, token: str) -> Optional[JobPosting]:
+    async def get_by_token(self, token: str) -> JobPosting | None:
         """Get job posting by application token."""
         result = await self.session.execute(
             select(JobPostingModel).where(JobPostingModel.application_token == token)
@@ -33,7 +32,7 @@ class JobPostingRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def get_by_opportunity_id(self, opportunity_id: UUID) -> Optional[JobPosting]:
+    async def get_by_opportunity_id(self, opportunity_id: UUID) -> JobPosting | None:
         """Get job posting by linked opportunity ID."""
         result = await self.session.execute(
             select(JobPostingModel).where(JobPostingModel.opportunity_id == opportunity_id)
@@ -41,9 +40,7 @@ class JobPostingRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def get_by_boond_opportunity_id(
-        self, boond_opportunity_id: str
-    ) -> Optional[JobPosting]:
+    async def get_by_boond_opportunity_id(self, boond_opportunity_id: str) -> JobPosting | None:
         """Get job posting by BoondManager opportunity external ID.
 
         Joins with opportunities table to find by external_id.
@@ -81,7 +78,7 @@ class JobPostingRepository:
             postings_map[external_id] = self._to_entity(posting_model)
         return postings_map
 
-    async def get_by_turnoverit_reference(self, reference: str) -> Optional[JobPosting]:
+    async def get_by_turnoverit_reference(self, reference: str) -> JobPosting | None:
         """Get job posting by Turnover-IT reference."""
         result = await self.session.execute(
             select(JobPostingModel).where(JobPostingModel.turnoverit_reference == reference)
@@ -178,7 +175,7 @@ class JobPostingRepository:
         self,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[JobPostingStatus] = None,
+        status: JobPostingStatus | None = None,
     ) -> list[JobPosting]:
         """List all job postings with optional status filter."""
         query = select(JobPostingModel)
@@ -221,7 +218,7 @@ class JobPostingRepository:
         result = await self.session.execute(query)
         return [self._to_entity(m) for m in result.scalars().all()]
 
-    async def count_all(self, status: Optional[JobPostingStatus] = None) -> int:
+    async def count_all(self, status: JobPostingStatus | None = None) -> int:
         """Count all job postings with optional status filter."""
         query = select(func.count(JobPostingModel.id))
         if status:
@@ -232,9 +229,7 @@ class JobPostingRepository:
     async def count_by_creator(self, user_id: UUID) -> int:
         """Count job postings created by a specific user."""
         result = await self.session.execute(
-            select(func.count(JobPostingModel.id)).where(
-                JobPostingModel.created_by == user_id
-            )
+            select(func.count(JobPostingModel.id)).where(JobPostingModel.created_by == user_id)
         )
         return result.scalar() or 0
 

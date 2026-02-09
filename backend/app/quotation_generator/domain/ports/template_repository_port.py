@@ -2,7 +2,6 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
 
 
 class TemplateRepositoryPort(ABC):
@@ -13,7 +12,7 @@ class TemplateRepositoryPort(ABC):
     """
 
     @abstractmethod
-    async def get_template(self, name: str) -> Optional[bytes]:
+    async def get_template(self, name: str) -> bytes | None:
         """Retrieve a template by name.
 
         Args:
@@ -30,7 +29,7 @@ class TemplateRepositoryPort(ABC):
         name: str,
         content: bytes,
         display_name: str,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> None:
         """Save or update a template.
 
@@ -83,7 +82,7 @@ class TemplateRepositoryPort(ABC):
         ...
 
     @abstractmethod
-    async def get_template_path(self, name: str) -> Optional[Path]:
+    async def get_template_path(self, name: str) -> Path | None:
         """Get filesystem path for a template.
 
         This is used for LibreOffice conversion which requires

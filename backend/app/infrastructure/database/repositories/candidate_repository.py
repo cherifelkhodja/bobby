@@ -1,7 +1,6 @@
 """Candidate repository implementation."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -18,7 +17,7 @@ class CandidateRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_id(self, candidate_id: UUID) -> Optional[Candidate]:
+    async def get_by_id(self, candidate_id: UUID) -> Candidate | None:
         """Get candidate by ID."""
         result = await self.session.execute(
             select(CandidateModel).where(CandidateModel.id == candidate_id)
@@ -26,7 +25,7 @@ class CandidateRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def get_by_email(self, email: str) -> Optional[Candidate]:
+    async def get_by_email(self, email: str) -> Candidate | None:
         """Get candidate by email."""
         result = await self.session.execute(
             select(CandidateModel).where(CandidateModel.email == email.lower())
@@ -34,7 +33,7 @@ class CandidateRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def get_by_external_id(self, external_id: str) -> Optional[Candidate]:
+    async def get_by_external_id(self, external_id: str) -> Candidate | None:
         """Get candidate by external BoondManager ID."""
         result = await self.session.execute(
             select(CandidateModel).where(CandidateModel.external_id == external_id)

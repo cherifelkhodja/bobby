@@ -5,7 +5,6 @@ It extracts user info from JWT and sets app.user_id and app.user_role
 before each database operation.
 """
 
-from typing import Optional
 from uuid import UUID
 
 from fastapi import Request
@@ -17,8 +16,8 @@ from app.infrastructure.security.jwt import decode_token
 
 async def set_rls_context(
     session: AsyncSession,
-    user_id: Optional[UUID],
-    user_role: Optional[str],
+    user_id: UUID | None,
+    user_role: str | None,
 ) -> None:
     """Set RLS context variables in the database session.
 
@@ -46,7 +45,7 @@ async def clear_rls_context(session: AsyncSession) -> None:
     await session.execute(text("SELECT clear_app_context()"))
 
 
-def extract_user_from_request(request: Request) -> tuple[Optional[UUID], Optional[str]]:
+def extract_user_from_request(request: Request) -> tuple[UUID | None, str | None]:
     """Extract user_id and role from request's Authorization header.
 
     Args:
@@ -82,8 +81,8 @@ class RLSContextManager:
     def __init__(
         self,
         session: AsyncSession,
-        user_id: Optional[UUID],
-        user_role: Optional[str],
+        user_id: UUID | None,
+        user_role: str | None,
     ):
         self.session = session
         self.user_id = user_id

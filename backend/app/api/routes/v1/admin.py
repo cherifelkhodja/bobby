@@ -1,9 +1,11 @@
 """Admin endpoints for system management."""
 
+from datetime import UTC
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import delete, select
 
 from app.api.dependencies import AdminUser
 from app.api.schemas.admin import (
@@ -48,7 +50,7 @@ from app.application.use_cases.admin.users import (
     UpdateUserCommand,
     UserNotFoundError,
 )
-from app.dependencies import AppSettings, AppSettingsSvc, DbSession, RedisClient
+from app.dependencies import AppSettings, AppSettingsSvc, DbSession
 from app.infrastructure.anonymizer.gemini_anonymizer import GeminiAnonymizer
 from app.infrastructure.anonymizer.job_posting_anonymizer import SKILLS_SYNC_INTERVAL
 from app.infrastructure.boond.client import BoondClient
@@ -61,7 +63,6 @@ from app.infrastructure.settings import (
     AVAILABLE_GEMINI_MODELS,
 )
 from app.infrastructure.turnoverit.client import TurnoverITClient
-from sqlalchemy import select, delete
 
 router = APIRouter()
 
@@ -158,7 +159,9 @@ DeleteUserUseCaseDep = Annotated[DeleteUserUseCase, Depends(get_delete_user_use_
 BoondStatusUseCaseDep = Annotated[GetBoondStatusUseCase, Depends(get_boond_status_use_case)]
 SyncBoondUseCaseDep = Annotated[SyncBoondOpportunitiesUseCase, Depends(get_sync_boond_use_case)]
 TestBoondUseCaseDep = Annotated[TestBoondConnectionUseCase, Depends(get_test_boond_use_case)]
-BoondResourcesUseCaseDep = Annotated[GetBoondResourcesUseCase, Depends(get_boond_resources_use_case)]
+BoondResourcesUseCaseDep = Annotated[
+    GetBoondResourcesUseCase, Depends(get_boond_resources_use_case)
+]
 
 
 # =============================================================================
@@ -467,9 +470,7 @@ async def get_cv_ai_settings(
     return CvAiSettingsResponse(
         current_provider=current_provider,
         current_model=current_model,
-        available_providers=[
-            {"id": p["id"], "name": p["name"]} for p in AVAILABLE_CV_AI_PROVIDERS
-        ],
+        available_providers=[{"id": p["id"], "name": p["name"]} for p in AVAILABLE_CV_AI_PROVIDERS],
         available_models_gemini=[
             {"id": m["id"], "name": m["name"], "description": m.get("description", "")}
             for m in AVAILABLE_GEMINI_MODELS
@@ -520,9 +521,7 @@ async def set_cv_ai_provider(
     return CvAiSettingsResponse(
         current_provider=request.provider,
         current_model=request.model,
-        available_providers=[
-            {"id": p["id"], "name": p["name"]} for p in AVAILABLE_CV_AI_PROVIDERS
-        ],
+        available_providers=[{"id": p["id"], "name": p["name"]} for p in AVAILABLE_CV_AI_PROVIDERS],
         available_models_gemini=[
             {"id": m["id"], "name": m["name"], "description": m.get("description", "")}
             for m in AVAILABLE_GEMINI_MODELS
@@ -649,7 +648,7 @@ async def get_turnoverit_skills(
             last_synced_at=metadata.last_synced_at if metadata else None,
             sync_interval_days=SKILLS_SYNC_INTERVAL.days,
         )
-    except Exception as e:
+    except Exception:
         # Table might not exist yet
         return TurnoverITSkillsResponse(
             skills=[],
@@ -687,7 +686,7 @@ async def sync_turnoverit_skills(
         await db.execute(delete(TurnoverITSkillModel))
 
         # Insert new skills
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         for skill in skills:
             skill_model = TurnoverITSkillModel(
@@ -703,12 +702,12 @@ async def sync_turnoverit_skills(
         metadata = result.scalar_one_or_none()
 
         if metadata:
-            metadata.last_synced_at = datetime.now(timezone.utc)
+            metadata.last_synced_at = datetime.now(UTC)
             metadata.total_skills = len(skills)
         else:
             metadata = TurnoverITSkillsMetadataModel(
                 id=1,
-                last_synced_at=datetime.now(timezone.utc),
+                last_synced_at=datetime.now(UTC),
                 total_skills=len(skills),
             )
             db.add(metadata)

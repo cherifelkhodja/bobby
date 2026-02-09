@@ -2,13 +2,10 @@
 
 from dataclasses import dataclass, field
 from datetime import date
-from decimal import Decimal
-from typing import Optional
 from uuid import UUID, uuid4
 
 from app.quotation_generator.domain.entities.quotation_line import QuotationLine
 from app.quotation_generator.domain.value_objects import Money, Period, QuotationStatus
-
 
 # Fixed legal text for Thales quotations
 THALES_LEGALS = """Les frais de déplacement se réfèreront à la politique de voyage Thales (tout déplacement hors IDF fera l'objet de frais annexes)
@@ -72,8 +69,8 @@ class Quotation:
     max_price: Money
     start_project: date
     # Date du devis (from CSV 'date' column, defaults to period start)
-    quotation_date: Optional[date] = None
-    comments: Optional[str] = None
+    quotation_date: date | None = None
+    comments: str | None = None
     # Period display name (e.g., "Janvier 2026")
     period_name: str = ""
     # Title of the need
@@ -90,10 +87,10 @@ class Quotation:
     id: UUID = field(default_factory=uuid4)
     row_index: int = 0
     status: QuotationStatus = QuotationStatus.PENDING
-    boond_quotation_id: Optional[str] = None
-    boond_reference: Optional[str] = None
-    pdf_path: Optional[str] = None  # Path to generated PDF file
-    error_message: Optional[str] = None
+    boond_quotation_id: str | None = None
+    boond_reference: str | None = None
+    pdf_path: str | None = None  # Path to generated PDF file
+    error_message: str | None = None
     validation_errors: list[str] = field(default_factory=list)
 
     @property
@@ -157,7 +154,7 @@ class Quotation:
 
         # Validate period
         if self.period.start_date >= self.period.end_date:
-            errors.append(f"Start date must be before end date")
+            errors.append("Start date must be before end date")
 
         # Validate pricing
         if self.line.unit_price_ht.amount <= 0:
@@ -251,12 +248,8 @@ class Quotation:
                             "type": "opportunity",
                         }
                     },
-                    "company": {
-                        "data": {"id": str(self.company_id), "type": "company"}
-                    },
-                    "contact": {
-                        "data": {"id": str(self.contact_id), "type": "contact"}
-                    },
+                    "company": {"data": {"id": str(self.company_id), "type": "company"}},
+                    "contact": {"data": {"id": str(self.contact_id), "type": "contact"}},
                     "billingDetail": {
                         "data": {"id": str(self.company_detail_id), "type": "detail"}
                     },
@@ -264,7 +257,7 @@ class Quotation:
             }
         }
 
-    def to_template_context(self, boond_reference: Optional[str] = None) -> dict:
+    def to_template_context(self, boond_reference: str | None = None) -> dict:
         """Generate context for Thales template filling.
 
         Args:
@@ -309,7 +302,7 @@ class Quotation:
         """
         self.status = step
 
-    def mark_as_completed(self, boond_id: str, reference: str, pdf_path: Optional[str] = None) -> None:
+    def mark_as_completed(self, boond_id: str, reference: str, pdf_path: str | None = None) -> None:
         """Mark quotation as successfully completed.
 
         Args:

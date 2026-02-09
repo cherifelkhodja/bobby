@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 from uuid import UUID, uuid4
 
 from app.quotation_generator.domain.entities.quotation import Quotation
@@ -33,11 +32,11 @@ class QuotationBatch:
     id: UUID = field(default_factory=uuid4)
     status: BatchStatus = BatchStatus.PENDING
     created_at: datetime = field(default_factory=datetime.utcnow)
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    merged_pdf_path: Optional[str] = None  # All quotations merged into one PDF
-    zip_file_path: Optional[str] = None  # ZIP archive with individual PDFs
-    error_message: Optional[str] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    merged_pdf_path: str | None = None  # All quotations merged into one PDF
+    zip_file_path: str | None = None  # ZIP archive with individual PDFs
+    error_message: str | None = None
 
     @property
     def total_count(self) -> int:
@@ -55,9 +54,7 @@ class QuotationBatch:
         Returns:
             Number of quotations with COMPLETED status.
         """
-        return sum(
-            1 for q in self.quotations if q.status == QuotationStatus.COMPLETED
-        )
+        return sum(1 for q in self.quotations if q.status == QuotationStatus.COMPLETED)
 
     @property
     def failed_count(self) -> int:
@@ -97,8 +94,7 @@ class QuotationBatch:
             True if no quotations are pending or in progress.
         """
         return all(
-            q.status in (QuotationStatus.COMPLETED, QuotationStatus.FAILED)
-            for q in self.quotations
+            q.status in (QuotationStatus.COMPLETED, QuotationStatus.FAILED) for q in self.quotations
         )
 
     @property
@@ -119,7 +115,7 @@ class QuotationBatch:
         quotation.row_index = len(self.quotations)
         self.quotations.append(quotation)
 
-    def get_quotation(self, quotation_id: UUID) -> Optional[Quotation]:
+    def get_quotation(self, quotation_id: UUID) -> Quotation | None:
         """Find a quotation by ID.
 
         Args:
@@ -133,7 +129,7 @@ class QuotationBatch:
                 return q
         return None
 
-    def get_quotation_by_index(self, index: int) -> Optional[Quotation]:
+    def get_quotation_by_index(self, index: int) -> Quotation | None:
         """Get quotation by row index.
 
         Args:
@@ -151,7 +147,7 @@ class QuotationBatch:
         self.status = BatchStatus.PROCESSING
         self.started_at = datetime.utcnow()
 
-    def mark_completed(self, merged_pdf_path: str, zip_path: Optional[str] = None) -> None:
+    def mark_completed(self, merged_pdf_path: str, zip_path: str | None = None) -> None:
         """Mark batch as successfully completed.
 
         Args:
@@ -163,7 +159,7 @@ class QuotationBatch:
         self.merged_pdf_path = merged_pdf_path
         self.zip_file_path = zip_path
 
-    def mark_partial(self, merged_pdf_path: str, zip_path: Optional[str] = None) -> None:
+    def mark_partial(self, merged_pdf_path: str, zip_path: str | None = None) -> None:
         """Mark batch as partially completed (some failed).
 
         Args:
@@ -242,7 +238,9 @@ class QuotationBatch:
                     "company_detail_id": q.company_detail_id,
                     "contact_name": q.contact_name,
                     "contact_id": q.contact_id,
-                    "quotation_date": (q.quotation_date or q.period.start_date).strftime("%d/%m/%Y"),  # Date du devis
+                    "quotation_date": (q.quotation_date or q.period.start_date).strftime(
+                        "%d/%m/%Y"
+                    ),  # Date du devis
                     "period": {
                         "start": q.period.format_start(),
                         "end": q.period.format_end(),

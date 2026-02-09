@@ -1,23 +1,21 @@
 """Tests for HR feature domain entities (JobPosting, JobApplication)."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from uuid import uuid4
 
 import pytest
 
 from app.domain.entities import (
-    JobPosting,
-    JobApplication,
     ApplicationStatus,
-    JobPostingStatus,
     ContractType,
-    RemotePolicy,
-    ExperienceLevel,
+    JobApplication,
+    JobPosting,
+    JobPostingStatus,
 )
 from app.domain.exceptions import (
-    InvalidStatusTransitionError,
-    InvalidJobPostingError,
     InvalidJobApplicationError,
+    InvalidJobPostingError,
+    InvalidStatusTransitionError,
 )
 
 
@@ -198,7 +196,9 @@ class TestJobApplication:
         assert application.full_name == "Jean DUPONT"
 
     def test_full_name_format(self):
-        application = self._create_valid_application(first_name="Jean-Pierre", last_name="De La Fontaine")
+        application = self._create_valid_application(
+            first_name="Jean-Pierre", last_name="De La Fontaine"
+        )
         # Last name should be uppercased
         assert "Jean-Pierre" in application.full_name
         assert "DE LA FONTAINE" in application.full_name

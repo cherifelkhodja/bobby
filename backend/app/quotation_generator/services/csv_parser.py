@@ -33,9 +33,26 @@ logger = logging.getLogger(__name__)
 COLUMN_MAPPING = {
     # Resource info
     "resource_id": ["ressource_id", "resource_id", "id_resource", "id_ressource"],
-    "resource_first_name": ["Prénom", "Prenom", "prenom", "first_name", "prénom", "PRÉNOM", "PRENOM", "firstName", "firstname", "FirstName"],
+    "resource_first_name": [
+        "Prénom",
+        "Prenom",
+        "prenom",
+        "first_name",
+        "prénom",
+        "PRÉNOM",
+        "PRENOM",
+        "firstName",
+        "firstname",
+        "FirstName",
+    ],
     "resource_last_name": ["Nom", "nom", "last_name", "NOM", "lastName", "lastname", "LastName"],
-    "resource_name": ["ressource_name", "resource_name", "nom_resource", "nom_ressource", "consultant"],
+    "resource_name": [
+        "ressource_name",
+        "resource_name",
+        "nom_resource",
+        "nom_ressource",
+        "consultant",
+    ],
     "resource_trigramme": ["ressource_trigramme", "trigramme", "resource_trigramme", "code"],
     # BoondManager relationships
     "opportunity_id": ["opportunity_id", "id_opportunite", "ao", "affaire"],
@@ -70,7 +87,12 @@ COLUMN_MAPPING = {
     "subcontracting": ["subcontracting", "sous_traitance"],
     "tier2_supplier": ["tier2_supplier", "fournisseur_tier2"],
     "tier3_supplier": ["tier3_supplier", "fournisseur_tier3"],
-    "start_project": ["initial_first_starting_date", "start_project", "debut_projet", "date_debut_projet"],
+    "start_project": [
+        "initial_first_starting_date",
+        "start_project",
+        "debut_projet",
+        "date_debut_projet",
+    ],
     "comments": ["additional_comments", "comments", "commentaires", "notes", "remarques"],
     # Additional fields from actual CSV (optional)
     "title": ["Title", "title", "titre"],
@@ -141,7 +163,7 @@ class CSVParserService:
         self._pricing_grid = PricingGridService()
         self._enrichment_service = enrichment_service
         self._is_simplified_format = False
-        self._enrichment_cache: dict[str, "EnrichedQuotationData"] = {}
+        self._enrichment_cache: dict[str, EnrichedQuotationData] = {}
 
     def _detect_format(self) -> bool:
         """Detect if CSV is in simplified format.
@@ -213,9 +235,7 @@ class CSVParserService:
                 except Exception as e:
                     logger.warning(f"Error parsing row {row_index + 2}: {e}")
                     # Create quotation with error
-                    error_quotation = self._create_error_quotation(
-                        row, row_index, str(e)
-                    )
+                    error_quotation = self._create_error_quotation(row, row_index, str(e))
                     batch.add_quotation(error_quotation)
 
             logger.info(f"Parsed {batch.total_count} quotations from CSV")
@@ -285,9 +305,7 @@ class CSVParserService:
                 except Exception as e:
                     logger.warning(f"Error parsing row {row_index + 2}: {e}")
                     # Create quotation with error
-                    error_quotation = self._create_error_quotation(
-                        row, row_index, str(e)
-                    )
+                    error_quotation = self._create_error_quotation(row, row_index, str(e))
                     batch.add_quotation(error_quotation)
 
             logger.info(f"Parsed {batch.total_count} quotations from CSV")
@@ -321,12 +339,12 @@ class CSVParserService:
         Returns:
             Delimiter character (';' or ',')
         """
-        first_line = content.split('\n')[0] if '\n' in content else content
-        semicolon_count = first_line.count(';')
-        comma_count = first_line.count(',')
+        first_line = content.split("\n")[0] if "\n" in content else content
+        semicolon_count = first_line.count(";")
+        comma_count = first_line.count(",")
 
         # Use semicolon if it appears more often in the header
-        return ';' if semicolon_count > comma_count else ','
+        return ";" if semicolon_count > comma_count else ","
 
     def _is_empty_row(self, row: dict) -> bool:
         """Check if a row is empty or is a total/summary row.
@@ -405,9 +423,7 @@ class CSVParserService:
         for field_name, possible_names in COLUMN_MAPPING.items():
             for possible_name in possible_names:
                 if possible_name.lower() in fieldnames_lower:
-                    self._column_map[field_name] = fieldnames_lower[
-                        possible_name.lower()
-                    ]
+                    self._column_map[field_name] = fieldnames_lower[possible_name.lower()]
                     break
 
         logger.debug(f"Column mapping: {self._column_map}")
@@ -422,9 +438,7 @@ class CSVParserService:
         """
         # Select required columns based on format
         required_columns = (
-            REQUIRED_COLUMNS_SIMPLIFIED
-            if self._is_simplified_format
-            else REQUIRED_COLUMNS_FULL
+            REQUIRED_COLUMNS_SIMPLIFIED if self._is_simplified_format else REQUIRED_COLUMNS_FULL
         )
 
         missing = []
@@ -437,7 +451,7 @@ class CSVParserService:
         if missing:
             raise MissingColumnsError(missing)
 
-    def _get_value(self, row: dict, field_name: str) -> Optional[str]:
+    def _get_value(self, row: dict, field_name: str) -> str | None:
         """Get value from row using column mapping.
 
         Args:
@@ -473,7 +487,7 @@ class CSVParserService:
 
         # Parse quotation_date (date du devis) - optional, defaults to start_date
         quotation_date_str = self._get_value(row, "quotation_date")
-        quotation_date: Optional[date] = None
+        quotation_date: date | None = None
         if quotation_date_str:
             quotation_date = self._parse_date(quotation_date_str, "quotation_date")
 
@@ -631,7 +645,7 @@ class CSVParserService:
 
         # Parse quotation_date (date du devis) - optional, defaults to start_date
         quotation_date_str = self._get_value(row, "quotation_date")
-        quotation_date: Optional[date] = None
+        quotation_date: date | None = None
         if quotation_date_str:
             quotation_date = self._parse_date(quotation_date_str, "quotation_date")
 
@@ -823,7 +837,7 @@ class CSVParserService:
             raise ValueError(f"Missing required field: {field_name}")
         return value
 
-    def _parse_date(self, value: Optional[str], field_name: str) -> date:
+    def _parse_date(self, value: str | None, field_name: str) -> date:
         """Parse date from string.
 
         Supports formats: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY
@@ -856,7 +870,7 @@ class CSVParserService:
 
         raise ValueError(f"Invalid date format for {field_name}: {value}")
 
-    def _parse_decimal(self, value: Optional[str], field_name: str) -> Decimal:
+    def _parse_decimal(self, value: str | None, field_name: str) -> Decimal:
         """Parse decimal from string.
 
         Handles formats like:
@@ -895,7 +909,7 @@ class CSVParserService:
         except InvalidOperation:
             raise ValueError(f"Invalid number format for {field_name}: {value}")
 
-    def _parse_int(self, value: Optional[str], field_name: str) -> int:
+    def _parse_int(self, value: str | None, field_name: str) -> int:
         """Parse integer from string.
 
         Args:
@@ -921,7 +935,7 @@ class CSVParserService:
         except ValueError:
             raise ValueError(f"Invalid integer format for {field_name}: {value}")
 
-    def _parse_bool(self, value: Optional[str], default: bool = False) -> bool:
+    def _parse_bool(self, value: str | None, default: bool = False) -> bool:
         """Parse boolean from string.
 
         Recognizes: yes/no, oui/non, true/false, 1/0
@@ -944,9 +958,7 @@ class CSVParserService:
 
         return default
 
-    def _create_error_quotation(
-        self, row: dict, row_index: int, error_message: str
-    ) -> Quotation:
+    def _create_error_quotation(self, row: dict, row_index: int, error_message: str) -> Quotation:
         """Create a quotation placeholder for rows with parsing errors.
 
         Args:

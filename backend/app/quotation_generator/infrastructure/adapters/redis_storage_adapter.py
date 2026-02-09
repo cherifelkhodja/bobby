@@ -4,7 +4,7 @@ import json
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 import redis.asyncio as redis
@@ -44,7 +44,7 @@ class RedisStorageAdapter(BatchStoragePort):
             redis_url: Redis connection URL.
         """
         self.redis_url = redis_url
-        self._redis: Optional[redis.Redis] = None
+        self._redis: redis.Redis | None = None
 
     async def _get_redis(self) -> redis.Redis:
         """Get or create Redis connection."""
@@ -129,7 +129,9 @@ class RedisStorageAdapter(BatchStoragePort):
                 "end_date": quotation.period.end_date.isoformat(),
             },
             "period_name": quotation.period_name,
-            "quotation_date": quotation.quotation_date.isoformat() if quotation.quotation_date else None,
+            "quotation_date": quotation.quotation_date.isoformat()
+            if quotation.quotation_date
+            else None,
             "need_title": quotation.need_title,
             "line": {
                 "description": quotation.line.description,
@@ -155,15 +157,18 @@ class RedisStorageAdapter(BatchStoragePort):
 
     def _dict_to_batch(self, data: dict) -> QuotationBatch:
         """Convert dictionary to batch."""
-        from datetime import date
 
         batch = QuotationBatch(
             user_id=UUID(data["user_id"]),
             id=UUID(data["id"]),
             status=BatchStatus(data["status"]),
             created_at=datetime.fromisoformat(data["created_at"]),
-            started_at=datetime.fromisoformat(data["started_at"]) if data.get("started_at") else None,
-            completed_at=datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None,
+            started_at=datetime.fromisoformat(data["started_at"])
+            if data.get("started_at")
+            else None,
+            completed_at=datetime.fromisoformat(data["completed_at"])
+            if data.get("completed_at")
+            else None,
             merged_pdf_path=data.get("merged_pdf_path"),
             zip_file_path=data.get("zip_file_path"),
             error_message=data.get("error_message"),
@@ -259,7 +264,7 @@ class RedisStorageAdapter(BatchStoragePort):
 
         logger.debug(f"Saved batch {batch.id} to Redis with TTL {ttl_seconds}s")
 
-    async def get_batch(self, batch_id: UUID) -> Optional[QuotationBatch]:
+    async def get_batch(self, batch_id: UUID) -> QuotationBatch | None:
         """Retrieve a batch by ID.
 
         Args:
@@ -302,7 +307,7 @@ class RedisStorageAdapter(BatchStoragePort):
         self,
         batch_id: UUID,
         status: str,
-        progress: Optional[dict] = None,
+        progress: dict | None = None,
     ) -> bool:
         """Update batch status and progress.
 
@@ -334,7 +339,7 @@ class RedisStorageAdapter(BatchStoragePort):
         await self.save_batch(batch, ttl_seconds=ttl)
         return True
 
-    async def get_batch_progress(self, batch_id: UUID) -> Optional[dict]:
+    async def get_batch_progress(self, batch_id: UUID) -> dict | None:
         """Get batch progress without full deserialization.
 
         Args:
@@ -433,7 +438,7 @@ class RedisStorageAdapter(BatchStoragePort):
         await self.save_batch(batch, ttl_seconds=ttl)
         return True
 
-    async def get_zip_path(self, batch_id: UUID) -> Optional[str]:
+    async def get_zip_path(self, batch_id: UUID) -> str | None:
         """Get the ZIP file path for a batch.
 
         Args:

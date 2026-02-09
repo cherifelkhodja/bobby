@@ -13,7 +13,6 @@ import google.generativeai as genai
 from app.config import Settings
 from app.infrastructure.cv_transformer.prompts import CV_EXTRACTION_PROMPT
 
-
 logger = logging.getLogger(__name__)
 
 # Structured CV data type
@@ -111,7 +110,7 @@ class GeminiClient:
         """
         # Method 1: Try standard .text property
         try:
-            if hasattr(response, 'text'):
+            if hasattr(response, "text"):
                 text = response.text
                 if text:
                     return text
@@ -120,21 +119,21 @@ class GeminiClient:
 
         # Method 2: Try accessing candidates directly
         try:
-            if hasattr(response, 'candidates') and response.candidates:
+            if hasattr(response, "candidates") and response.candidates:
                 candidate = response.candidates[0]
-                if hasattr(candidate, 'content') and candidate.content:
-                    if hasattr(candidate.content, 'parts') and candidate.content.parts:
+                if hasattr(candidate, "content") and candidate.content:
+                    if hasattr(candidate.content, "parts") and candidate.content.parts:
                         part = candidate.content.parts[0]
-                        if hasattr(part, 'text') and part.text:
+                        if hasattr(part, "text") and part.text:
                             return part.text
         except (KeyError, IndexError, AttributeError) as e:
             logger.warning(f"Candidate access failed: {type(e).__name__}: {e}")
 
         # Method 3: Try accessing parts directly from response
         try:
-            if hasattr(response, 'parts') and response.parts:
+            if hasattr(response, "parts") and response.parts:
                 part = response.parts[0]
-                if hasattr(part, 'text') and part.text:
+                if hasattr(part, "text") and part.text:
                     return part.text
         except (KeyError, IndexError, AttributeError) as e:
             logger.warning(f"Parts access failed: {type(e).__name__}: {e}")
@@ -142,11 +141,11 @@ class GeminiClient:
         # Method 4: Try to convert response to string and extract JSON
         try:
             response_str = str(response)
-            if '{' in response_str and '}' in response_str:
-                start = response_str.find('{')
-                end = response_str.rfind('}')
+            if "{" in response_str and "}" in response_str:
+                start = response_str.find("{")
+                end = response_str.rfind("}")
                 if start != -1 and end > start:
-                    potential_json = response_str[start:end + 1]
+                    potential_json = response_str[start : end + 1]
                     json.loads(potential_json)
                     return potential_json
         except Exception as e:
@@ -205,9 +204,9 @@ class GeminiClient:
             reponse = reponse[:-3]
 
         # Extract JSON between { and } (handles any extra text)
-        debut = reponse.find('{')
-        fin = reponse.rfind('}')
+        debut = reponse.find("{")
+        fin = reponse.rfind("}")
         if debut != -1 and fin != -1 and fin > debut:
-            reponse = reponse[debut:fin + 1]
+            reponse = reponse[debut : fin + 1]
 
         return reponse.strip()

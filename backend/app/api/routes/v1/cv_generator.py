@@ -131,9 +131,7 @@ async def parse_cv(
     log_repo = CvTransformationLogRepository(db)
 
     try:
-        logger.info(
-            f"[CV Generator] Parsing: file={file.filename}, model={ai_model}"
-        )
+        logger.info(f"[CV Generator] Parsing: file={file.filename}, model={ai_model}")
         cv_data = await parser.parse_cv(cv_text, model_name=ai_model)
 
         # Log success

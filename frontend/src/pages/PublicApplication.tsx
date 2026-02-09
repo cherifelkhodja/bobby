@@ -251,6 +251,7 @@ export default function PublicApplication() {
       const timer = setTimeout(() => setHasCachedData(false), 5000);
       return () => clearTimeout(timer);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save form data to cache on changes (debounced)

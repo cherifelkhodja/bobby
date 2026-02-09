@@ -4,7 +4,6 @@ import secrets
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID, uuid4
 
 
@@ -112,45 +111,45 @@ class JobPosting:
     location_country: str  # ISO country code (e.g., "France")
 
     # Location details (optional)
-    location_region: Optional[str] = None
-    location_postal_code: Optional[str] = None
-    location_city: Optional[str] = None
-    location_key: Optional[str] = None  # Turnover-IT location key for normalization
+    location_region: str | None = None
+    location_postal_code: str | None = None
+    location_city: str | None = None
+    location_key: str | None = None  # Turnover-IT location key for normalization
 
     # Job details
     contract_types: list[str] = field(default_factory=lambda: ["PERMANENT"])
     skills: list[str] = field(default_factory=list)
-    experience_level: Optional[str] = None
-    remote: Optional[str] = None
-    start_date: Optional[date] = None
-    duration_months: Optional[int] = None
+    experience_level: str | None = None
+    remote: str | None = None
+    start_date: date | None = None
+    duration_months: int | None = None
 
     # Salary information
-    salary_min_annual: Optional[float] = None
-    salary_max_annual: Optional[float] = None
-    salary_min_daily: Optional[float] = None  # TJM min
-    salary_max_daily: Optional[float] = None  # TJM max
+    salary_min_annual: float | None = None
+    salary_max_annual: float | None = None
+    salary_min_daily: float | None = None  # TJM min
+    salary_max_daily: float | None = None  # TJM max
 
     # Company description (optional)
-    employer_overview: Optional[str] = None
+    employer_overview: str | None = None
 
     # Status and tracking
     status: JobPostingStatus = JobPostingStatus.DRAFT
 
     # Turnover-IT integration
-    turnoverit_reference: Optional[str] = None  # Our reference sent to Turnover-IT
-    turnoverit_public_url: Optional[str] = None  # URL on Turnover-IT/Free-Work
+    turnoverit_reference: str | None = None  # Our reference sent to Turnover-IT
+    turnoverit_public_url: str | None = None  # URL on Turnover-IT/Free-Work
 
     # Public application form
     application_token: str = field(default_factory=lambda: secrets.token_urlsafe(32))
 
     # Audit fields
-    created_by: Optional[UUID] = None
+    created_by: UUID | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
-    published_at: Optional[datetime] = None
-    closed_at: Optional[datetime] = None
+    published_at: datetime | None = None
+    closed_at: datetime | None = None
 
     def __post_init__(self) -> None:
         """Generate turnoverit_reference if not set."""
@@ -213,7 +212,7 @@ class JobPosting:
 
         return errors
 
-    def publish(self, turnoverit_public_url: Optional[str] = None) -> None:
+    def publish(self, turnoverit_public_url: str | None = None) -> None:
         """Mark job posting as published.
 
         Args:
@@ -252,14 +251,14 @@ class JobPosting:
 
     def update_details(
         self,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
-        qualifications: Optional[str] = None,
-        skills: Optional[list[str]] = None,
-        experience_level: Optional[str] = None,
-        remote: Optional[str] = None,
-        salary_min_daily: Optional[float] = None,
-        salary_max_daily: Optional[float] = None,
+        title: str | None = None,
+        description: str | None = None,
+        qualifications: str | None = None,
+        skills: list[str] | None = None,
+        experience_level: str | None = None,
+        remote: str | None = None,
+        salary_min_daily: float | None = None,
+        salary_max_daily: float | None = None,
     ) -> None:
         """Update job posting details (only allowed in draft status)."""
         if not self.is_draft:

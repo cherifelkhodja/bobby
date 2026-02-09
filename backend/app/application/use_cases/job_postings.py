@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Optional
 from uuid import UUID
 
 from app.application.read_models.hr import (
@@ -48,9 +47,9 @@ class ListOpenOpportunitiesForHRUseCase:
 
     async def execute(
         self,
-        hr_manager_boond_id: Optional[str] = None,
+        hr_manager_boond_id: str | None = None,
         is_admin: bool = False,
-        search: Optional[str] = None,
+        search: str | None = None,
     ) -> OpportunityListForHRReadModel:
         """List opportunities from BoondManager where user is HR manager.
 
@@ -85,7 +84,8 @@ class ListOpenOpportunitiesForHRUseCase:
         if search:
             search_lower = search.lower()
             boond_opportunities = [
-                opp for opp in boond_opportunities
+                opp
+                for opp in boond_opportunities
                 if search_lower in opp.get("title", "").lower()
                 or search_lower in opp.get("reference", "").lower()
                 or search_lower in opp.get("company_name", "").lower()
@@ -109,8 +109,8 @@ class ListOpenOpportunitiesForHRUseCase:
                 applications_count = await self.job_application_repository.count_by_posting(
                     job_posting.id
                 )
-                new_applications_count = await self.job_application_repository.count_unread_by_posting(
-                    job_posting.id
+                new_applications_count = (
+                    await self.job_application_repository.count_unread_by_posting(job_posting.id)
                 )
 
             # Parse dates if they exist
@@ -144,7 +144,9 @@ class ListOpenOpportunitiesForHRUseCase:
                     has_job_posting=job_posting is not None,
                     job_posting_id=str(job_posting.id) if job_posting else None,
                     job_posting_status=str(job_posting.status) if job_posting else None,
-                    job_posting_status_display=job_posting.status.display_name if job_posting else None,
+                    job_posting_status_display=job_posting.status.display_name
+                    if job_posting
+                    else None,
                     applications_count=applications_count,
                     new_applications_count=new_applications_count,
                 )
@@ -168,21 +170,21 @@ class CreateJobPostingCommand:
     description: str
     qualifications: str
     location_country: str
-    location_region: Optional[str] = None
-    location_postal_code: Optional[str] = None
-    location_city: Optional[str] = None
-    location_key: Optional[str] = None  # Turnover-IT location key for normalization
+    location_region: str | None = None
+    location_postal_code: str | None = None
+    location_city: str | None = None
+    location_key: str | None = None  # Turnover-IT location key for normalization
     contract_types: list[str] = None  # type: ignore
     skills: list[str] = None  # type: ignore
-    experience_level: Optional[str] = None
-    remote: Optional[str] = None
-    start_date: Optional[date] = None
-    duration_months: Optional[int] = None
-    salary_min_annual: Optional[float] = None
-    salary_max_annual: Optional[float] = None
-    salary_min_daily: Optional[float] = None
-    salary_max_daily: Optional[float] = None
-    employer_overview: Optional[str] = None
+    experience_level: str | None = None
+    remote: str | None = None
+    start_date: date | None = None
+    duration_months: int | None = None
+    salary_min_annual: float | None = None
+    salary_max_annual: float | None = None
+    salary_min_daily: float | None = None
+    salary_max_daily: float | None = None
+    employer_overview: str | None = None
 
     def __post_init__(self) -> None:
         if self.contract_types is None:
@@ -212,9 +214,7 @@ class CreateJobPostingUseCase:
             raise OpportunityNotFoundError(str(command.opportunity_id))
 
         # Check if a posting already exists for this opportunity
-        existing = await self.job_posting_repository.get_by_opportunity_id(
-            command.opportunity_id
-        )
+        existing = await self.job_posting_repository.get_by_opportunity_id(command.opportunity_id)
         if existing:
             raise ValueError(
                 f"A job posting already exists for opportunity {command.opportunity_id}"
@@ -246,15 +246,21 @@ class CreateJobPostingUseCase:
         )
 
         saved = await self.job_posting_repository.save(job_posting)
-        return await self._to_read_model(saved, opportunity.title, opportunity.reference, opportunity.client_name, opportunity.external_id)
+        return await self._to_read_model(
+            saved,
+            opportunity.title,
+            opportunity.reference,
+            opportunity.client_name,
+            opportunity.external_id,
+        )
 
     async def _to_read_model(
         self,
         posting: JobPosting,
-        opportunity_title: Optional[str] = None,
-        opportunity_reference: Optional[str] = None,
-        client_name: Optional[str] = None,
-        boond_opportunity_id: Optional[str] = None,
+        opportunity_title: str | None = None,
+        opportunity_reference: str | None = None,
+        client_name: str | None = None,
+        boond_opportunity_id: str | None = None,
     ) -> JobPostingReadModel:
         created_by_name = None
         if posting.created_by:
@@ -342,11 +348,11 @@ class GetJobPostingUseCase:
     async def _to_read_model(
         self,
         posting: JobPosting,
-        opportunity_title: Optional[str] = None,
-        opportunity_reference: Optional[str] = None,
-        client_name: Optional[str] = None,
-        boond_opportunity_id: Optional[str] = None,
-        stats: Optional[dict] = None,
+        opportunity_title: str | None = None,
+        opportunity_reference: str | None = None,
+        client_name: str | None = None,
+        boond_opportunity_id: str | None = None,
+        stats: dict | None = None,
     ) -> JobPostingReadModel:
         created_by_name = None
         if posting.created_by:
@@ -457,7 +463,7 @@ class ListJobPostingsUseCase:
         self,
         page: int = 1,
         page_size: int = 20,
-        status: Optional[JobPostingStatus] = None,
+        status: JobPostingStatus | None = None,
     ) -> JobPostingListReadModel:
         """List job postings with pagination."""
         skip = (page - 1) * page_size
@@ -498,7 +504,9 @@ class ListJobPostingsUseCase:
                     location_city=posting.location_city,
                     contract_types=[str(ct) for ct in posting.contract_types],
                     skills=posting.skills,
-                    experience_level=str(posting.experience_level) if posting.experience_level else None,
+                    experience_level=str(posting.experience_level)
+                    if posting.experience_level
+                    else None,
                     remote=str(posting.remote) if posting.remote else None,
                     start_date=posting.start_date,
                     duration_months=posting.duration_months,
@@ -589,9 +597,9 @@ class PublishJobPostingUseCase:
     async def _to_read_model(
         self,
         posting: JobPosting,
-        opportunity_title: Optional[str] = None,
-        opportunity_reference: Optional[str] = None,
-        client_name: Optional[str] = None,
+        opportunity_title: str | None = None,
+        opportunity_reference: str | None = None,
+        client_name: str | None = None,
     ) -> JobPostingReadModel:
         created_by_name = None
         if posting.created_by:
@@ -675,7 +683,7 @@ class CloseJobPostingUseCase:
                 application_base_url = f"{settings.FRONTEND_URL}/postuler"
                 payload = posting.to_turnoverit_payload(application_base_url)
                 await self.turnoverit_client.close_job(posting.turnoverit_reference, payload)
-            except Exception as e:
+            except Exception:
                 # Log but don't fail - job might already be closed on their side
                 pass
 
@@ -693,9 +701,9 @@ class CloseJobPostingUseCase:
     async def _to_read_model(
         self,
         posting: JobPosting,
-        opportunity_title: Optional[str] = None,
-        opportunity_reference: Optional[str] = None,
-        client_name: Optional[str] = None,
+        opportunity_title: str | None = None,
+        opportunity_reference: str | None = None,
+        client_name: str | None = None,
     ) -> JobPostingReadModel:
         created_by_name = None
         if posting.created_by:
@@ -795,9 +803,9 @@ class ReactivateJobPostingUseCase:
     async def _to_read_model(
         self,
         posting: JobPosting,
-        opportunity_title: Optional[str] = None,
-        opportunity_reference: Optional[str] = None,
-        client_name: Optional[str] = None,
+        opportunity_title: str | None = None,
+        opportunity_reference: str | None = None,
+        client_name: str | None = None,
     ) -> JobPostingReadModel:
         created_by_name = None
         if posting.created_by:
@@ -852,25 +860,25 @@ class UpdateJobPostingCommand:
     """Command for updating a job posting."""
 
     posting_id: UUID
-    title: Optional[str] = None
-    description: Optional[str] = None
-    qualifications: Optional[str] = None
-    location_country: Optional[str] = None
-    location_region: Optional[str] = None
-    location_postal_code: Optional[str] = None
-    location_city: Optional[str] = None
-    location_key: Optional[str] = None  # Turnover-IT location key for normalization
-    contract_types: Optional[list[str]] = None
-    skills: Optional[list[str]] = None
-    experience_level: Optional[str] = None
-    remote: Optional[str] = None
-    start_date: Optional[date] = None
-    duration_months: Optional[int] = None
-    salary_min_annual: Optional[float] = None
-    salary_max_annual: Optional[float] = None
-    salary_min_daily: Optional[float] = None
-    salary_max_daily: Optional[float] = None
-    employer_overview: Optional[str] = None
+    title: str | None = None
+    description: str | None = None
+    qualifications: str | None = None
+    location_country: str | None = None
+    location_region: str | None = None
+    location_postal_code: str | None = None
+    location_city: str | None = None
+    location_key: str | None = None  # Turnover-IT location key for normalization
+    contract_types: list[str] | None = None
+    skills: list[str] | None = None
+    experience_level: str | None = None
+    remote: str | None = None
+    start_date: date | None = None
+    duration_months: int | None = None
+    salary_min_annual: float | None = None
+    salary_max_annual: float | None = None
+    salary_min_daily: float | None = None
+    salary_max_daily: float | None = None
+    employer_overview: str | None = None
 
 
 class UpdateJobPostingUseCase:
@@ -951,6 +959,7 @@ class UpdateJobPostingUseCase:
             except TurnoverITError as e:
                 # Log but don't fail - the local update succeeded
                 import logging
+
                 logging.warning(f"Failed to sync update to Turnover-IT: {e}")
 
         opportunity = await self.opportunity_repository.get_by_id(posting.opportunity_id)
@@ -965,9 +974,9 @@ class UpdateJobPostingUseCase:
     async def _to_read_model(
         self,
         posting: JobPosting,
-        opportunity_title: Optional[str] = None,
-        opportunity_reference: Optional[str] = None,
-        client_name: Optional[str] = None,
+        opportunity_title: str | None = None,
+        opportunity_reference: str | None = None,
+        client_name: str | None = None,
     ) -> JobPostingReadModel:
         created_by_name = None
         if posting.created_by:

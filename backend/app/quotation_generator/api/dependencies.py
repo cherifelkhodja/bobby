@@ -1,21 +1,19 @@
 """API dependencies for quotation generator."""
 
-from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_db
-from app.api.dependencies import AdminUser
 from app.config import Settings, get_settings
+from app.dependencies import get_db
 from app.quotation_generator.application.use_cases import (
-    PreviewBatchUseCase,
+    DownloadBatchUseCase,
     GenerateBatchUseCase,
     GetBatchProgressUseCase,
-    DownloadBatchUseCase,
-    UploadTemplateUseCase,
     ListTemplatesUseCase,
+    PreviewBatchUseCase,
+    UploadTemplateUseCase,
 )
 from app.quotation_generator.application.use_cases.generate_batch import (
     StartGenerationUseCase,
@@ -27,8 +25,8 @@ from app.quotation_generator.application.use_cases.get_progress import (
 from app.quotation_generator.infrastructure.adapters import (
     BoondManagerAdapter,
     LibreOfficeAdapter,
-    RedisStorageAdapter,
     PostgresTemplateRepository,
+    RedisStorageAdapter,
 )
 from app.quotation_generator.services import CSVParserService, TemplateFillerService
 from app.quotation_generator.services.boond_enrichment import BoondEnrichmentService
@@ -95,9 +93,7 @@ async def get_preview_batch_use_case(
 async def get_generate_batch_use_case(
     batch_storage: Annotated[RedisStorageAdapter, Depends(get_batch_storage)],
     erp_adapter: Annotated[BoondManagerAdapter, Depends(get_erp_adapter)],
-    template_repository: Annotated[
-        PostgresTemplateRepository, Depends(get_template_repository)
-    ],
+    template_repository: Annotated[PostgresTemplateRepository, Depends(get_template_repository)],
     pdf_converter: Annotated[LibreOfficeAdapter, Depends(get_pdf_converter)],
     template_filler: Annotated[TemplateFillerService, Depends(get_template_filler)],
 ) -> GenerateBatchUseCase:
@@ -168,9 +164,7 @@ async def get_download_batch_use_case(
 
 
 async def get_upload_template_use_case(
-    template_repository: Annotated[
-        PostgresTemplateRepository, Depends(get_template_repository)
-    ],
+    template_repository: Annotated[PostgresTemplateRepository, Depends(get_template_repository)],
     template_filler: Annotated[TemplateFillerService, Depends(get_template_filler)],
 ) -> UploadTemplateUseCase:
     """Get upload template use case."""
@@ -178,9 +172,7 @@ async def get_upload_template_use_case(
 
 
 async def get_list_templates_use_case(
-    template_repository: Annotated[
-        PostgresTemplateRepository, Depends(get_template_repository)
-    ],
+    template_repository: Annotated[PostgresTemplateRepository, Depends(get_template_repository)],
 ) -> ListTemplatesUseCase:
     """Get list templates use case."""
     return ListTemplatesUseCase(template_repository)

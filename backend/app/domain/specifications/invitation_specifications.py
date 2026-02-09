@@ -5,7 +5,6 @@ Business rules for filtering and validating invitations.
 """
 
 from datetime import datetime
-from typing import Optional
 
 from ..entities import Invitation
 from ..value_objects import UserRole
@@ -88,6 +87,7 @@ class RecentInvitationSpecification(Specification[Invitation]):
 
     def __init__(self, hours: int = 24):
         from datetime import timedelta
+
         self._cutoff = datetime.utcnow() - timedelta(hours=hours)
 
     def is_satisfied_by(self, invitation: Invitation) -> bool:

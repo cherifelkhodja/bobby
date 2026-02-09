@@ -71,7 +71,9 @@ class TestRegisterUserUseCase:
             last_name="User",
         )
 
-        with patch("app.application.use_cases.auth.create_verification_token", return_value="test-token"):
+        with patch(
+            "app.application.use_cases.auth.create_verification_token", return_value="test-token"
+        ):
             with patch("app.application.use_cases.auth.hash_password", return_value="hashed"):
                 result = await use_case.execute(command)
 
@@ -87,7 +89,7 @@ class TestRegisterUserUseCase:
         """Test registration fails when user already exists."""
         existing_user = create_mock_user()
         mock_user_repository.get_by_email = AsyncMock(return_value=existing_user)
-        
+
         use_case = RegisterUserUseCase(mock_user_repository, mock_email_service)
         command = RegisterCommand(
             email="test@example.com",
@@ -122,7 +124,9 @@ class TestLoginUseCase:
 
         with patch("app.application.use_cases.auth.verify_password", return_value=True):
             with patch("app.application.use_cases.auth.create_access_token", return_value="access"):
-                with patch("app.application.use_cases.auth.create_refresh_token", return_value="refresh"):
+                with patch(
+                    "app.application.use_cases.auth.create_refresh_token", return_value="refresh"
+                ):
                     tokens, user_model = await use_case.execute(command)
 
         assert tokens.access_token == "access"
@@ -196,7 +200,7 @@ class TestVerifyEmailUseCase:
         mock_user_repository.save = AsyncMock(side_effect=lambda u: u)
 
         use_case = VerifyEmailUseCase(mock_user_repository)
-        
+
         result = await use_case.execute("valid-token")
 
         assert result.is_verified is True
@@ -325,8 +329,13 @@ class TestRefreshTokenUseCase:
         mock_payload.sub = str(user.id)
 
         with patch("app.application.use_cases.auth.decode_token", return_value=mock_payload):
-            with patch("app.application.use_cases.auth.create_access_token", return_value="new_access"):
-                with patch("app.application.use_cases.auth.create_refresh_token", return_value="new_refresh"):
+            with patch(
+                "app.application.use_cases.auth.create_access_token", return_value="new_access"
+            ):
+                with patch(
+                    "app.application.use_cases.auth.create_refresh_token",
+                    return_value="new_refresh",
+                ):
                     tokens = await use_case.execute("valid-refresh-token")
 
         assert tokens.access_token == "new_access"

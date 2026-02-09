@@ -1,6 +1,5 @@
 """CV Transformer use cases."""
 
-from typing import Optional
 from uuid import UUID
 
 from app.domain.entities import CvTemplate, CvTransformationLog
@@ -42,7 +41,7 @@ class TransformCvUseCase:
         template_name: str,
         file_content: bytes,
         filename: str,
-        gemini_model: Optional[str] = None,
+        gemini_model: str | None = None,
     ) -> bytes:
         """Transform a CV file into a standardized Word document.
 
@@ -59,7 +58,7 @@ class TransformCvUseCase:
         Raises:
             ValueError: If transformation fails at any step.
         """
-        template: Optional[CvTemplate] = None
+        template: CvTemplate | None = None
 
         try:
             # Get the template
@@ -124,7 +123,9 @@ class TransformCvUseCase:
         elif file_lower.endswith(".docx"):
             return self._docx_extractor.extract(file_content)
         elif file_lower.endswith(".doc"):
-            raise ValueError("Les fichiers .doc ne sont pas supportés. Veuillez convertir en .docx ou .pdf")
+            raise ValueError(
+                "Les fichiers .doc ne sont pas supportés. Veuillez convertir en .docx ou .pdf"
+            )
         else:
             raise ValueError("Format de fichier non supporté. Utilisez PDF ou DOCX")
 
@@ -174,7 +175,7 @@ class UploadTemplateUseCase:
         display_name: str,
         file_content: bytes,
         file_name: str,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> dict:
         """Upload or update a template.
 

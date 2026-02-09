@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from app.config import Settings
 from app.domain.ports import BoondServicePort, CacheServicePort, OpportunityRepositoryPort
@@ -21,9 +20,9 @@ class BoondStatusResult:
     connected: bool
     configured: bool
     api_url: str
-    last_sync: Optional[datetime] = None
+    last_sync: datetime | None = None
     opportunities_count: int = 0
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
@@ -42,7 +41,7 @@ class TestConnectionResult:
     success: bool
     status_code: int
     message: str
-    candidates_count: Optional[int] = None
+    candidates_count: int | None = None
 
 
 @dataclass
@@ -53,15 +52,15 @@ class BoondResource:
     first_name: str
     last_name: str
     email: str
-    phone: Optional[str] = None
-    manager_id: Optional[str] = None
-    manager_name: Optional[str] = None
-    agency_id: Optional[str] = None
-    agency_name: Optional[str] = None
-    resource_type: Optional[int] = None
-    resource_type_name: Optional[str] = None
-    state: Optional[int] = None
-    state_name: Optional[str] = None
+    phone: str | None = None
+    manager_id: str | None = None
+    manager_name: str | None = None
+    agency_id: str | None = None
+    agency_name: str | None = None
+    resource_type: int | None = None
+    resource_type_name: str | None = None
+    state: int | None = None
+    state_name: str | None = None
     suggested_role: str = "user"
 
 
@@ -92,9 +91,7 @@ class GetBoondStatusUseCase:
         Returns:
             BoondStatusResult with connection info.
         """
-        configured = bool(
-            self._settings.BOOND_USERNAME and self._settings.BOOND_PASSWORD
-        )
+        configured = bool(self._settings.BOOND_USERNAME and self._settings.BOOND_PASSWORD)
 
         if not configured:
             return BoondStatusResult(

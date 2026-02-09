@@ -160,9 +160,7 @@ class CommandBus:
         """
         handler = self._handlers.get(type(command))
         if handler is None:
-            raise ValueError(
-                f"No handler registered for command type: {type(command).__name__}"
-            )
+            raise ValueError(f"No handler registered for command type: {type(command).__name__}")
         return await handler.handle(command)
 
     def has_handler(self, command_type: type[Command]) -> bool:
@@ -216,9 +214,7 @@ class QueryBus:
         """
         handler = self._handlers.get(type(query))
         if handler is None:
-            raise ValueError(
-                f"No handler registered for query type: {type(query).__name__}"
-            )
+            raise ValueError(f"No handler registered for query type: {type(query).__name__}")
         return await handler.handle(query)
 
     def has_handler(self, query_type: type[Query]) -> bool:

@@ -62,8 +62,9 @@ export function InvitationsTab() {
       queryClient.invalidateQueries({ queryKey: ['admin-invitations'] });
       setSendingResourceId(null);
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Erreur lors de l\'envoi');
+    onError: (error: unknown) => {
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      toast.error(axiosError.response?.data?.detail || 'Erreur lors de l\'envoi');
       setSendingResourceId(null);
     },
   });
@@ -106,8 +107,9 @@ export function InvitationsTab() {
       setEmailInviteEmail('');
       setEmailInviteRole('user');
       queryClient.invalidateQueries({ queryKey: ['admin-invitations'] });
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de l\'envoi');
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      toast.error(axiosError.response?.data?.detail || 'Erreur lors de l\'envoi');
     } finally {
       setIsSendingEmailInvite(false);
     }

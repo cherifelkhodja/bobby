@@ -5,7 +5,6 @@ import logging
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 from PyPDF2 import PdfMerger
 
@@ -24,8 +23,8 @@ class LibreOfficeAdapter(PDFConverterPort):
 
     def __init__(
         self,
-        libreoffice_path: Optional[str] = None,
-        temp_dir: Optional[Path] = None,
+        libreoffice_path: str | None = None,
+        temp_dir: Path | None = None,
     ) -> None:
         """Initialize adapter.
 
@@ -78,7 +77,7 @@ class LibreOfficeAdapter(PDFConverterPort):
     async def convert_to_pdf(
         self,
         input_path: Path,
-        output_path: Optional[Path] = None,
+        output_path: Path | None = None,
     ) -> Path:
         """Convert a document to PDF using LibreOffice.
 
@@ -136,17 +135,13 @@ class LibreOfficeAdapter(PDFConverterPort):
             if process.returncode != 0:
                 error_msg = stderr.decode() if stderr else "Unknown error"
                 logger.error(f"LibreOffice conversion failed: {error_msg}")
-                raise PDFConversionError(
-                    f"LibreOffice conversion failed: {error_msg}"
-                )
+                raise PDFConversionError(f"LibreOffice conversion failed: {error_msg}")
 
             # LibreOffice outputs to outdir with same name but .pdf extension
             expected_output = output_dir / f"{input_path.stem}.pdf"
 
             if not expected_output.exists():
-                raise PDFConversionError(
-                    f"PDF file not created: {expected_output}"
-                )
+                raise PDFConversionError(f"PDF file not created: {expected_output}")
 
             # Rename if different from requested output_path
             if expected_output != output_path:
@@ -155,7 +150,7 @@ class LibreOfficeAdapter(PDFConverterPort):
             logger.info(f"Successfully converted to {output_path}")
             return output_path
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise PDFConversionError("LibreOffice conversion timed out")
         except Exception as e:
             if isinstance(e, PDFConversionError):

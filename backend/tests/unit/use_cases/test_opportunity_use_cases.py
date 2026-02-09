@@ -2,10 +2,11 @@
 Tests for Opportunity use cases.
 """
 
-import pytest
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
+
+import pytest
 
 from app.application.use_cases.opportunities import (
     ListOpportunitiesUseCase,
@@ -107,9 +108,7 @@ class TestListOpportunitiesUseCase:
         mock_repository.list_active.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_list_opportunities_empty(
-        self, use_case, mock_repository, mock_cache
-    ):
+    async def test_list_opportunities_empty(self, use_case, mock_repository, mock_cache):
         """Test listing with no opportunities."""
         mock_cache.get.return_value = None
         mock_repository.list_active.return_value = []
@@ -133,9 +132,7 @@ class TestListOpportunitiesUseCase:
 
         assert result.page == 3
         assert result.page_size == 10
-        mock_repository.list_active.assert_called_with(
-            skip=20, limit=10, search=None
-        )
+        mock_repository.list_active.assert_called_with(skip=20, limit=10, search=None)
 
 
 class TestSyncOpportunitiesUseCase:
@@ -155,9 +152,7 @@ class TestSyncOpportunitiesUseCase:
 
     @pytest.fixture
     def use_case(self, mock_boond_client, mock_repository, mock_cache):
-        return SyncOpportunitiesUseCase(
-            mock_boond_client, mock_repository, mock_cache
-        )
+        return SyncOpportunitiesUseCase(mock_boond_client, mock_repository, mock_cache)
 
     @pytest.fixture
     def boond_opportunities(self):

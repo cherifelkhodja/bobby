@@ -14,7 +14,6 @@ before queries. This is done via middleware in the application.
 
 from alembic import op
 
-
 # revision identifiers, used by Alembic.
 revision = "010_add_row_level_security"
 down_revision = "009_add_hr_feature_tables"

@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 from uuid import UUID, uuid4
 
 
@@ -14,8 +13,8 @@ class CvTransformationLog:
     template_name: str  # Name of the template used
     original_filename: str  # Original CV filename
     success: bool  # Whether the transformation succeeded
-    template_id: Optional[UUID] = None  # Reference to the template (nullable if deleted)
-    error_message: Optional[str] = None  # Error message if failed
+    template_id: UUID | None = None  # Reference to the template (nullable if deleted)
+    error_message: str | None = None  # Error message if failed
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -43,7 +42,7 @@ class CvTransformationLog:
         template_name: str,
         original_filename: str,
         error_message: str,
-        template_id: Optional[UUID] = None,
+        template_id: UUID | None = None,
     ) -> "CvTransformationLog":
         """Create a failed transformation log."""
         return cls(

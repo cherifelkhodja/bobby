@@ -2,9 +2,10 @@
 Integration tests for Invitations API endpoints.
 """
 
-import pytest
 from datetime import datetime, timedelta
 from uuid import uuid4
+
+import pytest
 
 
 class TestCreateInvitation:
@@ -45,33 +46,25 @@ class TestCreateInvitation:
     @pytest.mark.asyncio
     async def test_create_invitation_duplicate_email(self):
         """Test creating invitation with existing email."""
-        error_response = {
-            "detail": "Une invitation existe déjà pour cet email"
-        }
+        error_response = {"detail": "Une invitation existe déjà pour cet email"}
         assert "existe déjà" in error_response["detail"]
 
     @pytest.mark.asyncio
     async def test_create_invitation_existing_user(self):
         """Test creating invitation for existing user."""
-        error_response = {
-            "detail": "Un utilisateur existe déjà avec cet email"
-        }
+        error_response = {"detail": "Un utilisateur existe déjà avec cet email"}
         assert "utilisateur existe" in error_response["detail"]
 
     @pytest.mark.asyncio
     async def test_create_invitation_invalid_email(self):
         """Test creating invitation with invalid email."""
-        error_response = {
-            "detail": "Adresse email invalide"
-        }
+        error_response = {"detail": "Adresse email invalide"}
         assert "invalide" in error_response["detail"]
 
     @pytest.mark.asyncio
     async def test_create_invitation_invalid_role(self):
         """Test creating invitation with invalid role."""
-        error_response = {
-            "detail": "Rôle invalide"
-        }
+        error_response = {"detail": "Rôle invalide"}
         assert "invalide" in error_response["detail"]
 
     @pytest.mark.asyncio

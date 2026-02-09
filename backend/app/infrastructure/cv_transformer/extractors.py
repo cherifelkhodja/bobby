@@ -6,8 +6,8 @@ Implements CvTextExtractorPort for dependency inversion.
 import io
 from typing import BinaryIO
 
-from pypdf import PdfReader
 from docx import Document
+from pypdf import PdfReader
 
 
 class PdfTextExtractor:

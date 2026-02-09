@@ -1,7 +1,6 @@
 """Opportunity read models."""
 
 from datetime import date, datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -15,17 +14,17 @@ class OpportunityReadModel(BaseModel):
     external_id: str
     title: str
     reference: str
-    budget: Optional[float] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    response_deadline: Optional[date] = None
-    manager_name: Optional[str] = None
-    client_name: Optional[str] = None
-    description: Optional[str] = None
+    budget: float | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    response_deadline: date | None = None
+    manager_name: str | None = None
+    client_name: str | None = None
+    description: str | None = None
     skills: list[str] = []
-    location: Optional[str] = None
+    location: str | None = None
     is_open: bool = True
-    days_until_deadline: Optional[int] = None
+    days_until_deadline: int | None = None
     synced_at: datetime
     created_at: datetime
 

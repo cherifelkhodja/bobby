@@ -2,7 +2,6 @@
 Invitation-related domain events.
 """
 
-from typing import Optional
 from uuid import UUID
 
 from ..value_objects import UserRole
@@ -17,7 +16,7 @@ class InvitationCreatedEvent(DomainEvent):
     role: UserRole
     invited_by: UUID
     expires_at: str  # ISO format datetime
-    boond_resource_id: Optional[str] = None
+    boond_resource_id: str | None = None
 
     def __init__(self, **data):
         super().__init__(aggregate_id=data.get("invitation_id"), **data)
@@ -65,7 +64,7 @@ class InvitationCancelledEvent(DomainEvent):
     invitation_id: UUID
     email: str
     cancelled_by: UUID
-    reason: Optional[str] = None
+    reason: str | None = None
 
     def __init__(self, **data):
         super().__init__(aggregate_id=data.get("invitation_id"), **data)

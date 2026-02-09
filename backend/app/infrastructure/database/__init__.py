@@ -1,22 +1,22 @@
 """Database infrastructure - SQLAlchemy models and repositories."""
 
 from app.infrastructure.database.connection import (
+    async_session_factory,
     engine,
     get_async_session,
-    async_session_factory,
 )
 from app.infrastructure.database.models import (
     Base,
-    UserModel,
     CandidateModel,
-    OpportunityModel,
     CooptationModel,
+    OpportunityModel,
+    UserModel,
 )
 from app.infrastructure.database.repositories import (
-    UserRepository,
-    OpportunityRepository,
-    CooptationRepository,
     CandidateRepository,
+    CooptationRepository,
+    OpportunityRepository,
+    UserRepository,
 )
 
 __all__ = [

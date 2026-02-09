@@ -4,10 +4,11 @@ Health check infrastructure.
 Provides health check endpoints for monitoring service status.
 """
 
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Coroutine, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -26,8 +27,8 @@ class ComponentHealth:
 
     name: str
     status: HealthStatus
-    message: Optional[str] = None
-    latency_ms: Optional[float] = None
+    message: str | None = None
+    latency_ms: float | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -75,9 +76,7 @@ class HealthChecker:
         self._version = version
         self._start_time = datetime.utcnow()
 
-    def register(
-        self, name: str
-    ) -> Callable[[HealthCheckFunc], HealthCheckFunc]:
+    def register(self, name: str) -> Callable[[HealthCheckFunc], HealthCheckFunc]:
         """
         Decorator to register a health check function.
 
@@ -159,8 +158,7 @@ class HealthChecker:
             if result.status == HealthStatus.UNHEALTHY:
                 overall_status = HealthStatus.UNHEALTHY
             elif (
-                result.status == HealthStatus.DEGRADED
-                and overall_status != HealthStatus.UNHEALTHY
+                result.status == HealthStatus.DEGRADED and overall_status != HealthStatus.UNHEALTHY
             ):
                 overall_status = HealthStatus.DEGRADED
 

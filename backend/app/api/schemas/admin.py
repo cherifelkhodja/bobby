@@ -1,10 +1,8 @@
 """Admin API schemas."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
-
 
 # =============================================================================
 # Boond Schemas
@@ -17,9 +15,9 @@ class BoondStatusResponse(BaseModel):
     connected: bool
     configured: bool
     api_url: str
-    last_sync: Optional[datetime] = None
+    last_sync: datetime | None = None
     opportunities_count: int = 0
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class SyncResponse(BaseModel):
@@ -36,7 +34,7 @@ class TestConnectionResponse(BaseModel):
     success: bool
     status_code: int
     message: str
-    candidates_count: Optional[int] = None
+    candidates_count: int | None = None
 
 
 class BoondResourceResponse(BaseModel):
@@ -46,15 +44,15 @@ class BoondResourceResponse(BaseModel):
     first_name: str
     last_name: str
     email: str
-    phone: Optional[str] = None
-    manager_id: Optional[str] = None
-    manager_name: Optional[str] = None
-    agency_id: Optional[str] = None
-    agency_name: Optional[str] = None
-    resource_type: Optional[int] = None
-    resource_type_name: Optional[str] = None
-    state: Optional[int] = None
-    state_name: Optional[str] = None
+    phone: str | None = None
+    manager_id: str | None = None
+    manager_name: str | None = None
+    agency_id: str | None = None
+    agency_name: str | None = None
+    resource_type: int | None = None
+    resource_type_name: str | None = None
+    state: int | None = None
+    state_name: str | None = None
     suggested_role: str = "user"
 
 
@@ -81,11 +79,11 @@ class UserAdminResponse(BaseModel):
     last_name: str
     full_name: str
     role: str
-    phone: Optional[str] = None
+    phone: str | None = None
     is_verified: bool
     is_active: bool
-    boond_resource_id: Optional[str] = None
-    manager_boond_id: Optional[str] = None
+    boond_resource_id: str | None = None
+    manager_boond_id: str | None = None
     created_at: str
     updated_at: str
 
@@ -129,17 +127,17 @@ class ChangeRoleRequest(BaseModel):
 class UpdateUserAdminRequest(BaseModel):
     """Request to update user (admin)."""
 
-    first_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    last_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    phone: Optional[str] = Field(None, max_length=20)
-    is_active: Optional[bool] = None
-    role: Optional[str] = Field(
+    first_name: str | None = Field(None, min_length=1, max_length=100)
+    last_name: str | None = Field(None, min_length=1, max_length=100)
+    phone: str | None = Field(None, max_length=20)
+    is_active: bool | None = None
+    role: str | None = Field(
         None,
         description="Role: user, commercial, rh, admin",
         pattern="^(user|commercial|rh|admin)$",
     )
-    boond_resource_id: Optional[str] = None
-    manager_boond_id: Optional[str] = None
+    boond_resource_id: str | None = None
+    manager_boond_id: str | None = None
 
 
 class MessageResponse(BaseModel):
@@ -247,7 +245,7 @@ class TurnoverITSkillsResponse(BaseModel):
 
     skills: list[TurnoverITSkillResponse]
     total: int
-    last_synced_at: Optional[datetime] = None
+    last_synced_at: datetime | None = None
     sync_interval_days: int = 30
 
 

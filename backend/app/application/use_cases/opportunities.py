@@ -1,7 +1,5 @@
 """Opportunity use cases."""
 
-from typing import Optional
-
 from app.application.read_models.opportunity import (
     OpportunityListReadModel,
     OpportunityReadModel,
@@ -27,7 +25,7 @@ class ListOpportunitiesUseCase:
         self,
         page: int = 1,
         page_size: int = 20,
-        search: Optional[str] = None,
+        search: str | None = None,
     ) -> OpportunityListReadModel:
         """List opportunities with pagination and optional search."""
         skip = (page - 1) * page_size
@@ -95,9 +93,7 @@ class SyncOpportunitiesUseCase:
 
         for boond_opp in boond_opportunities:
             # Check if opportunity already exists
-            existing = await self.opportunity_repository.get_by_external_id(
-                boond_opp.external_id
-            )
+            existing = await self.opportunity_repository.get_by_external_id(boond_opp.external_id)
 
             if existing:
                 # Update existing

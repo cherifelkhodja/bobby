@@ -1,7 +1,5 @@
 """API schemas for quotation generator."""
 
-from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -50,7 +48,7 @@ class QuotationPreviewItem(BaseModel):
     sow_reference: str
     object_of_need: str
     need_title: str
-    comments: Optional[str] = None
+    comments: str | None = None
     start_project: str
     # Additional Thales fields
     eacq_number: str
@@ -105,11 +103,11 @@ class BatchProgressResponse(BaseModel):
     progress_percentage: float
     is_complete: bool
     has_errors: bool
-    merged_pdf_path: Optional[str] = None  # Merged PDF with all quotations
-    zip_file_path: Optional[str] = None  # ZIP archive with individual PDFs
-    error_message: Optional[str] = None
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
+    merged_pdf_path: str | None = None  # Merged PDF with all quotations
+    zip_file_path: str | None = None  # ZIP archive with individual PDFs
+    error_message: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
 
 
 class QuotationStatusItem(BaseModel):
@@ -121,10 +119,10 @@ class QuotationStatusItem(BaseModel):
     opportunity_id: str
     company_name: str
     status: str
-    boond_quotation_id: Optional[str] = None
-    boond_reference: Optional[str] = None
-    pdf_path: Optional[str] = None  # Path to individual PDF for this quotation
-    error_message: Optional[str] = None
+    boond_quotation_id: str | None = None
+    boond_reference: str | None = None
+    pdf_path: str | None = None  # Path to individual PDF for this quotation
+    error_message: str | None = None
     is_valid: bool
     validation_errors: list[str]
 
@@ -136,8 +134,8 @@ class BatchDetailsResponse(BaseModel):
     user_id: str
     status: str
     created_at: str
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
+    started_at: str | None = None
+    completed_at: str | None = None
     total: int
     completed: int
     failed: int
@@ -145,9 +143,9 @@ class BatchDetailsResponse(BaseModel):
     progress_percentage: float
     is_complete: bool
     has_errors: bool
-    merged_pdf_path: Optional[str] = None  # Merged PDF with all quotations
-    zip_file_path: Optional[str] = None  # ZIP archive with individual PDFs
-    error_message: Optional[str] = None
+    merged_pdf_path: str | None = None  # Merged PDF with all quotations
+    zip_file_path: str | None = None  # ZIP archive with individual PDFs
+    error_message: str | None = None
     quotations: list[QuotationStatusItem]
 
 
@@ -155,8 +153,8 @@ class DownloadInfoResponse(BaseModel):
     """Response from download info endpoint."""
 
     is_ready: bool
-    filename: Optional[str] = None
-    file_size: Optional[int] = None
+    filename: str | None = None
+    file_size: int | None = None
     completed_count: int
     failed_count: int
 
@@ -166,8 +164,8 @@ class TemplateInfo(BaseModel):
 
     name: str
     display_name: str
-    description: Optional[str] = None
-    updated_at: Optional[str] = None
+    description: str | None = None
+    updated_at: str | None = None
 
 
 class TemplateListResponse(BaseModel):
@@ -196,7 +194,7 @@ class BatchSummary(BaseModel):
     failed: int
     progress_percentage: float
     is_complete: bool
-    created_at: Optional[str] = None
+    created_at: str | None = None
 
 
 class UserBatchesResponse(BaseModel):
@@ -209,7 +207,7 @@ class ErrorResponse(BaseModel):
     """Standard error response."""
 
     detail: str
-    error_code: Optional[str] = None
+    error_code: str | None = None
 
 
 class UpdateContactRequest(BaseModel):

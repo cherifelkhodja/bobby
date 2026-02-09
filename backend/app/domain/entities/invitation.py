@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Optional
 from uuid import UUID, uuid4
 
 from app.domain.value_objects import Email, UserRole
@@ -17,12 +16,12 @@ class Invitation:
     invited_by: UUID  # Admin who created the invitation
     token: str
     expires_at: datetime
-    accepted_at: Optional[datetime] = None
-    boond_resource_id: Optional[str] = None  # BoondManager resource ID
-    manager_boond_id: Optional[str] = None  # BoondManager manager ID
-    phone: Optional[str] = None  # International format +33...
-    first_name: Optional[str] = None  # Pre-filled from BoondManager
-    last_name: Optional[str] = None  # Pre-filled from BoondManager
+    accepted_at: datetime | None = None
+    boond_resource_id: str | None = None  # BoondManager resource ID
+    manager_boond_id: str | None = None  # BoondManager manager ID
+    phone: str | None = None  # International format +33...
+    first_name: str | None = None  # Pre-filled from BoondManager
+    last_name: str | None = None  # Pre-filled from BoondManager
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -65,11 +64,11 @@ class Invitation:
         invited_by: UUID,
         token: str,
         validity_hours: int = 48,
-        boond_resource_id: Optional[str] = None,
-        manager_boond_id: Optional[str] = None,
-        phone: Optional[str] = None,
-        first_name: Optional[str] = None,
-        last_name: Optional[str] = None,
+        boond_resource_id: str | None = None,
+        manager_boond_id: str | None = None,
+        phone: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
     ) -> "Invitation":
         """Create a new invitation with default 48h validity."""
         return cls(

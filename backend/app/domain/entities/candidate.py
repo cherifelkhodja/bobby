@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 from uuid import UUID, uuid4
 
 from app.domain.value_objects import Email, Phone
@@ -16,12 +15,12 @@ class Candidate:
     last_name: str
     email: Email
     civility: str = "M"  # M, Mme
-    phone: Optional[Phone] = None
-    cv_filename: Optional[str] = None
-    cv_path: Optional[str] = None
-    daily_rate: Optional[float] = None
-    note: Optional[str] = None
-    external_id: Optional[str] = None  # BoondManager ID
+    phone: Phone | None = None
+    cv_filename: str | None = None
+    cv_path: str | None = None
+    daily_rate: float | None = None
+    note: str | None = None
+    external_id: str | None = None  # BoondManager ID
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)

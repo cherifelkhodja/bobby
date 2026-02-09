@@ -1,28 +1,27 @@
 """Test factories for creating test data."""
 
 from datetime import datetime, timedelta
-from typing import Optional
 from uuid import uuid4
 
 from app.domain.entities import (
-    User,
+    ApplicationStatus,
     Candidate,
-    Opportunity,
+    ContractType,
     Cooptation,
     Invitation,
-    JobPosting,
     JobApplication,
-    PublishedOpportunity,
-    ContractType,
-    ApplicationStatus,
+    JobPosting,
     JobPostingStatus,
+    Opportunity,
+    PublishedOpportunity,
+    User,
 )
 from app.domain.value_objects import (
+    CooptationStatus,
     Email,
+    OpportunityStatus,
     Phone,
     UserRole,
-    CooptationStatus,
-    OpportunityStatus,
 )
 from app.infrastructure.security.password import hash_password
 
@@ -35,16 +34,16 @@ class UserFactory:
     @classmethod
     def create(
         cls,
-        email: Optional[str] = None,
+        email: str | None = None,
         password: str = "TestPassword123!",
         first_name: str = "Test",
         last_name: str = "User",
         role: UserRole = UserRole.USER,
         is_verified: bool = True,
         is_active: bool = True,
-        phone: Optional[str] = None,
-        boond_resource_id: Optional[str] = None,
-        manager_boond_id: Optional[str] = None,
+        phone: str | None = None,
+        boond_resource_id: str | None = None,
+        manager_boond_id: str | None = None,
         **kwargs,
     ) -> User:
         """Create a User entity with sensible defaults."""
@@ -106,13 +105,13 @@ class CandidateFactory:
     @classmethod
     def create(
         cls,
-        email: Optional[str] = None,
+        email: str | None = None,
         first_name: str = "Jean",
         last_name: str = "Dupont",
         civility: str = "M",
-        phone: Optional[str] = "+33612345678",
-        daily_rate: Optional[float] = 500.0,
-        note: Optional[str] = None,
+        phone: str | None = "+33612345678",
+        daily_rate: float | None = 500.0,
+        note: str | None = None,
         **kwargs,
     ) -> Candidate:
         """Create a Candidate entity."""
@@ -144,17 +143,17 @@ class OpportunityFactory:
     def create(
         cls,
         title: str = "Développeur Python Senior",
-        external_id: Optional[str] = None,
-        reference: Optional[str] = None,
-        budget: Optional[float] = 600.0,
-        manager_name: Optional[str] = "Manager Test",
-        manager_boond_id: Optional[str] = None,
-        client_name: Optional[str] = "Client Test",
-        description: Optional[str] = "Description de l'opportunité",
-        skills: Optional[list[str]] = None,
-        location: Optional[str] = "Paris",
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        external_id: str | None = None,
+        reference: str | None = None,
+        budget: float | None = 600.0,
+        manager_name: str | None = "Manager Test",
+        manager_boond_id: str | None = None,
+        client_name: str | None = "Client Test",
+        description: str | None = "Description de l'opportunité",
+        skills: list[str] | None = None,
+        location: str | None = "Paris",
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
         is_open: bool = True,
         **kwargs,
     ) -> Opportunity:
@@ -198,9 +197,9 @@ class CooptationFactory:
     @classmethod
     def create(
         cls,
-        candidate: Optional[Candidate] = None,
-        opportunity: Optional[Opportunity] = None,
-        submitter_id: Optional[str] = None,
+        candidate: Candidate | None = None,
+        opportunity: Opportunity | None = None,
+        submitter_id: str | None = None,
         status: CooptationStatus = CooptationStatus.PENDING,
         **kwargs,
     ) -> Cooptation:
@@ -238,10 +237,10 @@ class InvitationFactory:
     @classmethod
     def create(
         cls,
-        email: Optional[str] = None,
+        email: str | None = None,
         role: UserRole = UserRole.USER,
-        invited_by: Optional[str] = None,
-        expires_at: Optional[datetime] = None,
+        invited_by: str | None = None,
+        expires_at: datetime | None = None,
         **kwargs,
     ) -> Invitation:
         """Create an Invitation entity."""
@@ -290,9 +289,9 @@ class JobPostingFactory:
     def create(
         cls,
         title: str = "Développeur Python Senior",
-        description: Optional[str] = None,
-        qualifications: Optional[str] = None,
-        opportunity_id: Optional[str] = None,
+        description: str | None = None,
+        qualifications: str | None = None,
+        opportunity_id: str | None = None,
         status: JobPostingStatus = JobPostingStatus.DRAFT,
         **kwargs,
     ) -> JobPosting:
@@ -348,8 +347,8 @@ class JobApplicationFactory:
     @classmethod
     def create(
         cls,
-        job_posting_id: Optional[str] = None,
-        email: Optional[str] = None,
+        job_posting_id: str | None = None,
+        email: str | None = None,
         first_name: str = "Jean",
         last_name: str = "Candidat",
         status: ApplicationStatus = ApplicationStatus.NOUVEAU,
@@ -400,7 +399,7 @@ class PublishedOpportunityFactory:
         cls,
         title: str = "Mission Python Senior",
         description: str = "Description anonymisée de la mission",
-        boond_opportunity_id: Optional[str] = None,
+        boond_opportunity_id: str | None = None,
         status: OpportunityStatus = OpportunityStatus.PUBLISHED,
         **kwargs,
     ) -> PublishedOpportunity:

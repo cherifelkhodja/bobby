@@ -1,7 +1,7 @@
 """Published opportunity use cases."""
 
 from datetime import date
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from app.application.read_models.published_opportunity import (
@@ -32,7 +32,7 @@ class GetMyBoondOpportunitiesUseCase:
 
     async def execute(
         self,
-        manager_boond_id: Optional[str] = None,
+        manager_boond_id: str | None = None,
         is_admin: bool = False,
     ) -> BoondOpportunityListReadModel:
         """Fetch opportunities from BoondManager.
@@ -158,7 +158,7 @@ class AnonymizeOpportunityUseCase:
         title: str,
         description: str,
         boond_opportunity_id: str,
-        model_name: Optional[str] = None,
+        model_name: str | None = None,
     ) -> AnonymizedPreviewReadModel:
         """Anonymize opportunity title and description.
 
@@ -203,8 +203,8 @@ class PublishOpportunityUseCase:
         description: str,
         skills: list[str],
         original_title: str,
-        original_data: Optional[dict[str, Any]],
-        end_date: Optional[date],
+        original_data: dict[str, Any] | None,
+        end_date: date | None,
         publisher_id: UUID,
     ) -> PublishedOpportunityReadModel:
         """Publish an anonymized opportunity.
@@ -247,9 +247,7 @@ class PublishOpportunityUseCase:
 
         return self._to_read_model(saved)
 
-    def _to_read_model(
-        self, opportunity: PublishedOpportunity
-    ) -> PublishedOpportunityReadModel:
+    def _to_read_model(self, opportunity: PublishedOpportunity) -> PublishedOpportunityReadModel:
         return PublishedOpportunityReadModel(
             id=str(opportunity.id),
             boond_opportunity_id=opportunity.boond_opportunity_id,
@@ -277,7 +275,7 @@ class ListPublishedOpportunitiesUseCase:
         self,
         page: int = 1,
         page_size: int = 20,
-        search: Optional[str] = None,
+        search: str | None = None,
     ) -> PublishedOpportunityListReadModel:
         """List published opportunities with pagination.
 
@@ -307,9 +305,7 @@ class ListPublishedOpportunitiesUseCase:
             page_size=page_size,
         )
 
-    def _to_read_model(
-        self, opportunity: PublishedOpportunity
-    ) -> PublishedOpportunityReadModel:
+    def _to_read_model(self, opportunity: PublishedOpportunity) -> PublishedOpportunityReadModel:
         return PublishedOpportunityReadModel(
             id=str(opportunity.id),
             boond_opportunity_id=opportunity.boond_opportunity_id,
@@ -333,7 +329,7 @@ class GetPublishedOpportunityUseCase:
     ) -> None:
         self._repository = published_opportunity_repository
 
-    async def execute(self, opportunity_id: UUID) -> Optional[PublishedOpportunityReadModel]:
+    async def execute(self, opportunity_id: UUID) -> PublishedOpportunityReadModel | None:
         """Get published opportunity by ID.
 
         Args:

@@ -1,6 +1,5 @@
 """Opportunity endpoints."""
 
-from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -69,7 +68,7 @@ async def list_opportunities(
     redis: RedisClient,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    search: Optional[str] = Query(None),
+    search: str | None = Query(None),
     shared_only: bool = Query(False, description="Only show shared opportunities"),
 ):
     """List available opportunities with pagination.
@@ -118,8 +117,7 @@ async def list_my_opportunities(
 
     if user.role not in (UserRole.COMMERCIAL, UserRole.ADMIN):
         raise HTTPException(
-            status_code=403,
-            detail="Seuls les commerciaux peuvent accéder à leurs opportunités"
+            status_code=403, detail="Seuls les commerciaux peuvent accéder à leurs opportunités"
         )
 
     opportunity_repo = OpportunityRepository(db)
@@ -167,7 +165,7 @@ async def share_opportunity(
     if user.role not in (UserRole.COMMERCIAL, UserRole.ADMIN):
         raise HTTPException(
             status_code=403,
-            detail="Seuls les commerciaux et admins peuvent partager des opportunités"
+            detail="Seuls les commerciaux et admins peuvent partager des opportunités",
         )
 
     opportunity_repo = OpportunityRepository(db)
@@ -180,8 +178,7 @@ async def share_opportunity(
     if user.role == UserRole.COMMERCIAL:
         if opportunity.owner_id and opportunity.owner_id != user.id:
             raise HTTPException(
-                status_code=403,
-                detail="Vous ne pouvez partager que vos propres opportunités"
+                status_code=403, detail="Vous ne pouvez partager que vos propres opportunités"
             )
         # Assign ownership if not set
         if not opportunity.owner_id:
@@ -204,8 +201,7 @@ async def unshare_opportunity(
 
     if user.role not in (UserRole.COMMERCIAL, UserRole.ADMIN):
         raise HTTPException(
-            status_code=403,
-            detail="Seuls les commerciaux et admins peuvent gérer les opportunités"
+            status_code=403, detail="Seuls les commerciaux et admins peuvent gérer les opportunités"
         )
 
     opportunity_repo = OpportunityRepository(db)
@@ -217,8 +213,7 @@ async def unshare_opportunity(
     # Check ownership for commercials (admins can unshare any)
     if user.role == UserRole.COMMERCIAL and opportunity.owner_id != user.id:
         raise HTTPException(
-            status_code=403,
-            detail="Vous ne pouvez gérer que vos propres opportunités"
+            status_code=403, detail="Vous ne pouvez gérer que vos propres opportunités"
         )
 
     opportunity.unshare()
@@ -232,7 +227,7 @@ async def assign_opportunity_owner(
     opportunity_id: UUID,
     db: DbSession,
     authorization: str = Header(default=""),
-    owner_id: Optional[UUID] = None,
+    owner_id: UUID | None = None,
 ):
     """Assign an owner to an opportunity (admin only, or commercial assigns to self)."""
     user = await get_current_user(db, authorization)
@@ -249,8 +244,7 @@ async def assign_opportunity_owner(
     elif user.role == UserRole.COMMERCIAL:
         if owner_id and owner_id != user.id:
             raise HTTPException(
-                status_code=403,
-                detail="Vous ne pouvez vous assigner que vous-même"
+                status_code=403, detail="Vous ne pouvez vous assigner que vous-même"
             )
         new_owner_id = user.id
     else:

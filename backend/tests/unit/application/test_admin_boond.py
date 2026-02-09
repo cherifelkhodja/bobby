@@ -195,9 +195,7 @@ class TestTestBoondConnectionUseCase:
     """Tests for TestBoondConnectionUseCase."""
 
     @pytest.mark.asyncio
-    async def test_connection_not_configured(
-        self, mock_settings_unconfigured, mock_boond_client
-    ):
+    async def test_connection_not_configured(self, mock_settings_unconfigured, mock_boond_client):
         """Test connection test when not configured."""
         use_case = TestBoondConnectionUseCase(
             settings=mock_settings_unconfigured,
@@ -251,9 +249,7 @@ class TestGetBoondResourcesUseCase:
     """Tests for GetBoondResourcesUseCase."""
 
     @pytest.mark.asyncio
-    async def test_resources_not_configured(
-        self, mock_settings_unconfigured, mock_boond_client
-    ):
+    async def test_resources_not_configured(self, mock_settings_unconfigured, mock_boond_client):
         """Test getting resources when not configured."""
         use_case = GetBoondResourcesUseCase(
             settings=mock_settings_unconfigured,

@@ -13,10 +13,10 @@ New fields for CV quality evaluation (/20):
   - points_forts, points_faibles, synthese, classification
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "017_add_cv_quality_fields"

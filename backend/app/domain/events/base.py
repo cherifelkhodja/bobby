@@ -5,8 +5,9 @@ Provides the foundation for event-driven architecture in the domain layer.
 """
 
 from abc import ABC
+from collections.abc import Callable, Coroutine
 from datetime import datetime
-from typing import Any, Callable, Coroutine, Dict, List, Type, TypeVar
+from typing import Any, TypeVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -32,7 +33,7 @@ class DomainEvent(BaseModel, ABC):
     event_type: str = Field(default="")
     occurred_at: datetime = Field(default_factory=datetime.utcnow)
     aggregate_id: UUID | None = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -66,12 +67,10 @@ class EventBus:
     """
 
     def __init__(self):
-        self._handlers: Dict[Type[DomainEvent], List[EventHandler]] = {}
-        self._middleware: List[Callable[[DomainEvent], Coroutine[Any, Any, None]]] = []
+        self._handlers: dict[type[DomainEvent], list[EventHandler]] = {}
+        self._middleware: list[Callable[[DomainEvent], Coroutine[Any, Any, None]]] = []
 
-    def subscribe(
-        self, event_type: Type[T]
-    ) -> Callable[[EventHandler[T]], EventHandler[T]]:
+    def subscribe(self, event_type: type[T]) -> Callable[[EventHandler[T]], EventHandler[T]]:
         """
         Decorator to subscribe a handler to an event type.
 
@@ -86,16 +85,16 @@ class EventBus:
             async def handle_user_registered(event: UserRegisteredEvent):
                 pass
         """
+
         def decorator(handler: EventHandler[T]) -> EventHandler[T]:
             if event_type not in self._handlers:
                 self._handlers[event_type] = []
             self._handlers[event_type].append(handler)
             return handler
+
         return decorator
 
-    def register_handler(
-        self, event_type: Type[T], handler: EventHandler[T]
-    ) -> None:
+    def register_handler(self, event_type: type[T], handler: EventHandler[T]) -> None:
         """
         Register a handler for an event type (non-decorator version).
 
@@ -107,9 +106,7 @@ class EventBus:
             self._handlers[event_type] = []
         self._handlers[event_type].append(handler)
 
-    def unregister_handler(
-        self, event_type: Type[T], handler: EventHandler[T]
-    ) -> bool:
+    def unregister_handler(self, event_type: type[T], handler: EventHandler[T]) -> bool:
         """
         Unregister a handler for an event type.
 
@@ -171,11 +168,9 @@ class EventBus:
             try:
                 await handler(event)
             except Exception as e:
-                logger.error(
-                    f"Handler {handler.__name__} failed for {event.event_type}: {e}"
-                )
+                logger.error(f"Handler {handler.__name__} failed for {event.event_type}: {e}")
 
-    async def publish_all(self, events: List[DomainEvent]) -> None:
+    async def publish_all(self, events: list[DomainEvent]) -> None:
         """
         Publish multiple events in order.
 
@@ -185,7 +180,7 @@ class EventBus:
         for event in events:
             await self.publish(event)
 
-    def clear_handlers(self, event_type: Type[DomainEvent] | None = None) -> None:
+    def clear_handlers(self, event_type: type[DomainEvent] | None = None) -> None:
         """
         Clear all handlers, optionally for a specific event type.
 

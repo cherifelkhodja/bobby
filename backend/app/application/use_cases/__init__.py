@@ -1,25 +1,40 @@
 """Application use cases."""
 
+from app.application.use_cases.admin import (
+    ActivateUserUseCase,
+    ChangeUserRoleUseCase,
+    DeactivateUserUseCase,
+    DeleteUserUseCase,
+    GetBoondResourcesUseCase,
+    # Boond
+    GetBoondStatusUseCase,
+    GetUserUseCase,
+    # Users
+    ListUsersUseCase,
+    SyncBoondOpportunitiesUseCase,
+    TestBoondConnectionUseCase,
+    UpdateUserUseCase,
+)
 from app.application.use_cases.auth import (
-    LoginUseCase,
-    RegisterUserUseCase,
-    VerifyEmailUseCase,
     ForgotPasswordUseCase,
-    ResetPasswordUseCase,
+    LoginUseCase,
     RefreshTokenUseCase,
+    RegisterUserUseCase,
+    ResetPasswordUseCase,
+    VerifyEmailUseCase,
 )
 from app.application.use_cases.cooptations import (
     CreateCooptationUseCase,
-    ListCooptationsUseCase,
-    GetCooptationUseCase,
-    UpdateCooptationStatusUseCase,
     GetCooptationStatsUseCase,
+    GetCooptationUseCase,
+    ListCooptationsUseCase,
+    UpdateCooptationStatusUseCase,
 )
 from app.application.use_cases.cv_transformer import (
-    TransformCvUseCase,
     GetTemplatesUseCase,
-    UploadTemplateUseCase,
     GetTransformationStatsUseCase,
+    TransformCvUseCase,
+    UploadTemplateUseCase,
 )
 from app.application.use_cases.job_applications import (
     CreateCandidateInBoondUseCase,
@@ -43,21 +58,6 @@ from app.application.use_cases.job_postings import (
 from app.application.use_cases.opportunities import (
     ListOpportunitiesUseCase,
     SyncOpportunitiesUseCase,
-)
-from app.application.use_cases.admin import (
-    # Users
-    ListUsersUseCase,
-    GetUserUseCase,
-    UpdateUserUseCase,
-    ChangeUserRoleUseCase,
-    ActivateUserUseCase,
-    DeactivateUserUseCase,
-    DeleteUserUseCase,
-    # Boond
-    GetBoondStatusUseCase,
-    SyncBoondOpportunitiesUseCase,
-    TestBoondConnectionUseCase,
-    GetBoondResourcesUseCase,
 )
 
 __all__ = [

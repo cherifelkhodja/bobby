@@ -1,7 +1,6 @@
 """BoondManager API client with retry and timeout."""
 
 import logging
-from typing import Optional
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -9,9 +8,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from app.config import Settings
 from app.domain.entities import Candidate, Opportunity
 from app.infrastructure.boond.dtos import (
-    BoondCandidateDTO,
     BoondOpportunityDTO,
-    BoondPositioningDTO,
 )
 from app.infrastructure.boond.mappers import (
     map_boond_opportunity_to_domain,
@@ -62,7 +59,7 @@ class BoondClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=4),
     )
-    async def get_opportunity(self, external_id: str) -> Optional[Opportunity]:
+    async def get_opportunity(self, external_id: str) -> Opportunity | None:
         """Fetch single opportunity from BoondManager."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             logger.info(f"Fetching opportunity {external_id} from BoondManager")
@@ -275,11 +272,19 @@ class BoondClient:
                     agency_data = relationships.get("agency", {}).get("data")
                     agency_id = str(agency_data.get("id")) if agency_data else None
                     # Use included data first, fallback to hardcoded names
-                    agency_name = agencies_map.get(agency_id) or self.AGENCY_NAMES.get(agency_id, "") if agency_id else ""
+                    agency_name = (
+                        agencies_map.get(agency_id) or self.AGENCY_NAMES.get(agency_id, "")
+                        if agency_id
+                        else ""
+                    )
 
                     # Get resource type - use hardcoded names
                     resource_type = attrs.get("typeOf", None)
-                    resource_type_name = self.RESOURCE_TYPE_NAMES.get(resource_type, "") if resource_type is not None else ""
+                    resource_type_name = (
+                        self.RESOURCE_TYPE_NAMES.get(resource_type, "")
+                        if resource_type is not None
+                        else ""
+                    )
 
                     # Determine role based on type
                     # 0, 1, 10 -> user (Consultant)
@@ -302,24 +307,30 @@ class BoondClient:
 
                     # Get resource state
                     resource_state = attrs.get("state", None)
-                    resource_state_name = self.RESOURCE_STATE_NAMES.get(resource_state, "") if resource_state is not None else ""
+                    resource_state_name = (
+                        self.RESOURCE_STATE_NAMES.get(resource_state, "")
+                        if resource_state is not None
+                        else ""
+                    )
 
-                    resources.append({
-                        "id": str(item.get("id")),
-                        "first_name": attrs.get("firstName", ""),
-                        "last_name": attrs.get("lastName", ""),
-                        "email": attrs.get("email1", "") or attrs.get("email2", ""),
-                        "phone": phone,
-                        "manager_id": manager_id,
-                        "manager_name": manager_name,
-                        "agency_id": agency_id,
-                        "agency_name": agency_name,
-                        "resource_type": resource_type,
-                        "resource_type_name": resource_type_name,
-                        "state": resource_state,
-                        "state_name": resource_state_name,
-                        "suggested_role": suggested_role,
-                    })
+                    resources.append(
+                        {
+                            "id": str(item.get("id")),
+                            "first_name": attrs.get("firstName", ""),
+                            "last_name": attrs.get("lastName", ""),
+                            "email": attrs.get("email1", "") or attrs.get("email2", ""),
+                            "phone": phone,
+                            "manager_id": manager_id,
+                            "manager_name": manager_name,
+                            "agency_id": agency_id,
+                            "agency_name": agency_name,
+                            "resource_type": resource_type,
+                            "resource_type_name": resource_type_name,
+                            "state": resource_state,
+                            "state_name": resource_state_name,
+                            "suggested_role": suggested_role,
+                        }
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to parse resource {item.get('id')}: {e}")
 
@@ -416,17 +427,17 @@ class BoondClient:
 
     # Color categories for frontend display
     OPPORTUNITY_STATE_COLORS = {
-        0: "blue",      # En cours
-        1: "green",     # Gagné
-        2: "red",       # Perdu
-        3: "gray",      # Abandonné
-        4: "green",     # Gagné attente contrat
-        5: "yellow",    # Piste identifiée
-        6: "green",     # Récurrent
-        7: "cyan",      # AO ouvert
-        8: "indigo",    # AO clos
-        9: "pink",      # Reporté
-        10: "blue",     # Besoin en avant de phase
+        0: "blue",  # En cours
+        1: "green",  # Gagné
+        2: "red",  # Perdu
+        3: "gray",  # Abandonné
+        4: "green",  # Gagné attente contrat
+        5: "yellow",  # Piste identifiée
+        6: "green",  # Récurrent
+        7: "cyan",  # AO ouvert
+        8: "indigo",  # AO clos
+        9: "pink",  # Reporté
+        10: "blue",  # Besoin en avant de phase
     }
 
     # States to include when fetching manager opportunities (open/active states only)
@@ -439,8 +450,8 @@ class BoondClient:
     )
     async def get_manager_opportunities(
         self,
-        manager_boond_id: Optional[str] = None,
-        states: Optional[list[int]] = None,
+        manager_boond_id: str | None = None,
+        states: list[int] | None = None,
         fetch_all: bool = False,
     ) -> list[dict]:
         """Fetch opportunities from BoondManager.
@@ -534,24 +545,34 @@ class BoondClient:
 
                     # Get state
                     opp_state = attrs.get("state", None)
-                    opp_state_name = self.OPPORTUNITY_STATE_NAMES.get(opp_state, "") if opp_state is not None else ""
-                    opp_state_color = self.OPPORTUNITY_STATE_COLORS.get(opp_state, "gray") if opp_state is not None else "gray"
+                    opp_state_name = (
+                        self.OPPORTUNITY_STATE_NAMES.get(opp_state, "")
+                        if opp_state is not None
+                        else ""
+                    )
+                    opp_state_color = (
+                        self.OPPORTUNITY_STATE_COLORS.get(opp_state, "gray")
+                        if opp_state is not None
+                        else "gray"
+                    )
 
-                    opportunities.append({
-                        "id": str(item.get("id")),
-                        "title": attrs.get("title", ""),
-                        "reference": attrs.get("reference", ""),
-                        "description": attrs.get("description", ""),
-                        "start_date": attrs.get("startDate"),
-                        "end_date": attrs.get("endDate"),
-                        "company_id": company_id,
-                        "company_name": company_name,
-                        "manager_id": manager_id,
-                        "manager_name": manager_name,
-                        "state": opp_state,
-                        "state_name": opp_state_name,
-                        "state_color": opp_state_color,
-                    })
+                    opportunities.append(
+                        {
+                            "id": str(item.get("id")),
+                            "title": attrs.get("title", ""),
+                            "reference": attrs.get("reference", ""),
+                            "description": attrs.get("description", ""),
+                            "start_date": attrs.get("startDate"),
+                            "end_date": attrs.get("endDate"),
+                            "company_id": company_id,
+                            "company_name": company_name,
+                            "manager_id": manager_id,
+                            "manager_name": manager_name,
+                            "state": opp_state,
+                            "state_name": opp_state_name,
+                            "state_color": opp_state_color,
+                        }
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to parse opportunity {item.get('id')}: {e}")
 
@@ -565,7 +586,7 @@ class BoondClient:
     async def get_hr_manager_opportunities(
         self,
         hr_manager_boond_id: str,
-        states: Optional[list[int]] = None,
+        states: list[int] | None = None,
     ) -> list[dict]:
         """Fetch opportunities from BoondManager where user is HR manager.
 
@@ -655,26 +676,36 @@ class BoondClient:
 
                     # Get state
                     opp_state = attrs.get("state", None)
-                    opp_state_name = self.OPPORTUNITY_STATE_NAMES.get(opp_state, "") if opp_state is not None else ""
-                    opp_state_color = self.OPPORTUNITY_STATE_COLORS.get(opp_state, "gray") if opp_state is not None else "gray"
+                    opp_state_name = (
+                        self.OPPORTUNITY_STATE_NAMES.get(opp_state, "")
+                        if opp_state is not None
+                        else ""
+                    )
+                    opp_state_color = (
+                        self.OPPORTUNITY_STATE_COLORS.get(opp_state, "gray")
+                        if opp_state is not None
+                        else "gray"
+                    )
 
-                    opportunities.append({
-                        "id": str(item.get("id")),
-                        "title": attrs.get("title", ""),
-                        "reference": attrs.get("reference", ""),
-                        "description": attrs.get("description", ""),
-                        "start_date": attrs.get("startDate"),
-                        "end_date": attrs.get("endDate"),
-                        "company_id": company_id,
-                        "company_name": company_name,
-                        "manager_id": manager_id,
-                        "manager_name": manager_name,
-                        "hr_manager_id": hr_manager_id,
-                        "hr_manager_name": hr_manager_name,
-                        "state": opp_state,
-                        "state_name": opp_state_name,
-                        "state_color": opp_state_color,
-                    })
+                    opportunities.append(
+                        {
+                            "id": str(item.get("id")),
+                            "title": attrs.get("title", ""),
+                            "reference": attrs.get("reference", ""),
+                            "description": attrs.get("description", ""),
+                            "start_date": attrs.get("startDate"),
+                            "end_date": attrs.get("endDate"),
+                            "company_id": company_id,
+                            "company_name": company_name,
+                            "manager_id": manager_id,
+                            "manager_name": manager_name,
+                            "hr_manager_id": hr_manager_id,
+                            "hr_manager_name": hr_manager_name,
+                            "state": opp_state,
+                            "state_name": opp_state_name,
+                            "state_color": opp_state_color,
+                        }
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to parse opportunity {item.get('id')}: {e}")
 
@@ -758,8 +789,14 @@ class BoondClient:
 
             # Get state
             opp_state = attrs.get("state", None)
-            opp_state_name = self.OPPORTUNITY_STATE_NAMES.get(opp_state, "") if opp_state is not None else ""
-            opp_state_color = self.OPPORTUNITY_STATE_COLORS.get(opp_state, "gray") if opp_state is not None else "gray"
+            opp_state_name = (
+                self.OPPORTUNITY_STATE_NAMES.get(opp_state, "") if opp_state is not None else ""
+            )
+            opp_state_color = (
+                self.OPPORTUNITY_STATE_COLORS.get(opp_state, "gray")
+                if opp_state is not None
+                else "gray"
+            )
 
             result = {
                 "id": str(opp_data.get("id")),

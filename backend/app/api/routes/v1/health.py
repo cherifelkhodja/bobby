@@ -6,7 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, Response
 from sqlalchemy import text
 
-from app.dependencies import DbSession, RedisClient, Boond
+from app.dependencies import Boond, DbSession, RedisClient
 from app.infrastructure.observability.metrics import metrics
 
 router = APIRouter()

@@ -1,14 +1,13 @@
 """User repository implementation."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities import User
-from app.domain.value_objects import Email, Phone, UserRole
+from app.domain.value_objects import Email, UserRole
 from app.infrastructure.database.models import UserModel
 
 
@@ -18,15 +17,13 @@ class UserRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_id(self, user_id: UUID) -> Optional[User]:
+    async def get_by_id(self, user_id: UUID) -> User | None:
         """Get user by ID."""
-        result = await self.session.execute(
-            select(UserModel).where(UserModel.id == user_id)
-        )
+        result = await self.session.execute(select(UserModel).where(UserModel.id == user_id))
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def get_by_email(self, email: str) -> Optional[User]:
+    async def get_by_email(self, email: str) -> User | None:
         """Get user by email."""
         result = await self.session.execute(
             select(UserModel).where(UserModel.email == email.lower())
@@ -34,7 +31,7 @@ class UserRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def get_by_verification_token(self, token: str) -> Optional[User]:
+    async def get_by_verification_token(self, token: str) -> User | None:
         """Get user by verification token."""
         result = await self.session.execute(
             select(UserModel).where(UserModel.verification_token == token)
@@ -42,19 +39,15 @@ class UserRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def get_by_reset_token(self, token: str) -> Optional[User]:
+    async def get_by_reset_token(self, token: str) -> User | None:
         """Get user by reset token."""
-        result = await self.session.execute(
-            select(UserModel).where(UserModel.reset_token == token)
-        )
+        result = await self.session.execute(select(UserModel).where(UserModel.reset_token == token))
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
     async def save(self, user: User) -> User:
         """Save user (create or update)."""
-        result = await self.session.execute(
-            select(UserModel).where(UserModel.id == user.id)
-        )
+        result = await self.session.execute(select(UserModel).where(UserModel.id == user.id))
         model = result.scalar_one_or_none()
 
         if model:
@@ -100,9 +93,7 @@ class UserRepository:
 
     async def delete(self, user_id: UUID) -> bool:
         """Delete user by ID."""
-        result = await self.session.execute(
-            select(UserModel).where(UserModel.id == user_id)
-        )
+        result = await self.session.execute(select(UserModel).where(UserModel.id == user_id))
         model = result.scalar_one_or_none()
         if model:
             await self.session.delete(model)

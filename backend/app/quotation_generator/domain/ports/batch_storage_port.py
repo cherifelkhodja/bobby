@@ -1,7 +1,6 @@
 """Batch storage port interface for batch state management."""
 
 from abc import ABC, abstractmethod
-from typing import Optional
 from uuid import UUID
 
 from app.quotation_generator.domain.entities import QuotationBatch
@@ -28,7 +27,7 @@ class BatchStoragePort(ABC):
         ...
 
     @abstractmethod
-    async def get_batch(self, batch_id: UUID) -> Optional[QuotationBatch]:
+    async def get_batch(self, batch_id: UUID) -> QuotationBatch | None:
         """Retrieve a batch by ID.
 
         Args:
@@ -56,7 +55,7 @@ class BatchStoragePort(ABC):
         self,
         batch_id: UUID,
         status: str,
-        progress: Optional[dict] = None,
+        progress: dict | None = None,
     ) -> bool:
         """Update batch status and progress.
 
@@ -77,7 +76,7 @@ class BatchStoragePort(ABC):
         ...
 
     @abstractmethod
-    async def get_batch_progress(self, batch_id: UUID) -> Optional[dict]:
+    async def get_batch_progress(self, batch_id: UUID) -> dict | None:
         """Get batch progress without full deserialization.
 
         Args:
@@ -132,7 +131,7 @@ class BatchStoragePort(ABC):
         ...
 
     @abstractmethod
-    async def get_zip_path(self, batch_id: UUID) -> Optional[str]:
+    async def get_zip_path(self, batch_id: UUID) -> str | None:
         """Get the ZIP file path for a batch.
 
         Args:

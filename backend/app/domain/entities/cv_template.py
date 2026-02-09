@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 from uuid import UUID, uuid4
 
 
@@ -14,7 +13,7 @@ class CvTemplate:
     display_name: str  # Human-readable name (e.g., "Template Gemini")
     file_content: bytes  # Binary content of the .docx file
     file_name: str  # Original filename
-    description: Optional[str] = None
+    description: str | None = None
     is_active: bool = True
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=datetime.utcnow)

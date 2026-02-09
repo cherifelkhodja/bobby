@@ -5,9 +5,10 @@ Revises: 008_add_published_opportunities
 Create Date: 2026-01-15
 """
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy.dialects.postgresql import JSON, UUID
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "009_add_hr_feature_tables"
@@ -63,12 +64,8 @@ def upgrade() -> None:
     )
 
     # Indexes for job_postings
-    op.create_index(
-        "ix_job_postings_opportunity_id", "job_postings", ["opportunity_id"]
-    )
-    op.create_index(
-        "ix_job_postings_application_token", "job_postings", ["application_token"]
-    )
+    op.create_index("ix_job_postings_opportunity_id", "job_postings", ["opportunity_id"])
+    op.create_index("ix_job_postings_application_token", "job_postings", ["application_token"])
     op.create_index("ix_job_postings_status", "job_postings", ["status"])
     op.create_index("ix_job_postings_created_by", "job_postings", ["created_by"])
     op.create_index(
@@ -107,17 +104,11 @@ def upgrade() -> None:
     )
 
     # Indexes for job_applications
-    op.create_index(
-        "ix_job_applications_job_posting_id", "job_applications", ["job_posting_id"]
-    )
+    op.create_index("ix_job_applications_job_posting_id", "job_applications", ["job_posting_id"])
     op.create_index("ix_job_applications_status", "job_applications", ["status"])
-    op.create_index(
-        "ix_job_applications_matching_score", "job_applications", ["matching_score"]
-    )
+    op.create_index("ix_job_applications_matching_score", "job_applications", ["matching_score"])
     op.create_index("ix_job_applications_email", "job_applications", ["email"])
-    op.create_index(
-        "ix_job_applications_created_at", "job_applications", ["created_at"]
-    )
+    op.create_index("ix_job_applications_created_at", "job_applications", ["created_at"])
 
 
 def downgrade() -> None:

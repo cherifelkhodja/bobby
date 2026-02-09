@@ -105,10 +105,7 @@ class AndSpecification(Specification[T]):
         self._right = right
 
     def is_satisfied_by(self, entity: T) -> bool:
-        return (
-            self._left.is_satisfied_by(entity) and
-            self._right.is_satisfied_by(entity)
-        )
+        return self._left.is_satisfied_by(entity) and self._right.is_satisfied_by(entity)
 
     @property
     def left(self) -> Specification[T]:
@@ -130,10 +127,7 @@ class OrSpecification(Specification[T]):
         self._right = right
 
     def is_satisfied_by(self, entity: T) -> bool:
-        return (
-            self._left.is_satisfied_by(entity) or
-            self._right.is_satisfied_by(entity)
-        )
+        return self._left.is_satisfied_by(entity) or self._right.is_satisfied_by(entity)
 
     @property
     def left(self) -> Specification[T]:

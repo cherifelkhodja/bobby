@@ -10,9 +10,9 @@ during job posting anonymization.
 Note: This is a re-creation of migration 011 which was skipped in some environments.
 """
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers
 revision = "013_add_turnoverit_skills_table"
@@ -35,7 +35,12 @@ def upgrade() -> None:
             sa.Column("name", sa.String(255), nullable=False),
             sa.Column("slug", sa.String(255), nullable=False, unique=True),
             sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now()),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+                onupdate=sa.func.now(),
+            ),
         )
 
         # Create index for fast name searches

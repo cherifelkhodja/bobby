@@ -1,7 +1,6 @@
 """Cooptation read models."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -14,8 +13,8 @@ class StatusChangeReadModel(BaseModel):
     from_status: str
     to_status: str
     changed_at: datetime
-    changed_by: Optional[str] = None
-    comment: Optional[str] = None
+    changed_by: str | None = None
+    comment: str | None = None
 
 
 class CooptationReadModel(BaseModel):
@@ -27,17 +26,17 @@ class CooptationReadModel(BaseModel):
     candidate_id: str
     candidate_name: str
     candidate_email: str
-    candidate_phone: Optional[str] = None
-    candidate_daily_rate: Optional[float] = None
+    candidate_phone: str | None = None
+    candidate_daily_rate: float | None = None
     opportunity_id: str
     opportunity_title: str
     opportunity_reference: str
     status: str
     status_display: str
     submitter_id: str
-    submitter_name: Optional[str] = None
-    external_positioning_id: Optional[str] = None
-    rejection_reason: Optional[str] = None
+    submitter_name: str | None = None
+    external_positioning_id: str | None = None
+    rejection_reason: str | None = None
     status_history: list[StatusChangeReadModel] = []
     submitted_at: datetime
     updated_at: datetime

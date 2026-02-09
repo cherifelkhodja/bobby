@@ -1,7 +1,5 @@
 """Public API endpoints for job applications (no authentication required)."""
 
-from typing import Optional
-
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, EmailStr, Field, validate_email
 
@@ -40,7 +38,13 @@ ALLOWED_CV_EXTENSIONS = {".pdf", ".docx", ".doc"}
 VALID_AVAILABILITY = {"asap", "1_month", "2_months", "3_months", "more_3_months"}
 # Base employment statuses (can be combined with comma)
 VALID_EMPLOYMENT_STATUS_BASE = {"freelance", "employee"}
-VALID_EMPLOYMENT_STATUS = {"freelance", "employee", "both", "freelance,employee", "employee,freelance"}
+VALID_EMPLOYMENT_STATUS = {
+    "freelance",
+    "employee",
+    "both",
+    "freelance,employee",
+    "employee,freelance",
+}
 VALID_ENGLISH_LEVELS = {"notions", "intermediate", "professional", "fluent", "bilingual"}
 
 
@@ -54,11 +58,13 @@ class ApplicationFormRequest(BaseModel):
     job_title: str = Field(..., min_length=1, max_length=200)
     availability: str = Field(..., description="asap, 1_month, 2_months, 3_months, more_3_months")
     employment_status: str = Field(..., description="freelance, employee, both")
-    english_level: str = Field(..., description="notions, intermediate, professional, fluent, bilingual")
-    tjm_current: Optional[float] = Field(None, ge=0)
-    tjm_desired: Optional[float] = Field(None, ge=0)
-    salary_current: Optional[float] = Field(None, ge=0)
-    salary_desired: Optional[float] = Field(None, ge=0)
+    english_level: str = Field(
+        ..., description="notions, intermediate, professional, fluent, bilingual"
+    )
+    tjm_current: float | None = Field(None, ge=0)
+    tjm_desired: float | None = Field(None, ge=0)
+    salary_current: float | None = Field(None, ge=0)
+    salary_desired: float | None = Field(None, ge=0)
 
 
 @router.get("/{token}", response_model=JobPostingPublicReadModel)
@@ -96,14 +102,14 @@ async def submit_application(
     email: str = Form(...),
     phone: str = Form(..., min_length=1, max_length=30),
     job_title: str = Form(..., min_length=1, max_length=200),
-    civility: Optional[str] = Form(None),
+    civility: str | None = Form(None),
     availability: str = Form(...),
     employment_status: str = Form(...),
     english_level: str = Form(...),
-    tjm_current: Optional[float] = Form(None, ge=0),
-    tjm_desired: Optional[float] = Form(None, ge=0),
-    salary_current: Optional[float] = Form(None, ge=0),
-    salary_desired: Optional[float] = Form(None, ge=0),
+    tjm_current: float | None = Form(None, ge=0),
+    tjm_desired: float | None = Form(None, ge=0),
+    salary_current: float | None = Form(None, ge=0),
+    salary_desired: float | None = Form(None, ge=0),
     cv: UploadFile = File(...),
 ):
     """Submit a job application through the public form.
@@ -196,7 +202,7 @@ async def submit_application(
     if len(cv_content) > MAX_CV_SIZE:
         raise HTTPException(
             status_code=400,
-            detail=f"Le fichier CV est trop volumineux. Maximum {MAX_CV_SIZE // (1024*1024)} Mo.",
+            detail=f"Le fichier CV est trop volumineux. Maximum {MAX_CV_SIZE // (1024 * 1024)} Mo.",
         )
 
     if len(cv_content) == 0:

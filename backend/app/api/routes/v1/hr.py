@@ -1,10 +1,9 @@
 """HR API endpoints for job postings and applications management."""
 
 from datetime import date
-from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, File, Form, Header, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.application.read_models.hr import (
@@ -36,9 +35,8 @@ from app.application.use_cases.job_postings import (
     UpdateJobPostingCommand,
     UpdateJobPostingUseCase,
 )
-from app.config import settings
 from app.dependencies import AppSettings, AppSettingsSvc, Boond, DbSession
-from app.domain.entities import ApplicationStatus, JobPostingStatus
+from app.domain.entities import ApplicationStatus, JobPostingStatus, Opportunity
 from app.domain.exceptions import (
     InvalidStatusTransitionError,
     JobApplicationNotFoundError,
@@ -46,14 +44,13 @@ from app.domain.exceptions import (
     OpportunityNotFoundError,
 )
 from app.domain.value_objects import UserRole
+from app.infrastructure.anonymizer.job_posting_anonymizer import JobPostingAnonymizer
 from app.infrastructure.database.repositories import (
     JobApplicationRepository,
     JobPostingRepository,
     OpportunityRepository,
     UserRepository,
 )
-from app.domain.entities import Opportunity
-from app.infrastructure.anonymizer.job_posting_anonymizer import JobPostingAnonymizer
 from app.infrastructure.matching.gemini_matcher import GeminiMatchingService
 from app.infrastructure.security.jwt import decode_token
 from app.infrastructure.storage.s3_client import S3StorageClient
@@ -72,58 +69,58 @@ class CreateJobPostingRequest(BaseModel):
     """Request body for creating a job posting."""
 
     opportunity_id: str
-    client_name: Optional[str] = Field(None, max_length=200)  # Client name from Boond
+    client_name: str | None = Field(None, max_length=200)  # Client name from Boond
     title: str = Field(..., min_length=5, max_length=100)
     description: str = Field(..., min_length=500, max_length=3000)
     qualifications: str = Field(..., min_length=150, max_length=3000)
     location_country: str = Field(..., min_length=2, max_length=50)
-    location_region: Optional[str] = Field(None, max_length=100)
-    location_postal_code: Optional[str] = Field(None, max_length=20)
-    location_city: Optional[str] = Field(None, max_length=100)
-    location_key: Optional[str] = Field(None, max_length=200)  # Turnover-IT location key
+    location_region: str | None = Field(None, max_length=100)
+    location_postal_code: str | None = Field(None, max_length=20)
+    location_city: str | None = Field(None, max_length=100)
+    location_key: str | None = Field(None, max_length=200)  # Turnover-IT location key
     contract_types: list[str] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)
-    experience_level: Optional[str] = None
-    remote: Optional[str] = None
-    start_date: Optional[date] = None
-    duration_months: Optional[int] = Field(None, ge=1, le=120)
-    salary_min_annual: Optional[float] = Field(None, ge=0)
-    salary_max_annual: Optional[float] = Field(None, ge=0)
-    salary_min_daily: Optional[float] = Field(None, ge=0)
-    salary_max_daily: Optional[float] = Field(None, ge=0)
-    employer_overview: Optional[str] = Field(None, max_length=3000)
-    pushToTop: Optional[bool] = Field(default=True)
+    experience_level: str | None = None
+    remote: str | None = None
+    start_date: date | None = None
+    duration_months: int | None = Field(None, ge=1, le=120)
+    salary_min_annual: float | None = Field(None, ge=0)
+    salary_max_annual: float | None = Field(None, ge=0)
+    salary_min_daily: float | None = Field(None, ge=0)
+    salary_max_daily: float | None = Field(None, ge=0)
+    employer_overview: str | None = Field(None, max_length=3000)
+    pushToTop: bool | None = Field(default=True)
 
 
 class UpdateJobPostingRequest(BaseModel):
     """Request body for updating a job posting."""
 
-    title: Optional[str] = Field(None, min_length=5, max_length=100)
-    description: Optional[str] = Field(None, min_length=500, max_length=3000)
-    qualifications: Optional[str] = Field(None, min_length=150, max_length=3000)
-    location_country: Optional[str] = Field(None, min_length=2, max_length=50)
-    location_region: Optional[str] = Field(None, max_length=100)
-    location_postal_code: Optional[str] = Field(None, max_length=20)
-    location_city: Optional[str] = Field(None, max_length=100)
-    location_key: Optional[str] = Field(None, max_length=200)  # Turnover-IT location key
-    contract_types: Optional[list[str]] = None
-    skills: Optional[list[str]] = None
-    experience_level: Optional[str] = None
-    remote: Optional[str] = None
-    start_date: Optional[date] = None
-    duration_months: Optional[int] = Field(None, ge=1, le=120)
-    salary_min_annual: Optional[float] = Field(None, ge=0)
-    salary_max_annual: Optional[float] = Field(None, ge=0)
-    salary_min_daily: Optional[float] = Field(None, ge=0)
-    salary_max_daily: Optional[float] = Field(None, ge=0)
-    employer_overview: Optional[str] = Field(None, max_length=3000)
+    title: str | None = Field(None, min_length=5, max_length=100)
+    description: str | None = Field(None, min_length=500, max_length=3000)
+    qualifications: str | None = Field(None, min_length=150, max_length=3000)
+    location_country: str | None = Field(None, min_length=2, max_length=50)
+    location_region: str | None = Field(None, max_length=100)
+    location_postal_code: str | None = Field(None, max_length=20)
+    location_city: str | None = Field(None, max_length=100)
+    location_key: str | None = Field(None, max_length=200)  # Turnover-IT location key
+    contract_types: list[str] | None = None
+    skills: list[str] | None = None
+    experience_level: str | None = None
+    remote: str | None = None
+    start_date: date | None = None
+    duration_months: int | None = Field(None, ge=1, le=120)
+    salary_min_annual: float | None = Field(None, ge=0)
+    salary_max_annual: float | None = Field(None, ge=0)
+    salary_min_daily: float | None = Field(None, ge=0)
+    salary_max_daily: float | None = Field(None, ge=0)
+    employer_overview: str | None = Field(None, max_length=3000)
 
 
 class UpdateApplicationStatusRequest(BaseModel):
     """Request body for updating application status."""
 
     status: str
-    comment: Optional[str] = Field(None, max_length=1000)
+    comment: str | None = Field(None, max_length=1000)
 
 
 class UpdateApplicationNoteRequest(BaseModel):
@@ -146,7 +143,7 @@ class AnonymizeJobPostingRequest(BaseModel):
     opportunity_id: str
     title: str
     description: str
-    client_name: Optional[str] = None
+    client_name: str | None = None
 
 
 class AnonymizedJobPostingResponse(BaseModel):
@@ -205,24 +202,24 @@ class OpportunityDetailResponse(BaseModel):
     id: str
     title: str
     reference: str
-    description: Optional[str] = None
-    criteria: Optional[str] = None
-    expertise_area: Optional[str] = None
-    place: Optional[str] = None
-    duration: Optional[int] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    company_id: Optional[str] = None
-    company_name: Optional[str] = None
-    manager_id: Optional[str] = None
-    manager_name: Optional[str] = None
-    contact_id: Optional[str] = None
-    contact_name: Optional[str] = None
-    agency_id: Optional[str] = None
-    agency_name: Optional[str] = None
-    state: Optional[int] = None
-    state_name: Optional[str] = None
-    state_color: Optional[str] = None
+    description: str | None = None
+    criteria: str | None = None
+    expertise_area: str | None = None
+    place: str | None = None
+    duration: int | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    company_id: str | None = None
+    company_name: str | None = None
+    manager_id: str | None = None
+    manager_name: str | None = None
+    contact_id: str | None = None
+    contact_name: str | None = None
+    agency_id: str | None = None
+    agency_name: str | None = None
+    state: int | None = None
+    state_name: str | None = None
+    state_color: str | None = None
 
 
 # --- Auth Helpers ---
@@ -255,7 +252,7 @@ async def get_current_user(
 async def get_current_user_full(
     db: DbSession,
     authorization: str,
-) -> tuple[UUID, UserRole, Optional[str]]:
+) -> tuple[UUID, UserRole, str | None]:
     """Verify user authentication and return user ID, role, and boond_resource_id."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Non authentifié")
@@ -388,7 +385,7 @@ async def sync_turnoverit_skills(
 @router.get("/skills", response_model=TurnoverITSkillsListResponse)
 async def get_turnoverit_skills(
     db: DbSession,
-    search: Optional[str] = Query(None, max_length=100),
+    search: str | None = Query(None, max_length=100),
     authorization: str = Header(default=""),
 ):
     """Get Turnover-IT skills from the database cache.
@@ -467,7 +464,7 @@ async def get_turnoverit_places(
 async def list_opportunities_for_hr(
     db: DbSession,
     boond_client: Boond,
-    search: Optional[str] = Query(None, max_length=100),
+    search: str | None = Query(None, max_length=100),
     authorization: str = Header(default=""),
 ):
     """List opportunities from BoondManager where user is HR manager.
@@ -611,7 +608,7 @@ async def list_job_postings(
     db: DbSession,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    status: Optional[str] = Query(None),
+    status: str | None = Query(None),
     authorization: str = Header(default=""),
 ):
     """List all job postings."""
@@ -659,7 +656,9 @@ async def get_job_posting(
         opportunity = await opportunity_repo.get_by_id(posting.opportunity_id)
         if opportunity and not opportunity.client_name and opportunity.external_id:
             try:
-                boond_detail = await boond_client.get_opportunity_information(opportunity.external_id)
+                boond_detail = await boond_client.get_opportunity_information(
+                    opportunity.external_id
+                )
                 if boond_detail and boond_detail.get("company_name"):
                     opportunity.client_name = boond_detail["company_name"]
                     await opportunity_repo.save(opportunity)
@@ -877,9 +876,14 @@ async def list_applications_for_posting(
     app_settings: AppSettings,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    status: Optional[str] = Query(None, description="Filter by application status"),
-    employment_status: Optional[str] = Query(None, description="Filter by employment status (freelance, employee, both)"),
-    availability: Optional[str] = Query(None, description="Filter by availability (asap, 1_month, 2_months, 3_months, more_3_months)"),
+    status: str | None = Query(None, description="Filter by application status"),
+    employment_status: str | None = Query(
+        None, description="Filter by employment status (freelance, employee, both)"
+    ),
+    availability: str | None = Query(
+        None,
+        description="Filter by availability (asap, 1_month, 2_months, 3_months, more_3_months)",
+    ),
     sort_by: str = Query("score", description="Sort field (score, tjm, salary, date)"),
     sort_order: str = Query("desc", description="Sort direction (asc, desc)"),
     authorization: str = Header(default=""),

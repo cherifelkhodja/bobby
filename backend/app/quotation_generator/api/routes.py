@@ -1,7 +1,6 @@
 """API routes for quotation generator."""
 
 import logging
-from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -9,43 +8,41 @@ from fastapi.responses import FileResponse
 
 from app.api.dependencies import AdminUser
 from app.quotation_generator.api.dependencies import (
-    get_preview_batch_use_case,
-    get_start_generation_use_case,
-    get_progress_use_case,
     get_batch_details_use_case,
-    get_list_user_batches_use_case,
-    get_download_batch_use_case,
-    get_upload_template_use_case,
-    get_list_templates_use_case,
     get_batch_storage,
+    get_download_batch_use_case,
+    get_list_templates_use_case,
+    get_list_user_batches_use_case,
+    get_preview_batch_use_case,
+    get_progress_use_case,
+    get_start_generation_use_case,
+    get_upload_template_use_case,
 )
-from app.quotation_generator.infrastructure.adapters import RedisStorageAdapter
 from app.quotation_generator.api.schemas import (
+    BatchDetailsResponse,
+    BatchProgressResponse,
+    ErrorResponse,
     PreviewBatchResponse,
     StartGenerationRequest,
     StartGenerationResponse,
-    BatchProgressResponse,
-    BatchDetailsResponse,
-    DownloadInfoResponse,
     TemplateListResponse,
-    UploadTemplateResponse,
-    UserBatchesResponse,
-    ErrorResponse,
     UpdateContactRequest,
     UpdateContactResponse,
+    UploadTemplateResponse,
+    UserBatchesResponse,
 )
 from app.quotation_generator.application.use_cases import (
-    PreviewBatchUseCase,
     DownloadBatchUseCase,
-    UploadTemplateUseCase,
     ListTemplatesUseCase,
+    PreviewBatchUseCase,
+    UploadTemplateUseCase,
 )
 from app.quotation_generator.application.use_cases.generate_batch import (
     StartGenerationUseCase,
 )
 from app.quotation_generator.application.use_cases.get_progress import (
-    GetBatchProgressUseCase,
     GetBatchDetailsUseCase,
+    GetBatchProgressUseCase,
     ListUserBatchesUseCase,
 )
 from app.quotation_generator.domain.exceptions import (
@@ -54,6 +51,7 @@ from app.quotation_generator.domain.exceptions import (
     DownloadNotReadyError,
     MissingColumnsError,
 )
+from app.quotation_generator.infrastructure.adapters import RedisStorageAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -432,8 +430,8 @@ async def download_example_csv(
 
     Returns a CSV file with the expected format and example data.
     """
-    import tempfile
     import os
+    import tempfile
 
     # Create a temporary file
     fd, path = tempfile.mkstemp(suffix=".csv")

@@ -7,10 +7,11 @@ Provides token bucket rate limiting with in-memory and Redis backends.
 import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import wraps
 from threading import Lock
-from typing import Any, Callable, Optional
+from typing import Any
 
 from fastapi import HTTPException, Request, status
 
@@ -90,9 +91,7 @@ class InMemoryRateLimiter(RateLimiter):
 
         with self._lock:
             # Remove old requests outside the window
-            self._requests[key] = [
-                ts for ts in self._requests[key] if ts > window_start
-            ]
+            self._requests[key] = [ts for ts in self._requests[key] if ts > window_start]
 
             current_count = len(self._requests[key])
 
@@ -188,8 +187,8 @@ _default_limiter = InMemoryRateLimiter()
 def rate_limit(
     limit: int = 100,
     window: int = 60,
-    key_func: Optional[Callable[[Request], str]] = None,
-    limiter: Optional[RateLimiter] = None,
+    key_func: Callable[[Request], str] | None = None,
+    limiter: RateLimiter | None = None,
 ):
     """
     Rate limiting decorator for FastAPI endpoints.

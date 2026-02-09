@@ -15,7 +15,6 @@ import google.generativeai as genai
 
 from app.config import Settings
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -121,6 +120,7 @@ class GeminiAnonymizer:
         self._configure()
 
         import time
+
         start_time = time.time()
 
         try:
@@ -230,14 +230,16 @@ class GeminiAnonymizer:
             )
 
         except json.JSONDecodeError as e:
-            logger.error(f"JSON parsing error: {e}. JSON text was: {json_text[:200] if 'json_text' in locals() else 'N/A'}")
-            raise ValueError(f"Erreur de parsing JSON. Veuillez réessayer.")
+            logger.error(
+                f"JSON parsing error: {e}. JSON text was: {json_text[:200] if 'json_text' in locals() else 'N/A'}"
+            )
+            raise ValueError("Erreur de parsing JSON. Veuillez réessayer.")
         except ValueError:
             # Re-raise ValueError as-is (already formatted)
             raise
         except Exception as e:
             logger.error(f"Unexpected error during anonymization: {type(e).__name__}: {e}")
-            raise ValueError(f"Erreur inattendue lors de l'anonymisation. Veuillez réessayer.")
+            raise ValueError("Erreur inattendue lors de l'anonymisation. Veuillez réessayer.")
 
     def _extract_response_text(self, response: Any) -> str | None:
         """Extract text from Gemini response with multiple fallback methods.
@@ -254,7 +256,7 @@ class GeminiAnonymizer:
         """
         # Method 1: Try standard .text property
         try:
-            if hasattr(response, 'text'):
+            if hasattr(response, "text"):
                 text = response.text
                 if text:
                     return text
@@ -263,21 +265,21 @@ class GeminiAnonymizer:
 
         # Method 2: Try accessing candidates directly
         try:
-            if hasattr(response, 'candidates') and response.candidates:
+            if hasattr(response, "candidates") and response.candidates:
                 candidate = response.candidates[0]
-                if hasattr(candidate, 'content') and candidate.content:
-                    if hasattr(candidate.content, 'parts') and candidate.content.parts:
+                if hasattr(candidate, "content") and candidate.content:
+                    if hasattr(candidate.content, "parts") and candidate.content.parts:
                         part = candidate.content.parts[0]
-                        if hasattr(part, 'text') and part.text:
+                        if hasattr(part, "text") and part.text:
                             return part.text
         except (KeyError, IndexError, AttributeError) as e:
             logger.warning(f"Candidate access failed: {type(e).__name__}: {e}")
 
         # Method 3: Try accessing parts directly from response
         try:
-            if hasattr(response, 'parts') and response.parts:
+            if hasattr(response, "parts") and response.parts:
                 part = response.parts[0]
-                if hasattr(part, 'text') and part.text:
+                if hasattr(part, "text") and part.text:
                     return part.text
         except (KeyError, IndexError, AttributeError) as e:
             logger.warning(f"Parts access failed: {type(e).__name__}: {e}")
@@ -286,11 +288,11 @@ class GeminiAnonymizer:
         try:
             response_str = str(response)
             # Look for JSON-like content in string representation
-            if '{' in response_str and '}' in response_str:
-                start = response_str.find('{')
-                end = response_str.rfind('}')
+            if "{" in response_str and "}" in response_str:
+                start = response_str.find("{")
+                end = response_str.rfind("}")
                 if start != -1 and end > start:
-                    potential_json = response_str[start:end + 1]
+                    potential_json = response_str[start : end + 1]
                     # Verify it's valid JSON
                     json.loads(potential_json)
                     return potential_json
@@ -299,7 +301,7 @@ class GeminiAnonymizer:
 
         # Log response structure for debugging
         logger.error(f"Failed to extract text. Response type: {type(response)}")
-        if hasattr(response, '__dict__'):
+        if hasattr(response, "__dict__"):
             logger.error(f"Response __dict__: {response.__dict__}")
 
         return None
@@ -333,13 +335,13 @@ class GeminiAnonymizer:
         response = response.strip()
 
         # Extract JSON between { and } (handles any extra text)
-        start = response.find('{')
-        end = response.rfind('}')
+        start = response.find("{")
+        end = response.rfind("}")
         if start != -1 and end != -1 and end > start:
-            response = response[start:end + 1]
+            response = response[start : end + 1]
         else:
             # Log the problematic response for debugging
             logger.error(f"No valid JSON structure found in response: {response[:200]}")
-            raise ValueError(f"Réponse Gemini invalide (pas de JSON trouvé)")
+            raise ValueError("Réponse Gemini invalide (pas de JSON trouvé)")
 
         return response.strip()

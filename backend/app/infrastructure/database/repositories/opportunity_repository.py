@@ -1,10 +1,9 @@
 """Opportunity repository implementation."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import func, select, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities import Opportunity
@@ -17,7 +16,7 @@ class OpportunityRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_id(self, opportunity_id: UUID) -> Optional[Opportunity]:
+    async def get_by_id(self, opportunity_id: UUID) -> Opportunity | None:
         """Get opportunity by ID."""
         result = await self.session.execute(
             select(OpportunityModel).where(OpportunityModel.id == opportunity_id)
@@ -25,7 +24,7 @@ class OpportunityRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def get_by_external_id(self, external_id: str) -> Optional[Opportunity]:
+    async def get_by_external_id(self, external_id: str) -> Opportunity | None:
         """Get opportunity by external BoondManager ID."""
         result = await self.session.execute(
             select(OpportunityModel).where(OpportunityModel.external_id == external_id)
@@ -111,7 +110,7 @@ class OpportunityRepository:
         self,
         skip: int = 0,
         limit: int = 100,
-        search: Optional[str] = None,
+        search: str | None = None,
     ) -> list[Opportunity]:
         """List active opportunities with pagination and optional search."""
         query = select(OpportunityModel).where(OpportunityModel.is_active == True)
@@ -130,11 +129,9 @@ class OpportunityRepository:
         result = await self.session.execute(query)
         return [self._to_entity(m) for m in result.scalars().all()]
 
-    async def count_active(self, search: Optional[str] = None) -> int:
+    async def count_active(self, search: str | None = None) -> int:
         """Count active opportunities."""
-        query = select(func.count(OpportunityModel.id)).where(
-            OpportunityModel.is_active == True
-        )
+        query = select(func.count(OpportunityModel.id)).where(OpportunityModel.is_active == True)
 
         if search:
             search_pattern = f"%{search}%"
@@ -149,18 +146,16 @@ class OpportunityRepository:
         result = await self.session.execute(query)
         return result.scalar() or 0
 
-    async def get_last_sync_time(self) -> Optional[datetime]:
+    async def get_last_sync_time(self) -> datetime | None:
         """Get the most recent sync time."""
-        result = await self.session.execute(
-            select(func.max(OpportunityModel.synced_at))
-        )
+        result = await self.session.execute(select(func.max(OpportunityModel.synced_at)))
         return result.scalar()
 
     async def list_shared(
         self,
         skip: int = 0,
         limit: int = 100,
-        search: Optional[str] = None,
+        search: str | None = None,
     ) -> list[Opportunity]:
         """List shared opportunities available for cooptation."""
         query = select(OpportunityModel).where(
@@ -182,7 +177,7 @@ class OpportunityRepository:
         result = await self.session.execute(query)
         return [self._to_entity(m) for m in result.scalars().all()]
 
-    async def count_shared(self, search: Optional[str] = None) -> int:
+    async def count_shared(self, search: str | None = None) -> int:
         """Count shared opportunities."""
         query = select(func.count(OpportunityModel.id)).where(
             OpportunityModel.is_active == True,
@@ -222,9 +217,7 @@ class OpportunityRepository:
     async def count_by_owner(self, owner_id: UUID) -> int:
         """Count opportunities owned by a specific user."""
         result = await self.session.execute(
-            select(func.count(OpportunityModel.id)).where(
-                OpportunityModel.owner_id == owner_id
-            )
+            select(func.count(OpportunityModel.id)).where(OpportunityModel.owner_id == owner_id)
         )
         return result.scalar() or 0
 

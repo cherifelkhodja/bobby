@@ -1,7 +1,6 @@
 """Get batch progress use case."""
 
 import logging
-from typing import Optional
 from uuid import UUID
 
 from app.quotation_generator.domain.exceptions import BatchNotFoundError
@@ -88,20 +87,22 @@ class GetBatchDetailsUseCase:
         # Build detailed response
         quotations = []
         for q in batch.quotations:
-            quotations.append({
-                "row_index": q.row_index,
-                "resource_name": q.resource_name,
-                "resource_trigramme": q.resource_trigramme,
-                "opportunity_id": q.opportunity_id,
-                "company_name": q.company_name,
-                "status": q.status.value,
-                "boond_quotation_id": q.boond_quotation_id,
-                "boond_reference": q.boond_reference,
-                "pdf_path": q.pdf_path,  # Individual PDF path for download
-                "error_message": q.error_message,
-                "is_valid": q.is_valid,
-                "validation_errors": q.validation_errors,
-            })
+            quotations.append(
+                {
+                    "row_index": q.row_index,
+                    "resource_name": q.resource_name,
+                    "resource_trigramme": q.resource_trigramme,
+                    "opportunity_id": q.opportunity_id,
+                    "company_name": q.company_name,
+                    "status": q.status.value,
+                    "boond_quotation_id": q.boond_quotation_id,
+                    "boond_reference": q.boond_reference,
+                    "pdf_path": q.pdf_path,  # Individual PDF path for download
+                    "error_message": q.error_message,
+                    "is_valid": q.is_valid,
+                    "validation_errors": q.validation_errors,
+                }
+            )
 
         return {
             "batch_id": str(batch.id),

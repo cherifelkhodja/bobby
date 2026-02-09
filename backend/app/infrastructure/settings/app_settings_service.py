@@ -1,14 +1,12 @@
 """Application settings service for runtime configuration."""
 
 import logging
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database.models import AppSettingModel
-
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +22,16 @@ DEFAULT_SETTINGS = {
 # Available Gemini models
 AVAILABLE_GEMINI_MODELS = [
     {"id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash", "description": "Fast and efficient"},
-    {"id": "gemini-2.0-flash-lite", "name": "Gemini 2.0 Flash Lite", "description": "Lighter version, faster"},
-    {"id": "gemini-1.5-flash", "name": "Gemini 1.5 Flash", "description": "Previous generation, stable"},
+    {
+        "id": "gemini-2.0-flash-lite",
+        "name": "Gemini 2.0 Flash Lite",
+        "description": "Lighter version, faster",
+    },
+    {
+        "id": "gemini-1.5-flash",
+        "name": "Gemini 1.5 Flash",
+        "description": "Previous generation, stable",
+    },
     {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro", "description": "More capable, slower"},
 ]
 
@@ -37,8 +43,16 @@ AVAILABLE_CV_AI_PROVIDERS = [
 
 # Available Claude models for CV transformation
 AVAILABLE_CLAUDE_MODELS = [
-    {"id": "claude-sonnet-4-5-20250929", "name": "Claude Sonnet 4.5", "description": "Recommandé pour CV"},
-    {"id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5", "description": "Plus rapide, moins précis"},
+    {
+        "id": "claude-sonnet-4-5-20250929",
+        "name": "Claude Sonnet 4.5",
+        "description": "Recommandé pour CV",
+    },
+    {
+        "id": "claude-haiku-4-5-20251001",
+        "name": "Claude Haiku 4.5",
+        "description": "Plus rapide, moins précis",
+    },
 ]
 
 
@@ -54,7 +68,7 @@ class AppSettingsService:
         self.db_session = db_session
         self._cache: dict[str, str] = {}
 
-    async def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
+    async def get(self, key: str, default: str | None = None) -> str | None:
         """Get a setting value by key.
 
         Args:
@@ -87,8 +101,8 @@ class AppSettingsService:
         self,
         key: str,
         value: str,
-        updated_by: Optional[UUID] = None,
-        description: Optional[str] = None,
+        updated_by: UUID | None = None,
+        description: str | None = None,
     ) -> bool:
         """Set a setting value.
 

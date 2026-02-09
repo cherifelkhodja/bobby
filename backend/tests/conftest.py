@@ -1,33 +1,30 @@
 """Pytest configuration and fixtures."""
 
 import asyncio
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
 from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
+from app.dependencies import get_db
 from app.domain.value_objects import UserRole
 from app.infrastructure.database.models import Base, UserModel
-from app.infrastructure.database.connection import get_async_session
 from app.infrastructure.security.jwt import create_access_token, create_refresh_token
 from app.infrastructure.security.password import hash_password
 from app.main import app
-from app.dependencies import get_db
-
 from tests.factories import (
-    UserFactory,
     CandidateFactory,
-    OpportunityFactory,
     CooptationFactory,
     InvitationFactory,
-    JobPostingFactory,
     JobApplicationFactory,
+    JobPostingFactory,
+    OpportunityFactory,
+    UserFactory,
 )
-
 
 # Use SQLite for testing
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -36,6 +33,7 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 # ============================================================================
 # Event Loop Configuration
 # ============================================================================
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -48,6 +46,7 @@ def event_loop():
 # ============================================================================
 # Database Fixtures
 # ============================================================================
+
 
 @pytest_asyncio.fixture(scope="function")
 async def db_engine():
@@ -86,6 +85,7 @@ async def db_session(db_engine) -> AsyncGenerator[AsyncSession, None]:
 # HTTP Client Fixtures
 # ============================================================================
 
+
 @pytest_asyncio.fixture(scope="function")
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Create test HTTP client with database override."""
@@ -105,6 +105,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 # ============================================================================
 # User Fixtures
 # ============================================================================
+
 
 @pytest_asyncio.fixture
 async def test_user(db_session: AsyncSession) -> UserModel:
@@ -225,6 +226,7 @@ async def inactive_user(db_session: AsyncSession) -> UserModel:
 # Authentication Helpers
 # ============================================================================
 
+
 def get_auth_headers(user_id: UUID) -> dict[str, str]:
     """Generate authorization headers for a user."""
     token = create_access_token(user_id)
@@ -259,6 +261,7 @@ def rh_headers(rh_user: UserModel) -> dict[str, str]:
 # Token Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def access_token(test_user: UserModel) -> str:
     """Create access token for test user."""
@@ -275,6 +278,7 @@ def refresh_token(test_user: UserModel) -> str:
 def expired_token() -> str:
     """Create an expired token."""
     from datetime import datetime, timedelta
+
     from jose import jwt
 
     payload = {
@@ -295,6 +299,7 @@ def invalid_token() -> str:
 # ============================================================================
 # Sample Data Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def user_data():
@@ -351,6 +356,7 @@ def opportunity_data():
 # ============================================================================
 # Factory Fixtures (from factories.py)
 # ============================================================================
+
 
 @pytest.fixture
 def user_factory():

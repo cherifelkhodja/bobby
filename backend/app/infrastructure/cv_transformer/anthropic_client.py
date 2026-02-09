@@ -13,7 +13,6 @@ from anthropic import Anthropic
 from app.config import Settings
 from app.infrastructure.cv_transformer.prompts import CV_EXTRACTION_PROMPT
 
-
 logger = logging.getLogger(__name__)
 
 # Structured CV data type

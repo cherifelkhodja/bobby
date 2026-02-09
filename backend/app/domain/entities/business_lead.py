@@ -3,7 +3,6 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID, uuid4
 
 
@@ -45,16 +44,16 @@ class BusinessLead:
     description: str
     submitter_id: UUID  # User who submitted the lead
     client_name: str
-    contact_name: Optional[str] = None
-    contact_email: Optional[str] = None
-    contact_phone: Optional[str] = None
-    estimated_budget: Optional[float] = None
-    expected_start_date: Optional[date] = None
+    contact_name: str | None = None
+    contact_email: str | None = None
+    contact_phone: str | None = None
+    estimated_budget: float | None = None
+    expected_start_date: date | None = None
     skills_needed: list[str] = field(default_factory=list)
-    location: Optional[str] = None
+    location: str | None = None
     status: BusinessLeadStatus = BusinessLeadStatus.DRAFT
-    rejection_reason: Optional[str] = None
-    notes: Optional[str] = None
+    rejection_reason: str | None = None
+    notes: str | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
@@ -80,7 +79,7 @@ class BusinessLead:
         self.status = BusinessLeadStatus.QUALIFIED
         self.updated_at = datetime.utcnow()
 
-    def reject(self, reason: Optional[str] = None) -> None:
+    def reject(self, reason: str | None = None) -> None:
         """Reject the business lead."""
         if self.status.is_final:
             raise ValueError("Cannot reject a lead with final status")

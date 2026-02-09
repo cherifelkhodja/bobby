@@ -1,12 +1,11 @@
 """CV Transformer API endpoints."""
 
-from typing import Optional
+import io
 from uuid import UUID
 
 from fastapi import APIRouter, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-import io
 
 from app.api.middleware.rate_limiter import limiter
 from app.application.use_cases.cv_transformer import (
@@ -15,7 +14,6 @@ from app.application.use_cases.cv_transformer import (
     TransformCvUseCase,
     UploadTemplateUseCase,
 )
-from app.config import settings
 from app.dependencies import AppSettings, AppSettingsSvc, DbSession
 from app.domain.value_objects import UserRole
 from app.infrastructure.audit import audit_logger
@@ -48,7 +46,7 @@ class TemplateResponse(BaseModel):
     id: str
     name: str
     display_name: str
-    description: Optional[str] = None
+    description: str | None = None
     is_active: bool
     updated_at: str
 
@@ -173,9 +171,7 @@ async def list_templates(
     include_inactive = role == UserRole.ADMIN
     templates = await use_case.execute(include_inactive=include_inactive)
 
-    return TemplatesListResponse(
-        templates=[TemplateResponse(**t) for t in templates]
-    )
+    return TemplatesListResponse(templates=[TemplateResponse(**t) for t in templates])
 
 
 @router.post("/transform")
@@ -194,7 +190,10 @@ async def transform_cv(
     Upload a PDF or DOCX file and receive a formatted Word document back.
     Rate limited to 10 transformations per hour (expensive operation).
     """
-    print(f"[CV Transform] Request received: template={template_name}, filename={file.filename}", flush=True)
+    print(
+        f"[CV Transform] Request received: template={template_name}, filename={file.filename}",
+        flush=True,
+    )
 
     user_id = await require_transformer_access(db, authorization)
     ip_address = request.client.host if request.client else None
@@ -240,7 +239,7 @@ async def transform_cv(
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=400,
-            detail=f"Fichier trop volumineux. Maximum {MAX_FILE_SIZE // (1024*1024)} Mo",
+            detail=f"Fichier trop volumineux. Maximum {MAX_FILE_SIZE // (1024 * 1024)} Mo",
         )
 
     if len(content) == 0:
@@ -263,7 +262,10 @@ async def transform_cv(
     )
 
     try:
-        print(f"[CV Transform] Starting transformation: template={template_name}, file={file.filename}, size={len(content)}", flush=True)
+        print(
+            f"[CV Transform] Starting transformation: template={template_name}, file={file.filename}, size={len(content)}",
+            flush=True,
+        )
         output_content = await use_case.execute(
             user_id=user_id,
             template_name=template_name,
@@ -328,7 +330,7 @@ async def upload_template(
     db: DbSession,
     file: UploadFile = File(...),
     display_name: str = Form(...),
-    description: Optional[str] = Form(None),
+    description: str | None = Form(None),
     authorization: str = Header(default=""),
 ):
     """Upload or update a CV template (admin only).
