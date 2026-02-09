@@ -203,9 +203,7 @@ class TestAnonymize:
 
     @pytest.mark.asyncio
     @patch("app.infrastructure.anonymizer.gemini_anonymizer.genai")
-    async def test_anonymize_empty_response_raises_value_error(
-        self, mock_genai, mock_settings
-    ):
+    async def test_anonymize_empty_response_raises_value_error(self, mock_genai, mock_settings):
         """Test that an empty Gemini response raises ValueError."""
         mock_genai_client = MagicMock()
         mock_genai.Client.return_value = mock_genai_client
@@ -220,9 +218,7 @@ class TestAnonymize:
 
     @pytest.mark.asyncio
     @patch("app.infrastructure.anonymizer.gemini_anonymizer.genai")
-    async def test_anonymize_malformed_json_raises_value_error(
-        self, mock_genai, mock_settings
-    ):
+    async def test_anonymize_malformed_json_raises_value_error(self, mock_genai, mock_settings):
         """Test that malformed JSON in response raises ValueError."""
         mock_genai_client = MagicMock()
         mock_genai.Client.return_value = mock_genai_client
@@ -237,9 +233,7 @@ class TestAnonymize:
 
     @pytest.mark.asyncio
     @patch("app.infrastructure.anonymizer.gemini_anonymizer.genai")
-    async def test_anonymize_non_dict_response_raises_value_error(
-        self, mock_genai, mock_settings
-    ):
+    async def test_anonymize_non_dict_response_raises_value_error(self, mock_genai, mock_settings):
         """Test that a non-dict JSON response (e.g. array) raises ValueError."""
         mock_genai_client = MagicMock()
         mock_genai.Client.return_value = mock_genai_client

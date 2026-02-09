@@ -275,9 +275,7 @@ class TestCalculateMatchEnhanced:
         assert "2024-03-01" in prompt
 
     @pytest.mark.asyncio
-    async def test_enhanced_match_returns_default_when_not_configured(
-        self, mock_settings_no_key
-    ):
+    async def test_enhanced_match_returns_default_when_not_configured(self, mock_settings_no_key):
         """Test that default result is returned when Gemini is not configured."""
         service = GeminiMatchingService(mock_settings_no_key)
         result = await service.calculate_match_enhanced(
@@ -291,9 +289,7 @@ class TestCalculateMatchEnhanced:
 
     @pytest.mark.asyncio
     @patch("app.infrastructure.matching.gemini_matcher.genai")
-    async def test_enhanced_match_returns_default_for_empty_inputs(
-        self, mock_genai, mock_settings
-    ):
+    async def test_enhanced_match_returns_default_for_empty_inputs(self, mock_genai, mock_settings):
         """Test that default result is returned for empty CV or job description."""
         mock_genai.Client.return_value = MagicMock()
 
@@ -308,9 +304,7 @@ class TestCalculateMatchEnhanced:
 
     @pytest.mark.asyncio
     @patch("app.infrastructure.matching.gemini_matcher.genai")
-    async def test_enhanced_match_empty_response_returns_default(
-        self, mock_genai, mock_settings
-    ):
+    async def test_enhanced_match_empty_response_returns_default(self, mock_genai, mock_settings):
         """Test that empty Gemini response returns default result."""
         mock_genai_client = MagicMock()
         mock_genai.Client.return_value = mock_genai_client
@@ -371,9 +365,7 @@ class TestCalculateMatchEnhanced:
 
     @pytest.mark.asyncio
     @patch("app.infrastructure.matching.gemini_matcher.genai")
-    async def test_enhanced_match_score_clamped_to_bounds(
-        self, mock_genai, mock_settings
-    ):
+    async def test_enhanced_match_score_clamped_to_bounds(self, mock_genai, mock_settings):
         """Test that score_global is clamped between 0 and 100."""
         mock_genai_client = MagicMock()
         mock_genai.Client.return_value = mock_genai_client
@@ -440,9 +432,7 @@ class TestCalculateMatchLegacy:
         assert "profil backend" in result["summary"]
 
     @pytest.mark.asyncio
-    async def test_legacy_match_returns_default_when_not_configured(
-        self, mock_settings_no_key
-    ):
+    async def test_legacy_match_returns_default_when_not_configured(self, mock_settings_no_key):
         """Test default result when Gemini is not configured."""
         service = GeminiMatchingService(mock_settings_no_key)
         result = await service.calculate_match("CV text", "Job desc")
@@ -453,9 +443,7 @@ class TestCalculateMatchLegacy:
 
     @pytest.mark.asyncio
     @patch("app.infrastructure.matching.gemini_matcher.genai")
-    async def test_legacy_match_score_clamped_to_bounds(
-        self, mock_genai, mock_settings
-    ):
+    async def test_legacy_match_score_clamped_to_bounds(self, mock_genai, mock_settings):
         """Test that score is clamped between 0 and 100."""
         mock_genai_client = MagicMock()
         mock_genai.Client.return_value = mock_genai_client
@@ -478,17 +466,12 @@ class TestCalculateMatchLegacy:
 
     @pytest.mark.asyncio
     @patch("app.infrastructure.matching.gemini_matcher.genai")
-    async def test_legacy_match_handles_markdown_wrapped_response(
-        self, mock_genai, mock_settings
-    ):
+    async def test_legacy_match_handles_markdown_wrapped_response(self, mock_genai, mock_settings):
         """Test that markdown-wrapped JSON is parsed correctly."""
         mock_genai_client = MagicMock()
         mock_genai.Client.return_value = mock_genai_client
 
-        raw = (
-            '```json\n{"score": 55, "strengths": ["A"], '
-            '"gaps": ["B"], "summary": "OK"}\n```'
-        )
+        raw = '```json\n{"score": 55, "strengths": ["A"], "gaps": ["B"], "summary": "OK"}\n```'
         mock_generate = AsyncMock(return_value=_make_response(raw))
         mock_genai_client.aio.models.generate_content = mock_generate
 
@@ -515,9 +498,7 @@ class TestEvaluateCvQuality:
         mock_genai_client = MagicMock()
         mock_genai.Client.return_value = mock_genai_client
 
-        mock_generate = AsyncMock(
-            return_value=_make_response(sample_cv_quality_response)
-        )
+        mock_generate = AsyncMock(return_value=_make_response(sample_cv_quality_response))
         mock_genai_client.aio.models.generate_content = mock_generate
 
         service = GeminiMatchingService(mock_settings)
@@ -536,9 +517,7 @@ class TestEvaluateCvQuality:
         mock_genai_client = MagicMock()
         mock_genai.Client.return_value = mock_genai_client
 
-        mock_generate = AsyncMock(
-            return_value=_make_response(sample_cv_quality_response)
-        )
+        mock_generate = AsyncMock(return_value=_make_response(sample_cv_quality_response))
         mock_genai_client.aio.models.generate_content = mock_generate
 
         service = GeminiMatchingService(mock_settings)
@@ -652,9 +631,7 @@ class TestEvaluateCvQuality:
 
     @pytest.mark.asyncio
     @patch("app.infrastructure.matching.gemini_matcher.genai")
-    async def test_evaluate_cv_quality_malformed_json_raises(
-        self, mock_genai, mock_settings
-    ):
+    async def test_evaluate_cv_quality_malformed_json_raises(self, mock_genai, mock_settings):
         """Test that malformed JSON raises CvMatchingError."""
         mock_genai_client = MagicMock()
         mock_genai.Client.return_value = mock_genai_client
@@ -669,9 +646,7 @@ class TestEvaluateCvQuality:
 
     @pytest.mark.asyncio
     @patch("app.infrastructure.matching.gemini_matcher.genai")
-    async def test_evaluate_cv_quality_note_clamped_to_20(
-        self, mock_genai, mock_settings
-    ):
+    async def test_evaluate_cv_quality_note_clamped_to_20(self, mock_genai, mock_settings):
         """Test that note_globale is clamped between 0 and 20."""
         mock_genai_client = MagicMock()
         mock_genai.Client.return_value = mock_genai_client
@@ -752,9 +727,7 @@ class TestHealthCheck:
 
     @pytest.mark.asyncio
     @patch("app.infrastructure.matching.gemini_matcher.genai")
-    async def test_health_check_returns_false_on_api_error(
-        self, mock_genai, mock_settings
-    ):
+    async def test_health_check_returns_false_on_api_error(self, mock_genai, mock_settings):
         """Test that health_check returns False when API call fails."""
         mock_genai_client = MagicMock()
         mock_genai.Client.return_value = mock_genai_client
@@ -768,9 +741,7 @@ class TestHealthCheck:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_health_check_returns_false_when_not_configured(
-        self, mock_settings_no_key
-    ):
+    async def test_health_check_returns_false_when_not_configured(self, mock_settings_no_key):
         """Test that health_check returns False when Gemini is not configured."""
         service = GeminiMatchingService(mock_settings_no_key)
         result = await service.health_check()
