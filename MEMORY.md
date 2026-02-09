@@ -140,6 +140,14 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-02-09
+- **fix(ci)**: Amélioration résilience workflow GitHub Actions
+  - Ajout `concurrency` group pour annuler les runs CI redondants
+  - Ajout `timeout-minutes` sur tous les jobs (15min backend/docker, 10min frontend)
+  - `fetch-depth: 1` explicite pour shallow clones plus rapides
+  - `npm ci` au lieu de `npm install` pour builds reproductibles
+  - Contexte : erreurs transitoires HTTP 500/502 de GitHub sur `actions/checkout@v4`
+
 ### 2026-02-08
 - **feat(cv-transformer)**: Intégration Claude Sonnet 4.5 comme provider IA alternatif
   - Nouveau client `AnthropicClient` implémentant `CvDataExtractorPort` (architecture hexagonale)
