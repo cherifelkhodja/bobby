@@ -116,7 +116,7 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         """Get list of allowed CORS origins."""
-        origins = [self.FRONTEND_URL]
+        origins = [self.FRONTEND_URL, "https://app.b0bby.fr"]
 
         # Add localhost for development
         if not self.is_production:
