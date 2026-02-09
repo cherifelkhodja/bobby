@@ -1,0 +1,43 @@
+{
+  "name": "Gemini",
+  "colors": {
+    "primary": "50A492",
+    "sectionBg": "5D9E98",
+    "border": "5B9B96",
+    "period": "707070",
+    "text": "000000",
+    "white": "FFFFFF"
+  },
+  "fonts": {
+    "main": "Calibri",
+    "sizes": {
+      "title": 34,
+      "subtitle": 28,
+      "section": 26,
+      "subsection": 24,
+      "text": 24,
+      "footer": 18
+    }
+  },
+  "spacing": {
+    "paragraph": 100,
+    "section": 300,
+    "subsection": 200,
+    "bullet": 100,
+    "competence": 100
+  },
+  "margins": {
+    "top": 720,
+    "right": 720,
+    "bottom": 900,
+    "left": 720
+  },
+  "logo": {
+    "width": 180,
+    "height": 59
+  },
+  "footer": {
+    "line1": "GEMINI",
+    "line2": "54 Avenue Hoche – 75008 Paris"
+  }
+}

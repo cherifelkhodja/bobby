@@ -13,6 +13,7 @@ import { MyCooptations } from './pages/MyCooptations';
 import { Profile } from './pages/Profile';
 import { Admin } from './pages/Admin';
 import { CvTransformer } from './pages/CvTransformer';
+import { CvGeneratorBeta } from './pages/CvGeneratorBeta';
 import { QuotationGenerator } from './pages/QuotationGenerator';
 import HRDashboard from './pages/HRDashboard';
 import CreateJobPosting from './pages/CreateJobPosting';
@@ -78,6 +79,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin', 'commercial', 'rh']}>
               <CvTransformer />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="cv-generator-beta"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'commercial', 'rh']}>
+              <CvGeneratorBeta />
             </ProtectedRoute>
           }
         />
