@@ -50,7 +50,8 @@
     "titleBold": true,
     "titleItalic": true,
     "titleBorderBottom": false,
-    "titleLineSpacing": 276
+    "titleLineSpacing": 276,
+    "contentLineSpacing": 360
   },
   "skipSections": ["competences"],
   "diplomeStyle": {

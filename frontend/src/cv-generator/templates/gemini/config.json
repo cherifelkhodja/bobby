@@ -36,6 +36,9 @@
     "width": 180,
     "height": 59
   },
+  "experienceStyle": {
+    "contentLineSpacing": 360
+  },
   "footer": {
     "line1": "GEMINI",
     "line2": "54 Avenue Hoche – 75008 Paris"

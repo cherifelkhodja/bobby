@@ -72,6 +72,7 @@ export interface TemplateConfig {
     titleItalic?: boolean; // default true
     titleBorderBottom?: boolean; // default true
     titleLineSpacing?: number;
+    contentLineSpacing?: number; // line spacing for content paragraphs (360 = 1.5x)
   };
   skipSections?: string[]; // section IDs to skip (e.g. ['competences'])
   diplomeStyle?: {
@@ -170,9 +171,13 @@ function createHelpers(
       });
     },
 
-    competenceLine: (category: string, values: string) =>
+    competenceLine: (category: string, values: string, lineSpacing?: number) =>
       new Paragraph({
-        spacing: { before: spacing.competence, after: spacing.competence },
+        spacing: {
+          before: spacing.competence,
+          after: spacing.competence,
+          ...(lineSpacing ? { line: lineSpacing } : {}),
+        },
         children: [
           new TextRun({
             text: category,
@@ -188,11 +193,15 @@ function createHelpers(
         ],
       }),
 
-    bullet: (text: string, level = 0) => {
+    bullet: (text: string, level = 0, lineSpacing?: number) => {
       const indent = 400 + level * 400;
       const marker = level === 0 ? '\u2022 ' : level === 1 ? '\u25CB ' : '\u25AA ';
       return new Paragraph({
-        spacing: { before: spacing.bullet, after: spacing.bullet },
+        spacing: {
+          before: spacing.bullet,
+          after: spacing.bullet,
+          ...(lineSpacing ? { line: lineSpacing } : {}),
+        },
         indent: { left: indent, hanging: 200 },
         children: [
           new TextRun({
@@ -204,9 +213,13 @@ function createHelpers(
       });
     },
 
-    text: (content: string, options: { bold?: boolean; italic?: boolean } = {}) =>
+    text: (content: string, options: { bold?: boolean; italic?: boolean; lineSpacing?: number } = {}) =>
       new Paragraph({
-        spacing: { before: spacing.paragraph, after: spacing.paragraph },
+        spacing: {
+          before: spacing.paragraph,
+          after: spacing.paragraph,
+          ...(options.lineSpacing ? { line: options.lineSpacing } : {}),
+        },
         children: [
           new TextRun({
             text: content,
@@ -503,7 +516,8 @@ function createHelpers(
 function renderContent(
   content: SectionContent[],
   helpers: ReturnType<typeof createHelpers>,
-  isExperienceSection = false
+  isExperienceSection = false,
+  lineSpacing?: number
 ): Paragraph[] {
   const elements: Paragraph[] = [];
 
@@ -517,16 +531,16 @@ function renderContent(
           );
         }
         elements.push(helpers.subSectionTitle(item.title));
-        elements.push(...renderContent(item.content, helpers));
+        elements.push(...renderContent(item.content, helpers, false, lineSpacing));
         break;
       case 'competence':
-        elements.push(helpers.competenceLine(item.category, item.values));
+        elements.push(helpers.competenceLine(item.category, item.values, lineSpacing));
         break;
       case 'bullet':
-        elements.push(helpers.bullet(item.text, item.level || 0));
+        elements.push(helpers.bullet(item.text, item.level || 0, lineSpacing));
         break;
       case 'text':
-        elements.push(helpers.text(item.text, { bold: item.bold }));
+        elements.push(helpers.text(item.text, { bold: item.bold, lineSpacing }));
         break;
       case 'diplome':
         elements.push(
@@ -538,12 +552,12 @@ function renderContent(
           ...helpers.expHeader(item.client, item.periode, item.titre)
         );
         if (item.description) {
-          elements.push(helpers.text(item.description));
+          elements.push(helpers.text(item.description, { lineSpacing }));
         }
-        elements.push(...renderContent(item.content, helpers));
+        elements.push(...renderContent(item.content, helpers, false, lineSpacing));
         if (item.environnement) {
           elements.push(
-            helpers.competenceLine('Environnement', item.environnement)
+            helpers.competenceLine('Environnement', item.environnement, lineSpacing)
           );
         }
         if (isExperienceSection && index < content.length - 1) {
@@ -564,13 +578,20 @@ function renderSections(
   const elements: Paragraph[] = [];
   const skipSections = config.skipSections ?? [];
 
+  const contentLineSpacing = config.experienceStyle?.contentLineSpacing;
+
   sections.forEach((section) => {
     if (skipSections.includes(section.id)) return;
 
     elements.push(helpers.sectionTitle(section.title));
     const isExperienceSection = section.id === 'experiences';
     elements.push(
-      ...renderContent(section.content, helpers, isExperienceSection)
+      ...renderContent(
+        section.content,
+        helpers,
+        isExperienceSection,
+        isExperienceSection ? contentLineSpacing : undefined
+      )
     );
     if (section.id === 'certifications') {
       elements.push(helpers.pageBreak());
