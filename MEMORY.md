@@ -167,6 +167,10 @@ docker-compose up # Start all services
   - `desiredContract` : 0=CDI (employee), 3=Freelance (freelance), 0=both
   - Appel automatique après `POST /candidates` dans les deux use cases
   - Fichiers modifiés : `mappers.py`, `client.py`, `job_applications.py`
+- **fix(boond)**: Correction `CreateCandidateInBoondUseCase.execute()` - return manquant + code mort
+  - `execute()` ne retournait pas de `JobApplicationReadModel` après création réussie (retour implicite None)
+  - Code mort après `return context` dans `_build_boond_context` (reste d'un refactoring précédent) supprimé
+  - Fichier modifié : `job_applications.py`
 - **refactor(admin)**: Stats CV Generator déplacées dans l'admin (onglet Stats dédié)
   - Retiré la section stats de `CvGeneratorBeta.tsx`
   - Créé `StatsTab.tsx` dans admin avec les mêmes stats
