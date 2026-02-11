@@ -735,6 +735,7 @@ async def update_job_posting(
 async def publish_job_posting(
     posting_id: str,
     db: DbSession,
+    boond_client: Boond,
     app_settings: AppSettings,
     authorization: str = Header(default=""),
 ):
@@ -751,6 +752,7 @@ async def publish_job_posting(
         opportunity_repository=opportunity_repo,
         user_repository=user_repo,
         turnoverit_client=turnoverit_client,
+        boond_client=boond_client,
     )
 
     try:

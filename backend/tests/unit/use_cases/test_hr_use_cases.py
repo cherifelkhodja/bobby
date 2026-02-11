@@ -290,6 +290,7 @@ class TestPublishJobPostingUseCase:
             "opportunity_repo": AsyncMock(),
             "user_repo": AsyncMock(),
             "turnoverit_client": AsyncMock(),
+            "boond_client": AsyncMock(),
         }
 
     @pytest.fixture
@@ -299,6 +300,7 @@ class TestPublishJobPostingUseCase:
             opportunity_repository=mock_deps["opportunity_repo"],
             user_repository=mock_deps["user_repo"],
             turnoverit_client=mock_deps["turnoverit_client"],
+            boond_client=mock_deps["boond_client"],
         )
 
     @pytest.mark.asyncio
@@ -340,13 +342,18 @@ class TestPublishJobPostingUseCase:
         posting.to_turnoverit_payload = MagicMock(return_value={})
         posting.publish = MagicMock()
 
-        opportunity = MagicMock(title="Opp Title", reference="REF", client_name="Client")
+        posting.generate_turnoverit_reference = MagicMock(return_value="GEM-20260211-A1B2C3")
+
+        opportunity = MagicMock(
+            title="Opp Title", reference="REF", client_name="Client", external_id="123"
+        )
         user = MagicMock(full_name="Admin")
 
         mock_deps["job_posting_repo"].get_by_id.return_value = posting
         mock_deps["opportunity_repo"].get_by_id.return_value = opportunity
         mock_deps["user_repo"].get_by_id.return_value = user
         mock_deps["turnoverit_client"].create_job.return_value = "TIT-12345"
+        mock_deps["boond_client"].get_opportunity_info.return_value = {"agency_id": "1"}
 
         async def mock_save(p):
             return p

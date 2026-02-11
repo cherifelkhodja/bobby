@@ -145,10 +145,25 @@ class TestJobPosting:
         posting.close()
         assert posting.status == JobPostingStatus.CLOSED
 
-    def test_turnoverit_reference_auto_generated(self):
+    def test_turnoverit_reference_not_auto_generated(self):
         posting = self._create_valid_posting()
-        assert posting.turnoverit_reference is not None
-        assert posting.turnoverit_reference.startswith("ESN-")
+        assert posting.turnoverit_reference is None
+
+    def test_generate_reference_gemini(self):
+        posting = self._create_valid_posting()
+        ref = posting.generate_turnoverit_reference("1")
+        assert ref.startswith("GEM-")
+        assert len(ref) == 18  # GEM-YYYYMMDD-XXXXXX
+
+    def test_generate_reference_craftmania(self):
+        posting = self._create_valid_posting()
+        ref = posting.generate_turnoverit_reference("5")
+        assert ref.startswith("CRA-")
+
+    def test_generate_reference_unknown_agency(self):
+        posting = self._create_valid_posting()
+        ref = posting.generate_turnoverit_reference(None)
+        assert ref.startswith("ESN-")
 
 
 class TestJobApplication:

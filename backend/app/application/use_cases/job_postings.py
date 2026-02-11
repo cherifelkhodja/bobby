@@ -549,11 +549,13 @@ class PublishJobPostingUseCase:
         opportunity_repository: OpportunityRepository,
         user_repository: UserRepository,
         turnoverit_client: TurnoverITClient,
+        boond_client: BoondClient,
     ) -> None:
         self.job_posting_repository = job_posting_repository
         self.opportunity_repository = opportunity_repository
         self.user_repository = user_repository
         self.turnoverit_client = turnoverit_client
+        self.boond_client = boond_client
 
     async def execute(self, posting_id: UUID) -> JobPostingReadModel:
         """Publish job posting to Turnover-IT."""
@@ -566,6 +568,20 @@ class PublishJobPostingUseCase:
 
         # Get opportunity for context
         opportunity = await self.opportunity_repository.get_by_id(posting.opportunity_id)
+
+        # Fetch Boond opportunity to get agency_id for reference prefix
+        agency_id = None
+        if opportunity and opportunity.external_id:
+            try:
+                boond_opp = await self.boond_client.get_opportunity_info(
+                    opportunity.external_id
+                )
+                agency_id = boond_opp.get("agency_id") if boond_opp else None
+            except Exception:
+                pass  # Fallback to default prefix
+
+        # Generate unique reference based on agency
+        posting.generate_turnoverit_reference(agency_id)
 
         # Build Turnover-IT payload
         application_base_url = f"{settings.FRONTEND_URL}/postuler"

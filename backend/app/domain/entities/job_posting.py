@@ -1,6 +1,7 @@
 """Job posting domain entity for Turnover-IT integration."""
 
 import secrets
+import string
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
@@ -151,10 +152,29 @@ class JobPosting:
     published_at: datetime | None = None
     closed_at: datetime | None = None
 
-    def __post_init__(self) -> None:
-        """Generate turnoverit_reference if not set."""
-        if not self.turnoverit_reference:
-            self.turnoverit_reference = f"ESN-{self.id.hex[:12].upper()}"
+    # Agency prefix mapping for Turnover-IT references
+    AGENCY_PREFIXES: dict[str, str] = {
+        "1": "GEM",   # Gemini
+        "5": "CRA",   # Craftmania
+    }
+    DEFAULT_PREFIX: str = "ESN"
+
+    def generate_turnoverit_reference(self, agency_id: str | None = None) -> str:
+        """Generate a unique Turnover-IT reference based on agency.
+
+        Format: {PREFIX}-{YYYYMMDD}-{6 random chars}
+        Examples: GEM-20260211-A1B2C3, CRA-20260211-X9Y8Z7
+
+        Args:
+            agency_id: Boond agency ID ("1" for Gemini, "5" for Craftmania).
+        """
+        prefix = self.AGENCY_PREFIXES.get(agency_id or "", self.DEFAULT_PREFIX)
+        date_str = datetime.utcnow().strftime("%Y%m%d")
+        random_part = "".join(
+            secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6)
+        )
+        self.turnoverit_reference = f"{prefix}-{date_str}-{random_part}"
+        return self.turnoverit_reference
 
     @property
     def is_published(self) -> bool:

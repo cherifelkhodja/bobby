@@ -144,6 +144,15 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-11
+- **feat(turnoverit)**: Référence Turnover-IT basée sur l'agence BoondManager
+  - Format : `{PREFIX}-{YYYYMMDD}-{6 chars aléatoires}` (ex: `GEM-20260211-A1B2C3`)
+  - Préfixes : `GEM` (Gemini, agency_id=1), `CRA` (Craftmania, agency_id=5), `ESN` (fallback)
+  - Référence générée à la publication (plus à la création), garantit l'unicité même en republication
+  - `PublishJobPostingUseCase` fetch l'opportunité Boond pour obtenir l'`agency_id`
+  - Fichiers modifiés : `job_posting.py` (entity), `job_postings.py` (use case), `hr.py` (route)
+- **feat(boond)**: Ajout du titre de poste (`job_title`) sur le candidat BoondManager lors de la création
+  - Utilise le `job_title` saisi par le candidat dans le formulaire de candidature
+  - Transmis via `BoondCandidateContext.job_title` → attribut `title` dans Boond
 - **feat(boond)**: Upload CV + action d'analyse lors de la création candidat BoondManager
   - **Upload CV** : Téléchargement du CV depuis S3 puis upload vers Boond via `POST /api/documents` (parentType: candidateResume)
   - **Action candidat** : Création automatique d'une action (typeOf: 13) sur le candidat Boond avec les analyses IA
