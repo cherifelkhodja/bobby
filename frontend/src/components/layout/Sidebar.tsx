@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Users, Settings, Shield, FileText, FileSpreadsheet, UserCheck, Sparkles, FlaskConical } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Users, Settings, Shield, FileText, FileSpreadsheet, UserCheck, Sparkles } from 'lucide-react';
 
 import { useAuthStore } from '../../stores/authStore';
 
@@ -15,8 +15,7 @@ const commercialItems = [
 ];
 
 const toolsItems = [
-  { to: '/cv-transformer', icon: FileText, label: 'Transformateur CV' },
-  { to: '/cv-generator-beta', icon: FlaskConical, label: 'CV Generator (beta)' },
+  { to: '/cv-generator', icon: FileText, label: 'CV Generator' },
 ];
 
 const hrItems = [

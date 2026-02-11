@@ -17,6 +17,7 @@ DEFAULT_SETTINGS = {
     "gemini_model_cv": "gemini-2.0-flash",
     "cv_ai_provider": "gemini",
     "cv_ai_model_claude": "claude-sonnet-4-5-20250929",
+    "cv_generator_beta_model": "claude-sonnet-4-5-20250929",
 }
 
 # Available Gemini models
@@ -208,6 +209,17 @@ class AppSettingsService:
         """
         return (
             await self.get("cv_ai_model_claude", "claude-sonnet-4-5-20250929")
+            or "claude-sonnet-4-5-20250929"
+        )
+
+    async def get_cv_generator_beta_model(self) -> str:
+        """Get the Claude model for CV Generator Beta.
+
+        Returns:
+            The Claude model ID.
+        """
+        return (
+            await self.get("cv_generator_beta_model", "claude-sonnet-4-5-20250929")
             or "claude-sonnet-4-5-20250929"
         )
 

@@ -148,12 +148,12 @@ jobs:
           fetch-depth: 1
 
       - name: Build images
-        run: docker compose build
+        run: docker compose -f docker-compose.yml build
 
       - name: Start services
         run: |
           cp .env.example .env
-          docker compose up -d
+          docker compose -f docker-compose.yml up -d
 
       - name: Wait for backend
         run: |
@@ -162,5 +162,10 @@ jobs:
       - name: Check backend health
         run: curl --fail http://localhost:8012/api/v1/health/live
 
+      - name: Show backend logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml logs backend --tail=100
+
       - name: Stop services
-        run: docker compose down -v
+        if: always()
+        run: docker compose -f docker-compose.yml down -v

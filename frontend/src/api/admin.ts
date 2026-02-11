@@ -88,6 +88,11 @@ export interface CvAiTestResponse {
   message: string;
 }
 
+export interface CvGeneratorBetaSettings {
+  current_model: string;
+  available_models: CvAiModelInfo[];
+}
+
 export interface TurnoverITSkill {
   name: string;
   slug: string;
@@ -224,6 +229,22 @@ export const adminApi = {
 
   testCvAi: async (provider: string, model: string): Promise<CvAiTestResponse> => {
     const response = await apiClient.post<CvAiTestResponse>('/admin/cv-ai/test', { provider, model });
+    return response.data;
+  },
+
+  // CV Generator Beta settings
+  getCvGeneratorBetaSettings: async (): Promise<CvGeneratorBetaSettings> => {
+    const response = await apiClient.get<CvGeneratorBetaSettings>('/admin/cv-generator-beta/settings');
+    return response.data;
+  },
+
+  setCvGeneratorBetaModel: async (model: string): Promise<CvGeneratorBetaSettings> => {
+    const response = await apiClient.post<CvGeneratorBetaSettings>('/admin/cv-generator-beta/settings', { model });
+    return response.data;
+  },
+
+  testCvGeneratorBeta: async (model: string): Promise<CvAiTestResponse> => {
+    const response = await apiClient.post<CvAiTestResponse>('/admin/cv-generator-beta/test', { model });
     return response.data;
   },
 

@@ -5,6 +5,7 @@ Implements CvDataExtractorPort for dependency inversion.
 
 import json
 import logging
+import re
 from typing import Any
 
 from google import genai
@@ -23,6 +24,7 @@ class GeminiClient:
     """Client for Google Gemini API to extract structured CV data."""
 
     DEFAULT_MODEL = "gemini-2.0-flash"
+    MAX_ATTEMPTS = 2
 
     def __init__(self, settings: Settings) -> None:
         """Initialize the Gemini client.
@@ -48,6 +50,8 @@ class GeminiClient:
     ) -> CvData:
         """Extract structured data from CV text using Gemini.
 
+        Retries once on JSON parsing errors.
+
         Args:
             cv_text: Raw text extracted from the CV document.
             model_name: Gemini model to use (optional, uses DEFAULT_MODEL if not set).
@@ -63,40 +67,98 @@ class GeminiClient:
         model_to_use = model_name or self.DEFAULT_MODEL
         logger.info(f"Using Gemini model for CV extraction: {model_to_use}")
 
+        last_error: Exception | None = None
+
+        for attempt in range(self.MAX_ATTEMPTS):
+            try:
+                prompt = CV_EXTRACTION_PROMPT + "\n\nTEXTE DU CV A ANALYSER :\n\n" + cv_text
+
+                # Use native async support from the new SDK
+                response = await client.aio.models.generate_content(
+                    model=model_to_use,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                    ),
+                )
+
+                # Extract text with fallback methods
+                response_text = self._extract_response_text(response)
+                if not response_text:
+                    raise ValueError("La réponse de Gemini est vide")
+
+                # Clean and extract JSON from response
+                json_text = self._nettoyer_reponse_json(response_text)
+
+                # Parse JSON with repair fallback
+                cv_data = self._parse_json_safe(json_text)
+
+                # Validate required fields
+                self._validate_cv_data(cv_data)
+
+                if attempt > 0:
+                    logger.info("CV Transformer (Gemini): retry succeeded")
+                return cv_data
+
+            except Exception as e:
+                if "API key" in str(e).lower() or "GEMINI" in str(e):
+                    raise
+                last_error = e
+                logger.warning(
+                    f"CV Transformer (Gemini) attempt {attempt + 1}/{self.MAX_ATTEMPTS} "
+                    f"failed: {type(e).__name__}: {e}"
+                )
+
+        error_msg = str(last_error) if last_error else "Erreur inconnue"
+        if isinstance(last_error, json.JSONDecodeError):
+            raise ValueError(f"Erreur de parsing JSON: {error_msg}")
+        raise ValueError(f"Erreur lors de l'extraction des données: {error_msg}")
+
+    def _parse_json_safe(self, json_text: str) -> CvData:
+        """Parse JSON with repair fallback for common LLM output issues."""
         try:
-            prompt = CV_EXTRACTION_PROMPT + "\n\nTEXTE DU CV A ANALYSER :\n\n" + cv_text
+            return json.loads(json_text)
+        except json.JSONDecodeError:
+            logger.info("JSON parse failed, attempting repair...")
+            repaired = self._repair_json(json_text)
+            return json.loads(repaired)
 
-            # Use native async support from the new SDK
-            response = await client.aio.models.generate_content(
-                model=model_to_use,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                ),
-            )
+    def _repair_json(self, text: str) -> str:
+        """Repair common JSON issues from LLM output."""
+        # Fix trailing commas
+        text = re.sub(r",(\s*[}\]])", r"\1", text)
 
-            # Extract text with fallback methods
-            response_text = self._extract_response_text(response)
-            if not response_text:
-                raise ValueError("La réponse de Gemini est vide")
+        # Fix truncated JSON by closing unclosed brackets
+        stack: list[str] = []
+        in_string = False
+        escape_next = False
 
-            # Clean and extract JSON from response
-            json_text = self._nettoyer_reponse_json(response_text)
+        for char in text:
+            if escape_next:
+                escape_next = False
+                continue
+            if char == "\\" and in_string:
+                escape_next = True
+                continue
+            if char == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if char in ("{", "["):
+                stack.append(char)
+            elif char == "}" and stack and stack[-1] == "{":
+                stack.pop()
+            elif char == "]" and stack and stack[-1] == "[":
+                stack.pop()
 
-            # Parse JSON
-            cv_data = json.loads(json_text)
+        if stack:
+            closers = {"{": "}", "[": "]"}
+            suffix = "".join(closers[b] for b in reversed(stack))
+            logger.info(f"JSON repair: closing {len(stack)} unclosed bracket(s)")
+            text += suffix
 
-            # Validate required fields
-            self._validate_cv_data(cv_data)
-
-            return cv_data
-
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Erreur de parsing JSON: {str(e)}")
-        except Exception as e:
-            if "API key" in str(e).lower() or "GEMINI" in str(e):
-                raise
-            raise ValueError(f"Erreur lors de l'extraction des données: {str(e)}")
+        return text
 
     def _extract_response_text(self, response: Any) -> str | None:
         """Extract text from Gemini response with multiple fallback methods.

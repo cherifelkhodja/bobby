@@ -25,7 +25,7 @@ import {
 import { toast } from 'sonner';
 
 import { apiClient } from '../../api/client';
-import { adminApi, type CvAiSettings, type CvAiTestResponse, type CvAiProviderInfo, type CvAiModelInfo } from '../../api/admin';
+import { adminApi, type CvAiTestResponse, type CvAiModelInfo, type CvGeneratorBetaSettings } from '../../api/admin';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -87,9 +87,8 @@ export function ApiTab() {
   const [geminiModel, setGeminiModel] = useState('gemini-2.5-flash-lite');
   const [showSkillsModal, setShowSkillsModal] = useState(false);
   const [skillsSearch, setSkillsSearch] = useState('');
-  const [cvAiProvider, setCvAiProvider] = useState('gemini');
-  const [cvAiModel, setCvAiModel] = useState('');
-  const [cvAiTestResult, setCvAiTestResult] = useState<CvAiTestResponse | null>(null);
+  const [betaModel, setBetaModel] = useState('');
+  const [betaTestResult, setBetaTestResult] = useState<CvAiTestResponse | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch services status
@@ -173,43 +172,37 @@ export function ApiTab() {
     },
   });
 
-  // CV AI Settings
+  // CV Generator Settings
   const {
-    data: cvAiData,
-  } = useQuery<CvAiSettings>({
-    queryKey: ['cv-ai-settings'],
-    queryFn: adminApi.getCvAiSettings,
+    data: betaData,
+  } = useQuery<CvGeneratorBetaSettings>({
+    queryKey: ['cv-generator-beta-settings'],
+    queryFn: adminApi.getCvGeneratorBetaSettings,
   });
 
-  // Initialize state from fetched data
   useEffect(() => {
-    if (cvAiData) {
-      setCvAiProvider(cvAiData.current_provider);
-      setCvAiModel(cvAiData.current_model);
+    if (betaData) {
+      setBetaModel(betaData.current_model);
     }
-  }, [cvAiData]);
+  }, [betaData]);
 
-  const currentModels = cvAiProvider === 'claude'
-    ? (cvAiData?.available_models_claude || [])
-    : (cvAiData?.available_models_gemini || []);
-
-  const saveCvAiMutation = useMutation({
-    mutationFn: () => adminApi.setCvAiProvider(cvAiProvider, cvAiModel),
+  const saveBetaMutation = useMutation({
+    mutationFn: () => adminApi.setCvGeneratorBetaModel(betaModel),
     onSuccess: () => {
-      toast.success(`Provider IA CV mis à jour: ${cvAiProvider} / ${cvAiModel}`);
-      queryClient.invalidateQueries({ queryKey: ['cv-ai-settings'] });
+      toast.success(`Modèle CV Generator mis à jour: ${betaModel}`);
+      queryClient.invalidateQueries({ queryKey: ['cv-generator-beta-settings'] });
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Erreur lors de la sauvegarde');
     },
   });
 
-  const testCvAiMutation = useMutation({
-    mutationFn: () => adminApi.testCvAi(cvAiProvider, cvAiModel),
+  const testBetaMutation = useMutation({
+    mutationFn: () => adminApi.testCvGeneratorBeta(betaModel),
     onSuccess: (result) => {
-      setCvAiTestResult(result);
+      setBetaTestResult(result);
       if (result.success) {
-        toast.success(`${result.provider} fonctionne (${result.response_time_ms}ms)`);
+        toast.success(`Claude fonctionne (${result.response_time_ms}ms)`);
       } else {
         toast.error(result.message);
       }
@@ -376,100 +369,64 @@ export function ApiTab() {
         })}
       </div>
 
-      {/* CV AI Provider Settings */}
+      {/* CV Generator Settings */}
       <Card>
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-            <Sparkles className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+          <div className="p-3 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+            <Sparkles className="h-6 w-6 text-amber-600 dark:text-amber-400" />
           </div>
           <div>
             <h3 className="font-medium text-gray-900 dark:text-white">
-              IA pour Transformation CV
+              IA pour CV Generator
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Choisir le provider et le modèle IA pour la transformation des CVs
+              Choisir le modèle Claude pour le CV Generator
             </p>
           </div>
-          {cvAiData && (
+          {betaData && (
             <Badge variant="primary" className="ml-auto">
-              {cvAiData.current_provider === 'claude' ? 'Claude' : 'Gemini'} actif
+              Claude actif
             </Badge>
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Provider Selector */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Provider IA
-            </label>
-            <select
-              value={cvAiProvider}
-              onChange={(e) => {
-                const newProvider = e.target.value;
-                setCvAiProvider(newProvider);
-                setCvAiTestResult(null);
-                // Set default model for new provider
-                if (newProvider === 'claude') {
-                  setCvAiModel(cvAiData?.available_models_claude?.[0]?.id || 'claude-sonnet-4-5-20250929');
-                } else {
-                  setCvAiModel(cvAiData?.available_models_gemini?.[0]?.id || 'gemini-2.0-flash');
-                }
-              }}
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-            >
-              {cvAiData?.available_providers?.map((p: CvAiProviderInfo) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              )) || (
-                <>
-                  <option value="gemini">Google Gemini</option>
-                  <option value="claude">Anthropic Claude</option>
-                </>
-              )}
-            </select>
-          </div>
-
-          {/* Model Selector */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Modèle
-            </label>
-            <select
-              value={cvAiModel}
-              onChange={(e) => {
-                setCvAiModel(e.target.value);
-                setCvAiTestResult(null);
-              }}
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-            >
-              {currentModels.map((m: CvAiModelInfo) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}{m.description ? ` - ${m.description}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Modèle Claude
+          </label>
+          <select
+            value={betaModel}
+            onChange={(e) => {
+              setBetaModel(e.target.value);
+              setBetaTestResult(null);
+            }}
+            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+          >
+            {(betaData?.available_models || []).map((m: CvAiModelInfo) => (
+              <option key={m.id} value={m.id}>
+                {m.name}{m.description ? ` - ${m.description}` : ''}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Test Result */}
-        {cvAiTestResult && (
+        {betaTestResult && (
           <div
             className={`mt-4 p-3 rounded-lg text-sm flex items-center gap-2 ${
-              cvAiTestResult.success
+              betaTestResult.success
                 ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300'
                 : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300'
             }`}
           >
-            {cvAiTestResult.success ? (
+            {betaTestResult.success ? (
               <CheckCircle className="h-4 w-4 flex-shrink-0" />
             ) : (
               <XCircle className="h-4 w-4 flex-shrink-0" />
             )}
             <span>
-              {cvAiTestResult.message}
-              {cvAiTestResult.success && ` (${cvAiTestResult.response_time_ms}ms)`}
+              {betaTestResult.message}
+              {betaTestResult.success && ` (${betaTestResult.response_time_ms}ms)`}
             </span>
           </div>
         )}
@@ -479,23 +436,23 @@ export function ApiTab() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => testCvAiMutation.mutate()}
-            isLoading={testCvAiMutation.isPending}
-            leftIcon={testCvAiMutation.isPending ? undefined : <RefreshCw className="h-4 w-4" />}
+            onClick={() => testBetaMutation.mutate()}
+            isLoading={testBetaMutation.isPending}
+            leftIcon={testBetaMutation.isPending ? undefined : <RefreshCw className="h-4 w-4" />}
           >
-            {testCvAiMutation.isPending ? 'Test en cours...' : 'Tester'}
+            {testBetaMutation.isPending ? 'Test en cours...' : 'Tester'}
           </Button>
           <Button
             variant="primary"
             size="sm"
-            onClick={() => saveCvAiMutation.mutate()}
-            isLoading={saveCvAiMutation.isPending}
+            onClick={() => saveBetaMutation.mutate()}
+            isLoading={saveBetaMutation.isPending}
             disabled={
-              saveCvAiMutation.isPending ||
-              (cvAiData?.current_provider === cvAiProvider && cvAiData?.current_model === cvAiModel)
+              saveBetaMutation.isPending ||
+              betaData?.current_model === betaModel
             }
           >
-            {saveCvAiMutation.isPending ? 'Sauvegarde...' : 'Sauvegarder'}
+            {saveBetaMutation.isPending ? 'Sauvegarde...' : 'Sauvegarder'}
           </Button>
         </div>
       </Card>

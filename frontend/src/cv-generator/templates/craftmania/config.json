@@ -1,0 +1,66 @@
+{
+  "name": "Craftmania",
+  "colors": {
+    "primary": "A9122A",
+    "sectionBg": null,
+    "border": "A9122A",
+    "period": "565656",
+    "text": "000000",
+    "white": "FFFFFF"
+  },
+  "fonts": {
+    "main": "Century Gothic",
+    "sizes": {
+      "title": 28,
+      "subtitle": 28,
+      "section": 24,
+      "subsection": 22,
+      "text": 22,
+      "footer": 18
+    }
+  },
+  "spacing": {
+    "paragraph": 80,
+    "section": 480,
+    "sectionAfter": 240,
+    "subsection": 200,
+    "subsectionAfter": 100,
+    "bullet": 60,
+    "competence": 80
+  },
+  "margins": {
+    "top": 720,
+    "right": 720,
+    "bottom": 720,
+    "left": 720
+  },
+  "logo": {
+    "width": 200,
+    "height": 39,
+    "position": "right"
+  },
+  "header": {
+    "layout": "table",
+    "titleBoldItalic": true
+  },
+  "subSectionStyle": {
+    "borderBottom": false
+  },
+  "experienceStyle": {
+    "titleBold": true,
+    "titleItalic": true,
+    "titleBorderBottom": false,
+    "titleLineSpacing": 276,
+    "contentLineSpacing": 360
+  },
+  "skipSections": ["competences"],
+  "diplomeStyle": {
+    "separator": " : ",
+    "compact": true
+  },
+  "footer": {
+    "enabled": false,
+    "line1": "",
+    "line2": ""
+  }
+}

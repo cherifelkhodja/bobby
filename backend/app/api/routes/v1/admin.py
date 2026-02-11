@@ -17,6 +17,8 @@ from app.api.schemas.admin import (
     CvAiSetProviderRequest,
     CvAiSettingsResponse,
     CvAiTestResponse,
+    CvGeneratorBetaSetModelRequest,
+    CvGeneratorBetaSettingsResponse,
     GeminiSetModelRequest,
     GeminiSettingsResponse,
     GeminiTestResponse,
@@ -607,6 +609,105 @@ async def test_cv_ai_provider(
         return CvAiTestResponse(
             success=False,
             provider=request.provider,
+            model=request.model,
+            response_time_ms=elapsed,
+            message=f"Erreur: {str(e)[:200]}",
+        )
+
+
+# =============================================================================
+# CV Generator Beta Settings Endpoints
+# =============================================================================
+
+
+@router.get("/cv-generator-beta/settings", response_model=CvGeneratorBetaSettingsResponse)
+async def get_cv_generator_beta_settings(
+    admin_id: AdminUser,
+    settings_svc: AppSettingsSvc,
+):
+    """Get CV Generator Beta model settings (admin only)."""
+    current_model = await settings_svc.get_cv_generator_beta_model()
+
+    return CvGeneratorBetaSettingsResponse(
+        current_model=current_model,
+        available_models=[
+            {"id": m["id"], "name": m["name"], "description": m.get("description", "")}
+            for m in AVAILABLE_CLAUDE_MODELS
+        ],
+    )
+
+
+@router.post("/cv-generator-beta/settings", response_model=CvGeneratorBetaSettingsResponse)
+async def set_cv_generator_beta_settings(
+    request: CvGeneratorBetaSetModelRequest,
+    admin_id: AdminUser,
+    settings_svc: AppSettingsSvc,
+):
+    """Set CV Generator Beta Claude model (admin only)."""
+    valid_models = [m["id"] for m in AVAILABLE_CLAUDE_MODELS]
+
+    if request.model not in valid_models:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Modèle invalide. Modèles disponibles: {', '.join(valid_models)}",
+        )
+
+    await settings_svc.set("cv_generator_beta_model", request.model, admin_id)
+
+    return CvGeneratorBetaSettingsResponse(
+        current_model=request.model,
+        available_models=[
+            {"id": m["id"], "name": m["name"], "description": m.get("description", "")}
+            for m in AVAILABLE_CLAUDE_MODELS
+        ],
+    )
+
+
+@router.post("/cv-generator-beta/test", response_model=CvAiTestResponse)
+async def test_cv_generator_beta(
+    request: CvGeneratorBetaSetModelRequest,
+    admin_id: AdminUser,
+    settings: AppSettings,
+):
+    """Test CV Generator Beta Claude model (admin only)."""
+    import time
+
+    start = time.time()
+
+    if not settings.ANTHROPIC_API_KEY:
+        return CvAiTestResponse(
+            success=False,
+            provider="claude",
+            model=request.model,
+            response_time_ms=0,
+            message="ANTHROPIC_API_KEY non configurée",
+        )
+
+    try:
+        from anthropic import Anthropic
+
+        client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        response = client.messages.create(
+            model=request.model,
+            max_tokens=50,
+            messages=[{"role": "user", "content": "Réponds uniquement 'OK'."}],
+        )
+        text = response.content[0].text if response.content else ""
+        elapsed = int((time.time() - start) * 1000)
+
+        return CvAiTestResponse(
+            success=True,
+            provider="claude",
+            model=request.model,
+            response_time_ms=elapsed,
+            message=f"Claude fonctionne. Réponse: {text.strip()[:100]}",
+        )
+
+    except Exception as e:
+        elapsed = int((time.time() - start) * 1000)
+        return CvAiTestResponse(
+            success=False,
+            provider="claude",
             model=request.model,
             response_time_ms=elapsed,
             message=f"Erreur: {str(e)[:200]}",

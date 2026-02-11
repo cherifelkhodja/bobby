@@ -1,5 +1,5 @@
 /**
- * CV transformation statistics tab component.
+ * CV transformation statistics tab component (admin only).
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -23,11 +23,10 @@ export function StatsTab() {
     <div className="space-y-6">
       <Card>
         <CardHeader
-          title="Statistiques de transformation CV"
+          title="Statistiques CV Generator"
           subtitle="Nombre de CVs transformés par utilisateur"
         />
 
-        {/* Total */}
         <div className="mb-6 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
           <div className="flex items-center">
             <BarChart3 className="h-8 w-8 text-primary-600 dark:text-primary-400 mr-4" />
@@ -38,7 +37,6 @@ export function StatsTab() {
           </div>
         </div>
 
-        {/* Per user stats */}
         {stats?.by_user && stats.by_user.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -76,13 +74,10 @@ export function StatsTab() {
             </table>
           </div>
         ) : (
-          <div className="text-center py-12">
+          <div className="text-center py-8">
             <BarChart3 className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">
-              Aucune transformation
-            </h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Les statistiques apparaîtront ici après les premières transformations.
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Aucune transformation pour le moment
             </p>
           </div>
         )}

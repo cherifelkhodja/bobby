@@ -26,7 +26,7 @@
 | Système d'invitations | ✅ Done | Depuis ressources Boond |
 | Panel Admin | ✅ Done | Users, invitations, Boond, templates |
 | Dark Mode | ✅ Done | System/Light/Dark |
-| CV Transformer | ✅ Done | PDF/DOCX → Word, multi-provider (Gemini/Claude) |
+| CV Generator | ✅ Done | PDF/DOCX → Word via Claude, templates locaux (Gemini/Craftmania) |
 | Opportunités publiées | ✅ Done | Anonymisation IA |
 | Quotation Generator (Thales) | ✅ Done | Excel + PDF merge |
 | Recrutement RH | ✅ Done | Turnover-IT, matching IA |
@@ -142,6 +142,91 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-02-11
+- **fix(ci)**: Correction Docker Build CI qui échouait (timeout health check)
+  - Cause racine : `docker compose up` chargeait automatiquement `docker-compose.override.yml` (dev), qui remplaçait le CMD (skip alembic) → tables inexistantes → crash au démarrage (seed_admin_user)
+  - Fix : CI utilise explicitement `-f docker-compose.yml` pour ignorer l'override dev
+  - Ajout port 8012:8000 dans `docker-compose.yml` base
+  - Ajout step "Show backend logs on failure" + `if: always()` sur cleanup
+- **refactor(admin)**: Stats CV Generator déplacées dans l'admin (onglet Stats dédié)
+  - Retiré la section stats de `CvGeneratorBeta.tsx`
+  - Créé `StatsTab.tsx` dans admin avec les mêmes stats
+  - Admin : 6 onglets (Users, Invitations, BoondManager, Templates, Stats, API)
+- **cleanup(admin)**: Retrait templates CV et ancien provider IA de l'admin
+  - TemplatesTab : supprimé section "Templates CV" (ne garde que Templates Devis/Thales)
+  - ApiTab : supprimé carte "IA pour Transformation CV" (ancien provider Gemini/Claude), renommé "CV Generator Beta" → "CV Generator"
+  - `cvTransformer.ts` : ne garde que `getStats()` (utilisé par la page CV Generator)
+  - `constants.ts` : supprimé `PREDEFINED_TEMPLATES` (templates CV gérés localement)
+- **refactor**: Suppression Transformateur CV legacy, remplacement par CV Generator
+  - Supprimé `CvTransformer.tsx` (page), `StatsTab.tsx` (admin)
+  - Route `/cv-transformer` supprimée, `/cv-generator-beta` renommée en `/cv-generator`
+  - Sidebar : un seul lien "CV Generator" au lieu de deux
+  - Badge Beta retiré de la page CV Generator
+  - Stats de transformation transférées sur la page CV Generator (section admin-only en bas)
+  - Fichiers modifiés : `App.tsx`, `Sidebar.tsx`, `CvGeneratorBeta.tsx`, `admin/index.tsx`
+- **refactor(cv-generator)**: Redesign page CV Generator Beta
+  - Layout 2 colonnes (upload | template) au lieu de 3 cartes verticales numérotées
+  - Suppression Card/CardHeader pour un design plus flat et aéré
+  - Radio buttons circulaires au lieu de checkmarks pour la sélection de template
+  - Bouton "Générer le CV" pleine largeur en bas, hors carte
+  - Progress/success/error placés entre la grille et le bouton
+  - Responsive : passe en colonne unique sur mobile
+  - Import Card/CardHeader supprimé (plus utilisé)
+  - Fichier modifié : `CvGeneratorBeta.tsx`
+- **feat(cv-generator)**: Interligne 1,5x dans les expériences professionnelles
+  - Ajout `experienceStyle.contentLineSpacing` (360 twips = 1.5x) dans TemplateConfig
+  - Appliqué aux paragraphes text, competenceLine dans les expériences (pas aux bullets)
+  - Bullets/réalisations gardent l'interligne simple (1x)
+  - Configuré pour les deux templates (Gemini + Craftmania)
+  - Fichiers modifiés : `renderer.ts`, `gemini/config.json`, `craftmania/config.json`
+- **feat(cv-generator)**: Support multi-template (Craftmania) dans CV Generator Beta
+  - **Nouveau template** : Craftmania avec design distinct (Century Gothic, rouge bordeaux #A9122A, header tableau, pas de footer)
+  - **TemplateConfig étendue** : Propriétés optionnelles `header.layout`, `subSectionStyle`, `experienceStyle`, `diplomeStyle`, `footer.enabled`
+  - **Renderer refactoré** : Sections avec bordure OU fond coloré, header centré OU tableau, footer optionnel
+  - **UI** : Sélecteur de template (étape 2) avec preview couleur + police, étapes renumérotées (1→2→3)
+  - **Fichier téléchargé** : `CV_[Nom].docx` utilise le nom du template sélectionné
+  - **Rétro-compatible** : Template Gemini fonctionne sans modification de son config.json
+  - Fichiers créés : `templates/craftmania/config.json`
+  - Fichiers modifiés : `renderer.ts` (TemplateConfig + createHelpers), `CvGeneratorBeta.tsx` (sélecteur + TEMPLATES)
+  - **skipSections** : Config `skipSections: ["competences"]` pour exclure le résumé des compétences du rendu Craftmania
+  - **Diplômes compacts** : Config `diplomeStyle.compact: true` pour supprimer l'espacement entre les formations
+  - **Logo** : Dimensions proportionnelles 200x39 (original 2164x425). Placer `logo-craftmania.png` dans `frontend/public/`
+- **feat(cv-generator)**: Configuration IA séparée pour CV Generator Beta
+  - **Nouvelle clé** : `cv_generator_beta_model` (indépendante de `cv_ai_model_claude` du legacy)
+  - **Admin API** : `GET/POST /admin/cv-generator-beta/settings`, `POST /admin/cv-generator-beta/test`
+  - **Admin UI** : Nouvelle carte "IA pour CV Generator Beta" dans ApiTab avec sélecteur de modèle Claude
+  - **Séparation** : La config legacy ("IA pour Transformation CV") et Beta sont entièrement indépendantes
+  - Fichiers : `app_settings_service.py`, `admin.py` (routes + schemas), `admin.ts`, `ApiTab.tsx`, `cv_generator.py`
+- **feat(cv-generator)**: SSE streaming pour feedback progressif lors du parsing CV
+  - **Nouvel endpoint** : `POST /cv-generator/parse-stream` retourne des Server-Sent Events
+  - **Events SSE** : `progress` (step, message, percent), `complete` (data), `error` (message)
+  - **Étapes progressives** : extracting (10-20%) → ai_parsing (30-85%) → validating (90%) → complete (100%)
+  - **Frontend** : Nouveau consumer SSE avec `fetch` + `ReadableStream` (pas axios, incompatible SSE)
+  - **Timer** : Affichage du temps écoulé en temps réel pendant le traitement
+  - **Indication UX** : Message "Cette étape peut prendre 15-30 secondes" pendant l'analyse IA
+  - **Token refresh** : Gestion 401 avec retry automatique après refresh du JWT
+  - Fichiers : `cv_generator.py` (backend), `cvGenerator.ts`, `CvGeneratorBeta.tsx` (frontend)
+- **fix(cv-generator)**: Correction accents français manquants dans les CV générés
+  - **Cause** : Le prompt entier n'avait aucun accent, Claude copiait le style sans accents
+  - **Fix** : Réécriture complète du prompt avec accents corrects (Résumé, Compétences, Expériences, Catégorie, Réalisation, Université, Décembre, Français, etc.)
+  - **Règle ajoutée** : "LANGUE : FRANÇAIS uniquement, avec les ACCENTS corrects (é, è, ê, à, ù, ç, etc.)"
+  - Fichier : `prompts.py`
+- **fix(cv-generator)**: Correction espacement entre sous-sections dans le DOCX généré
+  - **Cause** : Pas d'espace entre la fin d'une sous-section et le début de la suivante (ex: Points forts → Compétences fonctionnelles)
+  - **Fix** : Ajout d'un paragraphe vide (120 twips) entre sous-sections consécutives dans `renderContent()`
+  - Fichier : `renderer.ts`
+- **fix(cv-generator)**: Correction erreur "Erreur de parsing JSON" sur CV Generator Beta
+  - **Cause** : Claude peut retourner du JSON malformé (virgules en trop, réponse tronquée) sans mécanisme de rattrapage
+  - **JSON repair** : Ajout `_repair_json()` et `_parse_json_safe()` dans les 3 clients IA (CvGeneratorParser, AnthropicClient, GeminiClient)
+    - Suppression des trailing commas (`,}` → `}`, `,]` → `]`)
+    - Fermeture automatique des brackets non fermés (réponse tronquée)
+  - **Retry automatique** : Si le parsing échoue après repair, l'appel IA est relancé une fois (MAX_ATTEMPTS=2)
+  - **max_tokens doublé** : 8192 → 16384 pour éviter la troncature sur les CV longs
+  - **Détection troncature** : Log warning si `stop_reason == "max_tokens"`
+  - Fichiers modifiés : `anthropic_parser.py` (cv_generator), `anthropic_client.py` (cv_transformer), `gemini_client.py` (cv_transformer)
+- **fix(config)**: Ajout URL dev Railway aux CORS origins (`frontend-develpment.up.railway.app`)
+- **fix(cv-generator)**: `template_id` rendu optionnel dans `CvTransformationLog.create_success()` (CV Generator Beta n'utilise pas de template DB)
 
 ### 2026-02-09
 - **fix(ci)**: Résolution complète des échecs CI (573 tests passent, 0 failures, couverture 52.51%)
