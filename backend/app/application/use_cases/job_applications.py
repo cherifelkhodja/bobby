@@ -1141,6 +1141,24 @@ class CreateCandidateInBoondUseCase:
             await self.job_application_repository.save(application)
             raise ValueError(f"Failed to create candidate in BoondManager: {str(e)}")
 
+        # Build and return read model
+        posting = await self.job_posting_repository.get_by_id(application.job_posting_id)
+
+        cv_download_url = None
+        try:
+            cv_download_url = await self.s3_client.get_presigned_url(
+                key=saved.cv_s3_key,
+                expires_in=3600,
+            )
+        except Exception:
+            pass
+
+        return self._to_read_model(
+            saved,
+            posting.title if posting else None,
+            cv_download_url,
+        )
+
     async def _build_boond_context(
         self,
         application: JobApplication,
@@ -1183,23 +1201,6 @@ class CreateCandidateInBoondUseCase:
                     )
 
         return context
-
-        posting = await self.job_posting_repository.get_by_id(application.job_posting_id)
-
-        cv_download_url = None
-        try:
-            cv_download_url = await self.s3_client.get_presigned_url(
-                key=application.cv_s3_key,
-                expires_in=3600,
-            )
-        except Exception:
-            pass
-
-        return self._to_read_model(
-            saved,
-            posting.title if posting else None,
-            cv_download_url,
-        )
 
     def _to_read_model(
         self,
