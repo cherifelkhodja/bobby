@@ -7,13 +7,10 @@ import {
   Download,
   X,
   Loader2,
-  BarChart3,
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
 
 import { cvGeneratorApi } from '../api/cvGenerator';
 import type { SSEProgressEvent } from '../api/cvGenerator';
-import { cvTransformerApi } from '../api/cvTransformer';
 import { validateCV } from '../cv-generator/schema';
 import { generateCV } from '../cv-generator/renderer';
 import type { TemplateConfig } from '../cv-generator/renderer';
@@ -21,7 +18,6 @@ import geminiConfig from '../cv-generator/templates/gemini/config.json';
 import craftmaniaConfig from '../cv-generator/templates/craftmania/config.json';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { useAuthStore } from '../stores/authStore';
 
 type TemplateId = 'gemini' | 'craftmania';
 
@@ -99,17 +95,8 @@ export function CvGeneratorBeta() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { user } = useAuthStore();
-  const isAdmin = user?.role === 'admin';
-
   const isProcessing = ['uploading', 'extracting', 'ai_parsing', 'validating', 'generating'].includes(step);
   const elapsed = useElapsedTimer(isProcessing);
-
-  const { data: stats } = useQuery({
-    queryKey: ['cv-transformation-stats'],
-    queryFn: cvTransformerApi.getStats,
-    enabled: isAdmin,
-  });
 
   const handleTransform = useCallback(async () => {
     if (!selectedFile) return;
@@ -482,71 +469,6 @@ export function CvGeneratorBeta() {
           )}
         </div>
       </Card>
-
-      {/* Stats (admin only) */}
-      {isAdmin && (
-        <Card className="mt-6">
-          <CardHeader
-            title="Statistiques"
-            subtitle="Nombre de CVs transformés par utilisateur"
-          />
-
-          <div className="mb-6 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
-            <div className="flex items-center">
-              <BarChart3 className="h-8 w-8 text-primary-600 dark:text-primary-400 mr-4" />
-              <div>
-                <p className="text-sm text-primary-600 dark:text-primary-400">Total des transformations</p>
-                <p className="text-3xl font-bold text-primary-700 dark:text-primary-300">{stats?.total || 0}</p>
-              </div>
-            </div>
-          </div>
-
-          {stats?.by_user && stats.by_user.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-900">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Utilisateur
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      CVs transformés
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {stats.by_user.map((userStat) => (
-                    <tr key={userStat.user_id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {userStat.user_name}
-                          </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {userStat.user_email}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                          {userStat.count}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <BarChart3 className="mx-auto h-12 w-12 text-gray-400" />
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Aucune transformation pour le moment
-              </p>
-            </div>
-          )}
-        </Card>
-      )}
     </div>
   );
 }

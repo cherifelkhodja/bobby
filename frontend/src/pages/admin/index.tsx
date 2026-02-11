@@ -5,20 +5,22 @@
  * - Users: User management (list, edit, role change, delete)
  * - Invitations: Invite users via email or from BoondManager
  * - BoondManager: Connection status and synchronization
- * - Templates: CV and quotation template management
+ * - Templates: Quotation template management
+ * - Stats: CV transformation statistics
  * - API: API connections tests (Boond, Gemini)
  */
 
 import { useState } from 'react';
-import { Users, Mail, Settings, FileText, Plug } from 'lucide-react';
+import { Users, Mail, Settings, FileText, Plug, BarChart3 } from 'lucide-react';
 
 import { UsersTab } from './UsersTab';
 import { InvitationsTab } from './InvitationsTab';
 import { BoondTab } from './BoondTab';
 import { TemplatesTab } from './TemplatesTab';
+import { StatsTab } from './StatsTab';
 import { ApiTab } from './ApiTab';
 
-type TabType = 'users' | 'invitations' | 'boond' | 'templates' | 'api';
+type TabType = 'users' | 'invitations' | 'boond' | 'templates' | 'stats' | 'api';
 
 interface TabConfig {
   id: TabType;
@@ -31,6 +33,7 @@ const TABS: TabConfig[] = [
   { id: 'invitations', label: 'Invitations', icon: Mail },
   { id: 'boond', label: 'BoondManager', icon: Settings },
   { id: 'templates', label: 'Templates', icon: FileText },
+  { id: 'stats', label: 'Stats', icon: BarChart3 },
   { id: 'api', label: 'API', icon: Plug },
 ];
 
@@ -71,6 +74,7 @@ export function Admin() {
       {activeTab === 'invitations' && <InvitationsTab />}
       {activeTab === 'boond' && <BoondTab />}
       {activeTab === 'templates' && <TemplatesTab />}
+      {activeTab === 'stats' && <StatsTab />}
       {activeTab === 'api' && <ApiTab />}
     </div>
   );
@@ -81,4 +85,5 @@ export { UsersTab } from './UsersTab';
 export { InvitationsTab } from './InvitationsTab';
 export { BoondTab } from './BoondTab';
 export { TemplatesTab } from './TemplatesTab';
+export { StatsTab } from './StatsTab';
 export { ApiTab } from './ApiTab';
