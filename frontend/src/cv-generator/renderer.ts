@@ -537,7 +537,7 @@ function renderContent(
         elements.push(helpers.competenceLine(item.category, item.values, lineSpacing));
         break;
       case 'bullet':
-        elements.push(helpers.bullet(item.text, item.level || 0, lineSpacing));
+        elements.push(helpers.bullet(item.text, item.level || 0));
         break;
       case 'text':
         elements.push(helpers.text(item.text, { bold: item.bold, lineSpacing }));
