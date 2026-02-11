@@ -77,9 +77,7 @@ class CvGeneratorParser:
                 # Check for truncation
                 stop_reason = getattr(response, "stop_reason", None)
                 if stop_reason == "max_tokens":
-                    logger.warning(
-                        "CV Generator: response truncated (max_tokens reached)"
-                    )
+                    logger.warning("CV Generator: response truncated (max_tokens reached)")
 
                 response_text = self._extract_response_text(response)
                 if not response_text:

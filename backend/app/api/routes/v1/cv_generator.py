@@ -274,11 +274,14 @@ async def parse_cv_stream(
         """Generate SSE events for CV parsing progress."""
         try:
             # Step 1: Extracting text
-            yield _sse_event("progress", {
-                "step": "extracting",
-                "message": "Extraction du texte du document...",
-                "percent": 10,
-            })
+            yield _sse_event(
+                "progress",
+                {
+                    "step": "extracting",
+                    "message": "Extraction du texte du document...",
+                    "percent": 10,
+                },
+            )
 
             try:
                 if file_lower.endswith(".pdf"):
@@ -291,18 +294,24 @@ async def parse_cv_stream(
                 yield _sse_event("error", {"message": f"Erreur d'extraction du texte: {str(e)}"})
                 return
 
-            yield _sse_event("progress", {
-                "step": "extracting",
-                "message": "Texte extrait avec succès",
-                "percent": 20,
-            })
+            yield _sse_event(
+                "progress",
+                {
+                    "step": "extracting",
+                    "message": "Texte extrait avec succès",
+                    "percent": 20,
+                },
+            )
 
             # Step 2: AI Parsing
-            yield _sse_event("progress", {
-                "step": "ai_parsing",
-                "message": "Analyse IA en cours (Claude)...",
-                "percent": 30,
-            })
+            yield _sse_event(
+                "progress",
+                {
+                    "step": "ai_parsing",
+                    "message": "Analyse IA en cours (Claude)...",
+                    "percent": 30,
+                },
+            )
 
             parser = CvGeneratorParser(app_settings)
             log_repo = CvTransformationLogRepository(db)
@@ -334,18 +343,24 @@ async def parse_cv_stream(
                 yield _sse_event("error", {"message": str(e)})
                 return
 
-            yield _sse_event("progress", {
-                "step": "ai_parsing",
-                "message": "Analyse IA terminée",
-                "percent": 85,
-            })
+            yield _sse_event(
+                "progress",
+                {
+                    "step": "ai_parsing",
+                    "message": "Analyse IA terminée",
+                    "percent": 85,
+                },
+            )
 
             # Step 3: Validation
-            yield _sse_event("progress", {
-                "step": "validating",
-                "message": "Validation des données...",
-                "percent": 90,
-            })
+            yield _sse_event(
+                "progress",
+                {
+                    "step": "validating",
+                    "message": "Validation des données...",
+                    "percent": 90,
+                },
+            )
 
             # Log success
             from app.domain.entities.cv_transformation_log import CvTransformationLog
@@ -366,17 +381,23 @@ async def parse_cv_stream(
             )
 
             # Step 4: Complete
-            yield _sse_event("progress", {
-                "step": "complete",
-                "message": "CV parsé avec succès !",
-                "percent": 100,
-            })
+            yield _sse_event(
+                "progress",
+                {
+                    "step": "complete",
+                    "message": "CV parsé avec succès !",
+                    "percent": 100,
+                },
+            )
 
-            yield _sse_event("complete", {
-                "success": True,
-                "data": cv_data,
-                "model_used": ai_model,
-            })
+            yield _sse_event(
+                "complete",
+                {
+                    "success": True,
+                    "data": cv_data,
+                    "model_used": ai_model,
+                },
+            )
 
         except Exception as e:
             logger.error(f"[CV Generator SSE] Unexpected error: {type(e).__name__}: {str(e)}")
