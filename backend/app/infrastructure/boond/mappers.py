@@ -62,7 +62,7 @@ class BoondAdministrativeData:
     Logic per employment_status:
     - employee: salary fields only
     - freelance: TJM fields only
-    - both/employee,freelance: salary fields only (TJM is in internalNote)
+    - both/employee,freelance: salary fields + TJM in administrativeComments
     """
 
     salary_current: float | None = None
@@ -70,13 +70,15 @@ class BoondAdministrativeData:
     tjm_current: float | None = None
     tjm_desired: float | None = None
     desired_contract: int | None = None  # Boond dictionary integer
+    administrative_comments: str | None = None  # For TJM info when status is "both"
 
     @classmethod
     def from_application(cls, application: JobApplication) -> BoondAdministrativeData:
         """Build admin data from application based on employment status.
 
-        - employee / both: fill salary fields, skip TJM (TJM in internalNote)
-        - freelance only: fill TJM fields, skip salary
+        - employee: fill salary fields only
+        - freelance only: fill TJM fields only
+        - both: fill salary fields + TJM info in administrativeComments
         """
         status = application.employment_status or ""
         desired_contract = EMPLOYMENT_STATUS_TO_CONTRACT.get(status, 0)
@@ -89,7 +91,30 @@ class BoondAdministrativeData:
                 desired_contract=desired_contract,
             )
 
-        # Employee or both: salary only (TJM info is in internalNote)
+        if status in _EMPLOYEE_STATUSES and status != "employee":
+            # Both (employee + freelance): salary fields + TJM in comments
+            comments_parts = ["[b0bby] Informations freelance :"]
+            tjm_current_str = (
+                f"{int(application.tjm_current)}\u20ac/j"
+                if application.tjm_current
+                else "Non sp\u00e9cifi\u00e9"
+            )
+            tjm_desired_str = (
+                f"{int(application.tjm_desired)}\u20ac/j"
+                if application.tjm_desired
+                else "Non sp\u00e9cifi\u00e9"
+            )
+            comments_parts.append(f"TJM actuel : {tjm_current_str}")
+            comments_parts.append(f"TJM souhait\u00e9 : {tjm_desired_str}")
+
+            return cls(
+                salary_current=application.salary_current,
+                salary_desired=application.salary_desired,
+                desired_contract=desired_contract,
+                administrative_comments="\n".join(comments_parts),
+            )
+
+        # Pure employee: salary only
         return cls(
             salary_current=application.salary_current,
             salary_desired=application.salary_desired,
@@ -217,6 +242,9 @@ def map_candidate_administrative_to_boond(
 
     if admin_data.desired_contract is not None:
         attributes["desiredContract"] = admin_data.desired_contract
+
+    if admin_data.administrative_comments:
+        attributes["administrativeComments"] = admin_data.administrative_comments
 
     return {
         "data": {

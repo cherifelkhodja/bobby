@@ -907,10 +907,6 @@ class BoondClient:
             response.raise_for_status()
             logger.info(f"Uploaded CV for candidate {candidate_id}")
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=4),
-    )
     async def create_candidate_action(
         self,
         candidate_id: str,
@@ -919,6 +915,8 @@ class BoondClient:
         start_date: datetime | None = None,
     ) -> str:
         """Create an action (note) on a candidate in BoondManager.
+
+        No retry: action creation is not idempotent.
 
         Args:
             candidate_id: The BoondManager candidate ID.
@@ -971,6 +969,11 @@ class BoondClient:
             response.raise_for_status()
 
             data = response.json()
-            action_id = str(data.get("data", [{}])[0].get("id", ""))
+            # Response data can be a list or a single object
+            response_data = data.get("data", {})
+            if isinstance(response_data, list):
+                action_id = str(response_data[0].get("id", "")) if response_data else ""
+            else:
+                action_id = str(response_data.get("id", ""))
             logger.info(f"Created action {action_id} for candidate {candidate_id}")
             return action_id

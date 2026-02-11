@@ -153,6 +153,12 @@ docker-compose up # Start all services
   - **Non-bloquant** : Échecs d'upload CV ou de création d'action loggés mais ne bloquent pas la création candidat
   - Appliqué aux deux use cases : auto-create (validation) et manual create (bouton)
   - Fichiers modifiés : `client.py` (upload_candidate_cv, create_candidate_action), `mappers.py` (format_analyses_as_boond_html), `job_applications.py` (use cases)
+- **fix(boond)**: Correction action créée 3 fois (retry sur méthode non-idempotente)
+  - Suppression du `@retry` sur `create_candidate_action()` (une action ne doit pas être retentée)
+  - Parsing robuste de la réponse (gère `data` en tant que liste ou objet)
+- **fix(boond)**: Ajout `administrativeComments` pour statut "both" (salarié + freelance)
+  - Quand le candidat est ouvert aux deux, les infos TJM sont maintenant envoyées dans `administrativeComments`
+  - Champs salary remplis normalement, TJM dans les commentaires admin
 - **fix(boond)**: Correction création candidat BoondManager lors de la validation d'une candidature RH
   - **Cause** : Le payload envoyé à `POST /candidates` était un dict plat au lieu du format JSON:API attendu (`{"data": {"attributes": {...}}}`)
   - **Bug email** : Le champ `"email"` était utilisé au lieu de `"email1"` (nomenclature Boond)
