@@ -22,9 +22,9 @@ class CvTransformationLog:
     def create_success(
         cls,
         user_id: UUID,
-        template_id: UUID,
         template_name: str,
         original_filename: str,
+        template_id: UUID | None = None,
     ) -> "CvTransformationLog":
         """Create a successful transformation log."""
         return cls(
