@@ -1,6 +1,7 @@
 """BoondManager API client with retry and timeout."""
 
 import logging
+from datetime import datetime, timezone
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -867,3 +868,109 @@ class BoondClient:
 
             logger.info(f"Fetched opportunity information: {result['title']}")
             return result
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+    )
+    async def upload_candidate_cv(
+        self,
+        candidate_id: str,
+        filename: str,
+        file_content: bytes,
+        content_type: str = "application/pdf",
+    ) -> None:
+        """Upload CV document to a candidate in BoondManager.
+
+        Uses POST /api/documents with multipart form-data.
+
+        Args:
+            candidate_id: The BoondManager candidate ID.
+            filename: Original filename of the CV.
+            file_content: The CV file content as bytes.
+            content_type: MIME type of the file.
+        """
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+            logger.info(f"Uploading CV for candidate {candidate_id}: {filename}")
+
+            response = await client.post(
+                f"{self.base_url}/documents",
+                auth=self._auth,
+                data={
+                    "parentType": "candidateResume",
+                    "parentId": candidate_id,
+                },
+                files={
+                    "file": (filename, file_content, content_type),
+                },
+            )
+            response.raise_for_status()
+            logger.info(f"Uploaded CV for candidate {candidate_id}")
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+    )
+    async def create_candidate_action(
+        self,
+        candidate_id: str,
+        manager_boond_id: str,
+        text: str,
+        start_date: datetime | None = None,
+    ) -> str:
+        """Create an action (note) on a candidate in BoondManager.
+
+        Args:
+            candidate_id: The BoondManager candidate ID.
+            manager_boond_id: The Boond resource ID of the action's main manager.
+            text: HTML-formatted text content for the action.
+            start_date: Action date. Defaults to now.
+
+        Returns:
+            The created action ID.
+        """
+        if start_date is None:
+            start_date = datetime.now(timezone.utc)
+
+        # Format date as required: YYYY-MM-DDTHH:MM:SS+HHMM
+        date_str = start_date.strftime("%Y-%m-%dT%H:%M:%S%z")
+
+        payload = {
+            "data": {
+                "type": "action",
+                "attributes": {
+                    "startDate": date_str,
+                    "typeOf": 13,
+                    "text": text,
+                },
+                "relationships": {
+                    "mainManager": {
+                        "data": {
+                            "id": manager_boond_id,
+                            "type": "resource",
+                        }
+                    },
+                    "dependsOn": {
+                        "data": {
+                            "id": candidate_id,
+                            "type": "candidate",
+                        }
+                    },
+                },
+            }
+        }
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            logger.info(f"Creating action for candidate {candidate_id}")
+
+            response = await client.post(
+                f"{self.base_url}/actions",
+                auth=self._auth,
+                json=payload,
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            action_id = str(data.get("data", [{}])[0].get("id", ""))
+            logger.info(f"Created action {action_id} for candidate {candidate_id}")
+            return action_id

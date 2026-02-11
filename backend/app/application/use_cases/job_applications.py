@@ -30,6 +30,7 @@ from app.infrastructure.boond.client import BoondClient
 from app.infrastructure.boond.mappers import (
     BoondAdministrativeData,
     BoondCandidateContext,
+    format_analyses_as_boond_html,
 )
 from app.infrastructure.database.repositories import (
     JobApplicationRepository,
@@ -778,6 +779,16 @@ class UpdateApplicationStatusUseCase:
                 await self.boond_client.update_candidate_administrative(
                     external_id, admin_data
                 )
+
+                # Upload CV to Boond
+                await self._upload_cv_to_boond(application, external_id)
+
+                # Create action with analyses
+                await self._create_analysis_action(
+                    application=application,
+                    candidate_id=external_id,
+                    manager_boond_id=boond_context.hr_manager_boond_id,
+                )
             except Exception as e:
                 saved.boond_sync_error = str(e)
                 import structlog
@@ -850,6 +861,86 @@ class UpdateApplicationStatusUseCase:
                     )
 
         return context
+
+    async def _upload_cv_to_boond(
+        self,
+        application: JobApplication,
+        candidate_id: str,
+    ) -> None:
+        """Download CV from S3 and upload to Boond candidate."""
+        import structlog
+
+        log = structlog.get_logger(__name__)
+
+        if not application.cv_s3_key:
+            return
+
+        try:
+            cv_content = await self.s3_client.download_file(application.cv_s3_key)
+            # Determine content type from filename
+            filename = application.cv_filename or "cv.pdf"
+            content_type = "application/pdf"
+            if filename.lower().endswith((".docx",)):
+                content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            elif filename.lower().endswith((".doc",)):
+                content_type = "application/msword"
+
+            await self.boond_client.upload_candidate_cv(
+                candidate_id=candidate_id,
+                filename=filename,
+                file_content=cv_content,
+                content_type=content_type,
+            )
+        except Exception as e:
+            log.warning(
+                "boond_cv_upload_failed",
+                candidate_id=candidate_id,
+                error=str(e),
+            )
+
+    async def _create_analysis_action(
+        self,
+        application: JobApplication,
+        candidate_id: str,
+        manager_boond_id: str | None,
+    ) -> None:
+        """Create a Boond action with matching + CV quality analyses."""
+        import structlog
+
+        log = structlog.get_logger(__name__)
+
+        if not manager_boond_id:
+            log.warning(
+                "boond_action_skipped_no_manager",
+                candidate_id=candidate_id,
+            )
+            return
+
+        # Get posting title for context
+        posting_title = ""
+        posting = await self.job_posting_repository.get_by_id(application.job_posting_id)
+        if posting:
+            posting_title = posting.title
+
+        text = format_analyses_as_boond_html(
+            matching_details=application.matching_details,
+            cv_quality=application.cv_quality,
+            candidate_name=application.full_name,
+            job_title=posting_title,
+        )
+
+        try:
+            await self.boond_client.create_candidate_action(
+                candidate_id=candidate_id,
+                manager_boond_id=manager_boond_id,
+                text=text,
+            )
+        except Exception as e:
+            log.warning(
+                "boond_action_creation_failed",
+                candidate_id=candidate_id,
+                error=str(e),
+            )
 
     async def _to_read_model(
         self,
@@ -1109,6 +1200,16 @@ class CreateCandidateInBoondUseCase:
             await self.boond_client.update_candidate_administrative(
                 external_id, admin_data
             )
+
+            # Upload CV to Boond
+            await self._upload_cv_to_boond(application, external_id)
+
+            # Create action with analyses
+            await self._create_analysis_action(
+                application=application,
+                candidate_id=external_id,
+                manager_boond_id=boond_context.hr_manager_boond_id,
+            )
         except Exception as e:
             application.boond_sync_error = str(e)
             application.updated_at = datetime.utcnow()
@@ -1175,6 +1276,84 @@ class CreateCandidateInBoondUseCase:
                     )
 
         return context
+
+    async def _upload_cv_to_boond(
+        self,
+        application: JobApplication,
+        candidate_id: str,
+    ) -> None:
+        """Download CV from S3 and upload to Boond candidate."""
+        import structlog
+
+        log = structlog.get_logger(__name__)
+
+        if not application.cv_s3_key:
+            return
+
+        try:
+            cv_content = await self.s3_client.download_file(application.cv_s3_key)
+            filename = application.cv_filename or "cv.pdf"
+            content_type = "application/pdf"
+            if filename.lower().endswith((".docx",)):
+                content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            elif filename.lower().endswith((".doc",)):
+                content_type = "application/msword"
+
+            await self.boond_client.upload_candidate_cv(
+                candidate_id=candidate_id,
+                filename=filename,
+                file_content=cv_content,
+                content_type=content_type,
+            )
+        except Exception as e:
+            log.warning(
+                "boond_cv_upload_failed",
+                candidate_id=candidate_id,
+                error=str(e),
+            )
+
+    async def _create_analysis_action(
+        self,
+        application: JobApplication,
+        candidate_id: str,
+        manager_boond_id: str | None,
+    ) -> None:
+        """Create a Boond action with matching + CV quality analyses."""
+        import structlog
+
+        log = structlog.get_logger(__name__)
+
+        if not manager_boond_id:
+            log.warning(
+                "boond_action_skipped_no_manager",
+                candidate_id=candidate_id,
+            )
+            return
+
+        posting_title = ""
+        posting = await self.job_posting_repository.get_by_id(application.job_posting_id)
+        if posting:
+            posting_title = posting.title
+
+        text = format_analyses_as_boond_html(
+            matching_details=application.matching_details,
+            cv_quality=application.cv_quality,
+            candidate_name=application.full_name,
+            job_title=posting_title,
+        )
+
+        try:
+            await self.boond_client.create_candidate_action(
+                candidate_id=candidate_id,
+                manager_boond_id=manager_boond_id,
+                text=text,
+            )
+        except Exception as e:
+            log.warning(
+                "boond_action_creation_failed",
+                candidate_id=candidate_id,
+                error=str(e),
+            )
 
     def _to_read_model(
         self,

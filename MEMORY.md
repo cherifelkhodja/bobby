@@ -144,6 +144,15 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-11
+- **feat(boond)**: Upload CV + action d'analyse lors de la création candidat BoondManager
+  - **Upload CV** : Téléchargement du CV depuis S3 puis upload vers Boond via `POST /api/documents` (parentType: candidateResume)
+  - **Action candidat** : Création automatique d'une action (typeOf: 13) sur le candidat Boond avec les analyses IA
+  - **Contenu action** : Matching CV/offre (score global, scores détaillés, compétences matchées/manquantes, points forts, vigilance, recommandation) + Qualité CV (note/20, détails par critère, classification)
+  - **Format** : HTML formaté pour affichage dans BoondManager
+  - **Main manager** : Le RH qui valide/crée le candidat (boond_resource_id)
+  - **Non-bloquant** : Échecs d'upload CV ou de création d'action loggés mais ne bloquent pas la création candidat
+  - Appliqué aux deux use cases : auto-create (validation) et manual create (bouton)
+  - Fichiers modifiés : `client.py` (upload_candidate_cv, create_candidate_action), `mappers.py` (format_analyses_as_boond_html), `job_applications.py` (use cases)
 - **fix(boond)**: Correction création candidat BoondManager lors de la validation d'une candidature RH
   - **Cause** : Le payload envoyé à `POST /candidates` était un dict plat au lieu du format JSON:API attendu (`{"data": {"attributes": {...}}}`)
   - **Bug email** : Le champ `"email"` était utilisé au lieu de `"email1"` (nomenclature Boond)
