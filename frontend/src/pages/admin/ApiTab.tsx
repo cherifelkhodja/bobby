@@ -25,7 +25,7 @@ import {
 import { toast } from 'sonner';
 
 import { apiClient } from '../../api/client';
-import { adminApi, type CvAiSettings, type CvAiTestResponse, type CvAiProviderInfo, type CvAiModelInfo } from '../../api/admin';
+import { adminApi, type CvAiSettings, type CvAiTestResponse, type CvAiProviderInfo, type CvAiModelInfo, type CvGeneratorBetaSettings } from '../../api/admin';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -90,6 +90,8 @@ export function ApiTab() {
   const [cvAiProvider, setCvAiProvider] = useState('gemini');
   const [cvAiModel, setCvAiModel] = useState('');
   const [cvAiTestResult, setCvAiTestResult] = useState<CvAiTestResponse | null>(null);
+  const [betaModel, setBetaModel] = useState('');
+  const [betaTestResult, setBetaTestResult] = useState<CvAiTestResponse | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch services status
@@ -210,6 +212,46 @@ export function ApiTab() {
       setCvAiTestResult(result);
       if (result.success) {
         toast.success(`${result.provider} fonctionne (${result.response_time_ms}ms)`);
+      } else {
+        toast.error(result.message);
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erreur lors du test');
+    },
+  });
+
+  // CV Generator Beta Settings
+  const {
+    data: betaData,
+  } = useQuery<CvGeneratorBetaSettings>({
+    queryKey: ['cv-generator-beta-settings'],
+    queryFn: adminApi.getCvGeneratorBetaSettings,
+  });
+
+  useEffect(() => {
+    if (betaData) {
+      setBetaModel(betaData.current_model);
+    }
+  }, [betaData]);
+
+  const saveBetaMutation = useMutation({
+    mutationFn: () => adminApi.setCvGeneratorBetaModel(betaModel),
+    onSuccess: () => {
+      toast.success(`Modèle CV Generator Beta mis à jour: ${betaModel}`);
+      queryClient.invalidateQueries({ queryKey: ['cv-generator-beta-settings'] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erreur lors de la sauvegarde');
+    },
+  });
+
+  const testBetaMutation = useMutation({
+    mutationFn: () => adminApi.testCvGeneratorBeta(betaModel),
+    onSuccess: (result) => {
+      setBetaTestResult(result);
+      if (result.success) {
+        toast.success(`Claude fonctionne (${result.response_time_ms}ms)`);
       } else {
         toast.error(result.message);
       }
@@ -496,6 +538,94 @@ export function ApiTab() {
             }
           >
             {saveCvAiMutation.isPending ? 'Sauvegarde...' : 'Sauvegarder'}
+          </Button>
+        </div>
+      </Card>
+
+      {/* CV Generator Beta Settings */}
+      <Card>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-3 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+            <Sparkles className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+          </div>
+          <div>
+            <h3 className="font-medium text-gray-900 dark:text-white">
+              IA pour CV Generator Beta
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Choisir le modèle Claude pour le CV Generator (Beta)
+            </p>
+          </div>
+          {betaData && (
+            <Badge variant="warning" className="ml-auto">
+              Beta
+            </Badge>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Modèle Claude
+          </label>
+          <select
+            value={betaModel}
+            onChange={(e) => {
+              setBetaModel(e.target.value);
+              setBetaTestResult(null);
+            }}
+            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+          >
+            {(betaData?.available_models || []).map((m: CvAiModelInfo) => (
+              <option key={m.id} value={m.id}>
+                {m.name}{m.description ? ` - ${m.description}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Test Result */}
+        {betaTestResult && (
+          <div
+            className={`mt-4 p-3 rounded-lg text-sm flex items-center gap-2 ${
+              betaTestResult.success
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300'
+                : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300'
+            }`}
+          >
+            {betaTestResult.success ? (
+              <CheckCircle className="h-4 w-4 flex-shrink-0" />
+            ) : (
+              <XCircle className="h-4 w-4 flex-shrink-0" />
+            )}
+            <span>
+              {betaTestResult.message}
+              {betaTestResult.success && ` (${betaTestResult.response_time_ms}ms)`}
+            </span>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="mt-4 flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => testBetaMutation.mutate()}
+            isLoading={testBetaMutation.isPending}
+            leftIcon={testBetaMutation.isPending ? undefined : <RefreshCw className="h-4 w-4" />}
+          >
+            {testBetaMutation.isPending ? 'Test en cours...' : 'Tester'}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => saveBetaMutation.mutate()}
+            isLoading={saveBetaMutation.isPending}
+            disabled={
+              saveBetaMutation.isPending ||
+              betaData?.current_model === betaModel
+            }
+          >
+            {saveBetaMutation.isPending ? 'Sauvegarde...' : 'Sauvegarder'}
           </Button>
         </div>
       </Card>

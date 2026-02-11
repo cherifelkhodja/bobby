@@ -144,6 +144,12 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-11
+- **feat(cv-generator)**: Configuration IA séparée pour CV Generator Beta
+  - **Nouvelle clé** : `cv_generator_beta_model` (indépendante de `cv_ai_model_claude` du legacy)
+  - **Admin API** : `GET/POST /admin/cv-generator-beta/settings`, `POST /admin/cv-generator-beta/test`
+  - **Admin UI** : Nouvelle carte "IA pour CV Generator Beta" dans ApiTab avec sélecteur de modèle Claude
+  - **Séparation** : La config legacy ("IA pour Transformation CV") et Beta sont entièrement indépendantes
+  - Fichiers : `app_settings_service.py`, `admin.py` (routes + schemas), `admin.ts`, `ApiTab.tsx`, `cv_generator.py`
 - **feat(cv-generator)**: SSE streaming pour feedback progressif lors du parsing CV
   - **Nouvel endpoint** : `POST /cv-generator/parse-stream` retourne des Server-Sent Events
   - **Events SSE** : `progress` (step, message, percent), `complete` (data), `error` (message)

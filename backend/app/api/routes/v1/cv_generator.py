@@ -91,8 +91,8 @@ async def parse_cv(
             detail="Clé API Anthropic non configurée. Contactez l'administrateur.",
         )
 
-    # Get Claude model from settings
-    ai_model = await app_settings_svc.get_cv_ai_model_claude()
+    # Get Claude model from Beta-specific settings
+    ai_model = await app_settings_svc.get_cv_generator_beta_model()
 
     # Validate file
     if not file.filename:
@@ -244,7 +244,7 @@ async def parse_cv_stream(
             detail="Clé API Anthropic non configurée. Contactez l'administrateur.",
         )
 
-    ai_model = await app_settings_svc.get_cv_ai_model_claude()
+    ai_model = await app_settings_svc.get_cv_generator_beta_model()
 
     # Validate file
     if not file.filename:

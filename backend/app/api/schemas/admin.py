@@ -228,6 +228,19 @@ class CvAiTestResponse(BaseModel):
     message: str
 
 
+class CvGeneratorBetaSettingsResponse(BaseModel):
+    """CV Generator Beta settings response."""
+
+    current_model: str
+    available_models: list[CvAiModelInfo]
+
+
+class CvGeneratorBetaSetModelRequest(BaseModel):
+    """Request to set CV Generator Beta model."""
+
+    model: str = Field(..., description="Claude model ID for CV Generator Beta")
+
+
 # =============================================================================
 # Turnover-IT Skills Schemas
 # =============================================================================
