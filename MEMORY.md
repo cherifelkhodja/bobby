@@ -171,6 +171,15 @@ docker-compose up # Start all services
   - `execute()` ne retournait pas de `JobApplicationReadModel` après création réussie (retour implicite None)
   - Code mort après `return context` dans `_build_boond_context` (reste d'un refactoring précédent) supprimé
   - Fichier modifié : `job_applications.py`
+- **feat(boond)**: Note interne b0bby + logique admin data par statut d'emploi
+  - `to_boond_internal_note()` sur `JobApplication` : note complète avec statut, salaire, TJM, source "Plateforme b0bby"
+  - Données admin Boond selon `employment_status` :
+    - `employee` ou `both` : champs salaire uniquement (TJM dans la note)
+    - `freelance` : champs TJM uniquement
+  - `desiredSalary.min` = salaire actuel, `.max` = salaire souhaité
+  - `desiredAverageDailyCost.min` = TJM actuel, `.max` = TJM souhaité
+  - Factory `BoondAdministrativeData.from_application()` centralise la logique
+  - Fichiers modifiés : `job_application.py` (entity), `mappers.py`, `job_applications.py` (use cases)
 - **refactor(admin)**: Stats CV Generator déplacées dans l'admin (onglet Stats dédié)
   - Retiré la section stats de `CvGeneratorBeta.tsx`
   - Créé `StatsTab.tsx` dans admin avec les mêmes stats
