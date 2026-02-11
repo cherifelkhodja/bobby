@@ -159,19 +159,19 @@ def map_candidate_administrative_to_boond(
     if admin_data.salary_current is not None:
         attributes["actualSalary"] = admin_data.salary_current
 
-    if admin_data.salary_desired is not None:
+    if admin_data.salary_desired is not None or admin_data.salary_current is not None:
         attributes["desiredSalary"] = {
-            "min": admin_data.salary_desired,
-            "max": admin_data.salary_desired,
+            "min": admin_data.salary_current or admin_data.salary_desired,
+            "max": admin_data.salary_desired or admin_data.salary_current,
         }
 
     if admin_data.tjm_current is not None:
         attributes["actualAverageDailyCost"] = admin_data.tjm_current
 
-    if admin_data.tjm_desired is not None:
+    if admin_data.tjm_desired is not None or admin_data.tjm_current is not None:
         attributes["desiredAverageDailyCost"] = {
-            "min": admin_data.tjm_desired,
-            "max": admin_data.tjm_desired,
+            "min": admin_data.tjm_current or admin_data.tjm_desired,
+            "max": admin_data.tjm_desired or admin_data.tjm_current,
         }
 
     if admin_data.desired_contract is not None:
