@@ -6,6 +6,8 @@ services:
     container_name: cooptation-backend
     env_file:
       - .env
+    ports:
+      - "8012:8000"
     depends_on:
       postgres:
         condition: service_healthy
