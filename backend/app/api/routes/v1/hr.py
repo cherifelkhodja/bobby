@@ -969,12 +969,14 @@ async def update_application_status(
 
     job_application_repo = JobApplicationRepository(db)
     job_posting_repo = JobPostingRepository(db)
+    opportunity_repo = OpportunityRepository(db)
     user_repo = UserRepository(db)
     s3_client = S3StorageClient(app_settings)
 
     use_case = UpdateApplicationStatusUseCase(
         job_application_repository=job_application_repo,
         job_posting_repository=job_posting_repo,
+        opportunity_repository=opportunity_repo,
         user_repository=user_repo,
         s3_client=s3_client,
         boond_client=boond_client,
@@ -1121,21 +1123,25 @@ async def create_candidate_in_boond(
     authorization: str = Header(default=""),
 ):
     """Create candidate in BoondManager from application."""
-    await require_hr_access(db, authorization)
+    user_id = await require_hr_access(db, authorization)
 
     job_application_repo = JobApplicationRepository(db)
     job_posting_repo = JobPostingRepository(db)
+    opportunity_repo = OpportunityRepository(db)
+    user_repo = UserRepository(db)
     s3_client = S3StorageClient(app_settings)
 
     use_case = CreateCandidateInBoondUseCase(
         job_application_repository=job_application_repo,
         job_posting_repository=job_posting_repo,
+        opportunity_repository=opportunity_repo,
+        user_repository=user_repo,
         boond_client=boond_client,
         s3_client=s3_client,
     )
 
     try:
-        return await use_case.execute(UUID(application_id))
+        return await use_case.execute(UUID(application_id), created_by=user_id)
     except JobApplicationNotFoundError:
         raise HTTPException(status_code=404, detail="Candidature non trouvée")
     except ValueError as e:

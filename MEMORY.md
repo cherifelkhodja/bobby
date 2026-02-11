@@ -150,6 +150,15 @@ docker-compose up # Start all services
   - **Données manquantes** : Les champs `note` et `daily_rate` (TJM) du candidat n'étaient pas transmis à Boond
   - **Positionnement** : Même fix appliqué à `create_positioning` (format JSON:API avec `relationships`)
   - Fichiers modifiés : `mappers.py` (map_candidate_to_boond), `client.py` (create_candidate, create_positioning)
+- **feat(boond)**: Enrichissement création candidat Boond avec typeOf, source et relationships
+  - `typeOf` : 0=salarié, 1=freelance, 0=both (basé sur `employment_status` de la candidature)
+  - `source` : 6 (annonce), `sourceDetail` : ID Boond de l'opportunité
+  - `relationships.hrManager` : `boond_resource_id` du RH qui valide
+  - `relationships.mainManager` : manager principal de l'opportunité (fetch Boond API)
+  - `relationships.agency` : agence de l'opportunité (fetch Boond API)
+  - Nouveau `BoondCandidateContext` dataclass pour transporter le contexte Boond
+  - Mis à jour auto-create (validation) et manual create (bouton) use cases
+  - Fichiers modifiés : `mappers.py`, `client.py`, `job_applications.py` (use cases), `hr.py` (routes)
 - **refactor(admin)**: Stats CV Generator déplacées dans l'admin (onglet Stats dédié)
   - Retiré la section stats de `CvGeneratorBeta.tsx`
   - Créé `StatsTab.tsx` dans admin avec les mêmes stats

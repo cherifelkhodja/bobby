@@ -27,9 +27,11 @@ from app.domain.exceptions import (
     JobPostingNotFoundError,
 )
 from app.infrastructure.boond.client import BoondClient
+from app.infrastructure.boond.mappers import BoondCandidateContext
 from app.infrastructure.database.repositories import (
     JobApplicationRepository,
     JobPostingRepository,
+    OpportunityRepository,
     UserRepository,
 )
 from app.infrastructure.matching.gemini_matcher import GeminiMatchingService
@@ -700,12 +702,14 @@ class UpdateApplicationStatusUseCase:
         self,
         job_application_repository: JobApplicationRepository,
         job_posting_repository: JobPostingRepository,
+        opportunity_repository: OpportunityRepository,
         user_repository: UserRepository,
         s3_client: S3StorageClient,
         boond_client: BoondClient | None = None,
     ) -> None:
         self.job_application_repository = job_application_repository
         self.job_posting_repository = job_posting_repository
+        self.opportunity_repository = opportunity_repository
         self.user_repository = user_repository
         self.s3_client = s3_client
         self.boond_client = boond_client
@@ -756,7 +760,16 @@ class UpdateApplicationStatusUseCase:
                         f"Disponibilité: {application.availability_display}"
                     ),
                 )
-                external_id = await self.boond_client.create_candidate(candidate)
+
+                # Build Boond context from opportunity and validating user
+                boond_context = await self._build_boond_context(
+                    application=application,
+                    changed_by=command.changed_by,
+                )
+
+                external_id = await self.boond_client.create_candidate(
+                    candidate, boond_context
+                )
                 saved.boond_candidate_id = external_id
                 saved.boond_synced_at = datetime.utcnow()
                 saved.boond_sync_error = None
@@ -790,6 +803,48 @@ class UpdateApplicationStatusUseCase:
             posting.title if posting else None,
             cv_download_url,
         )
+
+    async def _build_boond_context(
+        self,
+        application: JobApplication,
+        changed_by: UUID,
+    ) -> BoondCandidateContext:
+        """Build BoondCandidateContext from opportunity data and validating user."""
+        import structlog
+
+        log = structlog.get_logger(__name__)
+
+        context = BoondCandidateContext(
+            employment_status=application.employment_status,
+        )
+
+        # Get HR manager from the user who validates
+        user = await self.user_repository.get_by_id(changed_by)
+        if user and user.boond_resource_id:
+            context.hr_manager_boond_id = user.boond_resource_id
+
+        # Get opportunity info for manager, agency, and sourceDetail
+        posting = await self.job_posting_repository.get_by_id(application.job_posting_id)
+        if posting:
+            opportunity = await self.opportunity_repository.get_by_id(posting.opportunity_id)
+            if opportunity and opportunity.external_id:
+                context.boond_opportunity_id = opportunity.external_id
+
+                # Fetch full opportunity detail from Boond for manager and agency
+                try:
+                    opp_info = await self.boond_client.get_opportunity_information(
+                        opportunity.external_id
+                    )
+                    context.main_manager_boond_id = opp_info.get("manager_id")
+                    context.agency_boond_id = opp_info.get("agency_id")
+                except Exception as e:
+                    log.warning(
+                        "boond_opportunity_fetch_failed",
+                        opportunity_id=opportunity.external_id,
+                        error=str(e),
+                    )
+
+        return context
 
     async def _to_read_model(
         self,
@@ -993,15 +1048,21 @@ class CreateCandidateInBoondUseCase:
         self,
         job_application_repository: JobApplicationRepository,
         job_posting_repository: JobPostingRepository,
+        opportunity_repository: OpportunityRepository,
+        user_repository: UserRepository,
         boond_client: BoondClient,
         s3_client: S3StorageClient,
     ) -> None:
         self.job_application_repository = job_application_repository
         self.job_posting_repository = job_posting_repository
+        self.opportunity_repository = opportunity_repository
+        self.user_repository = user_repository
         self.boond_client = boond_client
         self.s3_client = s3_client
 
-    async def execute(self, application_id: UUID) -> JobApplicationReadModel:
+    async def execute(
+        self, application_id: UUID, created_by: UUID | None = None
+    ) -> JobApplicationReadModel:
         """Create candidate in BoondManager."""
         application = await self.job_application_repository.get_by_id(application_id)
         if not application:
@@ -1029,9 +1090,14 @@ class CreateCandidateInBoondUseCase:
             ),
         )
 
+        # Build Boond context
+        boond_context = await self._build_boond_context(application, created_by)
+
         # Create in Boond
         try:
-            external_id = await self.boond_client.create_candidate(candidate)
+            external_id = await self.boond_client.create_candidate(
+                candidate, boond_context
+            )
             application.boond_candidate_id = external_id
             application.boond_synced_at = datetime.utcnow()
             application.boond_sync_error = None
@@ -1042,6 +1108,49 @@ class CreateCandidateInBoondUseCase:
             application.updated_at = datetime.utcnow()
             await self.job_application_repository.save(application)
             raise ValueError(f"Failed to create candidate in BoondManager: {str(e)}")
+
+    async def _build_boond_context(
+        self,
+        application: JobApplication,
+        created_by: UUID | None = None,
+    ) -> BoondCandidateContext:
+        """Build BoondCandidateContext from opportunity data and current user."""
+        import structlog
+
+        log = structlog.get_logger(__name__)
+
+        context = BoondCandidateContext(
+            employment_status=application.employment_status,
+        )
+
+        # Get HR manager from the user who triggers the action
+        if created_by:
+            user = await self.user_repository.get_by_id(created_by)
+            if user and user.boond_resource_id:
+                context.hr_manager_boond_id = user.boond_resource_id
+
+        # Get opportunity info for manager, agency, and sourceDetail
+        posting = await self.job_posting_repository.get_by_id(application.job_posting_id)
+        if posting:
+            opportunity = await self.opportunity_repository.get_by_id(posting.opportunity_id)
+            if opportunity and opportunity.external_id:
+                context.boond_opportunity_id = opportunity.external_id
+
+                # Fetch full opportunity detail from Boond for manager and agency
+                try:
+                    opp_info = await self.boond_client.get_opportunity_information(
+                        opportunity.external_id
+                    )
+                    context.main_manager_boond_id = opp_info.get("manager_id")
+                    context.agency_boond_id = opp_info.get("agency_id")
+                except Exception as e:
+                    log.warning(
+                        "boond_opportunity_fetch_failed",
+                        opportunity_id=opportunity.external_id,
+                        error=str(e),
+                    )
+
+        return context
 
         posting = await self.job_posting_repository.get_by_id(application.job_posting_id)
 

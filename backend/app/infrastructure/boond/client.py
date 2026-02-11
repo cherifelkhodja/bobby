@@ -11,6 +11,7 @@ from app.infrastructure.boond.dtos import (
     BoondOpportunityDTO,
 )
 from app.infrastructure.boond.mappers import (
+    BoondCandidateContext,
     map_boond_opportunity_to_domain,
     map_candidate_to_boond,
 )
@@ -81,12 +82,16 @@ class BoondClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=4),
     )
-    async def create_candidate(self, candidate: Candidate) -> str:
+    async def create_candidate(
+        self,
+        candidate: Candidate,
+        context: BoondCandidateContext | None = None,
+    ) -> str:
         """Create candidate in BoondManager. Returns external ID."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             logger.info(f"Creating candidate {candidate.email} in BoondManager")
 
-            payload = map_candidate_to_boond(candidate)
+            payload = map_candidate_to_boond(candidate, context)
             # Set candidate state inside JSON:API attributes
             payload["data"]["attributes"]["state"] = self.candidate_state_id
 
