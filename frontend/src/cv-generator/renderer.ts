@@ -73,8 +73,10 @@ export interface TemplateConfig {
     titleBorderBottom?: boolean; // default true
     titleLineSpacing?: number;
   };
+  skipSections?: string[]; // section IDs to skip (e.g. ['competences'])
   diplomeStyle?: {
     separator?: string; // default ' - '
+    compact?: boolean; // no spacing between diploma entries
   };
   footer: {
     enabled?: boolean; // default true
@@ -281,9 +283,10 @@ function createHelpers(
 
     diplome: (date: string, titre: string, etablissement: string) => {
       const sep = config.diplomeStyle?.separator ?? ' - ';
+      const compact = config.diplomeStyle?.compact ?? false;
       return [
         new Paragraph({
-          spacing: { before: spacing.paragraph, after: 40 },
+          spacing: { before: compact ? 40 : spacing.paragraph, after: compact ? 0 : 40 },
           children: [
             new TextRun({
               text: date + sep + titre,
@@ -294,7 +297,7 @@ function createHelpers(
           ],
         }),
         new Paragraph({
-          spacing: { after: spacing.paragraph },
+          spacing: { after: compact ? 40 : spacing.paragraph },
           children: [
             new TextRun({
               text: etablissement,
@@ -555,11 +558,15 @@ function renderContent(
 
 function renderSections(
   sections: CVData['sections'],
-  helpers: ReturnType<typeof createHelpers>
+  helpers: ReturnType<typeof createHelpers>,
+  config: TemplateConfig
 ): Paragraph[] {
   const elements: Paragraph[] = [];
+  const skipSections = config.skipSections ?? [];
 
   sections.forEach((section) => {
+    if (skipSections.includes(section.id)) return;
+
     elements.push(helpers.sectionTitle(section.title));
     const isExperienceSection = section.id === 'experiences';
     elements.push(
@@ -619,7 +626,7 @@ export async function generateCV(
         ...(hasFooter ? { footers: { default: helpers.footer() } } : {}),
         children: [
           ...helpers.header(cvData.header),
-          ...renderSections(cvData.sections, helpers),
+          ...renderSections(cvData.sections, helpers, config),
         ],
       },
     ],

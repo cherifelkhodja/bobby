@@ -35,8 +35,8 @@
     "left": 720
   },
   "logo": {
-    "width": 120,
-    "height": 120,
+    "width": 200,
+    "height": 39,
     "position": "right"
   },
   "header": {
@@ -52,8 +52,10 @@
     "titleBorderBottom": false,
     "titleLineSpacing": 276
   },
+  "skipSections": ["competences"],
   "diplomeStyle": {
-    "separator": " : "
+    "separator": " : ",
+    "compact": true
   },
   "footer": {
     "enabled": false,

@@ -153,7 +153,9 @@ docker-compose up # Start all services
   - **Rétro-compatible** : Template Gemini fonctionne sans modification de son config.json
   - Fichiers créés : `templates/craftmania/config.json`
   - Fichiers modifiés : `renderer.ts` (TemplateConfig + createHelpers), `CvGeneratorBeta.tsx` (sélecteur + TEMPLATES)
-  - **Note** : Placer `logo-craftmania.png` dans `frontend/public/` pour l'intégration logo
+  - **skipSections** : Config `skipSections: ["competences"]` pour exclure le résumé des compétences du rendu Craftmania
+  - **Diplômes compacts** : Config `diplomeStyle.compact: true` pour supprimer l'espacement entre les formations
+  - **Logo** : Dimensions proportionnelles 200x39 (original 2164x425). Placer `logo-craftmania.png` dans `frontend/public/`
 - **feat(cv-generator)**: Configuration IA séparée pour CV Generator Beta
   - **Nouvelle clé** : `cv_generator_beta_model` (indépendante de `cv_ai_model_claude` du legacy)
   - **Admin API** : `GET/POST /admin/cv-generator-beta/settings`, `POST /admin/cv-generator-beta/test`
