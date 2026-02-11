@@ -144,6 +144,14 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-11
+- **refactor**: Suppression Transformateur CV legacy, remplacement par CV Generator
+  - Supprimé `CvTransformer.tsx` (page), `cvTransformer.ts` (API client)
+  - Supprimé onglets admin : `TemplatesTab.tsx` (templates DB), `StatsTab.tsx` (statistiques transformation)
+  - Route `/cv-transformer` supprimée, `/cv-generator-beta` renommée en `/cv-generator`
+  - Sidebar : un seul lien "CV Generator" au lieu de deux
+  - Badge Beta retiré de la page CV Generator
+  - Admin réduit à 4 onglets : Utilisateurs, Invitations, BoondManager, API
+  - Fichiers modifiés : `App.tsx`, `Sidebar.tsx`, `CvGeneratorBeta.tsx`, `admin/index.tsx`
 - **refactor(cv-generator)**: Redesign page CV Generator Beta
   - Layout 2 colonnes (upload | template) au lieu de 3 cartes verticales numérotées
   - Suppression Card/CardHeader pour un design plus flat et aéré
