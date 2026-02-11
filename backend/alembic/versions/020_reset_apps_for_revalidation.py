@@ -1,6 +1,6 @@
 """Reset all job applications to en_cours for Boond re-validation.
 
-Revision ID: 020_reset_applications_for_boond_revalidation
+Revision ID: 020_reset_apps_revalidation
 Revises: 019_add_civility_and_boond_sync
 Create Date: 2026-02-11
 
@@ -16,7 +16,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "020_reset_applications_for_boond_revalidation"
+revision = "020_reset_apps_revalidation"
 down_revision = "019_add_civility_and_boond_sync"
 branch_labels = None
 depends_on = None
