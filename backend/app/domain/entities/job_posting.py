@@ -96,6 +96,14 @@ class ExperienceLevel(str, Enum):
         return names[self]
 
 
+# Agency prefix mapping for Turnover-IT references
+_AGENCY_PREFIXES: dict[str, str] = {
+    "1": "GEM",   # Gemini
+    "5": "CRA",   # Craftmania
+}
+_DEFAULT_PREFIX = "ESN"
+
+
 @dataclass
 class JobPosting:
     """Job posting entity for publishing opportunities to Turnover-IT.
@@ -152,13 +160,6 @@ class JobPosting:
     published_at: datetime | None = None
     closed_at: datetime | None = None
 
-    # Agency prefix mapping for Turnover-IT references
-    AGENCY_PREFIXES: dict[str, str] = {
-        "1": "GEM",   # Gemini
-        "5": "CRA",   # Craftmania
-    }
-    DEFAULT_PREFIX: str = "ESN"
-
     def generate_turnoverit_reference(self, agency_id: str | None = None) -> str:
         """Generate a unique Turnover-IT reference based on agency.
 
@@ -168,7 +169,7 @@ class JobPosting:
         Args:
             agency_id: Boond agency ID ("1" for Gemini, "5" for Craftmania).
         """
-        prefix = self.AGENCY_PREFIXES.get(agency_id or "", self.DEFAULT_PREFIX)
+        prefix = _AGENCY_PREFIXES.get(agency_id or "", _DEFAULT_PREFIX)
         date_str = datetime.utcnow().strftime("%Y%m%d")
         random_part = "".join(
             secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6)
