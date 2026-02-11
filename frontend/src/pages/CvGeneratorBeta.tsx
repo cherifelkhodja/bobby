@@ -26,21 +26,21 @@ interface TemplateOption {
   config: TemplateConfig;
   logoPath: string;
   label: string;
-  color: string;
+  description: string;
 }
 
 const TEMPLATES: Record<TemplateId, TemplateOption> = {
   gemini: {
     config: geminiConfig as TemplateConfig,
     logoPath: '/logo-gemini.png',
-    label: 'Gemini Consulting',
-    color: '#50A492',
+    label: 'Template Gemini',
+    description: 'Format standard Gemini Consulting',
   },
   craftmania: {
     config: craftmaniaConfig as TemplateConfig,
     logoPath: '/logo-craftmania.png',
-    label: 'Craftmania',
-    color: '#A9122A',
+    label: 'Template Craftmania',
+    description: 'Format standard Craftmania',
   },
 };
 
@@ -297,16 +297,13 @@ export function CvGeneratorBeta() {
                   </div>
                 )}
                 <div className="flex items-center mb-2">
-                  <div
-                    className="w-6 h-6 rounded mr-2 flex-shrink-0"
-                    style={{ backgroundColor: tpl.color }}
-                  />
+                  <FileText className={`h-6 w-6 mr-2 ${selectedTemplate === id ? 'text-primary-500' : 'text-gray-400'}`} />
                   <span className="font-medium text-gray-900 dark:text-gray-100">
                     {tpl.label}
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {tpl.config.fonts.main}
+                  {tpl.description}
                 </p>
               </button>
             )
