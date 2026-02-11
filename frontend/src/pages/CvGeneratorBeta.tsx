@@ -16,8 +16,33 @@ import { validateCV } from '../cv-generator/schema';
 import { generateCV } from '../cv-generator/renderer';
 import type { TemplateConfig } from '../cv-generator/renderer';
 import geminiConfig from '../cv-generator/templates/gemini/config.json';
+import craftmaniaConfig from '../cv-generator/templates/craftmania/config.json';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+
+type TemplateId = 'gemini' | 'craftmania';
+
+interface TemplateOption {
+  config: TemplateConfig;
+  logoPath: string;
+  label: string;
+  color: string; // For UI accent
+}
+
+const TEMPLATES: Record<TemplateId, TemplateOption> = {
+  gemini: {
+    config: geminiConfig as TemplateConfig,
+    logoPath: '/logo-gemini.png',
+    label: 'Gemini Consulting',
+    color: '#50A492',
+  },
+  craftmania: {
+    config: craftmaniaConfig as TemplateConfig,
+    logoPath: '/logo-craftmania.png',
+    label: 'Craftmania',
+    color: '#A9122A',
+  },
+};
 
 type Step = 'idle' | 'uploading' | 'extracting' | 'ai_parsing' | 'validating' | 'generating' | 'done' | 'error';
 
@@ -63,6 +88,7 @@ function formatElapsed(seconds: number): string {
 
 export function CvGeneratorBeta() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>('gemini');
   const [isDragging, setIsDragging] = useState(false);
   const [step, setStep] = useState<Step>('idle');
   const [progress, setProgress] = useState(0);
@@ -128,10 +154,11 @@ export function CvGeneratorBeta() {
       setProgress(95);
       setProgressMessage('Génération du document Word...');
 
+      const template = TEMPLATES[selectedTemplate];
       const blob = await generateCV(
         validation.data,
-        geminiConfig as TemplateConfig,
-        '/logo-gemini.png'
+        template.config,
+        template.logoPath
       );
 
       setStep('done');
@@ -143,7 +170,7 @@ export function CvGeneratorBeta() {
       a.href = url;
       const originalName =
         selectedFile?.name.replace(/\.[^/.]+$/, '') || 'cv';
-      a.download = `${originalName}_Gemini.docx`;
+      a.download = `${originalName}_${template.config.name}.docx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -154,7 +181,7 @@ export function CvGeneratorBeta() {
         error instanceof Error ? error.message : 'Une erreur est survenue'
       );
     }
-  }, [selectedFile]);
+  }, [selectedFile, selectedTemplate]);
 
   // Drag and drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -244,7 +271,7 @@ export function CvGeneratorBeta() {
         </span>
       </div>
       <p className="text-gray-600 dark:text-gray-400 mb-8">
-        Générez un CV au format Gemini Consulting à partir d'un CV existant
+        Générez un CV formaté à partir d'un CV existant
       </p>
 
       {/* File Upload */}
@@ -324,11 +351,62 @@ export function CvGeneratorBeta() {
         )}
       </Card>
 
+      {/* Template Selection */}
+      <Card className="mb-6">
+        <CardHeader
+          title="2. Choisir le format"
+          subtitle="Sélectionnez le template de mise en forme"
+        />
+        <div className="grid grid-cols-2 gap-3">
+          {(Object.entries(TEMPLATES) as [TemplateId, TemplateOption][]).map(
+            ([id, tpl]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setSelectedTemplate(id)}
+                disabled={isProcessing}
+                className={`
+                  relative flex items-center gap-3 p-4 rounded-lg border-2 transition-all text-left
+                  ${
+                    selectedTemplate === id
+                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                  }
+                  ${isProcessing ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
+                `}
+              >
+                <div
+                  className="w-10 h-10 rounded-lg flex-shrink-0"
+                  style={{ backgroundColor: tpl.color }}
+                />
+                <div>
+                  <p
+                    className={`font-medium ${
+                      selectedTemplate === id
+                        ? 'text-primary-700 dark:text-primary-300'
+                        : 'text-gray-900 dark:text-gray-100'
+                    }`}
+                  >
+                    {tpl.label}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {tpl.config.fonts.main}
+                  </p>
+                </div>
+                {selectedTemplate === id && (
+                  <Check className="absolute top-3 right-3 h-5 w-5 text-primary-500" />
+                )}
+              </button>
+            )
+          )}
+        </div>
+      </Card>
+
       {/* Generate & Download */}
       <Card>
         <CardHeader
-          title="2. Générer le CV"
-          subtitle="Le document sera téléchargé automatiquement au format Gemini"
+          title="3. Générer le CV"
+          subtitle={`Le document sera téléchargé au format ${TEMPLATES[selectedTemplate].label}`}
         />
 
         {/* Progress indicator */}

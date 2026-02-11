@@ -144,6 +144,16 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-11
+- **feat(cv-generator)**: Support multi-template (Craftmania) dans CV Generator Beta
+  - **Nouveau template** : Craftmania avec design distinct (Century Gothic, rouge bordeaux #A9122A, header tableau, pas de footer)
+  - **TemplateConfig étendue** : Propriétés optionnelles `header.layout`, `subSectionStyle`, `experienceStyle`, `diplomeStyle`, `footer.enabled`
+  - **Renderer refactoré** : Sections avec bordure OU fond coloré, header centré OU tableau, footer optionnel
+  - **UI** : Sélecteur de template (étape 2) avec preview couleur + police, étapes renumérotées (1→2→3)
+  - **Fichier téléchargé** : `CV_[Nom].docx` utilise le nom du template sélectionné
+  - **Rétro-compatible** : Template Gemini fonctionne sans modification de son config.json
+  - Fichiers créés : `templates/craftmania/config.json`
+  - Fichiers modifiés : `renderer.ts` (TemplateConfig + createHelpers), `CvGeneratorBeta.tsx` (sélecteur + TEMPLATES)
+  - **Note** : Placer `logo-craftmania.png` dans `frontend/public/` pour l'intégration logo
 - **feat(cv-generator)**: Configuration IA séparée pour CV Generator Beta
   - **Nouvelle clé** : `cv_generator_beta_model` (indépendante de `cv_ai_model_claude` du legacy)
   - **Admin API** : `GET/POST /admin/cv-generator-beta/settings`, `POST /admin/cv-generator-beta/test`

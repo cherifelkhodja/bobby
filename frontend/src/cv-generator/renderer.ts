@@ -5,6 +5,11 @@ import {
   TextRun,
   ImageRun,
   Footer,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  VerticalAlign,
   AlignmentType,
   BorderStyle,
   PageBreak,
@@ -18,7 +23,7 @@ export interface TemplateConfig {
   name: string;
   colors: {
     primary: string;
-    sectionBg: string;
+    sectionBg: string | null; // null = border-bottom style instead of background
     border: string;
     period: string;
     text: string;
@@ -38,7 +43,9 @@ export interface TemplateConfig {
   spacing: {
     paragraph: number;
     section: number;
+    sectionAfter?: number;
     subsection: number;
+    subsectionAfter?: number;
     bullet: number;
     competence: number;
   };
@@ -51,8 +58,26 @@ export interface TemplateConfig {
   logo: {
     width: number;
     height: number;
+    position?: string; // 'left' (default) | 'right'
+  };
+  header?: {
+    layout?: string; // 'centered' (default) | 'table'
+    titleBoldItalic?: boolean;
+  };
+  subSectionStyle?: {
+    borderBottom?: boolean; // default true
+  };
+  experienceStyle?: {
+    titleBold?: boolean;
+    titleItalic?: boolean; // default true
+    titleBorderBottom?: boolean; // default true
+    titleLineSpacing?: number;
+  };
+  diplomeStyle?: {
+    separator?: string; // default ' - '
   };
   footer: {
+    enabled?: boolean; // default true
     line1: string;
     line2: string;
   };
@@ -65,37 +90,72 @@ function createHelpers(
   const { colors, fonts, spacing } = config;
 
   return {
-    sectionTitle: (title: string) =>
-      new Paragraph({
-        spacing: { before: spacing.section, after: spacing.subsection },
-        shading: {
-          type: ShadingType.SOLID,
-          color: colors.sectionBg,
-          fill: colors.sectionBg,
+    sectionTitle: (title: string) => {
+      const afterSpacing = config.spacing.sectionAfter ?? spacing.subsection;
+
+      if (colors.sectionBg) {
+        // Background style (Gemini)
+        return new Paragraph({
+          spacing: { before: spacing.section, after: afterSpacing },
+          shading: {
+            type: ShadingType.SOLID,
+            color: colors.sectionBg,
+            fill: colors.sectionBg,
+          },
+          alignment: AlignmentType.CENTER,
+          children: [
+            new TextRun({
+              text: title,
+              bold: true,
+              size: fonts.sizes.section,
+              color: colors.white,
+              font: fonts.main,
+            }),
+          ],
+        });
+      }
+
+      // Border-bottom style (Craftmania)
+      return new Paragraph({
+        spacing: { before: spacing.section, after: afterSpacing },
+        border: {
+          bottom: {
+            style: BorderStyle.SINGLE,
+            size: 12,
+            space: 3,
+            color: colors.border,
+          },
         },
-        alignment: AlignmentType.CENTER,
         children: [
           new TextRun({
             text: title,
             bold: true,
             size: fonts.sizes.section,
-            color: colors.white,
+            color: colors.text,
             font: fonts.main,
           }),
         ],
-      }),
+      });
+    },
 
-    subSectionTitle: (title: string) =>
-      new Paragraph({
-        spacing: { before: spacing.subsection, after: spacing.paragraph },
-        border: {
-          bottom: {
-            style: BorderStyle.SINGLE,
-            size: 18,
-            space: 5,
-            color: colors.border,
-          },
-        },
+    subSectionTitle: (title: string) => {
+      const hasBorder = config.subSectionStyle?.borderBottom !== false;
+      const afterSpacing = config.spacing.subsectionAfter ?? spacing.paragraph;
+
+      return new Paragraph({
+        spacing: { before: spacing.subsection, after: afterSpacing },
+        ...(hasBorder
+          ? {
+              border: {
+                bottom: {
+                  style: BorderStyle.SINGLE,
+                  size: 18,
+                  space: 5,
+                  color: colors.border,
+                },
+              },
+            }
+          : {}),
         children: [
           new TextRun({
             text: title,
@@ -105,7 +165,8 @@ function createHelpers(
             font: fonts.main,
           }),
         ],
-      }),
+      });
+    },
 
     competenceLine: (category: string, values: string) =>
       new Paragraph({
@@ -155,88 +216,196 @@ function createHelpers(
         ],
       }),
 
-    expHeader: (client: string, periode: string, titre: string) => [
-      new Paragraph({
-        spacing: { before: spacing.subsection, after: 60 },
-        children: [
-          new TextRun({
-            text: client,
-            bold: true,
-            size: fonts.sizes.text,
-            font: fonts.main,
-            color: colors.text,
-          }),
-          new TextRun({
-            text: ' | ',
-            size: fonts.sizes.text,
-            font: fonts.main,
-            color: colors.period,
-          }),
-          new TextRun({
-            text: periode,
-            size: fonts.sizes.text,
-            font: fonts.main,
-            color: colors.period,
-          }),
-        ],
-      }),
-      new Paragraph({
-        spacing: { after: spacing.paragraph },
-        border: {
-          bottom: {
-            style: BorderStyle.SINGLE,
-            size: 18,
-            space: 5,
-            color: colors.border,
+    expHeader: (client: string, periode: string, titre: string) => {
+      const style = config.experienceStyle;
+      const titleBold = style?.titleBold ?? false;
+      const titleItalic = style?.titleItalic ?? true;
+      const titleBorderBottom = style?.titleBorderBottom ?? true;
+      const titleLineSpacing = style?.titleLineSpacing;
+
+      return [
+        new Paragraph({
+          spacing: { before: spacing.subsection, after: 60 },
+          children: [
+            new TextRun({
+              text: client,
+              bold: true,
+              size: fonts.sizes.text,
+              font: fonts.main,
+              color: colors.text,
+            }),
+            new TextRun({
+              text: ' | ',
+              size: fonts.sizes.text,
+              font: fonts.main,
+              color: colors.period,
+            }),
+            new TextRun({
+              text: periode,
+              size: fonts.sizes.text,
+              font: fonts.main,
+              color: colors.period,
+            }),
+          ],
+        }),
+        new Paragraph({
+          spacing: {
+            after: spacing.paragraph,
+            ...(titleLineSpacing ? { line: titleLineSpacing } : {}),
           },
-        },
-        children: [
-          new TextRun({
-            text: titre,
-            italics: true,
-            size: fonts.sizes.text,
-            font: fonts.main,
-            color: colors.text,
-          }),
-        ],
-      }),
-    ],
+          ...(titleBorderBottom
+            ? {
+                border: {
+                  bottom: {
+                    style: BorderStyle.SINGLE,
+                    size: 18,
+                    space: 5,
+                    color: colors.border,
+                  },
+                },
+              }
+            : {}),
+          children: [
+            new TextRun({
+              text: titre,
+              bold: titleBold,
+              italics: titleItalic,
+              size: fonts.sizes.text,
+              font: fonts.main,
+              color: colors.text,
+            }),
+          ],
+        }),
+      ];
+    },
 
-    diplome: (date: string, titre: string, etablissement: string) => [
-      new Paragraph({
-        spacing: { before: spacing.paragraph, after: 40 },
-        children: [
-          new TextRun({
-            text: date + ' - ',
-            bold: true,
-            size: fonts.sizes.text,
-            font: fonts.main,
-          }),
-          new TextRun({
-            text: titre,
-            bold: true,
-            size: fonts.sizes.text,
-            font: fonts.main,
-          }),
-        ],
-      }),
-      new Paragraph({
-        spacing: { after: spacing.paragraph },
-        children: [
-          new TextRun({
-            text: etablissement,
-            size: fonts.sizes.text,
-            font: fonts.main,
-          }),
-        ],
-      }),
-    ],
+    diplome: (date: string, titre: string, etablissement: string) => {
+      const sep = config.diplomeStyle?.separator ?? ' - ';
+      return [
+        new Paragraph({
+          spacing: { before: spacing.paragraph, after: 40 },
+          children: [
+            new TextRun({
+              text: date + sep + titre,
+              bold: true,
+              size: fonts.sizes.text,
+              font: fonts.main,
+            }),
+          ],
+        }),
+        new Paragraph({
+          spacing: { after: spacing.paragraph },
+          children: [
+            new TextRun({
+              text: etablissement,
+              size: fonts.sizes.text,
+              font: fonts.main,
+            }),
+          ],
+        }),
+      ];
+    },
 
-    header: (cvHeader: { titre: string; experience: string }) => {
-      const paragraphs: Paragraph[] = [];
+    header: (cvHeader: { titre: string; experience: string }): (Paragraph | Table)[] => {
+      const headerLayout = config.header?.layout || 'centered';
+      const titleBoldItalic = config.header?.titleBoldItalic ?? false;
+
+      if (headerLayout === 'table') {
+        // Table layout (Craftmania): title left, logo right
+        const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+        const cellBorders = {
+          top: noBorder,
+          bottom: noBorder,
+          left: noBorder,
+          right: noBorder,
+        };
+
+        const leftCellChildren = [
+          new Paragraph({
+            spacing: { after: 60 },
+            children: [
+              new TextRun({
+                text: cvHeader.titre,
+                bold: true,
+                italics: titleBoldItalic,
+                size: fonts.sizes.title,
+                font: fonts.main,
+              }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: cvHeader.experience,
+                italics: true,
+                size: fonts.sizes.subtitle,
+                font: fonts.main,
+              }),
+            ],
+          }),
+        ];
+
+        const rightCellChildren: Paragraph[] = [];
+        if (logoData) {
+          rightCellChildren.push(
+            new Paragraph({
+              alignment: AlignmentType.RIGHT,
+              children: [
+                new ImageRun({
+                  type: 'png',
+                  data: logoData,
+                  transformation: {
+                    width: config.logo.width,
+                    height: config.logo.height,
+                  },
+                }),
+              ],
+            })
+          );
+        } else {
+          rightCellChildren.push(new Paragraph({}));
+        }
+
+        return [
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: noBorder,
+              bottom: noBorder,
+              left: noBorder,
+              right: noBorder,
+              insideHorizontal: noBorder,
+              insideVertical: noBorder,
+            },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    width: { size: 60, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: cellBorders,
+                    children: leftCellChildren,
+                  }),
+                  new TableCell({
+                    width: { size: 40, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: cellBorders,
+                    children: rightCellChildren,
+                  }),
+                ],
+              }),
+            ],
+          }),
+          new Paragraph({ spacing: { after: spacing.section } }),
+        ];
+      }
+
+      // Centered layout (Gemini): floating logo left, centered title
+      const elements: (Paragraph | Table)[] = [];
+      const titleColor = colors.sectionBg || colors.primary;
 
       if (logoData) {
-        paragraphs.push(
+        elements.push(
           new Paragraph({
             children: [
               new ImageRun({
@@ -260,7 +429,7 @@ function createHelpers(
         );
       }
 
-      paragraphs.push(
+      elements.push(
         new Paragraph({
           alignment: AlignmentType.CENTER,
           spacing: { after: 60 },
@@ -269,7 +438,7 @@ function createHelpers(
               text: cvHeader.titre,
               bold: true,
               size: fonts.sizes.title,
-              color: colors.sectionBg,
+              color: titleColor,
               font: fonts.main,
             }),
           ],
@@ -282,18 +451,19 @@ function createHelpers(
               text: cvHeader.experience,
               italics: true,
               size: fonts.sizes.subtitle,
-              color: colors.sectionBg,
+              color: titleColor,
               font: fonts.main,
             }),
           ],
         })
       );
 
-      return paragraphs;
+      return elements;
     },
 
-    footer: () =>
-      new Footer({
+    footer: () => {
+      const footerColor = colors.sectionBg || colors.primary;
+      return new Footer({
         children: [
           new Paragraph({
             alignment: AlignmentType.CENTER,
@@ -303,7 +473,7 @@ function createHelpers(
                 text: config.footer.line1,
                 bold: true,
                 size: fonts.sizes.footer,
-                color: colors.sectionBg,
+                color: footerColor,
                 font: fonts.main,
               }),
             ],
@@ -314,13 +484,14 @@ function createHelpers(
               new TextRun({
                 text: config.footer.line2,
                 size: fonts.sizes.footer,
-                color: colors.sectionBg,
+                color: footerColor,
                 font: fonts.main,
               }),
             ],
           }),
         ],
-      }),
+      });
+    },
 
     pageBreak: () => new Paragraph({ children: [new PageBreak()] }),
   };
@@ -427,6 +598,8 @@ export async function generateCV(
   const logoData = logoPath ? await loadLogo(logoPath) : null;
   const helpers = createHelpers(config, logoData);
 
+  const hasFooter = config.footer.enabled !== false;
+
   const doc = new Document({
     styles: {
       default: {
@@ -443,7 +616,7 @@ export async function generateCV(
         properties: {
           page: { margin: config.margins },
         },
-        footers: { default: helpers.footer() },
+        ...(hasFooter ? { footers: { default: helpers.footer() } } : {}),
         children: [
           ...helpers.header(cvData.header),
           ...renderSections(cvData.sections, helpers),
