@@ -1,12 +1,16 @@
 """CV Generator (Beta) API endpoint.
 
 Returns parsed JSON to the frontend for client-side DOCX generation.
+Supports SSE streaming for progressive feedback.
 """
 
+import json
 import logging
+from collections.abc import AsyncGenerator
 from uuid import UUID
 
 from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.api.middleware.rate_limiter import limiter
@@ -206,3 +210,184 @@ async def parse_cv(
             status_code=500,
             detail=f"Erreur lors du parsing: {str(e)}",
         )
+
+
+def _sse_event(event: str, data: dict) -> str:
+    """Format a Server-Sent Event."""
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@router.post("/parse-stream")
+@limiter.limit("10/hour")
+async def parse_cv_stream(
+    request: Request,
+    db: DbSession,
+    app_settings: AppSettings,
+    app_settings_svc: AppSettingsSvc,
+    file: UploadFile = File(...),
+    authorization: str = Header(default=""),
+):
+    """Upload a CV and get parsed JSON via SSE streaming with progress updates.
+
+    Sends Server-Sent Events:
+    - event: progress  {step, message, percent}
+    - event: complete  {success, data, model_used}
+    - event: error     {message}
+    """
+    # Authenticate before streaming
+    user_id = await _require_access(db, authorization)
+    ip_address = request.client.host if request.client else None
+
+    if not app_settings.ANTHROPIC_API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="Clé API Anthropic non configurée. Contactez l'administrateur.",
+        )
+
+    ai_model = await app_settings_svc.get_cv_ai_model_claude()
+
+    # Validate file
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Nom de fichier manquant")
+
+    file_lower = file.filename.lower()
+    if not (file_lower.endswith(".pdf") or file_lower.endswith(".docx")):
+        raise HTTPException(
+            status_code=400,
+            detail="Format non supporté. Utilisez PDF ou DOCX.",
+        )
+
+    file_content = await file.read()
+
+    if len(file_content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Fichier trop volumineux. Maximum {MAX_FILE_SIZE // (1024 * 1024)} Mo",
+        )
+
+    if len(file_content) == 0:
+        raise HTTPException(status_code=400, detail="Fichier vide")
+
+    filename = file.filename
+
+    async def event_stream() -> AsyncGenerator[str, None]:
+        """Generate SSE events for CV parsing progress."""
+        try:
+            # Step 1: Extracting text
+            yield _sse_event("progress", {
+                "step": "extracting",
+                "message": "Extraction du texte du document...",
+                "percent": 10,
+            })
+
+            try:
+                if file_lower.endswith(".pdf"):
+                    extractor = PdfTextExtractor()
+                    cv_text = extractor.extract(file_content)
+                else:
+                    extractor = DocxTextExtractor()
+                    cv_text = extractor.extract(file_content)
+            except Exception as e:
+                yield _sse_event("error", {"message": f"Erreur d'extraction du texte: {str(e)}"})
+                return
+
+            yield _sse_event("progress", {
+                "step": "extracting",
+                "message": "Texte extrait avec succès",
+                "percent": 20,
+            })
+
+            # Step 2: AI Parsing
+            yield _sse_event("progress", {
+                "step": "ai_parsing",
+                "message": "Analyse IA en cours (Claude)...",
+                "percent": 30,
+            })
+
+            parser = CvGeneratorParser(app_settings)
+            log_repo = CvTransformationLogRepository(db)
+
+            try:
+                logger.info(f"[CV Generator SSE] Parsing: file={filename}, model={ai_model}")
+                cv_data = await parser.parse_cv(cv_text, model_name=ai_model)
+            except (ValueError, Exception) as e:
+                logger.warning(f"[CV Generator SSE] Error: {type(e).__name__}: {str(e)}")
+
+                from app.domain.entities.cv_transformation_log import CvTransformationLog
+
+                log = CvTransformationLog.create_failure(
+                    user_id=user_id,
+                    template_name="cv-generator-beta",
+                    original_filename=filename,
+                    error_message=str(e),
+                )
+                await log_repo.save(log)
+
+                audit_logger.log_cv_transform(
+                    user_id=user_id,
+                    filename=filename,
+                    template="cv-generator-beta",
+                    success=False,
+                    ip_address=ip_address,
+                    error_message=str(e),
+                )
+                yield _sse_event("error", {"message": str(e)})
+                return
+
+            yield _sse_event("progress", {
+                "step": "ai_parsing",
+                "message": "Analyse IA terminée",
+                "percent": 85,
+            })
+
+            # Step 3: Validation
+            yield _sse_event("progress", {
+                "step": "validating",
+                "message": "Validation des données...",
+                "percent": 90,
+            })
+
+            # Log success
+            from app.domain.entities.cv_transformation_log import CvTransformationLog
+
+            log = CvTransformationLog.create_success(
+                user_id=user_id,
+                template_name="cv-generator-beta",
+                original_filename=filename,
+            )
+            await log_repo.save(log)
+
+            audit_logger.log_cv_transform(
+                user_id=user_id,
+                filename=filename,
+                template="cv-generator-beta",
+                success=True,
+                ip_address=ip_address,
+            )
+
+            # Step 4: Complete
+            yield _sse_event("progress", {
+                "step": "complete",
+                "message": "CV parsé avec succès !",
+                "percent": 100,
+            })
+
+            yield _sse_event("complete", {
+                "success": True,
+                "data": cv_data,
+                "model_used": ai_model,
+            })
+
+        except Exception as e:
+            logger.error(f"[CV Generator SSE] Unexpected error: {type(e).__name__}: {str(e)}")
+            yield _sse_event("error", {"message": f"Erreur inattendue: {str(e)}"})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

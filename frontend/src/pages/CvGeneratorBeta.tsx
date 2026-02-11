@@ -1,5 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Upload,
   FileText,
@@ -12,7 +11,7 @@ import {
 } from 'lucide-react';
 
 import { cvGeneratorApi } from '../api/cvGenerator';
-import { getErrorMessage } from '../api/client';
+import type { SSEProgressEvent } from '../api/cvGenerator';
 import { validateCV } from '../cv-generator/schema';
 import { generateCV } from '../cv-generator/renderer';
 import type { TemplateConfig } from '../cv-generator/renderer';
@@ -20,38 +19,102 @@ import geminiConfig from '../cv-generator/templates/gemini/config.json';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 
-type Step = 'idle' | 'uploading' | 'parsing' | 'generating' | 'done' | 'error';
+type Step = 'idle' | 'uploading' | 'extracting' | 'ai_parsing' | 'validating' | 'generating' | 'done' | 'error';
 
-const stepMessages: Record<Step, string> = {
-  idle: '',
-  uploading: 'Envoi du fichier...',
-  parsing: "Analyse par l'IA...",
-  generating: 'Génération du document...',
-  done: 'CV généré avec succès !',
-  error: 'Une erreur est survenue',
+const stepConfig: Record<Step, { message: string; icon?: string }> = {
+  idle: { message: '' },
+  uploading: { message: 'Envoi du fichier...' },
+  extracting: { message: 'Extraction du texte...' },
+  ai_parsing: { message: "Analyse par l'IA (Claude)..." },
+  validating: { message: 'Validation des données...' },
+  generating: { message: 'Génération du document Word...' },
+  done: { message: 'CV généré avec succès !' },
+  error: { message: 'Une erreur est survenue' },
 };
+
+function useElapsedTimer(isRunning: boolean) {
+  const [elapsed, setElapsed] = useState(0);
+  const startRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isRunning) {
+      startRef.current = Date.now();
+      setElapsed(0);
+      const interval = setInterval(() => {
+        if (startRef.current) {
+          setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    } else {
+      startRef.current = null;
+    }
+  }, [isRunning]);
+
+  return elapsed;
+}
+
+function formatElapsed(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const min = Math.floor(seconds / 60);
+  const sec = seconds % 60;
+  return `${min}m ${sec.toString().padStart(2, '0')}s`;
+}
 
 export function CvGeneratorBeta() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [step, setStep] = useState<Step>('idle');
+  const [progress, setProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const transformMutation = useMutation({
-    mutationFn: async (file: File) => {
-      setStep('uploading');
+  const isProcessing = ['uploading', 'extracting', 'ai_parsing', 'validating', 'generating'].includes(step);
+  const elapsed = useElapsedTimer(isProcessing);
 
-      // Step 1: Send to backend for AI parsing
-      setStep('parsing');
-      const response = await cvGeneratorApi.parseCv(file);
+  const handleTransform = useCallback(async () => {
+    if (!selectedFile) return;
+    setErrorMessage(null);
+    setStep('uploading');
+    setProgress(5);
+    setProgressMessage('Envoi du fichier...');
 
-      if (!response.success) {
-        throw new Error('Le parsing a échoué');
+    try {
+      let cvData: Record<string, unknown> | null = null;
+
+      // Use SSE streaming endpoint
+      await cvGeneratorApi.parseCvStream(selectedFile, {
+        onProgress: (event: SSEProgressEvent) => {
+          setStep(event.step as Step);
+          setProgress(event.percent);
+          setProgressMessage(event.message);
+        },
+        onComplete: (event) => {
+          cvData = event.data;
+        },
+        onError: (message: string) => {
+          setStep('error');
+          setErrorMessage(message);
+        },
+      });
+
+      // If we got an error during streaming, stop here
+      if (!cvData) {
+        if (step !== 'error') {
+          // Stream ended without complete event and without explicit error
+          setStep('error');
+          setErrorMessage("Le flux s'est terminé sans résultat");
+        }
+        return;
       }
 
-      // Step 2: Validate with Zod
-      const validation = validateCV(response.data);
+      // Validate with Zod
+      setStep('validating');
+      setProgress(92);
+      setProgressMessage('Validation du schéma...');
+
+      const validation = validateCV(cvData);
       if (!validation.valid) {
         const errorDetails = validation.errors
           .slice(0, 3)
@@ -60,18 +123,19 @@ export function CvGeneratorBeta() {
         throw new Error(`Validation du JSON échouée: ${errorDetails}`);
       }
 
-      // Step 3: Generate DOCX in the browser
+      // Generate DOCX in the browser
       setStep('generating');
+      setProgress(95);
+      setProgressMessage('Génération du document Word...');
+
       const blob = await generateCV(
         validation.data,
         geminiConfig as TemplateConfig,
         '/logo-gemini.png'
       );
 
-      return blob;
-    },
-    onSuccess: (blob) => {
       setStep('done');
+      setProgress(100);
 
       // Trigger download
       const url = window.URL.createObjectURL(blob);
@@ -84,12 +148,13 @@ export function CvGeneratorBeta() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    },
-    onError: (error) => {
+    } catch (error) {
       setStep('error');
-      setErrorMessage(getErrorMessage(error));
-    },
-  });
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Une erreur est survenue'
+      );
+    }
+  }, [selectedFile]);
 
   // Drag and drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -148,15 +213,11 @@ export function CvGeneratorBeta() {
     return true;
   };
 
-  const handleTransform = () => {
-    if (!selectedFile) return;
-    setErrorMessage(null);
-    transformMutation.mutate(selectedFile);
-  };
-
   const resetForm = () => {
     setSelectedFile(null);
     setStep('idle');
+    setProgress(0);
+    setProgressMessage('');
     setErrorMessage(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -169,7 +230,6 @@ export function CvGeneratorBeta() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
   };
 
-  const isProcessing = ['uploading', 'parsing', 'generating'].includes(step);
   const canTransform = selectedFile && !isProcessing;
 
   return (
@@ -274,24 +334,30 @@ export function CvGeneratorBeta() {
         {/* Progress indicator */}
         {isProcessing && (
           <div className="mb-6">
-            <div className="flex items-center mb-2">
-              <Loader2 className="h-5 w-5 text-primary-500 animate-spin mr-2" />
-              <span className="text-gray-700 dark:text-gray-300">
-                {stepMessages[step]}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center">
+                <Loader2 className="h-5 w-5 text-primary-500 animate-spin mr-2" />
+                <span className="text-gray-700 dark:text-gray-300">
+                  {progressMessage || stepConfig[step]?.message || ''}
+                </span>
+              </div>
+              <span className="text-sm text-gray-500 dark:text-gray-400 tabular-nums">
+                {formatElapsed(elapsed)}
               </span>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
               <div
-                className="bg-primary-500 h-2 rounded-full transition-all duration-500"
-                style={{
-                  width:
-                    step === 'uploading'
-                      ? '20%'
-                      : step === 'parsing'
-                        ? '60%'
-                        : '90%',
-                }}
+                className="bg-primary-500 h-2.5 rounded-full transition-all duration-700 ease-out"
+                style={{ width: `${progress}%` }}
               />
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-xs text-gray-400">{progress}%</span>
+              {step === 'ai_parsing' && (
+                <span className="text-xs text-gray-400">
+                  Cette étape peut prendre 15-30 secondes
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -305,7 +371,7 @@ export function CvGeneratorBeta() {
                 CV généré avec succès !
               </p>
               <p className="text-sm text-green-600 dark:text-green-500">
-                Le document a été téléchargé automatiquement
+                Le document a été téléchargé automatiquement ({formatElapsed(elapsed)})
               </p>
             </div>
           </div>

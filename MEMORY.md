@@ -144,6 +144,24 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-11
+- **feat(cv-generator)**: SSE streaming pour feedback progressif lors du parsing CV
+  - **Nouvel endpoint** : `POST /cv-generator/parse-stream` retourne des Server-Sent Events
+  - **Events SSE** : `progress` (step, message, percent), `complete` (data), `error` (message)
+  - **Étapes progressives** : extracting (10-20%) → ai_parsing (30-85%) → validating (90%) → complete (100%)
+  - **Frontend** : Nouveau consumer SSE avec `fetch` + `ReadableStream` (pas axios, incompatible SSE)
+  - **Timer** : Affichage du temps écoulé en temps réel pendant le traitement
+  - **Indication UX** : Message "Cette étape peut prendre 15-30 secondes" pendant l'analyse IA
+  - **Token refresh** : Gestion 401 avec retry automatique après refresh du JWT
+  - Fichiers : `cv_generator.py` (backend), `cvGenerator.ts`, `CvGeneratorBeta.tsx` (frontend)
+- **fix(cv-generator)**: Correction accents français manquants dans les CV générés
+  - **Cause** : Le prompt entier n'avait aucun accent, Claude copiait le style sans accents
+  - **Fix** : Réécriture complète du prompt avec accents corrects (Résumé, Compétences, Expériences, Catégorie, Réalisation, Université, Décembre, Français, etc.)
+  - **Règle ajoutée** : "LANGUE : FRANÇAIS uniquement, avec les ACCENTS corrects (é, è, ê, à, ù, ç, etc.)"
+  - Fichier : `prompts.py`
+- **fix(cv-generator)**: Correction espacement entre sous-sections dans le DOCX généré
+  - **Cause** : Pas d'espace entre la fin d'une sous-section et le début de la suivante (ex: Points forts → Compétences fonctionnelles)
+  - **Fix** : Ajout d'un paragraphe vide (120 twips) entre sous-sections consécutives dans `renderContent()`
+  - Fichier : `renderer.ts`
 - **fix(cv-generator)**: Correction erreur "Erreur de parsing JSON" sur CV Generator Beta
   - **Cause** : Claude peut retourner du JSON malformé (virgules en trop, réponse tronquée) sans mécanisme de rattrapage
   - **JSON repair** : Ajout `_repair_json()` et `_parse_json_safe()` dans les 3 clients IA (CvGeneratorParser, AnthropicClient, GeminiClient)
@@ -153,6 +171,8 @@ docker-compose up # Start all services
   - **max_tokens doublé** : 8192 → 16384 pour éviter la troncature sur les CV longs
   - **Détection troncature** : Log warning si `stop_reason == "max_tokens"`
   - Fichiers modifiés : `anthropic_parser.py` (cv_generator), `anthropic_client.py` (cv_transformer), `gemini_client.py` (cv_transformer)
+- **fix(config)**: Ajout URL dev Railway aux CORS origins (`frontend-develpment.up.railway.app`)
+- **fix(cv-generator)**: `template_id` rendu optionnel dans `CvTransformationLog.create_success()` (CV Generator Beta n'utilise pas de template DB)
 
 ### 2026-02-09
 - **fix(ci)**: Résolution complète des échecs CI (573 tests passent, 0 failures, couverture 52.51%)

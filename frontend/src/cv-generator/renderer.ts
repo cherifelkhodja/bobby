@@ -336,6 +336,12 @@ function renderContent(
   content.forEach((item, index) => {
     switch (item.type) {
       case 'subsection':
+        // Add spacing between consecutive subsections
+        if (index > 0 && content[index - 1].type === 'subsection') {
+          elements.push(
+            new Paragraph({ spacing: { before: 120, after: 120 } })
+          );
+        }
         elements.push(helpers.subSectionTitle(item.title));
         elements.push(...renderContent(item.content, helpers));
         break;
