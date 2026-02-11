@@ -4,6 +4,7 @@ import {
   FileText,
   Check,
   AlertCircle,
+  Download,
   X,
   Loader2,
   FlaskConical,
@@ -16,6 +17,7 @@ import { generateCV } from '../cv-generator/renderer';
 import type { TemplateConfig } from '../cv-generator/renderer';
 import geminiConfig from '../cv-generator/templates/gemini/config.json';
 import craftmaniaConfig from '../cv-generator/templates/craftmania/config.json';
+import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 
 type TemplateId = 'gemini' | 'craftmania';
@@ -24,7 +26,7 @@ interface TemplateOption {
   config: TemplateConfig;
   logoPath: string;
   label: string;
-  color: string; // For UI accent
+  color: string;
 }
 
 const TEMPLATES: Record<TemplateId, TemplateOption> = {
@@ -44,7 +46,7 @@ const TEMPLATES: Record<TemplateId, TemplateOption> = {
 
 type Step = 'idle' | 'uploading' | 'extracting' | 'ai_parsing' | 'validating' | 'generating' | 'done' | 'error';
 
-const stepConfig: Record<Step, { message: string; icon?: string }> = {
+const stepConfig: Record<Step, { message: string }> = {
   idle: { message: '' },
   uploading: { message: 'Envoi du fichier...' },
   extracting: { message: 'Extraction du texte...' },
@@ -107,7 +109,6 @@ export function CvGeneratorBeta() {
     try {
       let cvData: Record<string, unknown> | null = null;
 
-      // Use SSE streaming endpoint
       await cvGeneratorApi.parseCvStream(selectedFile, {
         onProgress: (event: SSEProgressEvent) => {
           setStep(event.step as Step);
@@ -123,7 +124,6 @@ export function CvGeneratorBeta() {
         },
       });
 
-      // If we got an error during streaming, stop here
       if (!cvData) {
         if (step !== 'error') {
           setStep('error');
@@ -132,7 +132,6 @@ export function CvGeneratorBeta() {
         return;
       }
 
-      // Validate with Zod
       setStep('validating');
       setProgress(92);
       setProgressMessage('Validation du schéma...');
@@ -146,7 +145,6 @@ export function CvGeneratorBeta() {
         throw new Error(`Validation du JSON échouée: ${errorDetails}`);
       }
 
-      // Generate DOCX in the browser
       setStep('generating');
       setProgress(95);
       setProgressMessage('Génération du document Word...');
@@ -161,7 +159,6 @@ export function CvGeneratorBeta() {
       setStep('done');
       setProgress(100);
 
-      // Trigger download
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -180,7 +177,6 @@ export function CvGeneratorBeta() {
     }
   }, [selectedFile, selectedTemplate]);
 
-  // Drag and drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -221,7 +217,7 @@ export function CvGeneratorBeta() {
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ];
     const validExtensions = ['.pdf', '.docx'];
-    const maxSize = 16 * 1024 * 1024; // 16 MB
+    const maxSize = 16 * 1024 * 1024;
 
     if (file.size > maxSize) {
       setErrorMessage('Le fichier est trop volumineux (max 16 Mo)');
@@ -258,7 +254,6 @@ export function CvGeneratorBeta() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Header */}
       <div className="flex items-center gap-3 mb-2">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
           CV Generator
@@ -272,233 +267,218 @@ export function CvGeneratorBeta() {
         Générez un CV formaté à partir d'un CV existant
       </p>
 
-      {/* Two-column layout: Upload + Template */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        {/* Upload zone */}
-        <div>
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
-            Télécharger un CV
-          </h2>
-
-          {!selectedFile ? (
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`
-                border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors h-[calc(100%-2rem)]
-                flex flex-col items-center justify-center
-                ${
-                  isDragging
-                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                    : 'border-gray-300 dark:border-gray-600 hover:border-primary-400 dark:hover:border-primary-500'
-                }
-              `}
-            >
-              <Upload
-                className={`h-10 w-10 mb-4 ${
-                  isDragging ? 'text-primary-500' : 'text-gray-400'
-                }`}
-              />
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                Glissez-déposez votre fichier ici
-              </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                ou{' '}
-                <span className="text-primary-600 dark:text-primary-400 font-medium underline">
-                  parcourez
-                </span>
-              </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                PDF ou DOCX - 16 Mo max
-              </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.docx"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-            </div>
-          ) : (
-            <div className="border-2 border-gray-200 dark:border-gray-600 rounded-xl p-6 h-[calc(100%-2rem)] flex flex-col items-center justify-center">
-              <FileText className="h-10 w-10 text-primary-500 mb-3" />
-              <p className="font-medium text-gray-900 dark:text-gray-100 text-sm text-center">
-                {selectedFile.name}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                {formatFileSize(selectedFile.size)}
-              </p>
+      {/* Template Selection */}
+      <Card className="mb-6">
+        <CardHeader
+          title="1. Choisir un template"
+          subtitle="Sélectionnez le format de mise en forme"
+        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {(Object.entries(TEMPLATES) as [TemplateId, TemplateOption][]).map(
+            ([id, tpl]) => (
               <button
+                key={id}
                 type="button"
-                onClick={resetForm}
+                onClick={() => setSelectedTemplate(id)}
                 disabled={isProcessing}
-                className="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50"
+                className={`
+                  relative p-4 rounded-lg border-2 text-left transition-all
+                  ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                  ${
+                    selectedTemplate === id
+                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-700'
+                  }
+                `}
               >
-                <X className="h-3.5 w-3.5" />
-                Supprimer
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Template selection */}
-        <div>
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
-            Choisir un template
-          </h2>
-
-          <div className="space-y-3">
-            {(Object.entries(TEMPLATES) as [TemplateId, TemplateOption][]).map(
-              ([id, tpl]) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setSelectedTemplate(id)}
-                  disabled={isProcessing}
-                  className={`
-                    w-full flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left
-                    ${
-                      selectedTemplate === id
-                        ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-900/20'
-                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                    }
-                    ${isProcessing ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
-                  `}
-                >
-                  {/* Radio circle */}
-                  <div
-                    className={`
-                      w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0
-                      ${
-                        selectedTemplate === id
-                          ? 'border-primary-500'
-                          : 'border-gray-300 dark:border-gray-500'
-                      }
-                    `}
-                  >
-                    {selectedTemplate === id && (
-                      <div className="w-2.5 h-2.5 rounded-full bg-primary-500" />
-                    )}
+                {selectedTemplate === id && (
+                  <div className="absolute top-2 right-2">
+                    <Check className="h-5 w-5 text-primary-500" />
                   </div>
-
-                  {/* Color swatch */}
+                )}
+                <div className="flex items-center mb-2">
                   <div
-                    className="w-9 h-9 rounded-lg flex-shrink-0"
+                    className="w-6 h-6 rounded mr-2 flex-shrink-0"
                     style={{ backgroundColor: tpl.color }}
                   />
-
-                  {/* Label */}
-                  <div>
-                    <p
-                      className={`font-medium text-sm ${
-                        selectedTemplate === id
-                          ? 'text-primary-700 dark:text-primary-300'
-                          : 'text-gray-900 dark:text-gray-100'
-                      }`}
-                    >
-                      {tpl.label}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {tpl.config.fonts.main}
-                    </p>
-                  </div>
-                </button>
-              )
-            )}
-          </div>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">
+                    {tpl.label}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {tpl.config.fonts.main}
+                </p>
+              </button>
+            )
+          )}
         </div>
-      </div>
+      </Card>
 
-      {/* File validation error */}
-      {errorMessage && step !== 'error' && (
-        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center text-red-700 dark:text-red-400">
-          <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
-          <span className="text-sm">{errorMessage}</span>
-        </div>
-      )}
+      {/* File Upload */}
+      <Card className="mb-6">
+        <CardHeader
+          title="2. Importer un CV"
+          subtitle="PDF ou Word (.docx), max 16 Mo"
+        />
 
-      {/* Progress indicator */}
-      {isProcessing && (
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center">
-              <Loader2 className="h-5 w-5 text-primary-500 animate-spin mr-2" />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                {progressMessage || stepConfig[step]?.message || ''}
+        {!selectedFile ? (
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`
+              border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
+              ${
+                isDragging
+                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                  : 'border-gray-300 dark:border-gray-600 hover:border-primary-400 dark:hover:border-primary-500'
+              }
+            `}
+          >
+            <Upload
+              className={`h-12 w-12 mx-auto mb-4 ${
+                isDragging ? 'text-primary-500' : 'text-gray-400'
+              }`}
+            />
+            <p className="text-gray-600 dark:text-gray-400 mb-2">
+              Glissez-déposez votre CV ici
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-500">
+              ou{' '}
+              <span className="text-primary-600 dark:text-primary-400 font-medium">
+                parcourez vos fichiers
               </span>
-            </div>
-            <span className="text-sm text-gray-500 dark:text-gray-400 tabular-nums">
-              {formatElapsed(elapsed)}
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-            <div
-              className="bg-primary-500 h-2 rounded-full transition-all duration-700 ease-out"
-              style={{ width: `${progress}%` }}
+            </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx"
+              onChange={handleFileSelect}
+              className="hidden"
             />
           </div>
-          <div className="flex justify-between mt-1">
-            <span className="text-xs text-gray-400">{progress}%</span>
-            {step === 'ai_parsing' && (
-              <span className="text-xs text-gray-400">
-                Cette étape peut prendre 15-30 secondes
-              </span>
-            )}
+        ) : (
+          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <div className="flex items-center">
+              <FileText className="h-10 w-10 text-primary-500 mr-4" />
+              <div>
+                <p className="font-medium text-gray-900 dark:text-gray-100">
+                  {selectedFile.name}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {formatFileSize(selectedFile.size)}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetForm}
+              disabled={isProcessing}
+              leftIcon={<X className="h-4 w-4" />}
+            >
+              Supprimer
+            </Button>
           </div>
-        </div>
-      )}
-
-      {/* Success message */}
-      {step === 'done' && (
-        <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center">
-          <Check className="h-6 w-6 text-green-500 mr-3" />
-          <div>
-            <p className="font-medium text-green-700 dark:text-green-400">
-              CV généré avec succès !
-            </p>
-            <p className="text-sm text-green-600 dark:text-green-500">
-              Le document a été téléchargé automatiquement ({formatElapsed(elapsed)})
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Error message */}
-      {step === 'error' && errorMessage && (
-        <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center">
-          <AlertCircle className="h-6 w-6 text-red-500 mr-3" />
-          <div>
-            <p className="font-medium text-red-700 dark:text-red-400">
-              Erreur lors de la génération
-            </p>
-            <p className="text-sm text-red-600 dark:text-red-500">
-              {errorMessage}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Generate button */}
-      <div className="flex gap-4">
-        <Button
-          onClick={handleTransform}
-          disabled={!canTransform}
-          isLoading={isProcessing}
-          className="flex-1"
-        >
-          {isProcessing
-            ? 'Génération en cours...'
-            : 'Générer le CV'}
-        </Button>
-
-        {(step === 'done' || step === 'error') && (
-          <Button variant="outline" onClick={resetForm}>
-            Nouveau CV
-          </Button>
         )}
-      </div>
+
+        {errorMessage && step !== 'error' && (
+          <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center text-red-700 dark:text-red-400">
+            <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+            <span className="text-sm">{errorMessage}</span>
+          </div>
+        )}
+      </Card>
+
+      {/* Generate & Download */}
+      <Card>
+        <CardHeader
+          title="3. Générer le CV"
+          subtitle={`Le document sera téléchargé au format ${TEMPLATES[selectedTemplate].label}`}
+        />
+
+        {/* Progress indicator */}
+        {isProcessing && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center">
+                <Loader2 className="h-5 w-5 text-primary-500 animate-spin mr-2" />
+                <span className="text-gray-700 dark:text-gray-300">
+                  {progressMessage || stepConfig[step]?.message || ''}
+                </span>
+              </div>
+              <span className="text-sm text-gray-500 dark:text-gray-400 tabular-nums">
+                {formatElapsed(elapsed)}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div
+                className="bg-primary-500 h-2 rounded-full transition-all duration-700 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-xs text-gray-400">{progress}%</span>
+              {step === 'ai_parsing' && (
+                <span className="text-xs text-gray-400">
+                  Cette étape peut prendre 15-30 secondes
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Success message */}
+        {step === 'done' && (
+          <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center">
+            <Check className="h-6 w-6 text-green-500 mr-3" />
+            <div>
+              <p className="font-medium text-green-700 dark:text-green-400">
+                CV généré avec succès !
+              </p>
+              <p className="text-sm text-green-600 dark:text-green-500">
+                Le document a été téléchargé automatiquement ({formatElapsed(elapsed)})
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Error message */}
+        {step === 'error' && errorMessage && (
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center">
+            <AlertCircle className="h-6 w-6 text-red-500 mr-3" />
+            <div>
+              <p className="font-medium text-red-700 dark:text-red-400">
+                Erreur lors de la génération
+              </p>
+              <p className="text-sm text-red-600 dark:text-red-500">
+                {errorMessage}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-4">
+          <Button
+            onClick={handleTransform}
+            disabled={!canTransform}
+            isLoading={isProcessing}
+            leftIcon={<Download className="h-4 w-4" />}
+            className="flex-1"
+          >
+            {isProcessing
+              ? 'Génération en cours...'
+              : 'Générer et télécharger'}
+          </Button>
+
+          {(step === 'done' || step === 'error') && (
+            <Button variant="outline" onClick={resetForm}>
+              Nouveau CV
+            </Button>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }
