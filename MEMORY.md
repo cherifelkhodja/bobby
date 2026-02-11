@@ -144,6 +144,21 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-11
+- **refactor(cv-generator)**: Redesign page CV Generator Beta
+  - Layout 2 colonnes (upload | template) au lieu de 3 cartes verticales numérotées
+  - Suppression Card/CardHeader pour un design plus flat et aéré
+  - Radio buttons circulaires au lieu de checkmarks pour la sélection de template
+  - Bouton "Générer le CV" pleine largeur en bas, hors carte
+  - Progress/success/error placés entre la grille et le bouton
+  - Responsive : passe en colonne unique sur mobile
+  - Import Card/CardHeader supprimé (plus utilisé)
+  - Fichier modifié : `CvGeneratorBeta.tsx`
+- **feat(cv-generator)**: Interligne 1,5x dans les expériences professionnelles
+  - Ajout `experienceStyle.contentLineSpacing` (360 twips = 1.5x) dans TemplateConfig
+  - Appliqué aux paragraphes text, competenceLine dans les expériences (pas aux bullets)
+  - Bullets/réalisations gardent l'interligne simple (1x)
+  - Configuré pour les deux templates (Gemini + Craftmania)
+  - Fichiers modifiés : `renderer.ts`, `gemini/config.json`, `craftmania/config.json`
 - **feat(cv-generator)**: Support multi-template (Craftmania) dans CV Generator Beta
   - **Nouveau template** : Craftmania avec design distinct (Century Gothic, rouge bordeaux #A9122A, header tableau, pas de footer)
   - **TemplateConfig étendue** : Propriétés optionnelles `header.layout`, `subSectionStyle`, `experienceStyle`, `diplomeStyle`, `footer.enabled`
