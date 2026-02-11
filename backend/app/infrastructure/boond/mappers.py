@@ -24,14 +24,31 @@ def map_boond_opportunity_to_domain(dto: BoondOpportunityDTO) -> Opportunity:
 
 
 def map_candidate_to_boond(candidate: Candidate) -> dict:
-    """Map domain candidate to BoondManager API payload."""
-    return {
+    """Map domain candidate to BoondManager JSON:API payload.
+
+    BoondManager uses JSON:API format: {"data": {"attributes": {...}}}
+    Email field must be "email1" (not "email").
+    """
+    attributes: dict = {
         "firstName": candidate.first_name,
         "lastName": candidate.last_name,
-        "email": str(candidate.email),
+        "email1": str(candidate.email),
         "civility": candidate.civility,
-        "phone1": str(candidate.phone) if candidate.phone else None,
-        "state": 1,  # Default state
+    }
+
+    if candidate.phone:
+        attributes["phone1"] = str(candidate.phone)
+
+    if candidate.daily_rate is not None:
+        attributes["averageDailyPriceForSale"] = candidate.daily_rate
+
+    if candidate.note:
+        attributes["internalNote"] = candidate.note
+
+    return {
+        "data": {
+            "attributes": attributes,
+        }
     }
 
 

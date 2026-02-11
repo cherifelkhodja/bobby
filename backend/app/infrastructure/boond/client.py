@@ -87,7 +87,8 @@ class BoondClient:
             logger.info(f"Creating candidate {candidate.email} in BoondManager")
 
             payload = map_candidate_to_boond(candidate)
-            payload["state"] = self.candidate_state_id
+            # Set candidate state inside JSON:API attributes
+            payload["data"]["attributes"]["state"] = self.candidate_state_id
 
             response = await client.post(
                 f"{self.base_url}/candidates",
@@ -118,9 +119,19 @@ class BoondClient:
             )
 
             payload = {
-                "candidate": int(candidate_external_id),
-                "opportunity": int(opportunity_external_id),
-                "state": self.positioning_state_id,
+                "data": {
+                    "attributes": {
+                        "state": self.positioning_state_id,
+                    },
+                    "relationships": {
+                        "candidate": {
+                            "data": {"id": int(candidate_external_id), "type": "candidate"},
+                        },
+                        "opportunity": {
+                            "data": {"id": int(opportunity_external_id), "type": "opportunity"},
+                        },
+                    },
+                }
             }
 
             response = await client.post(

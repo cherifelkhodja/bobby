@@ -144,6 +144,12 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-11
+- **fix(boond)**: Correction création candidat BoondManager lors de la validation d'une candidature RH
+  - **Cause** : Le payload envoyé à `POST /candidates` était un dict plat au lieu du format JSON:API attendu (`{"data": {"attributes": {...}}}`)
+  - **Bug email** : Le champ `"email"` était utilisé au lieu de `"email1"` (nomenclature Boond)
+  - **Données manquantes** : Les champs `note` et `daily_rate` (TJM) du candidat n'étaient pas transmis à Boond
+  - **Positionnement** : Même fix appliqué à `create_positioning` (format JSON:API avec `relationships`)
+  - Fichiers modifiés : `mappers.py` (map_candidate_to_boond), `client.py` (create_candidate, create_positioning)
 - **refactor(admin)**: Stats CV Generator déplacées dans l'admin (onglet Stats dédié)
   - Retiré la section stats de `CvGeneratorBeta.tsx`
   - Créé `StatsTab.tsx` dans admin avec les mêmes stats
