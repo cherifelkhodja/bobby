@@ -144,6 +144,11 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-11
+- **fix(ci)**: Correction Docker Build CI qui échouait (timeout health check)
+  - Cause racine : `docker compose up` chargeait automatiquement `docker-compose.override.yml` (dev), qui remplaçait le CMD (skip alembic) → tables inexistantes → crash au démarrage (seed_admin_user)
+  - Fix : CI utilise explicitement `-f docker-compose.yml` pour ignorer l'override dev
+  - Ajout port 8012:8000 dans `docker-compose.yml` base
+  - Ajout step "Show backend logs on failure" + `if: always()` sur cleanup
 - **refactor(admin)**: Stats CV Generator déplacées dans l'admin (onglet Stats dédié)
   - Retiré la section stats de `CvGeneratorBeta.tsx`
   - Créé `StatsTab.tsx` dans admin avec les mêmes stats
