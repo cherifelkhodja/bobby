@@ -144,6 +144,10 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-11
+- **refactor(admin)**: Stats CV Generator déplacées dans l'admin (onglet Stats dédié)
+  - Retiré la section stats de `CvGeneratorBeta.tsx`
+  - Créé `StatsTab.tsx` dans admin avec les mêmes stats
+  - Admin : 6 onglets (Users, Invitations, BoondManager, Templates, Stats, API)
 - **cleanup(admin)**: Retrait templates CV et ancien provider IA de l'admin
   - TemplatesTab : supprimé section "Templates CV" (ne garde que Templates Devis/Thales)
   - ApiTab : supprimé carte "IA pour Transformation CV" (ancien provider Gemini/Claude), renommé "CV Generator Beta" → "CV Generator"
