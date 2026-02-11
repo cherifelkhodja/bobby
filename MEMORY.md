@@ -153,6 +153,9 @@ docker-compose up # Start all services
   - **Non-bloquant** : Échecs d'upload CV ou de création d'action loggés mais ne bloquent pas la création candidat
   - Appliqué aux deux use cases : auto-create (validation) et manual create (bouton)
   - Fichiers modifiés : `client.py` (upload_candidate_cv, create_candidate_action), `mappers.py` (format_analyses_as_boond_html), `job_applications.py` (use cases)
+- **feat(boond)**: Ajout du titre de poste (`job_title`) sur le candidat BoondManager lors de la création
+  - Utilise le `job_title` saisi par le candidat dans le formulaire de candidature
+  - Transmis via `BoondCandidateContext.job_title` → attribut `title` dans Boond
 - **fix(boond)**: Correction action créée 3 fois (retry sur méthode non-idempotente)
   - Suppression du `@retry` sur `create_candidate_action()` (une action ne doit pas être retentée)
   - Parsing robuste de la réponse (gère `data` en tant que liste ou objet)

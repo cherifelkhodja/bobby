@@ -51,6 +51,7 @@ class BoondCandidateContext:
     hr_manager_boond_id: str | None = None  # User who validates
     main_manager_boond_id: str | None = None  # Opportunity main manager
     agency_boond_id: str | None = None  # Opportunity agency
+    job_title: str | None = None  # Candidate's job title
 
 
 @dataclass
@@ -172,6 +173,10 @@ def map_candidate_to_boond(
 
     # Add Boond-specific fields from context
     if context:
+        # title: candidate's job title
+        if context.job_title:
+            attributes["title"] = context.job_title
+
         # typeOf: 0=Salarié, 1=Freelance
         if context.employment_status:
             attributes["typeOf"] = EMPLOYMENT_STATUS_TO_TYPEOF.get(

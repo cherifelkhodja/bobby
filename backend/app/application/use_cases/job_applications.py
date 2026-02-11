@@ -832,6 +832,7 @@ class UpdateApplicationStatusUseCase:
 
         context = BoondCandidateContext(
             employment_status=application.employment_status,
+            job_title=application.job_title,
         )
 
         # Get HR manager from the user who validates
@@ -1246,6 +1247,7 @@ class CreateCandidateInBoondUseCase:
 
         context = BoondCandidateContext(
             employment_status=application.employment_status,
+            job_title=application.job_title,
         )
 
         # Get HR manager from the user who triggers the action
