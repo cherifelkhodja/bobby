@@ -144,6 +144,14 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-11
+- **feat(hr)**: Suppression d'annonce disponible pour tous les statuts (draft, published, closed)
+  - Backend : endpoint `DELETE /hr/job-postings/{id}` accepte désormais tous les statuts (plus seulement draft)
+  - Backend : suppression automatique sur Turnover-IT (`DELETE /jobs/:reference`) si l'annonce a une référence Turnover-IT
+  - Backend : nouvelle méthode `TurnoverITClient.delete_job()` pour appel `DELETE /jobs/:reference`
+  - Frontend : bouton "Supprimer" ajouté pour les annonces publiées et fermées (existait déjà pour les brouillons)
+  - Frontend : texte de confirmation adapté (mention Turnover-IT si applicable)
+  - Frontend : bouton "Fermer" en orange pour distinguer visuellement de "Supprimer" (rouge)
+  - Fichiers modifiés : `turnoverit/client.py`, `hr.py` (route), `JobPostingDetails.tsx`
 - **feat(turnoverit)**: Référence Turnover-IT basée sur l'agence BoondManager
   - Format : `{PREFIX}-{YYYYMMDD}-{6 chars aléatoires}` (ex: `GEM-20260211-A1B2C3`)
   - Préfixes : `GEM` (Gemini, agency_id=1), `CRA` (Craftmania, agency_id=5), `ESN` (fallback)

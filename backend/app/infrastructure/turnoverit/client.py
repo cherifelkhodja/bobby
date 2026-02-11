@@ -288,6 +288,56 @@ class TurnoverITClient:
             logger.error(f"Request error reactivating job {reference}: {e}")
             raise TurnoverITError(f"Erreur de connexion: {str(e)}")
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+        reraise=True,
+    )
+    async def delete_job(self, reference: str) -> bool:
+        """Delete a job posting from Turnover-IT.
+
+        Args:
+            reference: The job reference.
+
+        Returns:
+            True if deletion was successful or job was already gone.
+
+        Raises:
+            TurnoverITError: If API call fails.
+        """
+        if not self._is_configured():
+            raise TurnoverITError("API key not configured")
+
+        logger.info(f"Deleting job on Turnover-IT: {reference}")
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.delete(
+                    f"{self.base_url}/jobs/{reference}",
+                    headers=self._get_headers(),
+                )
+
+                logger.info(f"Response: {response.status_code} - {response.text}")
+
+                if response.status_code in (200, 204):
+                    logger.info(f"Successfully deleted job: {reference}")
+                    return True
+
+                if response.status_code == 404:
+                    logger.warning(f"Job not found on Turnover-IT: {reference}")
+                    return True  # Already gone
+
+                error_msg = response.text
+                logger.error(f"Failed to delete job {reference}: {error_msg}")
+                raise TurnoverITError(f"Suppression échouée: {error_msg}")
+
+        except httpx.TimeoutException:
+            logger.error(f"Timeout deleting job {reference}")
+            raise TurnoverITError("Délai d'attente dépassé")
+        except httpx.RequestError as e:
+            logger.error(f"Request error deleting job {reference}: {e}")
+            raise TurnoverITError(f"Erreur de connexion: {str(e)}")
+
     async def get_places(self, search: str) -> list[dict[str, Any]]:
         """Get place suggestions from Turnover-IT locations autocomplete API.
 

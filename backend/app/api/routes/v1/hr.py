@@ -837,26 +837,31 @@ async def reactivate_job_posting(
 async def delete_job_posting(
     posting_id: str,
     db: DbSession,
+    app_settings: AppSettings,
     authorization: str = Header(default=""),
 ):
-    """Delete a draft job posting.
+    """Delete a job posting.
 
-    Only draft postings can be deleted. Published postings must be closed first.
+    Works for any status. If the posting was published on Turnover-IT,
+    it will be deleted there as well.
     """
     await require_hr_access(db, authorization)
 
     job_posting_repo = JobPostingRepository(db)
 
-    # Get the posting first to check status
+    # Get the posting first
     posting = await job_posting_repo.get_by_id(UUID(posting_id))
     if not posting:
         raise HTTPException(status_code=404, detail="Annonce non trouvée")
 
-    if posting.status.value != "draft":
-        raise HTTPException(
-            status_code=400,
-            detail="Seuls les brouillons peuvent être supprimés. Fermez d'abord l'annonce.",
-        )
+    # If posting has a Turnover-IT reference, delete from Turnover-IT first
+    if posting.turnoverit_reference:
+        try:
+            turnoverit_client = TurnoverITClient(app_settings)
+            await turnoverit_client.delete_job(posting.turnoverit_reference)
+        except Exception:
+            # Log but don't block - job might already be removed on their side
+            pass
 
     deleted = await job_posting_repo.delete(UUID(posting_id))
     if not deleted:
