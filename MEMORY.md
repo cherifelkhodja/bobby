@@ -26,7 +26,7 @@
 | Système d'invitations | ✅ Done | Depuis ressources Boond |
 | Panel Admin | ✅ Done | Users, invitations, Boond, templates |
 | Dark Mode | ✅ Done | System/Light/Dark |
-| CV Transformer | ✅ Done | PDF/DOCX → Word, multi-provider (Gemini/Claude) |
+| CV Generator | ✅ Done | PDF/DOCX → Word via Claude, templates locaux (Gemini/Craftmania) |
 | Opportunités publiées | ✅ Done | Anonymisation IA |
 | Quotation Generator (Thales) | ✅ Done | Excel + PDF merge |
 | Recrutement RH | ✅ Done | Turnover-IT, matching IA |
@@ -144,13 +144,16 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-11
+- **cleanup(admin)**: Retrait templates CV et ancien provider IA de l'admin
+  - TemplatesTab : supprimé section "Templates CV" (ne garde que Templates Devis/Thales)
+  - ApiTab : supprimé carte "IA pour Transformation CV" (ancien provider Gemini/Claude), renommé "CV Generator Beta" → "CV Generator"
+  - `cvTransformer.ts` : ne garde que `getStats()` (utilisé par la page CV Generator)
+  - `constants.ts` : supprimé `PREDEFINED_TEMPLATES` (templates CV gérés localement)
 - **refactor**: Suppression Transformateur CV legacy, remplacement par CV Generator
-  - Supprimé `CvTransformer.tsx` (page), `cvTransformer.ts` (API client)
-  - Supprimé onglets admin : `TemplatesTab.tsx` (templates DB), `StatsTab.tsx` (statistiques transformation)
+  - Supprimé `CvTransformer.tsx` (page), `StatsTab.tsx` (admin)
   - Route `/cv-transformer` supprimée, `/cv-generator-beta` renommée en `/cv-generator`
   - Sidebar : un seul lien "CV Generator" au lieu de deux
   - Badge Beta retiré de la page CV Generator
-  - Admin : onglet StatsTab supprimé, TemplatesTab conservé (gère templates CV + Devis)
   - Stats de transformation transférées sur la page CV Generator (section admin-only en bas)
   - Fichiers modifiés : `App.tsx`, `Sidebar.tsx`, `CvGeneratorBeta.tsx`, `admin/index.tsx`
 - **refactor(cv-generator)**: Redesign page CV Generator Beta
