@@ -150,7 +150,8 @@ docker-compose up # Start all services
   - Route `/cv-transformer` supprimée, `/cv-generator-beta` renommée en `/cv-generator`
   - Sidebar : un seul lien "CV Generator" au lieu de deux
   - Badge Beta retiré de la page CV Generator
-  - Admin réduit à 4 onglets : Utilisateurs, Invitations, BoondManager, API
+  - Admin : onglet StatsTab supprimé, TemplatesTab conservé (gère templates CV + Devis)
+  - Stats de transformation transférées sur la page CV Generator (section admin-only en bas)
   - Fichiers modifiés : `App.tsx`, `Sidebar.tsx`, `CvGeneratorBeta.tsx`, `admin/index.tsx`
 - **refactor(cv-generator)**: Redesign page CV Generator Beta
   - Layout 2 colonnes (upload | template) au lieu de 3 cartes verticales numérotées
