@@ -7,7 +7,6 @@ import {
   Download,
   X,
   Loader2,
-  FlaskConical,
 } from 'lucide-react';
 
 import { cvGeneratorApi } from '../api/cvGenerator';
@@ -254,15 +253,9 @@ export function CvGeneratorBeta() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-2">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          CV Generator
-        </h1>
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-          <FlaskConical className="h-3 w-3" />
-          Beta
-        </span>
-      </div>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+        CV Generator
+      </h1>
       <p className="text-gray-600 dark:text-gray-400 mb-8">
         Générez un CV formaté à partir d'un CV existant
       </p>

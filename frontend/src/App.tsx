@@ -12,7 +12,6 @@ import { Opportunities } from './pages/Opportunities';
 import { MyCooptations } from './pages/MyCooptations';
 import { Profile } from './pages/Profile';
 import { Admin } from './pages/Admin';
-import { CvTransformer } from './pages/CvTransformer';
 import { CvGeneratorBeta } from './pages/CvGeneratorBeta';
 import { QuotationGenerator } from './pages/QuotationGenerator';
 import HRDashboard from './pages/HRDashboard';
@@ -75,15 +74,7 @@ function App() {
         <Route path="my-cooptations" element={<MyCooptations />} />
         <Route path="profile" element={<Profile />} />
         <Route
-          path="cv-transformer"
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'commercial', 'rh']}>
-              <CvTransformer />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="cv-generator-beta"
+          path="cv-generator"
           element={
             <ProtectedRoute allowedRoles={['admin', 'commercial', 'rh']}>
               <CvGeneratorBeta />
