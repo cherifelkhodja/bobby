@@ -159,6 +159,14 @@ docker-compose up # Start all services
   - Nouveau `BoondCandidateContext` dataclass pour transporter le contexte Boond
   - Mis à jour auto-create (validation) et manual create (bouton) use cases
   - Fichiers modifiés : `mappers.py`, `client.py`, `job_applications.py` (use cases), `hr.py` (routes)
+- **feat(boond)**: PUT /candidates/{id}/administrative après création pour enregistrer salaires/TJM
+  - `actualSalary` : salaire actuel du candidat
+  - `desiredSalary` : salaire souhaité (min=max)
+  - `actualAverageDailyCost` : TJM actuel
+  - `desiredAverageDailyCost` : TJM souhaité (min=max)
+  - `desiredContract` : 0=CDI (employee), 3=Freelance (freelance), 0=both
+  - Appel automatique après `POST /candidates` dans les deux use cases
+  - Fichiers modifiés : `mappers.py`, `client.py`, `job_applications.py`
 - **refactor(admin)**: Stats CV Generator déplacées dans l'admin (onglet Stats dédié)
   - Retiré la section stats de `CvGeneratorBeta.tsx`
   - Créé `StatsTab.tsx` dans admin avec les mêmes stats

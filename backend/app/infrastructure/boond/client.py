@@ -11,8 +11,10 @@ from app.infrastructure.boond.dtos import (
     BoondOpportunityDTO,
 )
 from app.infrastructure.boond.mappers import (
+    BoondAdministrativeData,
     BoondCandidateContext,
     map_boond_opportunity_to_domain,
+    map_candidate_administrative_to_boond,
     map_candidate_to_boond,
 )
 
@@ -106,6 +108,29 @@ class BoondClient:
             external_id = str(data.get("data", {}).get("id"))
             logger.info(f"Created candidate with ID {external_id}")
             return external_id
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+    )
+    async def update_candidate_administrative(
+        self,
+        candidate_id: str,
+        admin_data: BoondAdministrativeData,
+    ) -> None:
+        """Update candidate administrative data (salary, TJM) in BoondManager."""
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            logger.info(f"Updating administrative data for candidate {candidate_id}")
+
+            payload = map_candidate_administrative_to_boond(candidate_id, admin_data)
+
+            response = await client.put(
+                f"{self.base_url}/candidates/{candidate_id}/administrative",
+                auth=self._auth,
+                json=payload,
+            )
+            response.raise_for_status()
+            logger.info(f"Updated administrative data for candidate {candidate_id}")
 
     @retry(
         stop=stop_after_attempt(3),

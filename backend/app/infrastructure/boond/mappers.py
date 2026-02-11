@@ -16,6 +16,16 @@ EMPLOYMENT_STATUS_TO_TYPEOF = {
     "employee,freelance": 0,
 }
 
+# Mapping employment_status → BoondManager desiredContract
+# 0 = CDI, 3 = Freelance
+EMPLOYMENT_STATUS_TO_CONTRACT = {
+    "employee": 0,
+    "freelance": 3,
+    "both": 0,
+    "freelance,employee": 0,
+    "employee,freelance": 0,
+}
+
 
 @dataclass
 class BoondCandidateContext:
@@ -30,6 +40,20 @@ class BoondCandidateContext:
     hr_manager_boond_id: str | None = None  # User who validates
     main_manager_boond_id: str | None = None  # Opportunity main manager
     agency_boond_id: str | None = None  # Opportunity agency
+
+
+@dataclass
+class BoondAdministrativeData:
+    """Administrative data for PUT /candidates/{id}/administrative.
+
+    Maps application salary/TJM fields to Boond administrative attributes.
+    """
+
+    salary_current: float | None = None
+    salary_desired: float | None = None
+    tjm_current: float | None = None
+    tjm_desired: float | None = None
+    desired_contract: int | None = None  # Boond dictionary integer
 
 
 def map_boond_opportunity_to_domain(dto: BoondOpportunityDTO) -> Opportunity:
@@ -119,6 +143,47 @@ def map_candidate_to_boond(
         payload["data"]["relationships"] = relationships
 
     return payload
+
+
+def map_candidate_administrative_to_boond(
+    candidate_id: str,
+    admin_data: BoondAdministrativeData,
+) -> dict:
+    """Map administrative data to BoondManager PUT /candidates/{id}/administrative payload.
+
+    Populates salary (actualSalary, desiredSalary) and TJM (actualAverageDailyCost,
+    desiredAverageDailyCost) based on the application data.
+    """
+    attributes: dict = {}
+
+    if admin_data.salary_current is not None:
+        attributes["actualSalary"] = admin_data.salary_current
+
+    if admin_data.salary_desired is not None:
+        attributes["desiredSalary"] = {
+            "min": admin_data.salary_desired,
+            "max": admin_data.salary_desired,
+        }
+
+    if admin_data.tjm_current is not None:
+        attributes["actualAverageDailyCost"] = admin_data.tjm_current
+
+    if admin_data.tjm_desired is not None:
+        attributes["desiredAverageDailyCost"] = {
+            "min": admin_data.tjm_desired,
+            "max": admin_data.tjm_desired,
+        }
+
+    if admin_data.desired_contract is not None:
+        attributes["desiredContract"] = admin_data.desired_contract
+
+    return {
+        "data": {
+            "id": candidate_id,
+            "type": "candidate",
+            "attributes": attributes,
+        }
+    }
 
 
 def map_opportunity_to_read_model(opportunity: Opportunity) -> dict:

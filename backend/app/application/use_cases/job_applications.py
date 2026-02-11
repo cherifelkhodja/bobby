@@ -27,7 +27,11 @@ from app.domain.exceptions import (
     JobPostingNotFoundError,
 )
 from app.infrastructure.boond.client import BoondClient
-from app.infrastructure.boond.mappers import BoondCandidateContext
+from app.infrastructure.boond.mappers import (
+    EMPLOYMENT_STATUS_TO_CONTRACT,
+    BoondAdministrativeData,
+    BoondCandidateContext,
+)
 from app.infrastructure.database.repositories import (
     JobApplicationRepository,
     JobPostingRepository,
@@ -773,6 +777,20 @@ class UpdateApplicationStatusUseCase:
                 saved.boond_candidate_id = external_id
                 saved.boond_synced_at = datetime.utcnow()
                 saved.boond_sync_error = None
+
+                # Update administrative data (salary/TJM/contract)
+                admin_data = BoondAdministrativeData(
+                    salary_current=application.salary_current,
+                    salary_desired=application.salary_desired,
+                    tjm_current=application.tjm_current,
+                    tjm_desired=application.tjm_desired,
+                    desired_contract=EMPLOYMENT_STATUS_TO_CONTRACT.get(
+                        application.employment_status, 0
+                    ) if application.employment_status else None,
+                )
+                await self.boond_client.update_candidate_administrative(
+                    external_id, admin_data
+                )
             except Exception as e:
                 saved.boond_sync_error = str(e)
                 import structlog
@@ -1103,6 +1121,20 @@ class CreateCandidateInBoondUseCase:
             application.boond_sync_error = None
             application.updated_at = datetime.utcnow()
             saved = await self.job_application_repository.save(application)
+
+            # Update administrative data (salary/TJM/contract)
+            admin_data = BoondAdministrativeData(
+                salary_current=application.salary_current,
+                salary_desired=application.salary_desired,
+                tjm_current=application.tjm_current,
+                tjm_desired=application.tjm_desired,
+                desired_contract=EMPLOYMENT_STATUS_TO_CONTRACT.get(
+                    application.employment_status, 0
+                ) if application.employment_status else None,
+            )
+            await self.boond_client.update_candidate_administrative(
+                external_id, admin_data
+            )
         except Exception as e:
             application.boond_sync_error = str(e)
             application.updated_at = datetime.utcnow()
