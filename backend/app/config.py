@@ -219,6 +219,7 @@ def get_settings() -> Settings:
             "ANTHROPIC_API_KEY": "ANTHROPIC_API_KEY",
             "SMTP_USER": "SMTP_USER",
             "SMTP_PASSWORD": "SMTP_PASSWORD",
+            "FRONTEND_URL": "FRONTEND_URL",
         }
 
         # Set environment variables from AWS secrets (don't override existing)
