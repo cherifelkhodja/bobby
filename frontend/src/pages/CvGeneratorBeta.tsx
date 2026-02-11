@@ -94,6 +94,8 @@ export function CvGeneratorBeta() {
   const [progressMessage, setProgressMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const stepRef = useRef<Step>(step);
+  stepRef.current = step;
 
   const isProcessing = ['uploading', 'extracting', 'ai_parsing', 'validating', 'generating'].includes(step);
   const elapsed = useElapsedTimer(isProcessing);
@@ -124,7 +126,7 @@ export function CvGeneratorBeta() {
       });
 
       if (!cvData) {
-        if (step !== 'error') {
+        if (stepRef.current !== 'error') {
           setStep('error');
           setErrorMessage("Le flux s'est terminé sans résultat");
         }
