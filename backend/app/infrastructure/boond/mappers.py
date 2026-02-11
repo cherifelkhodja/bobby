@@ -1,9 +1,15 @@
 """Mappers between BoondManager DTOs and Domain entities."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from app.domain.entities import Candidate, Opportunity
 from app.infrastructure.boond.dtos import BoondOpportunityDTO
+
+if TYPE_CHECKING:
+    from app.domain.entities.job_application import JobApplication
 
 
 # Mapping employment_status → BoondManager typeOf
@@ -26,6 +32,11 @@ EMPLOYMENT_STATUS_TO_CONTRACT = {
     "employee,freelance": 0,
 }
 
+# Employment statuses that include employee
+_EMPLOYEE_STATUSES = {"employee", "both", "freelance,employee", "employee,freelance"}
+# Employment statuses that are freelance only
+_FREELANCE_ONLY_STATUSES = {"freelance"}
+
 
 @dataclass
 class BoondCandidateContext:
@@ -47,6 +58,11 @@ class BoondAdministrativeData:
     """Administrative data for PUT /candidates/{id}/administrative.
 
     Maps application salary/TJM fields to Boond administrative attributes.
+
+    Logic per employment_status:
+    - employee: salary fields only
+    - freelance: TJM fields only
+    - both/employee,freelance: salary fields only (TJM is in internalNote)
     """
 
     salary_current: float | None = None
@@ -54,6 +70,31 @@ class BoondAdministrativeData:
     tjm_current: float | None = None
     tjm_desired: float | None = None
     desired_contract: int | None = None  # Boond dictionary integer
+
+    @classmethod
+    def from_application(cls, application: JobApplication) -> BoondAdministrativeData:
+        """Build admin data from application based on employment status.
+
+        - employee / both: fill salary fields, skip TJM (TJM in internalNote)
+        - freelance only: fill TJM fields, skip salary
+        """
+        status = application.employment_status or ""
+        desired_contract = EMPLOYMENT_STATUS_TO_CONTRACT.get(status, 0)
+
+        if status in _FREELANCE_ONLY_STATUSES:
+            # Pure freelance: TJM only
+            return cls(
+                tjm_current=application.tjm_current,
+                tjm_desired=application.tjm_desired,
+                desired_contract=desired_contract,
+            )
+
+        # Employee or both: salary only (TJM info is in internalNote)
+        return cls(
+            salary_current=application.salary_current,
+            salary_desired=application.salary_desired,
+            desired_contract=desired_contract,
+        )
 
 
 def map_boond_opportunity_to_domain(dto: BoondOpportunityDTO) -> Opportunity:

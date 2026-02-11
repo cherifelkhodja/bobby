@@ -28,7 +28,6 @@ from app.domain.exceptions import (
 )
 from app.infrastructure.boond.client import BoondClient
 from app.infrastructure.boond.mappers import (
-    EMPLOYMENT_STATUS_TO_CONTRACT,
     BoondAdministrativeData,
     BoondCandidateContext,
 )
@@ -758,11 +757,7 @@ class UpdateApplicationStatusUseCase:
                     daily_rate=application.tjm_desired
                     or application.tjm_current
                     or application.tjm_max,
-                    note=(
-                        f"Candidature validée - {application.job_title}\n"
-                        f"TJM: {application.tjm_range}\n"
-                        f"Disponibilité: {application.availability_display}"
-                    ),
+                    note=application.to_boond_internal_note(),
                 )
 
                 # Build Boond context from opportunity and validating user
@@ -779,15 +774,7 @@ class UpdateApplicationStatusUseCase:
                 saved.boond_sync_error = None
 
                 # Update administrative data (salary/TJM/contract)
-                admin_data = BoondAdministrativeData(
-                    salary_current=application.salary_current,
-                    salary_desired=application.salary_desired,
-                    tjm_current=application.tjm_current,
-                    tjm_desired=application.tjm_desired,
-                    desired_contract=EMPLOYMENT_STATUS_TO_CONTRACT.get(
-                        application.employment_status, 0
-                    ) if application.employment_status else None,
-                )
+                admin_data = BoondAdministrativeData.from_application(application)
                 await self.boond_client.update_candidate_administrative(
                     external_id, admin_data
                 )
@@ -1100,12 +1087,7 @@ class CreateCandidateInBoondUseCase:
             civility=application.civility or "M",
             phone=Phone(application.phone) if application.phone else None,
             daily_rate=application.tjm_desired or application.tjm_current or application.tjm_max,
-            note=(
-                f"Candidature via formulaire public\n"
-                f"TJM: {application.tjm_range}\n"
-                f"Disponibilité: {application.availability_display}\n"
-                f"Poste: {application.job_title}"
-            ),
+            note=application.to_boond_internal_note(),
         )
 
         # Build Boond context
@@ -1123,15 +1105,7 @@ class CreateCandidateInBoondUseCase:
             saved = await self.job_application_repository.save(application)
 
             # Update administrative data (salary/TJM/contract)
-            admin_data = BoondAdministrativeData(
-                salary_current=application.salary_current,
-                salary_desired=application.salary_desired,
-                tjm_current=application.tjm_current,
-                tjm_desired=application.tjm_desired,
-                desired_contract=EMPLOYMENT_STATUS_TO_CONTRACT.get(
-                    application.employment_status, 0
-                ) if application.employment_status else None,
-            )
+            admin_data = BoondAdministrativeData.from_application(application)
             await self.boond_client.update_candidate_administrative(
                 external_id, admin_data
             )
