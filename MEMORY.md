@@ -143,6 +143,17 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-02-11
+- **fix(cv-generator)**: Correction erreur "Erreur de parsing JSON" sur CV Generator Beta
+  - **Cause** : Claude peut retourner du JSON malformé (virgules en trop, réponse tronquée) sans mécanisme de rattrapage
+  - **JSON repair** : Ajout `_repair_json()` et `_parse_json_safe()` dans les 3 clients IA (CvGeneratorParser, AnthropicClient, GeminiClient)
+    - Suppression des trailing commas (`,}` → `}`, `,]` → `]`)
+    - Fermeture automatique des brackets non fermés (réponse tronquée)
+  - **Retry automatique** : Si le parsing échoue après repair, l'appel IA est relancé une fois (MAX_ATTEMPTS=2)
+  - **max_tokens doublé** : 8192 → 16384 pour éviter la troncature sur les CV longs
+  - **Détection troncature** : Log warning si `stop_reason == "max_tokens"`
+  - Fichiers modifiés : `anthropic_parser.py` (cv_generator), `anthropic_client.py` (cv_transformer), `gemini_client.py` (cv_transformer)
+
 ### 2026-02-09
 - **fix(ci)**: Résolution complète des échecs CI (573 tests passent, 0 failures, couverture 52.51%)
   - **Indexes SQLite dupliqués** : Suppression `Index("ix_job_applications_is_read")` et `Index("ix_job_applications_status")` en doublon avec `index=True` sur colonnes (incompatible SQLite en tests)
