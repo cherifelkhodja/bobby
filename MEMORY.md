@@ -144,6 +144,15 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-12
+- **feat(ui)**: Déplacement "Mon profil" du sidebar vers dropdown header
+  - Sidebar : suppression entrée "Mon profil" de la navigation
+  - Header : remplacement nom utilisateur statique + bouton déconnexion par dropdown menu (Headless UI `Menu`)
+  - Dropdown contient "Mon profil" (navigation) et "Déconnexion" (rouge, avec séparateur)
+  - Animation enter/leave avec `Transition`
+  - Fichiers modifiés : `Sidebar.tsx`, `Header.tsx`
+- **fix(ui)**: Page profil centrée correctement
+  - Ajout `mx-auto` au conteneur `max-w-2xl` pour centrer la page
+  - Fichier modifié : `Profile.tsx`
 - **feat(published-opportunities)**: Modification d'une opportunité publiée
   - Backend : `PATCH /published-opportunities/{id}` — titre, description, compétences, date de fin
   - Backend : Schema `UpdatePublishedOpportunityRequest`, entity `update_content` avec `end_date`
