@@ -24,8 +24,8 @@ const cooptationSchema = z.object({
   candidate_last_name: z.string().min(1, 'Nom requis'),
   candidate_email: z.string().email('Email invalide'),
   candidate_civility: z.enum(['M', 'Mme']),
-  candidate_phone: z.string().optional(),
-  candidate_daily_rate: z.coerce.number().positive().optional(),
+  candidate_phone: z.string().min(1, 'Telephone requis'),
+  candidate_daily_rate: z.coerce.number().positive('TJM requis'),
   candidate_note: z.string().max(2000).optional(),
 });
 

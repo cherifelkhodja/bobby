@@ -13,8 +13,8 @@ export interface CreateCooptationData {
   candidate_last_name: string;
   candidate_email: string;
   candidate_civility: 'M' | 'Mme';
-  candidate_phone?: string;
-  candidate_daily_rate?: number;
+  candidate_phone: string;
+  candidate_daily_rate: number;
   candidate_note?: string;
   cv: File;
 }
@@ -27,12 +27,8 @@ export const cooptationsApi = {
     formData.append('candidate_last_name', data.candidate_last_name);
     formData.append('candidate_email', data.candidate_email);
     formData.append('candidate_civility', data.candidate_civility);
-    if (data.candidate_phone) {
-      formData.append('candidate_phone', data.candidate_phone);
-    }
-    if (data.candidate_daily_rate !== undefined && data.candidate_daily_rate !== null) {
-      formData.append('candidate_daily_rate', String(data.candidate_daily_rate));
-    }
+    formData.append('candidate_phone', data.candidate_phone);
+    formData.append('candidate_daily_rate', String(data.candidate_daily_rate));
     if (data.candidate_note) {
       formData.append('candidate_note', data.candidate_note);
     }

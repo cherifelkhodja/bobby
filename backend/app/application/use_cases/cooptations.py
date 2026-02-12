@@ -37,8 +37,8 @@ class CreateCooptationCommand:
     candidate_last_name: str
     candidate_email: str
     candidate_civility: str = "M"
-    candidate_phone: str | None = None
-    candidate_daily_rate: float | None = None
+    candidate_phone: str = ""
+    candidate_daily_rate: float = 0.0
     candidate_note: str | None = None
     cv_s3_key: str | None = None
     cv_filename: str | None = None
