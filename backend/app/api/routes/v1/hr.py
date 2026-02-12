@@ -42,6 +42,7 @@ from app.domain.exceptions import (
     JobApplicationNotFoundError,
     JobPostingNotFoundError,
     OpportunityNotFoundError,
+    TurnoverITError,
 )
 from app.domain.value_objects import UserRole
 from app.infrastructure.anonymizer.job_posting_anonymizer import JobPostingAnonymizer
@@ -761,6 +762,11 @@ async def publish_job_posting(
         raise HTTPException(status_code=404, detail="Annonce non trouvée")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except TurnoverITError as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Erreur Turnover-IT: {str(e)}",
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,

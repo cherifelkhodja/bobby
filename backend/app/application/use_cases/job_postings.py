@@ -584,7 +584,8 @@ class PublishJobPostingUseCase:
         posting.generate_turnoverit_reference(agency_id)
 
         # Build Turnover-IT payload
-        application_base_url = f"{settings.FRONTEND_URL}/postuler"
+        frontend_url = settings.FRONTEND_URL.rstrip("/")
+        application_base_url = f"{frontend_url}/postuler"
         payload = posting.to_turnoverit_payload(application_base_url)
 
         try:
@@ -607,6 +608,8 @@ class PublishJobPostingUseCase:
                 opportunity.client_name if opportunity else None,
             )
 
+        except TurnoverITError:
+            raise
         except Exception as e:
             raise TurnoverITError(f"Failed to publish job: {str(e)}")
 

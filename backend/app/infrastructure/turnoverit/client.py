@@ -98,7 +98,20 @@ class TurnoverITClient:
                 # Handle error responses
                 try:
                     error_data = response.json()
-                    if isinstance(error_data.get("message"), list):
+                    # Handle Hydra ConstraintViolationList format
+                    if error_data.get("@type") == "ConstraintViolationList":
+                        violations = error_data.get("violations", [])
+                        if violations:
+                            errors = [
+                                f"{v.get('propertyPath', '?')}: {v.get('message', '?')}"
+                                for v in violations
+                            ]
+                            error_msg = "; ".join(errors)
+                        else:
+                            error_msg = error_data.get(
+                                "hydra:description", response.text
+                            )
+                    elif isinstance(error_data.get("message"), list):
                         errors = [e.get("message", str(e)) for e in error_data["message"]]
                         error_msg = "; ".join(errors)
                     else:

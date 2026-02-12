@@ -143,6 +143,14 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-02-12
+- **fix(hr)**: Correction publication Turnover-IT - URL invalide et chargement infini
+  - **URL invalide** : L'`application.url` (option payante) n'est envoyée que si c'est une URL HTTPS publique (pas localhost). En dev, le champ est omis car Turnover-IT rejette les URLs localhost.
+  - **Chargement infini** : Ajout du callback `onError` au `publishMutation` dans `CreateJobPosting.tsx` pour revenir au formulaire en cas d'erreur (comme `EditJobPosting.tsx` le faisait déjà).
+  - **Erreurs Hydra** : Parsing amélioré des erreurs Turnover-IT au format `ConstraintViolationList` dans le client pour messages lisibles.
+  - **Double-wrapping** : `TurnoverITError` n'est plus re-wrappée dans le use case, et le route handler distingue `TurnoverITError` (502) des autres erreurs (500).
+  - Fichiers modifiés : `job_posting.py` (entity), `job_postings.py` (use case), `turnoverit/client.py`, `hr.py` (route), `CreateJobPosting.tsx`
+
 ### 2026-02-11
 - **feat(hr)**: Suppression d'annonce disponible pour tous les statuts (draft, published, closed)
   - Backend : endpoint `DELETE /hr/job-postings/{id}` accepte désormais tous les statuts (plus seulement draft)
