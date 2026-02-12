@@ -152,6 +152,11 @@ docker-compose up # Start all services
   - Fichiers modifiés : `job_posting.py` (entity), `job_postings.py` (use case), `turnoverit/client.py`, `hr.py` (route), `CreateJobPosting.tsx`
 
 ### 2026-02-11
+- **fix(ci)**: Correction Docker Build CI qui échouait (timeout health check)
+  - Cause racine : `docker compose up` chargeait automatiquement `docker-compose.override.yml` (dev), qui remplaçait le CMD (skip alembic) → tables inexistantes → crash au démarrage (seed_admin_user)
+  - Fix : CI utilise explicitement `-f docker-compose.yml` pour ignorer l'override dev
+  - Ajout port 8012:8000 dans `docker-compose.yml` base
+  - Ajout step "Show backend logs on failure" + `if: always()` sur cleanup
 - **feat(hr)**: Suppression d'annonce disponible pour tous les statuts (draft, published, closed)
   - Backend : endpoint `DELETE /hr/job-postings/{id}` accepte désormais tous les statuts (plus seulement draft)
   - Backend : suppression automatique sur Turnover-IT (`DELETE /jobs/:reference`) si l'annonce a une référence Turnover-IT

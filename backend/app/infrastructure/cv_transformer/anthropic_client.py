@@ -87,9 +87,7 @@ class AnthropicClient:
                 # Check for truncation
                 stop_reason = getattr(response, "stop_reason", None)
                 if stop_reason == "max_tokens":
-                    logger.warning(
-                        "CV Transformer (Claude): response truncated (max_tokens)"
-                    )
+                    logger.warning("CV Transformer (Claude): response truncated (max_tokens)")
 
                 # Extract text from response
                 response_text = self._extract_response_text(response)
