@@ -143,12 +143,91 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-02-12
+- **fix(hr)**: Correction publication Turnover-IT - URL invalide et chargement infini
+  - **URL invalide** : L'`application.url` (option payante) n'est envoyée que si c'est une URL HTTPS publique (pas localhost). En dev, le champ est omis car Turnover-IT rejette les URLs localhost.
+  - **Chargement infini** : Ajout du callback `onError` au `publishMutation` dans `CreateJobPosting.tsx` pour revenir au formulaire en cas d'erreur (comme `EditJobPosting.tsx` le faisait déjà).
+  - **Erreurs Hydra** : Parsing amélioré des erreurs Turnover-IT au format `ConstraintViolationList` dans le client pour messages lisibles.
+  - **Double-wrapping** : `TurnoverITError` n'est plus re-wrappée dans le use case, et le route handler distingue `TurnoverITError` (502) des autres erreurs (500).
+  - Fichiers modifiés : `job_posting.py` (entity), `job_postings.py` (use case), `turnoverit/client.py`, `hr.py` (route), `CreateJobPosting.tsx`
+
 ### 2026-02-11
 - **fix(ci)**: Correction Docker Build CI qui échouait (timeout health check)
   - Cause racine : `docker compose up` chargeait automatiquement `docker-compose.override.yml` (dev), qui remplaçait le CMD (skip alembic) → tables inexistantes → crash au démarrage (seed_admin_user)
   - Fix : CI utilise explicitement `-f docker-compose.yml` pour ignorer l'override dev
   - Ajout port 8012:8000 dans `docker-compose.yml` base
   - Ajout step "Show backend logs on failure" + `if: always()` sur cleanup
+- **feat(hr)**: Suppression d'annonce disponible pour tous les statuts (draft, published, closed)
+  - Backend : endpoint `DELETE /hr/job-postings/{id}` accepte désormais tous les statuts (plus seulement draft)
+  - Backend : suppression automatique sur Turnover-IT (`DELETE /jobs/:reference`) si l'annonce a une référence Turnover-IT
+  - Backend : nouvelle méthode `TurnoverITClient.delete_job()` pour appel `DELETE /jobs/:reference`
+  - Frontend : bouton "Supprimer" ajouté pour les annonces publiées et fermées (existait déjà pour les brouillons)
+  - Frontend : texte de confirmation adapté (mention Turnover-IT si applicable)
+  - Frontend : bouton "Fermer" en orange pour distinguer visuellement de "Supprimer" (rouge)
+  - Fichiers modifiés : `turnoverit/client.py`, `hr.py` (route), `JobPostingDetails.tsx`
+- **feat(turnoverit)**: Référence Turnover-IT basée sur l'agence BoondManager
+  - Format : `{PREFIX}-{YYYYMMDD}-{6 chars aléatoires}` (ex: `GEM-20260211-A1B2C3`)
+  - Préfixes : `GEM` (Gemini, agency_id=1), `CRA` (Craftmania, agency_id=5), `ESN` (fallback)
+  - Référence générée à la publication (plus à la création), garantit l'unicité même en republication
+  - `PublishJobPostingUseCase` fetch l'opportunité Boond pour obtenir l'`agency_id`
+  - Fichiers modifiés : `job_posting.py` (entity), `job_postings.py` (use case), `hr.py` (route)
+- **feat(boond)**: Ajout du titre de poste (`job_title`) sur le candidat BoondManager lors de la création
+  - Utilise le `job_title` saisi par le candidat dans le formulaire de candidature
+  - Transmis via `BoondCandidateContext.job_title` → attribut `title` dans Boond
+- **feat(boond)**: Upload CV + action d'analyse lors de la création candidat BoondManager
+  - **Upload CV** : Téléchargement du CV depuis S3 puis upload vers Boond via `POST /api/documents` (parentType: candidateResume)
+  - **Action candidat** : Création automatique d'une action (typeOf: 13) sur le candidat Boond avec les analyses IA
+  - **Contenu action** : Matching CV/offre (score global, scores détaillés, compétences matchées/manquantes, points forts, vigilance, recommandation) + Qualité CV (note/20, détails par critère, classification)
+  - **Format** : HTML formaté pour affichage dans BoondManager
+  - **Main manager** : Le RH qui valide/crée le candidat (boond_resource_id)
+  - **Non-bloquant** : Échecs d'upload CV ou de création d'action loggés mais ne bloquent pas la création candidat
+  - Appliqué aux deux use cases : auto-create (validation) et manual create (bouton)
+  - Fichiers modifiés : `client.py` (upload_candidate_cv, create_candidate_action), `mappers.py` (format_analyses_as_boond_html), `job_applications.py` (use cases)
+- **feat(boond)**: Ajout du titre de poste (`job_title`) sur le candidat BoondManager lors de la création
+  - Utilise le `job_title` saisi par le candidat dans le formulaire de candidature
+  - Transmis via `BoondCandidateContext.job_title` → attribut `title` dans Boond
+- **fix(boond)**: Correction action créée 3 fois (retry sur méthode non-idempotente)
+  - Suppression du `@retry` sur `create_candidate_action()` (une action ne doit pas être retentée)
+  - Parsing robuste de la réponse (gère `data` en tant que liste ou objet)
+- **fix(boond)**: Ajout `administrativeComments` pour statut "both" (salarié + freelance)
+  - Quand le candidat est ouvert aux deux, les infos TJM sont maintenant envoyées dans `administrativeComments`
+  - Champs salary remplis normalement, TJM dans les commentaires admin
+- **fix(boond)**: Correction création candidat BoondManager lors de la validation d'une candidature RH
+  - **Cause** : Le payload envoyé à `POST /candidates` était un dict plat au lieu du format JSON:API attendu (`{"data": {"attributes": {...}}}`)
+  - **Bug email** : Le champ `"email"` était utilisé au lieu de `"email1"` (nomenclature Boond)
+  - **Données manquantes** : Les champs `note` et `daily_rate` (TJM) du candidat n'étaient pas transmis à Boond
+  - **Positionnement** : Même fix appliqué à `create_positioning` (format JSON:API avec `relationships`)
+  - Fichiers modifiés : `mappers.py` (map_candidate_to_boond), `client.py` (create_candidate, create_positioning)
+- **feat(boond)**: Enrichissement création candidat Boond avec typeOf, source et relationships
+  - `typeOf` : 0=salarié, 1=freelance, 0=both (basé sur `employment_status` de la candidature)
+  - `source` : 6 (annonce), `sourceDetail` : ID Boond de l'opportunité
+  - `relationships.hrManager` : `boond_resource_id` du RH qui valide
+  - `relationships.mainManager` : manager principal de l'opportunité (fetch Boond API)
+  - `relationships.agency` : agence de l'opportunité (fetch Boond API)
+  - Nouveau `BoondCandidateContext` dataclass pour transporter le contexte Boond
+  - Mis à jour auto-create (validation) et manual create (bouton) use cases
+  - Fichiers modifiés : `mappers.py`, `client.py`, `job_applications.py` (use cases), `hr.py` (routes)
+- **feat(boond)**: PUT /candidates/{id}/administrative après création pour enregistrer salaires/TJM
+  - `actualSalary` : salaire actuel du candidat
+  - `desiredSalary` : salaire souhaité (min=max)
+  - `actualAverageDailyCost` : TJM actuel
+  - `desiredAverageDailyCost` : TJM souhaité (min=max)
+  - `desiredContract` : 0=CDI (employee), 3=Freelance (freelance), 0=both
+  - Appel automatique après `POST /candidates` dans les deux use cases
+  - Fichiers modifiés : `mappers.py`, `client.py`, `job_applications.py`
+- **fix(boond)**: Correction `CreateCandidateInBoondUseCase.execute()` - return manquant + code mort
+  - `execute()` ne retournait pas de `JobApplicationReadModel` après création réussie (retour implicite None)
+  - Code mort après `return context` dans `_build_boond_context` (reste d'un refactoring précédent) supprimé
+  - Fichier modifié : `job_applications.py`
+- **feat(boond)**: Note interne b0bby + logique admin data par statut d'emploi
+  - `to_boond_internal_note()` sur `JobApplication` : note complète avec statut, salaire, TJM, source "Plateforme b0bby"
+  - Données admin Boond selon `employment_status` :
+    - `employee` ou `both` : champs salaire uniquement (TJM dans la note)
+    - `freelance` : champs TJM uniquement
+  - `desiredSalary.min` = salaire actuel, `.max` = salaire souhaité
+  - `desiredAverageDailyCost.min` = TJM actuel, `.max` = TJM souhaité
+  - Factory `BoondAdministrativeData.from_application()` centralise la logique
+  - Fichiers modifiés : `job_application.py` (entity), `mappers.py`, `job_applications.py` (use cases)
 - **refactor(admin)**: Stats CV Generator déplacées dans l'admin (onglet Stats dédié)
   - Retiré la section stats de `CvGeneratorBeta.tsx`
   - Créé `StatsTab.tsx` dans admin avec les mêmes stats

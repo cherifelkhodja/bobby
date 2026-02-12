@@ -412,6 +412,9 @@ export default function CreateJobPosting() {
       queryClient.invalidateQueries({ queryKey: ['hr-job-postings'] });
       navigate(`/rh/annonces/${posting.id}`);
     },
+    onError: () => {
+      setStep('form');
+    },
   });
 
   const handleAnonymize = () => {

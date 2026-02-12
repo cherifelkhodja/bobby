@@ -42,6 +42,7 @@ from app.domain.exceptions import (
     JobApplicationNotFoundError,
     JobPostingNotFoundError,
     OpportunityNotFoundError,
+    TurnoverITError,
 )
 from app.domain.value_objects import UserRole
 from app.infrastructure.anonymizer.job_posting_anonymizer import JobPostingAnonymizer
@@ -735,6 +736,7 @@ async def update_job_posting(
 async def publish_job_posting(
     posting_id: str,
     db: DbSession,
+    boond_client: Boond,
     app_settings: AppSettings,
     authorization: str = Header(default=""),
 ):
@@ -751,6 +753,7 @@ async def publish_job_posting(
         opportunity_repository=opportunity_repo,
         user_repository=user_repo,
         turnoverit_client=turnoverit_client,
+        boond_client=boond_client,
     )
 
     try:
@@ -759,6 +762,11 @@ async def publish_job_posting(
         raise HTTPException(status_code=404, detail="Annonce non trouvée")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except TurnoverITError as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Erreur Turnover-IT: {str(e)}",
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -835,26 +843,31 @@ async def reactivate_job_posting(
 async def delete_job_posting(
     posting_id: str,
     db: DbSession,
+    app_settings: AppSettings,
     authorization: str = Header(default=""),
 ):
-    """Delete a draft job posting.
+    """Delete a job posting.
 
-    Only draft postings can be deleted. Published postings must be closed first.
+    Works for any status. If the posting was published on Turnover-IT,
+    it will be deleted there as well.
     """
     await require_hr_access(db, authorization)
 
     job_posting_repo = JobPostingRepository(db)
 
-    # Get the posting first to check status
+    # Get the posting first
     posting = await job_posting_repo.get_by_id(UUID(posting_id))
     if not posting:
         raise HTTPException(status_code=404, detail="Annonce non trouvée")
 
-    if posting.status.value != "draft":
-        raise HTTPException(
-            status_code=400,
-            detail="Seuls les brouillons peuvent être supprimés. Fermez d'abord l'annonce.",
-        )
+    # If posting has a Turnover-IT reference, delete from Turnover-IT first
+    if posting.turnoverit_reference:
+        try:
+            turnoverit_client = TurnoverITClient(app_settings)
+            await turnoverit_client.delete_job(posting.turnoverit_reference)
+        except Exception:
+            # Log but don't block - job might already be removed on their side
+            pass
 
     deleted = await job_posting_repo.delete(UUID(posting_id))
     if not deleted:
@@ -969,12 +982,14 @@ async def update_application_status(
 
     job_application_repo = JobApplicationRepository(db)
     job_posting_repo = JobPostingRepository(db)
+    opportunity_repo = OpportunityRepository(db)
     user_repo = UserRepository(db)
     s3_client = S3StorageClient(app_settings)
 
     use_case = UpdateApplicationStatusUseCase(
         job_application_repository=job_application_repo,
         job_posting_repository=job_posting_repo,
+        opportunity_repository=opportunity_repo,
         user_repository=user_repo,
         s3_client=s3_client,
         boond_client=boond_client,
@@ -1121,21 +1136,25 @@ async def create_candidate_in_boond(
     authorization: str = Header(default=""),
 ):
     """Create candidate in BoondManager from application."""
-    await require_hr_access(db, authorization)
+    user_id = await require_hr_access(db, authorization)
 
     job_application_repo = JobApplicationRepository(db)
     job_posting_repo = JobPostingRepository(db)
+    opportunity_repo = OpportunityRepository(db)
+    user_repo = UserRepository(db)
     s3_client = S3StorageClient(app_settings)
 
     use_case = CreateCandidateInBoondUseCase(
         job_application_repository=job_application_repo,
         job_posting_repository=job_posting_repo,
+        opportunity_repository=opportunity_repo,
+        user_repository=user_repo,
         boond_client=boond_client,
         s3_client=s3_client,
     )
 
     try:
-        return await use_case.execute(UUID(application_id))
+        return await use_case.execute(UUID(application_id), created_by=user_id)
     except JobApplicationNotFoundError:
         raise HTTPException(status_code=404, detail="Candidature non trouvée")
     except ValueError as e:

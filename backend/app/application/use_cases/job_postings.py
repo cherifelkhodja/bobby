@@ -268,7 +268,7 @@ class CreateJobPostingUseCase:
             if user:
                 created_by_name = user.full_name
 
-        application_url = f"{settings.FRONTEND_URL}/postuler/{posting.application_token}"
+        application_url = f"{settings.frontend_url}/postuler/{posting.application_token}"
 
         return JobPostingReadModel(
             id=str(posting.id),
@@ -360,7 +360,7 @@ class GetJobPostingUseCase:
             if user:
                 created_by_name = user.full_name
 
-        application_url = f"{settings.FRONTEND_URL}/postuler/{posting.application_token}"
+        application_url = f"{settings.frontend_url}/postuler/{posting.application_token}"
 
         return JobPostingReadModel(
             id=str(posting.id),
@@ -486,7 +486,7 @@ class ListJobPostingsUseCase:
                 if user:
                     created_by_name = user.full_name
 
-            application_url = f"{settings.FRONTEND_URL}/postuler/{posting.application_token}"
+            application_url = f"{settings.frontend_url}/postuler/{posting.application_token}"
 
             items.append(
                 JobPostingReadModel(
@@ -549,11 +549,13 @@ class PublishJobPostingUseCase:
         opportunity_repository: OpportunityRepository,
         user_repository: UserRepository,
         turnoverit_client: TurnoverITClient,
+        boond_client: BoondClient,
     ) -> None:
         self.job_posting_repository = job_posting_repository
         self.opportunity_repository = opportunity_repository
         self.user_repository = user_repository
         self.turnoverit_client = turnoverit_client
+        self.boond_client = boond_client
 
     async def execute(self, posting_id: UUID) -> JobPostingReadModel:
         """Publish job posting to Turnover-IT."""
@@ -567,8 +569,30 @@ class PublishJobPostingUseCase:
         # Get opportunity for context
         opportunity = await self.opportunity_repository.get_by_id(posting.opportunity_id)
 
+        # Fetch Boond opportunity to get agency_id for reference prefix
+        agency_id = None
+        if opportunity and opportunity.external_id:
+            try:
+                boond_opp = await self.boond_client.get_opportunity_info(
+                    opportunity.external_id
+                )
+                agency_id = boond_opp.get("agency_id") if boond_opp else None
+            except Exception:
+                pass  # Fallback to default prefix
+
+        # Generate unique reference based on agency
+        posting.generate_turnoverit_reference(agency_id)
+
         # Build Turnover-IT payload
-        application_base_url = f"{settings.FRONTEND_URL}/postuler"
+        frontend_url = settings.frontend_url
+        # Validate FRONTEND_URL is properly configured (not just protocol)
+        if not frontend_url or frontend_url in ("https://", "http://"):
+            raise ValueError(
+                "FRONTEND_URL n'est pas configuré. "
+                "Définissez la variable d'environnement FRONTEND_URL avec l'URL du frontend "
+                "(ex: https://bobby-frontend.railway.app)"
+            )
+        application_base_url = f"{frontend_url}/postuler"
         payload = posting.to_turnoverit_payload(application_base_url)
 
         try:
@@ -591,6 +615,8 @@ class PublishJobPostingUseCase:
                 opportunity.client_name if opportunity else None,
             )
 
+        except TurnoverITError:
+            raise
         except Exception as e:
             raise TurnoverITError(f"Failed to publish job: {str(e)}")
 
@@ -607,7 +633,7 @@ class PublishJobPostingUseCase:
             if user:
                 created_by_name = user.full_name
 
-        application_url = f"{settings.FRONTEND_URL}/postuler/{posting.application_token}"
+        application_url = f"{settings.frontend_url}/postuler/{posting.application_token}"
 
         return JobPostingReadModel(
             id=str(posting.id),
@@ -680,7 +706,7 @@ class CloseJobPostingUseCase:
         if posting.turnoverit_reference:
             try:
                 # Build the payload with current job data (status will be set to INACTIVE by the client)
-                application_base_url = f"{settings.FRONTEND_URL}/postuler"
+                application_base_url = f"{settings.frontend_url}/postuler"
                 payload = posting.to_turnoverit_payload(application_base_url)
                 await self.turnoverit_client.close_job(posting.turnoverit_reference, payload)
             except Exception:
@@ -711,7 +737,7 @@ class CloseJobPostingUseCase:
             if user:
                 created_by_name = user.full_name
 
-        application_url = f"{settings.FRONTEND_URL}/postuler/{posting.application_token}"
+        application_url = f"{settings.frontend_url}/postuler/{posting.application_token}"
 
         return JobPostingReadModel(
             id=str(posting.id),
@@ -783,7 +809,7 @@ class ReactivateJobPostingUseCase:
         # Reactivate on Turnover-IT if reference exists
         if posting.turnoverit_reference:
             # Build the payload with current job data (status will be set to PUBLISHED by the client)
-            application_base_url = f"{settings.FRONTEND_URL}/postuler"
+            application_base_url = f"{settings.frontend_url}/postuler"
             payload = posting.to_turnoverit_payload(application_base_url)
             await self.turnoverit_client.reactivate_job(posting.turnoverit_reference, payload)
 
@@ -813,7 +839,7 @@ class ReactivateJobPostingUseCase:
             if user:
                 created_by_name = user.full_name
 
-        application_url = f"{settings.FRONTEND_URL}/postuler/{posting.application_token}"
+        application_url = f"{settings.frontend_url}/postuler/{posting.application_token}"
 
         return JobPostingReadModel(
             id=str(posting.id),
@@ -953,7 +979,7 @@ class UpdateJobPostingUseCase:
         # Sync to Turnover-IT if posting is published
         if saved.status == JobPostingStatus.PUBLISHED and saved.turnoverit_reference:
             try:
-                application_base_url = f"{settings.FRONTEND_URL}/postuler"
+                application_base_url = f"{settings.frontend_url}/postuler"
                 payload = saved.to_turnoverit_payload(application_base_url)
                 await self.turnoverit_client.update_job(saved.turnoverit_reference, payload)
             except TurnoverITError as e:
@@ -984,7 +1010,7 @@ class UpdateJobPostingUseCase:
             if user:
                 created_by_name = user.full_name
 
-        application_url = f"{settings.FRONTEND_URL}/postuler/{posting.application_token}"
+        application_url = f"{settings.frontend_url}/postuler/{posting.application_token}"
 
         return JobPostingReadModel(
             id=str(posting.id),

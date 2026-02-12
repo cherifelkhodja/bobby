@@ -425,3 +425,57 @@ class JobApplication:
             "englishLevel": self.english_level_display,
             "employmentStatus": self.employment_status_display,
         }
+
+    def to_boond_internal_note(self) -> str:
+        """Build internal note for BoondManager with all financial info.
+
+        Includes employment status, salary and TJM data for both statuses,
+        mentioning the data source as the b0bby platform.
+        """
+        lines = [f"[b0bby] Candidature - {self.job_title or 'N/A'}"]
+        lines.append(f"Statut : {self.employment_status_display}")
+        lines.append(f"Disponibilité : {self.availability_display}")
+        lines.append("")
+
+        has_employee = self.employment_status in (
+            "employee", "both", "freelance,employee", "employee,freelance"
+        )
+        has_freelance = self.employment_status in (
+            "freelance", "both", "freelance,employee", "employee,freelance"
+        )
+
+        if has_employee:
+            lines.append("Salarié :")
+            current = (
+                f"{int(self.salary_current):,}".replace(",", " ") + "€"
+                if self.salary_current
+                else "Non spécifié"
+            )
+            desired = (
+                f"{int(self.salary_desired):,}".replace(",", " ") + "€"
+                if self.salary_desired
+                else "Non spécifié"
+            )
+            lines.append(f"  Salaire actuel : {current}")
+            lines.append(f"  Salaire souhaité : {desired}")
+            lines.append("")
+
+        if has_freelance:
+            lines.append("Freelance :")
+            tjm_current_str = (
+                f"{int(self.tjm_current)}€/j"
+                if self.tjm_current
+                else "Non spécifié"
+            )
+            tjm_desired_str = (
+                f"{int(self.tjm_desired)}€/j"
+                if self.tjm_desired
+                else "Non spécifié"
+            )
+            lines.append(f"  TJM actuel : {tjm_current_str}")
+            lines.append(f"  TJM souhaité : {tjm_desired_str}")
+            lines.append("")
+
+        lines.append("Source : Plateforme b0bby")
+
+        return "\n".join(lines)

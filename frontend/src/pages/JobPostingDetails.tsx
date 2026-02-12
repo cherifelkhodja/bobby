@@ -419,32 +419,50 @@ export default function JobPostingDetails() {
               </>
             )}
             {posting.status === 'published' && (
-              <button
-                onClick={() => closeMutation.mutate()}
-                disabled={closeMutation.isPending}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium rounded-lg transition-colors"
-              >
-                {closeMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <XCircle className="h-4 w-4" />
-                )}
-                Fermer l'annonce
-              </button>
+              <>
+                <button
+                  onClick={() => closeMutation.mutate()}
+                  disabled={closeMutation.isPending}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 text-white font-medium rounded-lg transition-colors"
+                >
+                  {closeMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
+                  Fermer l'annonce
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 font-medium rounded-lg transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Supprimer
+                </button>
+              </>
             )}
             {posting.status === 'closed' && (
-              <button
-                onClick={() => reactivateMutation.mutate()}
-                disabled={reactivateMutation.isPending}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors"
-              >
-                {reactivateMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-                Réactiver l'annonce
-              </button>
+              <>
+                <button
+                  onClick={() => reactivateMutation.mutate()}
+                  disabled={reactivateMutation.isPending}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors"
+                >
+                  {reactivateMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Réactiver l'annonce
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 font-medium rounded-lg transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Supprimer
+                </button>
+              </>
             )}
             {posting.turnoverit_public_url && (
               <a
@@ -1292,11 +1310,13 @@ export default function JobPostingDetails() {
                   <Trash2 className="h-6 w-6 text-red-600 dark:text-red-400" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Supprimer le brouillon
+                  Supprimer l'annonce
                 </h3>
               </div>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Êtes-vous sûr de vouloir supprimer ce brouillon d'annonce ? Cette action est irréversible.
+                Êtes-vous sûr de vouloir supprimer cette annonce ?
+                {posting?.turnoverit_reference && ' Elle sera également supprimée de Turnover-IT.'}
+                {' '}Cette action est irréversible.
               </p>
               <div className="flex gap-3 justify-end">
                 <button

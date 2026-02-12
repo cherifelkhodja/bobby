@@ -390,6 +390,9 @@ export default function EditJobPosting() {
       queryClient.invalidateQueries({ queryKey: ['job-posting', postingId] });
       navigate(`/rh/annonces/${posting.id}`);
     },
+    onError: () => {
+      setStep('form');
+    },
   });
 
   const onSaveDraft = (data: JobPostingFormData) => {
@@ -1036,10 +1039,10 @@ export default function EditJobPosting() {
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
               <p className="text-red-800 dark:text-red-200">
-                {saveMutation.error instanceof Error
-                  ? saveMutation.error.message
-                  : publishMutation.error instanceof Error
-                  ? publishMutation.error.message
+                {saveMutation.error
+                  ? getErrorMessage(saveMutation.error, "Erreur lors de la sauvegarde")
+                  : publishMutation.error
+                  ? getErrorMessage(publishMutation.error, "Erreur lors de la publication")
                   : "Erreur lors de l'opération"}
               </p>
             </div>

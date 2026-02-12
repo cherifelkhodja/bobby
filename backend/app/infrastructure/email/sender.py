@@ -28,7 +28,7 @@ class EmailService:
         self.password = settings.SMTP_PASSWORD
         self.from_email = settings.SMTP_FROM
         self.enabled = settings.FEATURE_EMAIL_NOTIFICATIONS
-        self.frontend_url = settings.FRONTEND_URL.rstrip("/")
+        self.frontend_url = settings.frontend_url
         self.resend_api_key = settings.RESEND_API_KEY
 
         # Configure Resend if API key is available
