@@ -144,6 +144,17 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-12
+- **feat(hr)**: Compteur de vues sur les pages de candidature publiques `/postuler/{token}`
+  - Backend : Migration 023 ajoute `view_count` (integer, default 0) à `job_postings`
+  - Backend : Incrémentation atomique du compteur à chaque `GET /api/v1/postuler/{token}`
+  - Backend : `view_count` exposé dans `JobPostingReadModel` pour les pages RH
+  - Frontend : Nouvelle carte "Vues" dans la page `/rh/annonces/:postingId` (grille 5 colonnes)
+  - Fichiers modifiés : migration 023, `models.py`, `job_posting.py` (entity), `job_posting_repository.py`, `public_applications.py`, `hr.py` (read models), `job_postings.py` (use cases), `types/index.ts`, `JobPostingDetails.tsx`
+- **feat(ui)**: Réorganisation navigation sidebar/header
+  - "Administration" déplacée du sidebar vers le dropdown du header (admin uniquement)
+  - "Génération Devis" renommée en "Génération Devis Thales" et déplacée dans la rubrique Outils
+  - Section "Admin" du sidebar supprimée (vide)
+  - Fichiers modifiés : `Sidebar.tsx`, `Header.tsx`
 - **feat(ui)**: Déplacement "Mon profil" du sidebar vers dropdown header
   - Sidebar : suppression entrée "Mon profil" de la navigation
   - Header : remplacement nom utilisateur statique + bouton déconnexion par dropdown menu (Headless UI `Menu`)
