@@ -413,6 +413,7 @@ class UpdateCooptationStatusUseCase:
                 candidate_name=cooptation.candidate.full_name,
                 opportunity_title=cooptation.opportunity.title,
                 new_status=str(new_status),
+                comment=comment,
             )
 
         return self._to_read_model(saved)

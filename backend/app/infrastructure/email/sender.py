@@ -258,6 +258,7 @@ class EmailService:
         candidate_name: str,
         opportunity_title: str,
         new_status: str,
+        comment: str | None = None,
     ) -> bool:
         """Send cooptation status update notification."""
         status_labels = {
@@ -279,6 +280,14 @@ class EmailService:
         elif new_status == "interview":
             status_color = "#0ea5e9"  # primary/blue
 
+        comment_html = ""
+        if comment:
+            comment_html = f"""
+                    <p><strong>Commentaire :</strong></p>
+                    <p style="background-color: #fff; padding: 10px; border-left: 3px solid {status_color}; margin: 5px 0; font-style: italic;">
+                        {comment}
+                    </p>"""
+
         html_body = f"""
         <!DOCTYPE html>
         <html>
@@ -295,7 +304,7 @@ class EmailService:
                     <p><strong>Opportunité :</strong> {opportunity_title}</p>
                     <p><strong>Nouveau statut :</strong>
                        <span style="color: {status_color}; font-weight: bold;">{status_label}</span>
-                    </p>
+                    </p>{comment_html}
                 </div>
                 <p>Connectez-vous à votre espace pour plus de détails.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
