@@ -1,10 +1,14 @@
 """Published opportunity endpoints."""
 
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
 
 from app.api.dependencies import AdminOrCommercialUser, CurrentUserId
+
+logger = logging.getLogger(__name__)
 from app.api.schemas.published_opportunity import (
     AnonymizedPreviewResponse,
     AnonymizeRequest,
@@ -173,6 +177,17 @@ async def publish_opportunity(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except IntegrityError:
+        raise HTTPException(
+            status_code=409,
+            detail="Cette opportunité a déjà été publiée",
+        )
+    except Exception:
+        logger.exception("Error publishing opportunity %s", request.boond_opportunity_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur lors de la publication de l'opportunité",
+        )
 
     return PublishedOpportunityResponse(**result.model_dump())
 

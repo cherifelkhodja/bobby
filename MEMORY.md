@@ -152,6 +152,12 @@ docker-compose up # Start all services
   - Suppression des modals de cooptation dans `OpportunityDetail` et `Opportunities`
   - Route ajoutée dans `App.tsx`
   - Fichiers modifiés : `cooptation_repository.py`, `cooptations.py` (use case + route), `cooptations.ts` (API), `ProposeCandidate.tsx` (new), `OpportunityDetail.tsx`, `Opportunities.tsx`, `App.tsx`
+- **fix(published-opportunities)**: Correction 500 Internal Server Error lors de la publication d'opportunité
+  - **Cause racine** : Mismatch de type colonne `skills` — migration 008 crée `ARRAY(varchar(100))` mais le modèle SQLAlchemy utilisait `JSON`, causant une erreur asyncpg lors de l'INSERT
+  - Fix : `mapped_column(JSON)` → `mapped_column(ARRAY(String(100)))` dans `PublishedOpportunityModel`
+  - Fix : annotation `Mapped[datetime | None]` → `Mapped[date | None]` pour `end_date`
+  - Ajout gestion `IntegrityError` (409) et exception générique (500 avec logging) dans le route handler
+  - Fichiers modifiés : `models.py`, `published_opportunities.py` (route)
 - **fix(hr)**: Correction publication Turnover-IT - URL invalide et chargement infini
   - **URL invalide** : L'`application.url` (option payante) n'est envoyée que si c'est une URL HTTPS publique (pas localhost). En dev, le champ est omis car Turnover-IT rejette les URLs localhost.
   - **Chargement infini** : Ajout du callback `onError` au `publishMutation` dans `CreateJobPosting.tsx` pour revenir au formulaire en cas d'erreur (comme `EditJobPosting.tsx` le faisait déjà).
