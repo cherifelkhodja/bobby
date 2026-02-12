@@ -90,6 +90,14 @@ class Settings(BaseSettings):
     FEATURE_BOOND_SYNC: bool = True
 
     @property
+    def frontend_url(self) -> str:
+        """Get normalized FRONTEND_URL with protocol and no trailing slash."""
+        url = self.FRONTEND_URL.rstrip("/")
+        if not url.startswith(("http://", "https://")):
+            url = f"https://{url}"
+        return url
+
+    @property
     def is_production(self) -> bool:
         """Check if running in production mode."""
         return self.ENV == "prod"
