@@ -356,11 +356,8 @@ class JobPosting:
 
         # Application redirect URL - candidates clicking "Apply" on Free-Work
         # will be redirected to our own application form (paid option)
-        # Only include if it's a valid public URL (not localhost)
-        application_url = f"{application_base_url}/{self.application_token}"
-        if application_url.startswith("https://") and "localhost" not in application_url:
-            payload["application"] = {
-                "url": application_url,
-            }
+        payload["application"] = {
+            "url": f"{application_base_url}/{self.application_token}",
+        }
 
         return payload
