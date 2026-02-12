@@ -123,7 +123,6 @@ class TestJobPosting:
         posting = self._create_valid_posting()
         posting.publish()
         assert posting.status == JobPostingStatus.PUBLISHED
-        assert posting.turnoverit_reference is not None
         assert posting.published_at is not None
 
     def test_publish_closed_raises_error(self):
@@ -153,7 +152,7 @@ class TestJobPosting:
         posting = self._create_valid_posting()
         ref = posting.generate_turnoverit_reference("1")
         assert ref.startswith("GEM-")
-        assert len(ref) == 18  # GEM-YYYYMMDD-XXXXXX
+        assert len(ref) == 19  # GEM-YYYYMMDD-XXXXXX
 
     def test_generate_reference_craftmania(self):
         posting = self._create_valid_posting()

@@ -521,6 +521,7 @@ class TestUpdateApplicationStatusUseCase:
         return {
             "job_application_repo": AsyncMock(),
             "job_posting_repo": AsyncMock(),
+            "opportunity_repo": AsyncMock(),
             "user_repo": AsyncMock(),
             "s3_client": AsyncMock(),
         }
@@ -530,6 +531,7 @@ class TestUpdateApplicationStatusUseCase:
         return UpdateApplicationStatusUseCase(
             job_application_repository=mock_deps["job_application_repo"],
             job_posting_repository=mock_deps["job_posting_repo"],
+            opportunity_repository=mock_deps["opportunity_repo"],
             user_repository=mock_deps["user_repo"],
             s3_client=mock_deps["s3_client"],
         )
