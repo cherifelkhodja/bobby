@@ -159,9 +159,10 @@ docker-compose up # Start all services
   - Fichiers modifiés : `client.py` (Boond), `MyBoondOpportunities.tsx`
 - **feat(published-opportunities)**: Date de fin obligatoire
   - Backend : `end_date` obligatoire dans `PublishRequest` et `UpdatePublishedOpportunityRequest`
-  - Frontend : Champ date de fin requis dans la modal de publication et d'édition
-  - Frontend : Types `PublishRequest` et `UpdatePublishedOpportunityData` mis à jour
-  - Fichiers modifiés : schemas `published_opportunity.py`, `MyBoondOpportunities.tsx`, `types/index.ts`
+  - Frontend : Champ date de fin requis dans les modals de publication et d'édition (MyBoondOpportunities + PublishedOpportunityDetail)
+  - Frontend : Types `PublishRequest` et `UpdatePublishedOpportunityData` mis à jour (non-nullable)
+  - Frontend : Validation disable bouton Enregistrer si date de fin vide
+  - Fichiers modifiés : schemas `published_opportunity.py`, `MyBoondOpportunities.tsx`, `PublishedOpportunityDetail.tsx`, `types/index.ts`
 - **feat(published-opportunities)**: Fermeture automatique des opportunités expirées
   - Backend : `close_expired()` dans `PublishedOpportunityRepository` (UPDATE atomique)
   - Backend : Appelé automatiquement dans `ListPublishedOpportunitiesUseCase` et `GetMyBoondOpportunitiesUseCase`
