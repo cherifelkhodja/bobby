@@ -124,6 +124,20 @@ async def list_cooptations(
     status_filter = CooptationStatus(status) if status else None
     opp_id = UUID(opportunity_id) if opportunity_id else None
 
+    # Resolve published opportunity ID to actual opportunity ID.
+    # Cooptations reference the synced opportunity (from Boond), which may
+    # have a different UUID than the published_opportunity.id.
+    if opp_id:
+        published_repo = PublishedOpportunityRepository(db)
+        published = await published_repo.get_by_id(opp_id)
+        if published:
+            opportunity_repo = OpportunityRepository(db)
+            opp = await opportunity_repo.get_by_external_id(
+                published.boond_opportunity_id
+            )
+            if opp:
+                opp_id = opp.id
+
     use_case = ListCooptationsUseCase(cooptation_repo, user_repo)
     result = await use_case.execute(
         page=page,

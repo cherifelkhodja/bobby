@@ -165,6 +165,11 @@ docker-compose up # Start all services
   - Fix : ajout lookup `get_by_external_id(published.boond_opportunity_id)` avant de créer une nouvelle entrée — réutilise l'opportunité existante si elle existe
   - Ajout error handling dans le route handler : `OpportunityNotFoundError` → 404, `CandidateAlreadyExistsError` → 409, générique → 500 avec logging
   - Fichiers modifiés : `cooptations.py` (use case + route)
+- **fix(cooptation)**: Les cooptations n'apparaissaient pas dans la page détail opportunité publiée
+  - **Cause racine** : La cooptation était liée à l'opportunité syncée Boond (UUID différent de `published_opportunity.id`). Les requêtes par `publishedId` ne trouvaient rien.
+  - Fix 1 : `get_published_boond_data()` — JOIN via `opportunities.external_id = published.boond_opportunity_id` au lieu de `published.id = cooptations.opportunity_id`
+  - Fix 2 : `list_cooptations` route — résolution de l'ID publié vers l'ID réel via `get_by_external_id()` avant la requête
+  - Fichiers modifiés : `published_opportunity_repository.py`, `cooptations.py` (route)
 - **fix(published-opportunities)**: Correction 500 Internal Server Error lors de la publication d'opportunité
   - **Cause racine** : Mismatch de type colonne `skills` — migration 008 crée `ARRAY(varchar(100))` mais le modèle SQLAlchemy utilisait `JSON`, causant une erreur asyncpg lors de l'INSERT
   - Fix : `mapped_column(JSON)` → `mapped_column(ARRAY(String(100)))` dans `PublishedOpportunityModel`

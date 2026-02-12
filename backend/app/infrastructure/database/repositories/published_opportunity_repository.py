@@ -8,7 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities import PublishedOpportunity
 from app.domain.value_objects.status import OpportunityStatus
-from app.infrastructure.database.models import CooptationModel, PublishedOpportunityModel
+from app.infrastructure.database.models import (
+    CooptationModel,
+    OpportunityModel,
+    PublishedOpportunityModel,
+)
 
 
 class PublishedOpportunityRepository:
@@ -167,6 +171,9 @@ class PublishedOpportunityRepository:
         Returns a dict mapping boond_opportunity_id to {id, status, cooptations_count}.
         Uses a LEFT JOIN with cooptations to count candidates per opportunity.
         """
+        # Join through opportunities table to handle case where cooptation's
+        # opportunity_id points to a synced opportunity (different UUID than
+        # published_opportunity.id), linked via external_id/boond_opportunity_id.
         query = (
             select(
                 PublishedOpportunityModel.boond_opportunity_id,
@@ -175,8 +182,13 @@ class PublishedOpportunityRepository:
                 func.count(CooptationModel.id).label("cooptations_count"),
             )
             .outerjoin(
+                OpportunityModel,
+                OpportunityModel.external_id
+                == PublishedOpportunityModel.boond_opportunity_id,
+            )
+            .outerjoin(
                 CooptationModel,
-                PublishedOpportunityModel.id == CooptationModel.opportunity_id,
+                CooptationModel.opportunity_id == OpportunityModel.id,
             )
             .group_by(
                 PublishedOpportunityModel.boond_opportunity_id,
