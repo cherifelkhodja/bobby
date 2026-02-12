@@ -1,5 +1,6 @@
 """Cooptation endpoints."""
 
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -20,6 +21,10 @@ from app.application.use_cases.cooptations import (
     UpdateCooptationStatusUseCase,
 )
 from app.dependencies import AppSettings, Boond, DbSession
+from app.domain.exceptions import (
+    CandidateAlreadyExistsError,
+    OpportunityNotFoundError,
+)
 from app.domain.value_objects import CooptationStatus
 from app.infrastructure.database.repositories import (
     CandidateRepository,
@@ -30,6 +35,8 @@ from app.infrastructure.database.repositories import (
 )
 from app.infrastructure.email.sender import EmailService
 from app.infrastructure.security.jwt import decode_token
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -83,7 +90,19 @@ async def create_cooptation(
         candidate_note=request.candidate_note,
     )
 
-    result = await use_case.execute(command)
+    try:
+        result = await use_case.execute(command)
+    except OpportunityNotFoundError:
+        raise HTTPException(status_code=404, detail="Opportunité non trouvée")
+    except CandidateAlreadyExistsError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception:
+        logger.exception("Error creating cooptation for opportunity %s", request.opportunity_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur lors de la création de la cooptation",
+        )
+
     return CooptationResponse(**result.model_dump())
 
 

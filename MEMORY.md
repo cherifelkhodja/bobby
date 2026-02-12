@@ -160,6 +160,11 @@ docker-compose up # Start all services
   - Nouvelle page `PublishedOpportunityDetail.tsx` : header avec actions (clôturer/réactiver), stats cards, compétences, description, table des cooptations
   - Route `/my-boond-opportunities/:publishedId` ajoutée
   - Fichiers modifiés : `published_opportunity_repository.py`, `published_opportunities.py` (use case + route), `published_opportunity.py` (entity + read model + schema), `types/index.ts`, `publishedOpportunities.ts`, `MyBoondOpportunities.tsx`, `PublishedOpportunityDetail.tsx` (new), `App.tsx`
+- **fix(cooptation)**: Correction 500 Internal Server Error lors de la soumission d'une cooptation
+  - **Cause racine** : `CreateCooptationUseCase` tentait de créer un `Opportunity` à partir du `PublishedOpportunity` avec `external_id = boond_opportunity_id`, mais cette `external_id` existait déjà dans la table `opportunities` (synced depuis Boond) → violation contrainte UNIQUE → 500
+  - Fix : ajout lookup `get_by_external_id(published.boond_opportunity_id)` avant de créer une nouvelle entrée — réutilise l'opportunité existante si elle existe
+  - Ajout error handling dans le route handler : `OpportunityNotFoundError` → 404, `CandidateAlreadyExistsError` → 409, générique → 500 avec logging
+  - Fichiers modifiés : `cooptations.py` (use case + route)
 - **fix(published-opportunities)**: Correction 500 Internal Server Error lors de la publication d'opportunité
   - **Cause racine** : Mismatch de type colonne `skills` — migration 008 crée `ARRAY(varchar(100))` mais le modèle SQLAlchemy utilisait `JSON`, causant une erreur asyncpg lors de l'INSERT
   - Fix : `mapped_column(JSON)` → `mapped_column(ARRAY(String(100)))` dans `PublishedOpportunityModel`

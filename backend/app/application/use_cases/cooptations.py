@@ -74,23 +74,28 @@ class CreateCooptationUseCase:
                 command.opportunity_id
             )
             if published:
-                # Convert PublishedOpportunity to Opportunity for the cooptation
-                opportunity = Opportunity(
-                    id=published.id,
-                    title=published.title,
-                    reference=f"PUB-{published.boond_opportunity_id}",
-                    external_id=published.boond_opportunity_id,
-                    description=published.description,
-                    skills=published.skills,
-                    end_date=published.end_date,
-                    is_active=published.status.is_visible_to_consultants,
-                    is_shared=True,
-                    owner_id=published.published_by,
-                    created_at=published.created_at,
-                    updated_at=published.updated_at,
+                # Check if opportunity already exists by Boond ID (from sync)
+                opportunity = await self.opportunity_repository.get_by_external_id(
+                    published.boond_opportunity_id
                 )
-                # Save to opportunities table for foreign key constraint
-                opportunity = await self.opportunity_repository.save(opportunity)
+                if not opportunity:
+                    # Convert PublishedOpportunity to Opportunity for the cooptation
+                    opportunity = Opportunity(
+                        id=published.id,
+                        title=published.title,
+                        reference=f"PUB-{published.boond_opportunity_id}",
+                        external_id=published.boond_opportunity_id,
+                        description=published.description,
+                        skills=published.skills,
+                        end_date=published.end_date,
+                        is_active=published.status.is_visible_to_consultants,
+                        is_shared=True,
+                        owner_id=published.published_by,
+                        created_at=published.created_at,
+                        updated_at=published.updated_at,
+                    )
+                    # Save to opportunities table for foreign key constraint
+                    opportunity = await self.opportunity_repository.save(opportunity)
 
         if not opportunity:
             raise OpportunityNotFoundError(str(command.opportunity_id))
