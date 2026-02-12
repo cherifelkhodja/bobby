@@ -502,7 +502,7 @@ function EditOpportunityModal({
           .split(',')
           .map((s) => s.trim())
           .filter(Boolean),
-        end_date: endDate || null,
+        end_date: endDate,
       }),
     onSuccess: () => {
       toast.success('Opportunite mise a jour');
@@ -543,10 +543,11 @@ function EditOpportunityModal({
           />
         </div>
         <Input
-          label="Date de fin"
+          label="Date de fin *"
           type="date"
           value={endDate}
           onChange={(e) => setEndDate(e.target.value)}
+          required
         />
         <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-700">
           <Button variant="secondary" onClick={onClose}>
@@ -555,7 +556,7 @@ function EditOpportunityModal({
           <Button
             onClick={() => updateMutation.mutate()}
             isLoading={updateMutation.isPending}
-            disabled={!title.trim() || !description.trim()}
+            disabled={!title.trim() || !description.trim() || !endDate}
           >
             Enregistrer
           </Button>
