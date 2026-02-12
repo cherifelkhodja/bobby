@@ -187,6 +187,8 @@ export interface Cooptation {
   candidate_email: string;
   candidate_phone: string | null;
   candidate_daily_rate: number | null;
+  candidate_cv_filename: string | null;
+  candidate_note: string | null;
   opportunity_id: string;
   opportunity_title: string;
   opportunity_reference: string;
@@ -199,6 +201,12 @@ export interface Cooptation {
   status_history: StatusChange[];
   submitted_at: string;
   updated_at: string;
+}
+
+export interface CvDownloadUrlResponse {
+  url: string;
+  filename: string;
+  expires_in: number;
 }
 
 export interface CooptationListResponse {

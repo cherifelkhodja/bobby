@@ -27,7 +27,7 @@
 | Panel Admin | ✅ Done | Users, invitations, Boond, templates |
 | Dark Mode | ✅ Done | System/Light/Dark |
 | CV Generator | ✅ Done | PDF/DOCX → Word via Claude, templates locaux (Gemini/Craftmania) |
-| Opportunités publiées | ✅ Done | Anonymisation IA |
+| Opportunités publiées | ✅ Done | Anonymisation IA, cooptation avec CV |
 | Quotation Generator (Thales) | ✅ Done | Excel + PDF merge |
 | Recrutement RH | ✅ Done | Turnover-IT, matching IA |
 | Rate Limiting | ✅ Done | Redis + slowapi |
@@ -144,6 +144,19 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-12
+- **feat(cooptation)**: Upload CV obligatoire + détail candidat avec téléchargement CV
+  - **Backend** : `create_cooptation` accepte `multipart/form-data` avec CV (PDF/DOCX, max 10 Mo)
+  - **Backend** : Validation CV (extension, MIME type, taille), upload S3 avec clé `cooptations/{opp_id}/{Prénom NOM - YYYYMMDD.ext}`
+  - **Backend** : Nouvel endpoint `GET /cooptations/{id}/cv` retourne presigned URL S3 (1h), accès admin + commercial owner
+  - **Backend** : `CreateCooptationCommand` étendu avec `cv_s3_key` et `cv_filename`
+  - **Backend** : Read model + schema enrichis : `candidate_cv_filename`, `candidate_note`
+  - **Frontend** : `CreateCooptationForm` et `ProposeCandidate` avec upload CV drag-and-drop (obligatoire)
+  - **Frontend** : API client `cooptationsApi.create()` envoie FormData, `getCvDownloadUrl()` ajouté
+  - **Frontend** : `CandidateDrawer` slide-over dans `PublishedOpportunityDetail` : nom, statut, email, tel, TJM, CV download, note, historique
+  - **Frontend** : Table cooptations cliquable avec colonne CV
+  - Fichiers modifiés : `cooptations.py` (route + use case), `cooptation.py` (schema + read model), `cooptations.ts`, `CreateCooptationForm.tsx`, `ProposeCandidate.tsx`, `PublishedOpportunityDetail.tsx`, `types/index.ts`
+- **fix(ui)**: Label rôle "Consultant" → "Utilisateur" sur la page d'inscription après invitation
+  - `AcceptInvitation.tsx` : `roleLabels.user` corrigé de "Consultant" à "Utilisateur" (cohérent avec admin panel)
 - **feat(cooptation)**: Page dédiée de proposition de candidat (`/opportunities/:id/proposer`)
   - Nouvelle page `ProposeCandidate.tsx` avec layout 2 colonnes : résumé opportunité + formulaire + liste des candidats déjà proposés
   - Backend : ajout `list_by_opportunity` et `count_by_opportunity` au `CooptationRepository`, filtre `opportunity_id` sur `GET /cooptations`

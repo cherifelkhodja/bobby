@@ -32,7 +32,7 @@ const acceptInvitationSchema = z
 type AcceptInvitationFormData = z.infer<typeof acceptInvitationSchema>;
 
 const roleLabels: Record<string, string> = {
-  user: 'Consultant',
+  user: 'Utilisateur',
   commercial: 'Commercial',
   rh: 'Ressources Humaines',
   admin: 'Administrateur',

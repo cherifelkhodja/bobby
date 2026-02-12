@@ -40,6 +40,8 @@ class CreateCooptationCommand:
     candidate_phone: str | None = None
     candidate_daily_rate: float | None = None
     candidate_note: str | None = None
+    cv_s3_key: str | None = None
+    cv_filename: str | None = None
 
 
 class CreateCooptationUseCase:
@@ -119,7 +121,13 @@ class CreateCooptationUseCase:
                 phone=Phone(command.candidate_phone) if command.candidate_phone else None,
                 daily_rate=command.candidate_daily_rate,
                 note=command.candidate_note,
+                cv_filename=command.cv_filename,
+                cv_path=command.cv_s3_key,
             )
+            candidate = await self.candidate_repository.save(candidate)
+        elif command.cv_s3_key:
+            # Update CV even if candidate already exists
+            candidate.update_cv(command.cv_filename or "", command.cv_s3_key)
             candidate = await self.candidate_repository.save(candidate)
 
         # Create candidate in Boond if not exists
@@ -187,6 +195,8 @@ class CreateCooptationUseCase:
                 str(cooptation.candidate.phone) if cooptation.candidate.phone else None
             ),
             candidate_daily_rate=cooptation.candidate.daily_rate,
+            candidate_cv_filename=cooptation.candidate.cv_filename,
+            candidate_note=cooptation.candidate.note,
             opportunity_id=str(cooptation.opportunity.id),
             opportunity_title=cooptation.opportunity.title,
             opportunity_reference=cooptation.opportunity.reference,
@@ -291,6 +301,8 @@ class ListCooptationsUseCase:
                 str(cooptation.candidate.phone) if cooptation.candidate.phone else None
             ),
             candidate_daily_rate=cooptation.candidate.daily_rate,
+            candidate_cv_filename=cooptation.candidate.cv_filename,
+            candidate_note=cooptation.candidate.note,
             opportunity_id=str(cooptation.opportunity.id),
             opportunity_title=cooptation.opportunity.title,
             opportunity_reference=cooptation.opportunity.reference,
@@ -340,6 +352,8 @@ class GetCooptationUseCase:
                 str(cooptation.candidate.phone) if cooptation.candidate.phone else None
             ),
             candidate_daily_rate=cooptation.candidate.daily_rate,
+            candidate_cv_filename=cooptation.candidate.cv_filename,
+            candidate_note=cooptation.candidate.note,
             opportunity_id=str(cooptation.opportunity.id),
             opportunity_title=cooptation.opportunity.title,
             opportunity_reference=cooptation.opportunity.reference,
@@ -424,6 +438,8 @@ class UpdateCooptationStatusUseCase:
                 str(cooptation.candidate.phone) if cooptation.candidate.phone else None
             ),
             candidate_daily_rate=cooptation.candidate.daily_rate,
+            candidate_cv_filename=cooptation.candidate.cv_filename,
+            candidate_note=cooptation.candidate.note,
             opportunity_id=str(cooptation.opportunity.id),
             opportunity_title=cooptation.opportunity.title,
             opportunity_reference=cooptation.opportunity.reference,

@@ -28,6 +28,8 @@ class CooptationReadModel(BaseModel):
     candidate_email: str
     candidate_phone: str | None = None
     candidate_daily_rate: float | None = None
+    candidate_cv_filename: str | None = None
+    candidate_note: str | None = None
     opportunity_id: str
     opportunity_title: str
     opportunity_reference: str

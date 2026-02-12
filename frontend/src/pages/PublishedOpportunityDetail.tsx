@@ -3,9 +3,11 @@
  * Accessible by admin and commercial users.
  */
 
+import { Fragment, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { Dialog, Transition } from '@headlessui/react';
 import {
   ChevronLeft,
   Loader2,
@@ -20,6 +22,12 @@ import {
   User,
   Mail,
   Phone,
+  Download,
+  X,
+  Euro,
+  MessageSquare,
+  Clock,
+  ChevronRight,
 } from 'lucide-react';
 import {
   getPublishedOpportunity,
@@ -27,9 +35,10 @@ import {
   reopenOpportunity,
 } from '../api/publishedOpportunities';
 import { cooptationsApi } from '../api/cooptations';
+import { getErrorMessage } from '../api/client';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import type { PublishedOpportunityStatus } from '../types';
+import type { Cooptation, PublishedOpportunityStatus } from '../types';
 
 const STATUS_BADGES: Record<PublishedOpportunityStatus, { label: string; bgClass: string; textClass: string }> = {
   draft: {
@@ -38,12 +47,12 @@ const STATUS_BADGES: Record<PublishedOpportunityStatus, { label: string; bgClass
     textClass: 'text-gray-800 dark:text-gray-300',
   },
   published: {
-    label: 'Publiée',
+    label: 'Publiee',
     bgClass: 'bg-green-100 dark:bg-green-900/30',
     textClass: 'text-green-800 dark:text-green-300',
   },
   closed: {
-    label: 'Clôturée',
+    label: 'Cloturee',
     bgClass: 'bg-red-100 dark:bg-red-900/30',
     textClass: 'text-red-800 dark:text-red-300',
   },
@@ -66,21 +75,258 @@ const COOPTATION_STATUS_BADGES: Record<string, { label: string; bgClass: string;
     textClass: 'text-purple-800 dark:text-purple-300',
   },
   accepted: {
-    label: 'Accepté',
+    label: 'Accepte',
     bgClass: 'bg-green-100 dark:bg-green-900/30',
     textClass: 'text-green-800 dark:text-green-300',
   },
   rejected: {
-    label: 'Refusé',
+    label: 'Refuse',
     bgClass: 'bg-red-100 dark:bg-red-900/30',
     textClass: 'text-red-800 dark:text-red-300',
   },
 };
 
+function CandidateDrawer({
+  cooptation,
+  isOpen,
+  onClose,
+}: {
+  cooptation: Cooptation | null;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadCv = async () => {
+    if (!cooptation) return;
+    setIsDownloading(true);
+    try {
+      const { url } = await cooptationsApi.getCvDownloadUrl(cooptation.id);
+      window.open(url, '_blank');
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  if (!cooptation) return null;
+
+  const statusBadge = COOPTATION_STATUS_BADGES[cooptation.status] || COOPTATION_STATUS_BADGES.pending;
+
+  return (
+    <Transition appear show={isOpen} as={Fragment}>
+      <Dialog as="div" className="relative z-50" onClose={onClose}>
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/25" />
+        </Transition.Child>
+
+        <div className="fixed inset-0 overflow-hidden">
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+              <Transition.Child
+                as={Fragment}
+                enter="transform transition ease-in-out duration-300"
+                enterFrom="translate-x-full"
+                enterTo="translate-x-0"
+                leave="transform transition ease-in-out duration-200"
+                leaveFrom="translate-x-0"
+                leaveTo="translate-x-full"
+              >
+                <Dialog.Panel className="pointer-events-auto w-screen max-w-md">
+                  <div className="flex h-full flex-col bg-white dark:bg-gray-900 shadow-xl">
+                    {/* Header */}
+                    <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
+                            <User className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+                          </div>
+                          <div>
+                            <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                              {cooptation.candidate_name}
+                            </Dialog.Title>
+                            <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${statusBadge.bgClass} ${statusBadge.textClass}`}>
+                              {statusBadge.label}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={onClose}
+                          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+                      {/* Contact */}
+                      <div>
+                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                          Contact
+                        </h3>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Mail className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <a
+                              href={`mailto:${cooptation.candidate_email}`}
+                              className="text-primary-600 dark:text-primary-400 hover:underline"
+                            >
+                              {cooptation.candidate_email}
+                            </a>
+                          </div>
+                          {cooptation.candidate_phone && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                              <a
+                                href={`tel:${cooptation.candidate_phone}`}
+                                className="text-gray-700 dark:text-gray-300 hover:underline"
+                              >
+                                {cooptation.candidate_phone}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* TJM */}
+                      {cooptation.candidate_daily_rate && (
+                        <div>
+                          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                            TJM souhaite
+                          </h3>
+                          <div className="flex items-center gap-2 text-sm">
+                            <Euro className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <span className="text-gray-900 dark:text-gray-100 font-medium">
+                              {cooptation.candidate_daily_rate} EUR/jour
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* CV */}
+                      {cooptation.candidate_cv_filename && (
+                        <div>
+                          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                            CV
+                          </h3>
+                          <button
+                            onClick={handleDownloadCv}
+                            disabled={isDownloading}
+                            className="w-full flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+                          >
+                            <FileText className="h-5 w-5 text-primary-600 dark:text-primary-400 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                {cooptation.candidate_cv_filename}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Cliquez pour telecharger
+                              </p>
+                            </div>
+                            {isDownloading ? (
+                              <Loader2 className="h-4 w-4 text-gray-400 animate-spin flex-shrink-0" />
+                            ) : (
+                              <Download className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            )}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Note */}
+                      {cooptation.candidate_note && (
+                        <div>
+                          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                            Note
+                          </h3>
+                          <div className="flex gap-2 text-sm">
+                            <MessageSquare className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                              {cooptation.candidate_note}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Submitter */}
+                      <div>
+                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                          Soumis par
+                        </h3>
+                        <div className="flex items-center gap-2 text-sm">
+                          <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          <span className="text-gray-700 dark:text-gray-300">
+                            {cooptation.submitter_name || '-'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm mt-1">
+                          <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {new Date(cooptation.submitted_at).toLocaleDateString('fr-FR', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Status history */}
+                      {cooptation.status_history.length > 0 && (
+                        <div>
+                          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                            Historique
+                          </h3>
+                          <div className="space-y-2">
+                            {cooptation.status_history.map((change, i) => {
+                              const toBadge = COOPTATION_STATUS_BADGES[change.to_status] || COOPTATION_STATUS_BADGES.pending;
+                              return (
+                                <div key={i} className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                  <ChevronRight className="h-3 w-3 flex-shrink-0" />
+                                  <span className={`px-1.5 py-0.5 rounded-full ${toBadge.bgClass} ${toBadge.textClass}`}>
+                                    {toBadge.label}
+                                  </span>
+                                  <span>
+                                    {new Date(change.changed_at).toLocaleDateString('fr-FR')}
+                                  </span>
+                                  {change.comment && (
+                                    <span className="text-gray-600 dark:text-gray-400 italic truncate">
+                                      - {change.comment}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+}
+
 export default function PublishedOpportunityDetail() {
   const { publishedId } = useParams<{ publishedId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [selectedCooptation, setSelectedCooptation] = useState<Cooptation | null>(null);
 
   // Fetch published opportunity
   const {
@@ -106,10 +352,10 @@ export default function PublishedOpportunityDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['published-opportunity', publishedId] });
       queryClient.invalidateQueries({ queryKey: ['my-boond-opportunities'] });
-      toast.success('Opportunité clôturée');
+      toast.success('Opportunite cloturee');
     },
     onError: () => {
-      toast.error('Erreur lors de la clôture');
+      toast.error('Erreur lors de la cloture');
     },
   });
 
@@ -119,10 +365,10 @@ export default function PublishedOpportunityDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['published-opportunity', publishedId] });
       queryClient.invalidateQueries({ queryKey: ['my-boond-opportunities'] });
-      toast.success('Opportunité réactivée');
+      toast.success('Opportunite reactivee');
     },
     onError: () => {
-      toast.error('Erreur lors de la réactivation');
+      toast.error('Erreur lors de la reactivation');
     },
   });
 
@@ -139,13 +385,13 @@ export default function PublishedOpportunityDetail() {
       <div className="text-center py-12">
         <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-          Opportunité non trouvée
+          Opportunite non trouvee
         </h2>
         <p className="text-gray-600 dark:text-gray-400 mb-4">
-          Cette opportunité n'existe pas ou a été supprimée.
+          Cette opportunite n'existe pas ou a ete supprimee.
         </p>
         <Button variant="outline" onClick={() => navigate('/my-boond-opportunities')}>
-          Retour aux opportunités
+          Retour aux opportunites
         </Button>
       </div>
     );
@@ -162,7 +408,7 @@ export default function PublishedOpportunityDetail() {
         className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
       >
         <ChevronLeft className="h-4 w-4" />
-        Retour aux opportunités
+        Retour aux opportunites
       </Link>
 
       {/* Header */}
@@ -178,9 +424,9 @@ export default function PublishedOpportunityDetail() {
               </span>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Réf Boond: {opportunity.boond_opportunity_id}
+              Ref Boond: {opportunity.boond_opportunity_id}
               {' · '}
-              Publiée le {new Date(opportunity.created_at).toLocaleDateString('fr-FR')}
+              Publiee le {new Date(opportunity.created_at).toLocaleDateString('fr-FR')}
             </p>
           </div>
           <div className="flex gap-2 flex-shrink-0">
@@ -193,7 +439,7 @@ export default function PublishedOpportunityDetail() {
                 leftIcon={<XCircle className="h-4 w-4" />}
                 className="text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/20"
               >
-                {closeMutation.isPending ? 'Fermeture...' : 'Clôturer'}
+                {closeMutation.isPending ? 'Fermeture...' : 'Cloturer'}
               </Button>
             )}
             {opportunity.status === 'closed' && (
@@ -204,7 +450,7 @@ export default function PublishedOpportunityDetail() {
                 disabled={reopenMutation.isPending}
                 leftIcon={<RefreshCw className="h-4 w-4" />}
               >
-                {reopenMutation.isPending ? 'Réactivation...' : 'Réactiver'}
+                {reopenMutation.isPending ? 'Reactivation...' : 'Reactiver'}
               </Button>
             )}
           </div>
@@ -220,7 +466,7 @@ export default function PublishedOpportunityDetail() {
           <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
             {opportunity.boond_opportunity_id}
           </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Réf Boond</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Ref Boond</p>
         </Card>
         <Card className="!p-3 text-center">
           <div className="flex items-center justify-center mb-1">
@@ -229,7 +475,7 @@ export default function PublishedOpportunityDetail() {
           <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
             {opportunity.skills.length}
           </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Compétences</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Competences</p>
         </Card>
         <Card className="!p-3 text-center">
           <div className="flex items-center justify-center mb-1">
@@ -259,7 +505,7 @@ export default function PublishedOpportunityDetail() {
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="h-4 w-4 text-gray-500 dark:text-gray-400" />
             <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              Compétences extraites
+              Competences extraites
             </h2>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -280,7 +526,7 @@ export default function PublishedOpportunityDetail() {
         <div className="flex items-center gap-2 mb-3">
           <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />
           <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            Description anonymisée
+            Description anonymisee
           </h2>
         </div>
         <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -310,7 +556,7 @@ export default function PublishedOpportunityDetail() {
           <div className="text-center py-8">
             <Users className="h-8 w-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Aucune cooptation pour cette opportunité
+              Aucune cooptation pour cette opportunite
             </p>
           </div>
         ) : (
@@ -328,6 +574,9 @@ export default function PublishedOpportunityDetail() {
                     TJM
                   </th>
                   <th className="text-left py-2 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
+                    CV
+                  </th>
+                  <th className="text-left py-2 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
                     Statut
                   </th>
                   <th className="text-left py-2 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
@@ -340,11 +589,12 @@ export default function PublishedOpportunityDetail() {
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {cooptations.map((cooptation) => {
-                  const statusBadge = COOPTATION_STATUS_BADGES[cooptation.status] || COOPTATION_STATUS_BADGES.pending;
+                  const coopStatusBadge = COOPTATION_STATUS_BADGES[cooptation.status] || COOPTATION_STATUS_BADGES.pending;
                   return (
                     <tr
                       key={cooptation.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800/30"
+                      onClick={() => setSelectedCooptation(cooptation)}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800/30 cursor-pointer"
                     >
                       <td className="py-2.5 px-4">
                         <div className="flex items-center gap-2">
@@ -372,12 +622,22 @@ export default function PublishedOpportunityDetail() {
                       </td>
                       <td className="py-2.5 px-4 text-gray-600 dark:text-gray-400">
                         {cooptation.candidate_daily_rate
-                          ? `${cooptation.candidate_daily_rate} €/j`
+                          ? `${cooptation.candidate_daily_rate} EUR/j`
                           : '-'}
                       </td>
                       <td className="py-2.5 px-4">
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusBadge.bgClass} ${statusBadge.textClass}`}>
-                          {statusBadge.label}
+                        {cooptation.candidate_cv_filename ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400">
+                            <FileText className="h-3 w-3" />
+                            CV
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-4">
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${coopStatusBadge.bgClass} ${coopStatusBadge.textClass}`}>
+                          {coopStatusBadge.label}
                         </span>
                       </td>
                       <td className="py-2.5 px-4 text-gray-600 dark:text-gray-400 text-xs">
@@ -394,6 +654,13 @@ export default function PublishedOpportunityDetail() {
           </div>
         )}
       </Card>
+
+      {/* Candidate detail drawer */}
+      <CandidateDrawer
+        cooptation={selectedCooptation}
+        isOpen={!!selectedCooptation}
+        onClose={() => setSelectedCooptation(null)}
+      />
     </div>
   );
 }

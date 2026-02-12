@@ -15,6 +15,9 @@ import {
   User,
   Mail,
   Phone,
+  Upload,
+  X,
+  FileText,
 } from 'lucide-react';
 
 import { getPublishedOpportunity } from '../api/publishedOpportunities';
@@ -39,11 +42,26 @@ const cooptationSchema = z.object({
 
 type CooptationFormData = z.infer<typeof cooptationSchema>;
 
+const ALLOWED_EXTENSIONS = ['.pdf', '.docx'];
+const ALLOWED_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
+const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+}
+
 export default function ProposeCandidate() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(true);
+  const [cvFile, setCvFile] = useState<File | null>(null);
+  const [cvError, setCvError] = useState<string | null>(null);
 
   // Fetch opportunity
   const {
@@ -85,6 +103,8 @@ export default function ProposeCandidate() {
       queryClient.invalidateQueries({ queryKey: ['my-stats'] });
       toast.success('Cooptation soumise avec succes !');
       reset();
+      setCvFile(null);
+      setCvError(null);
       setShowForm(false);
     },
     onError: (error) => {
@@ -92,11 +112,40 @@ export default function ProposeCandidate() {
     },
   });
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setCvError(null);
+    if (!file) return;
+
+    const hasValidExtension = ALLOWED_EXTENSIONS.some((ext) =>
+      file.name.toLowerCase().endsWith(ext)
+    );
+    if (!ALLOWED_TYPES.includes(file.type) && !hasValidExtension) {
+      setCvError('Format non supporte. Utilisez PDF ou DOCX.');
+      return;
+    }
+    if (file.size > MAX_SIZE) {
+      setCvError('Fichier trop volumineux. Maximum 10 Mo.');
+      return;
+    }
+    setCvFile(file);
+  };
+
+  const removeFile = () => {
+    setCvFile(null);
+    setCvError(null);
+  };
+
   const onSubmit = (data: CooptationFormData) => {
     if (!id) return;
+    if (!cvFile) {
+      setCvError('Le CV est obligatoire');
+      return;
+    }
     mutation.mutate({
       opportunity_id: id,
       ...data,
+      cv: cvFile,
     });
   };
 
@@ -292,6 +341,57 @@ export default function ProposeCandidate() {
                   error={errors.candidate_daily_rate?.message}
                   {...register('candidate_daily_rate')}
                 />
+
+                {/* CV Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    CV <span className="text-red-500">*</span>
+                  </label>
+                  {cvFile ? (
+                    <div className="flex items-center gap-3 p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg">
+                      <FileText className="h-5 w-5 text-primary-600 dark:text-primary-400 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                          {cvFile.name}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatFileSize(cvFile.size)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={removeFile}
+                        className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-primary-400 dark:hover:border-primary-500 transition-colors bg-gray-50 dark:bg-gray-800/30">
+                      <div className="flex flex-col items-center">
+                        <Upload className="h-6 w-6 text-gray-400 mb-1" />
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          <span className="font-medium text-primary-600 dark:text-primary-400">
+                            Cliquez pour choisir
+                          </span>{' '}
+                          ou glissez-deposez
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          PDF ou DOCX (max 10 Mo)
+                        </p>
+                      </div>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        onChange={handleFileChange}
+                      />
+                    </label>
+                  )}
+                  {cvError && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{cvError}</p>
+                  )}
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
