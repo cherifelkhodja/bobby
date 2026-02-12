@@ -56,14 +56,23 @@ const DISPLAY_MODE_OPTIONS: { value: DisplayMode; label: string; icon: typeof La
   { value: 'inline', label: 'Expansion', icon: Layout },
 ];
 
-// State configuration for open/active opportunities only (0, 5, 6, 7, 10)
+// All Boond opportunity states
 const STATE_CONFIG: Record<number, { name: string; bgClass: string; textClass: string }> = {
   0: { name: 'En cours', bgClass: 'bg-blue-100 dark:bg-blue-900/30', textClass: 'text-blue-700 dark:text-blue-400' },
+  1: { name: 'Gagné', bgClass: 'bg-green-100 dark:bg-green-900/30', textClass: 'text-green-700 dark:text-green-400' },
+  2: { name: 'Perdu', bgClass: 'bg-red-100 dark:bg-red-900/30', textClass: 'text-red-700 dark:text-red-400' },
+  3: { name: 'Abandonné', bgClass: 'bg-gray-200 dark:bg-gray-700', textClass: 'text-gray-700 dark:text-gray-400' },
+  4: { name: 'Gagné attente contrat', bgClass: 'bg-emerald-100 dark:bg-emerald-900/30', textClass: 'text-emerald-700 dark:text-emerald-400' },
   5: { name: 'Piste identifiée', bgClass: 'bg-yellow-100 dark:bg-yellow-900/30', textClass: 'text-yellow-700 dark:text-yellow-400' },
   6: { name: 'Récurrent', bgClass: 'bg-teal-100 dark:bg-teal-900/30', textClass: 'text-teal-700 dark:text-teal-400' },
   7: { name: 'AO ouvert', bgClass: 'bg-cyan-100 dark:bg-cyan-900/30', textClass: 'text-cyan-700 dark:text-cyan-400' },
+  8: { name: 'AO clos', bgClass: 'bg-indigo-100 dark:bg-indigo-900/30', textClass: 'text-indigo-700 dark:text-indigo-400' },
+  9: { name: 'Reporté', bgClass: 'bg-pink-100 dark:bg-pink-900/30', textClass: 'text-pink-700 dark:text-pink-400' },
   10: { name: 'Besoin en avant de phase', bgClass: 'bg-sky-100 dark:bg-sky-900/30', textClass: 'text-sky-700 dark:text-sky-400' },
 };
+
+// Default state filter: En cours (0), Récurrent (6), Besoin en avant de phase (10)
+const DEFAULT_STATE_FILTER = new Set([0, 6, 10]);
 
 const PUBLISHED_STATUS_BADGES: Record<PublishedOpportunityStatus, { label: string; bgClass: string; textClass: string }> = {
   draft: {
@@ -227,7 +236,7 @@ function EditPublishedOpportunityModal({
           .split(',')
           .map((s) => s.trim())
           .filter(Boolean),
-        end_date: endDate || null,
+        end_date: endDate,
       }),
     onSuccess: () => {
       toast.success('Opportunite mise a jour');
@@ -269,12 +278,17 @@ function EditPublishedOpportunityModal({
             placeholder="React, TypeScript, Node.js"
           />
         </div>
-        <Input
-          label="Date de fin"
-          type="date"
-          value={endDate}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndDate(e.target.value)}
-        />
+        <div>
+          <Input
+            label="Date de fin *"
+            type="date"
+            value={endDate}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndDate(e.target.value)}
+          />
+          {!endDate && (
+            <p className="text-xs text-red-500 mt-1">La date de fin est obligatoire</p>
+          )}
+        </div>
         <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-700">
           <Button variant="secondary" onClick={onClose}>
             Annuler
@@ -282,7 +296,7 @@ function EditPublishedOpportunityModal({
           <Button
             onClick={() => updateMutation.mutate()}
             isLoading={updateMutation.isPending}
-            disabled={!title.trim() || !description.trim()}
+            disabled={!title.trim() || !description.trim() || !endDate}
           >
             Enregistrer
           </Button>
@@ -295,7 +309,7 @@ function EditPublishedOpportunityModal({
 export function MyBoondOpportunities() {
   const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState('');
-  const [stateFilter, setStateFilter] = useState<number | 'all'>('all');
+  const [stateFilter, setStateFilter] = useState<number | 'all' | 'default'>('default');
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [managerFilter, setManagerFilter] = useState<string>('all');
   const [publicationFilter, setPublicationFilter] = useState<string>('all');
@@ -313,6 +327,7 @@ export function MyBoondOpportunities() {
   const [preview, setPreview] = useState<AnonymizedPreview | null>(null);
   const [editedTitle, setEditedTitle] = useState('');
   const [editedDescription, setEditedDescription] = useState('');
+  const [editedEndDate, setEditedEndDate] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
@@ -428,7 +443,11 @@ export function MyBoondOpportunities() {
         if (!matchesSearch) return false;
       }
 
-      if (stateFilter !== 'all' && opp.state !== stateFilter) return false;
+      if (stateFilter === 'default') {
+        if (opp.state === null || !DEFAULT_STATE_FILTER.has(opp.state)) return false;
+      } else if (stateFilter !== 'all' && opp.state !== stateFilter) {
+        return false;
+      }
 
       if (clientFilter !== 'all') {
         const clientName = opp.company_name || 'Sans client';
@@ -468,11 +487,13 @@ export function MyBoondOpportunities() {
     setAnonymizeOpportunity(opportunity);
     setAnonymizeDetail(null);
     setErrorMessage(null);
+    setEditedEndDate(opportunity.end_date || '');
     setStep('loading-detail');
 
     try {
       const detail = await getBoondOpportunityDetail(opportunity.id);
       setAnonymizeDetail(detail);
+      if (detail.end_date) setEditedEndDate(detail.end_date);
       setStep('anonymizing');
 
       const fullDescription = [detail.description, detail.criteria]
@@ -508,7 +529,7 @@ export function MyBoondOpportunities() {
   };
 
   const handlePublish = () => {
-    if (!anonymizeOpportunity_ || !preview) return;
+    if (!anonymizeOpportunity_ || !preview || !editedEndDate) return;
     setStep('publishing');
     setErrorMessage(null);
 
@@ -523,7 +544,7 @@ export function MyBoondOpportunities() {
         company_name: anonymizeOpportunity_.company_name,
         description: anonymizeOpportunity_.description,
       },
-      end_date: anonymizeOpportunity_.end_date || null,
+      end_date: editedEndDate,
     });
   };
 
@@ -535,6 +556,7 @@ export function MyBoondOpportunities() {
     setErrorMessage(null);
     setEditedTitle('');
     setEditedDescription('');
+    setEditedEndDate('');
   };
 
   const getStateBadge = (state: number | null, stateName: string | null) => {
@@ -637,9 +659,14 @@ export function MyBoondOpportunities() {
 
           <select
             value={stateFilter}
-            onChange={(e) => setStateFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === 'all' || val === 'default') setStateFilter(val);
+              else setStateFilter(parseInt(val));
+            }}
             className="min-w-[160px] px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           >
+            <option value="default">En cours, Récurrent, Avant de phase</option>
             <option value="all">Tous les états ({stats.total})</option>
             {availableStates.map(({ state, count }) => (
               <option key={state} value={state}>
@@ -1079,6 +1106,22 @@ export function MyBoondOpportunities() {
               </div>
             )}
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Date de fin <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={editedEndDate}
+                onChange={(e) => setEditedEndDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 text-sm"
+                required
+              />
+              {!editedEndDate && (
+                <p className="text-xs text-red-500 mt-1">La date de fin est obligatoire</p>
+              )}
+            </div>
+
             <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button variant="outline" onClick={handleRegenerate}>
                 Régénérer
@@ -1086,7 +1129,7 @@ export function MyBoondOpportunities() {
               <Button variant="outline" onClick={handleCloseModal}>
                 Annuler
               </Button>
-              <Button onClick={handlePublish} className="flex-1">
+              <Button onClick={handlePublish} className="flex-1" disabled={!editedEndDate}>
                 Publier
               </Button>
             </div>

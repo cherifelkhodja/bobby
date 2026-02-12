@@ -144,6 +144,22 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-12
+- **feat(published-opportunities)**: Filtrage par défaut et tous les états Boond
+  - Backend : `ALL_OPPORTUNITY_STATES` ajouté au client Boond (11 états : 0-10)
+  - Backend : `get_manager_opportunities` utilise désormais tous les états par défaut
+  - Frontend : `STATE_CONFIG` étendu avec tous les états (En cours, Gagné, Perdu, Abandonné, etc.)
+  - Frontend : Filtre par défaut "En cours, Récurrent, Avant de phase" (états 0, 6, 10) au lieu de "Tous"
+  - Fichiers modifiés : `client.py` (Boond), `MyBoondOpportunities.tsx`
+- **feat(published-opportunities)**: Date de fin obligatoire
+  - Backend : `end_date` obligatoire dans `PublishRequest` et `UpdatePublishedOpportunityRequest`
+  - Frontend : Champ date de fin requis dans la modal de publication et d'édition
+  - Frontend : Types `PublishRequest` et `UpdatePublishedOpportunityData` mis à jour
+  - Fichiers modifiés : schemas `published_opportunity.py`, `MyBoondOpportunities.tsx`, `types/index.ts`
+- **feat(published-opportunities)**: Fermeture automatique des opportunités expirées
+  - Backend : `close_expired()` dans `PublishedOpportunityRepository` (UPDATE atomique)
+  - Backend : Appelé automatiquement dans `ListPublishedOpportunitiesUseCase` et `GetMyBoondOpportunitiesUseCase`
+  - Ferme les opportunités publiées dont `end_date < today()`
+  - Fichiers modifiés : `published_opportunity_repository.py`, `published_opportunities.py` (use cases)
 - **feat(hr)**: Compteur de vues sur les pages de candidature publiques `/postuler/{token}`
   - Backend : Migration 023 ajoute `view_count` (integer, default 0) à `job_postings`
   - Backend : Incrémentation atomique du compteur à chaque `GET /api/v1/postuler/{token}`

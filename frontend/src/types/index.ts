@@ -341,7 +341,7 @@ export interface PublishRequest {
   skills: string[];
   original_title: string;
   original_data?: Record<string, unknown> | null;
-  end_date?: string | null;
+  end_date: string;
 }
 
 export interface PublishedOpportunity {
@@ -361,7 +361,7 @@ export interface UpdatePublishedOpportunityData {
   title: string;
   description: string;
   skills: string[];
-  end_date?: string | null;
+  end_date: string;
 }
 
 export interface PublishedOpportunityListResponse {

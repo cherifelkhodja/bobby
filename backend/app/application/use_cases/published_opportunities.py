@@ -50,6 +50,9 @@ class GetMyBoondOpportunitiesUseCase:
         if not is_admin and not manager_boond_id:
             raise ValueError("L'utilisateur n'a pas d'identifiant BoondManager configuré")
 
+        # Auto-close expired published opportunities
+        await self._published_repository.close_expired()
+
         # Fetch opportunities from Boond
         boond_opportunities = await self._boond_client.get_manager_opportunities(
             manager_boond_id=manager_boond_id,
@@ -284,6 +287,8 @@ class ListPublishedOpportunitiesUseCase:
     ) -> PublishedOpportunityListReadModel:
         """List published opportunities with pagination.
 
+        Auto-closes expired opportunities before listing.
+
         Args:
             page: Page number (1-indexed).
             page_size: Items per page.
@@ -292,6 +297,9 @@ class ListPublishedOpportunitiesUseCase:
         Returns:
             Paginated list of published opportunities.
         """
+        # Auto-close expired opportunities
+        await self._repository.close_expired()
+
         skip = (page - 1) * page_size
 
         opportunities = await self._repository.list_published(

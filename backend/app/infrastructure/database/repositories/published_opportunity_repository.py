@@ -1,9 +1,9 @@
 """Published Opportunity repository implementation."""
 
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities import PublishedOpportunity
@@ -205,6 +205,26 @@ class PublishedOpportunityRepository:
             }
             for row in result.all()
         }
+
+    async def close_expired(self) -> int:
+        """Close all published opportunities whose end_date has passed.
+
+        Returns the number of opportunities closed.
+        """
+        result = await self.session.execute(
+            update(PublishedOpportunityModel)
+            .where(
+                PublishedOpportunityModel.status == str(OpportunityStatus.PUBLISHED),
+                PublishedOpportunityModel.end_date.isnot(None),
+                PublishedOpportunityModel.end_date < date.today(),
+            )
+            .values(
+                status=str(OpportunityStatus.CLOSED),
+                updated_at=datetime.utcnow(),
+            )
+        )
+        await self.session.flush()
+        return result.rowcount
 
     def _to_entity(self, model: PublishedOpportunityModel) -> PublishedOpportunity:
         """Convert model to entity."""

@@ -486,6 +486,12 @@ class BoondClient:
     # 0: En cours, 5: Piste identifiée, 6: Récurrent, 7: AO ouvert, 10: Besoin en avant de phase
     ACTIVE_OPPORTUNITY_STATES = [0, 5, 6, 7, 10]
 
+    # All opportunity states for full visibility
+    # 0: En cours, 1: Gagné, 2: Perdu, 3: Abandonné, 4: Gagné attente contrat,
+    # 5: Piste identifiée, 6: Récurrent, 7: AO ouvert, 8: AO clos, 9: Reporté,
+    # 10: Besoin en avant de phase
+    ALL_OPPORTUNITY_STATES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=4),
@@ -511,7 +517,7 @@ class BoondClient:
             raise ValueError("manager_boond_id is required when fetch_all is False")
 
         if states is None:
-            states = self.ACTIVE_OPPORTUNITY_STATES
+            states = self.ALL_OPPORTUNITY_STATES
 
         async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
             if fetch_all:
