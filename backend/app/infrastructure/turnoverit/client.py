@@ -108,9 +108,7 @@ class TurnoverITClient:
                             ]
                             error_msg = "; ".join(errors)
                         else:
-                            error_msg = error_data.get(
-                                "hydra:description", response.text
-                            )
+                            error_msg = error_data.get("hydra:description", response.text)
                     elif isinstance(error_data.get("message"), list):
                         errors = [e.get("message", str(e)) for e in error_data["message"]]
                         error_msg = "; ".join(errors)

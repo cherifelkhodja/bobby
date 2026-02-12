@@ -438,10 +438,16 @@ class JobApplication:
         lines.append("")
 
         has_employee = self.employment_status in (
-            "employee", "both", "freelance,employee", "employee,freelance"
+            "employee",
+            "both",
+            "freelance,employee",
+            "employee,freelance",
         )
         has_freelance = self.employment_status in (
-            "freelance", "both", "freelance,employee", "employee,freelance"
+            "freelance",
+            "both",
+            "freelance,employee",
+            "employee,freelance",
         )
 
         if has_employee:
@@ -462,16 +468,8 @@ class JobApplication:
 
         if has_freelance:
             lines.append("Freelance :")
-            tjm_current_str = (
-                f"{int(self.tjm_current)}€/j"
-                if self.tjm_current
-                else "Non spécifié"
-            )
-            tjm_desired_str = (
-                f"{int(self.tjm_desired)}€/j"
-                if self.tjm_desired
-                else "Non spécifié"
-            )
+            tjm_current_str = f"{int(self.tjm_current)}€/j" if self.tjm_current else "Non spécifié"
+            tjm_desired_str = f"{int(self.tjm_desired)}€/j" if self.tjm_desired else "Non spécifié"
             lines.append(f"  TJM actuel : {tjm_current_str}")
             lines.append(f"  TJM souhaité : {tjm_desired_str}")
             lines.append("")

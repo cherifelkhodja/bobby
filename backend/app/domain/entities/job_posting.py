@@ -98,8 +98,8 @@ class ExperienceLevel(str, Enum):
 
 # Agency prefix mapping for Turnover-IT references
 _AGENCY_PREFIXES: dict[str, str] = {
-    "1": "GEM",   # Gemini
-    "5": "CRA",   # Craftmania
+    "1": "GEM",  # Gemini
+    "5": "CRA",  # Craftmania
 }
 _DEFAULT_PREFIX = "ESN"
 
