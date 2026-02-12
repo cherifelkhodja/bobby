@@ -11,10 +11,7 @@ import {
   Briefcase,
   CheckCircle,
   Clock,
-  Users,
   User,
-  Mail,
-  Phone,
   Upload,
   X,
   FileText,
@@ -26,9 +23,7 @@ import { getErrorMessage } from '../api/client';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Badge } from '../components/ui/Badge';
 import { PageSpinner } from '../components/ui/Spinner';
-import type { CooptationStatus } from '../types';
 
 const cooptationSchema = z.object({
   candidate_first_name: z.string().min(1, 'Prenom requis'),
@@ -74,13 +69,6 @@ export default function ProposeCandidate() {
     enabled: !!id,
   });
 
-  // Fetch existing cooptations for this opportunity
-  const { data: cooptationsData, isLoading: loadingCooptations } = useQuery({
-    queryKey: ['cooptations-by-opportunity', id],
-    queryFn: () => cooptationsApi.listByOpportunity(id!, { page: 1, page_size: 50 }),
-    enabled: !!id,
-  });
-
   // Form
   const {
     register,
@@ -98,7 +86,6 @@ export default function ProposeCandidate() {
   const mutation = useMutation({
     mutationFn: cooptationsApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cooptations-by-opportunity', id] });
       queryClient.invalidateQueries({ queryKey: ['my-cooptations'] });
       queryClient.invalidateQueries({ queryKey: ['my-stats'] });
       toast.success('Cooptation soumise avec succes !');
@@ -177,9 +164,6 @@ export default function ProposeCandidate() {
       </div>
     );
   }
-
-  const cooptations = cooptationsData?.items || [];
-  const totalCooptations = cooptationsData?.total || 0;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -439,79 +423,6 @@ export default function ProposeCandidate() {
             )}
           </Card>
 
-          {/* Submitted cooptations list */}
-          <Card>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary-500" />
-              Candidats proposes
-              {totalCooptations > 0 && (
-                <span className="ml-2 px-2.5 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-sm font-medium">
-                  {totalCooptations}
-                </span>
-              )}
-            </h2>
-
-            {loadingCooptations ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500" />
-              </div>
-            ) : cooptations.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="h-10 w-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Aucun candidat propose pour le moment.
-                </p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  Soyez le premier a proposer un profil !
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                {cooptations.map((cooptation) => (
-                  <div
-                    key={cooptation.id}
-                    className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex-shrink-0 w-9 h-9 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                        <User className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                          {cooptation.candidate_name}
-                        </p>
-                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                          <span className="flex items-center gap-1 truncate">
-                            <Mail className="h-3 w-3" />
-                            {cooptation.candidate_email}
-                          </span>
-                          {cooptation.candidate_phone && (
-                            <span className="flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              {cooptation.candidate_phone}
-                            </span>
-                          )}
-                        </div>
-                        {cooptation.submitter_name && (
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                            Propose par {cooptation.submitter_name} le {formatDate(cooptation.submitted_at)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {cooptation.candidate_daily_rate && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {cooptation.candidate_daily_rate} EUR/j
-                        </span>
-                      )}
-                      <Badge status={cooptation.status as CooptationStatus} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
         </div>
       </div>
     </div>
