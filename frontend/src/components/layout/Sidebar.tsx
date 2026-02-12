@@ -10,7 +10,7 @@ const navItems = [
 ];
 
 const commercialItems = [
-  { to: '/my-boond-opportunities', icon: Sparkles, label: 'Mes opportunités Boond' },
+  { to: '/my-boond-opportunities', icon: Sparkles, label: 'Gestion opportunités' },
 ];
 
 const toolsItems = [
@@ -18,7 +18,7 @@ const toolsItems = [
 ];
 
 const hrItems = [
-  { to: '/rh', icon: UserCheck, label: 'Recrutement' },
+  { to: '/rh', icon: UserCheck, label: 'Gestion des annonces' },
 ];
 
 const adminItems = [
