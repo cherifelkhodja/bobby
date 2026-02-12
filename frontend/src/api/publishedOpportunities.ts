@@ -102,3 +102,16 @@ export async function closeOpportunity(
   );
   return response.data;
 }
+
+/**
+ * Reopen a closed published opportunity.
+ * Can only be reopened by the publisher or an admin.
+ */
+export async function reopenOpportunity(
+  id: string
+): Promise<PublishedOpportunity> {
+  const response = await apiClient.patch<PublishedOpportunity>(
+    `${BASE_PATH}/${id}/reopen`
+  );
+  return response.data;
+}

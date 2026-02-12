@@ -275,6 +275,9 @@ export interface BoondOpportunity {
   manager_id: string | null;
   manager_name: string | null;
   is_published: boolean;
+  published_opportunity_id: string | null;
+  published_status: PublishedOpportunityStatus | null;
+  cooptations_count: number;
 }
 
 export interface BoondOpportunityListResponse {

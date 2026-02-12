@@ -152,6 +152,14 @@ docker-compose up # Start all services
   - Suppression des modals de cooptation dans `OpportunityDetail` et `Opportunities`
   - Route ajoutée dans `App.tsx`
   - Fichiers modifiés : `cooptation_repository.py`, `cooptations.py` (use case + route), `cooptations.ts` (API), `ProposeCandidate.tsx` (new), `OpportunityDetail.tsx`, `Opportunities.tsx`, `App.tsx`
+- **feat(published-opportunities)**: Redesign MyBoondOpportunities + Page détail opportunité publiée
+  - Présentation alignée sur le module RH (HRDashboard) : stats card, filtres (état, client, manager, publication), display mode selector (modal/drawer/split/inline)
+  - Table enrichie avec colonnes : Opportunité, Client, État Boond, Publication (badge), Cooptations (compteur), Action
+  - Backend : endpoint `PATCH /{id}/reopen` pour réactiver une opportunité clôturée
+  - Backend : `get_published_boond_data()` avec LEFT JOIN pour enrichir la réponse `/my-boond` (published_opportunity_id, published_status, cooptations_count)
+  - Nouvelle page `PublishedOpportunityDetail.tsx` : header avec actions (clôturer/réactiver), stats cards, compétences, description, table des cooptations
+  - Route `/my-boond-opportunities/:publishedId` ajoutée
+  - Fichiers modifiés : `published_opportunity_repository.py`, `published_opportunities.py` (use case + route), `published_opportunity.py` (entity + read model + schema), `types/index.ts`, `publishedOpportunities.ts`, `MyBoondOpportunities.tsx`, `PublishedOpportunityDetail.tsx` (new), `App.tsx`
 - **fix(published-opportunities)**: Correction 500 Internal Server Error lors de la publication d'opportunité
   - **Cause racine** : Mismatch de type colonne `skills` — migration 008 crée `ARRAY(varchar(100))` mais le modèle SQLAlchemy utilisait `JSON`, causant une erreur asyncpg lors de l'INSERT
   - Fix : `mapped_column(JSON)` → `mapped_column(ARRAY(String(100)))` dans `PublishedOpportunityModel`

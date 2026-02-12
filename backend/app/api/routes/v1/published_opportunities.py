@@ -27,6 +27,7 @@ from app.application.use_cases.published_opportunities import (
     GetPublishedOpportunityUseCase,
     ListPublishedOpportunitiesUseCase,
     PublishOpportunityUseCase,
+    ReopenOpportunityUseCase,
 )
 from app.dependencies import AppSettings, AppSettingsSvc, Boond, DbSession
 from app.infrastructure.anonymizer.gemini_anonymizer import GeminiAnonymizer
@@ -276,6 +277,46 @@ async def close_opportunity(
             raise HTTPException(
                 status_code=403,
                 detail="Vous ne pouvez fermer que vos propres opportunités",
+            )
+
+        result = await use_case.execute(
+            opportunity_id=opportunity_id,
+            user_id=opportunity.published_by if is_admin else user_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return PublishedOpportunityResponse(**result.model_dump())
+
+
+@router.patch("/{opportunity_id}/reopen", response_model=PublishedOpportunityResponse)
+async def reopen_opportunity(
+    opportunity_id: UUID,
+    db: DbSession,
+    user_id: AdminOrCommercialUser,
+):
+    """Reopen a closed published opportunity.
+
+    Can only be reopened by the publisher or an admin.
+    Requires admin or commercial role.
+    """
+    published_repo = PublishedOpportunityRepository(db)
+    user_repo = UserRepository(db)
+
+    user = await user_repo.get_by_id(user_id)
+    is_admin = user and user.role == "admin"
+
+    use_case = ReopenOpportunityUseCase(published_repo)
+
+    try:
+        opportunity = await published_repo.get_by_id(opportunity_id)
+        if not opportunity:
+            raise HTTPException(status_code=404, detail="Opportunité non trouvée")
+
+        if not is_admin and opportunity.published_by != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Vous ne pouvez réactiver que vos propres opportunités",
             )
 
         result = await use_case.execute(

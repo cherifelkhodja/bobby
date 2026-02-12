@@ -56,28 +56,33 @@ class GetMyBoondOpportunitiesUseCase:
             fetch_all=is_admin,
         )
 
-        # Get already published IDs
-        published_ids = await self._published_repository.get_published_boond_ids()
+        # Get enriched publication data (id, status, cooptations_count)
+        published_data = await self._published_repository.get_published_boond_data()
 
         # Build read models
-        items = [
-            BoondOpportunityReadModel(
-                id=opp["id"],
-                title=opp["title"],
-                reference=opp["reference"],
-                description=opp.get("description"),
-                start_date=opp.get("start_date"),
-                end_date=opp.get("end_date"),
-                company_name=opp.get("company_name"),
-                state=opp.get("state"),
-                state_name=opp.get("state_name"),
-                state_color=opp.get("state_color"),
-                manager_id=opp.get("manager_id"),
-                manager_name=opp.get("manager_name"),
-                is_published=opp["id"] in published_ids,
+        items = []
+        for opp in boond_opportunities:
+            pub = published_data.get(opp["id"])
+            items.append(
+                BoondOpportunityReadModel(
+                    id=opp["id"],
+                    title=opp["title"],
+                    reference=opp["reference"],
+                    description=opp.get("description"),
+                    start_date=opp.get("start_date"),
+                    end_date=opp.get("end_date"),
+                    company_name=opp.get("company_name"),
+                    state=opp.get("state"),
+                    state_name=opp.get("state_name"),
+                    state_color=opp.get("state_color"),
+                    manager_id=opp.get("manager_id"),
+                    manager_name=opp.get("manager_name"),
+                    is_published=pub is not None,
+                    published_opportunity_id=pub["id"] if pub else None,
+                    published_status=pub["status"] if pub else None,
+                    cooptations_count=pub["cooptations_count"] if pub else 0,
+                )
             )
-            for opp in boond_opportunities
-        ]
 
         return BoondOpportunityListReadModel(
             items=items,
@@ -397,6 +402,61 @@ class CloseOpportunityUseCase:
         opportunity.close()
 
         # Save
+        saved = await self._repository.save(opportunity)
+
+        return PublishedOpportunityReadModel(
+            id=str(saved.id),
+            boond_opportunity_id=saved.boond_opportunity_id,
+            title=saved.title,
+            description=saved.description,
+            skills=saved.skills,
+            end_date=saved.end_date,
+            status=str(saved.status),
+            status_display=saved.status.display_name,
+            created_at=saved.created_at,
+            updated_at=saved.updated_at,
+        )
+
+
+class ReopenOpportunityUseCase:
+    """Use case for reopening a closed published opportunity."""
+
+    def __init__(
+        self,
+        published_opportunity_repository: PublishedOpportunityRepository,
+    ) -> None:
+        self._repository = published_opportunity_repository
+
+    async def execute(
+        self,
+        opportunity_id: UUID,
+        user_id: UUID,
+    ) -> PublishedOpportunityReadModel:
+        """Reopen a closed published opportunity.
+
+        Args:
+            opportunity_id: UUID of the opportunity to reopen.
+            user_id: ID of the user reopening the opportunity.
+
+        Returns:
+            Updated opportunity read model.
+
+        Raises:
+            ValueError: If opportunity not found, not closed, or user not authorized.
+        """
+        opportunity = await self._repository.get_by_id(opportunity_id)
+
+        if not opportunity:
+            raise ValueError("Opportunité non trouvée")
+
+        if opportunity.published_by != user_id:
+            raise ValueError("Non autorisé à réactiver cette opportunité")
+
+        if opportunity.status != OpportunityStatus.CLOSED:
+            raise ValueError("Seule une opportunité clôturée peut être réactivée")
+
+        opportunity.reopen()
+
         saved = await self._repository.save(opportunity)
 
         return PublishedOpportunityReadModel(
