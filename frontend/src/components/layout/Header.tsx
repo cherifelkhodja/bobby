@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, Sun, Moon, Monitor, ChevronDown } from 'lucide-react';
+import { LogOut, User, Sun, Moon, Monitor, ChevronDown, Shield } from 'lucide-react';
 import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import { useAuthStore } from '../../stores/authStore';
@@ -9,6 +9,7 @@ import { Button } from '../ui/Button';
 export function Header() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
   const { theme, toggleTheme } = useTheme();
 
   const handleLogout = () => {
@@ -78,6 +79,21 @@ export function Header() {
                     </button>
                   )}
                 </Menu.Item>
+                {isAdmin && (
+                  <Menu.Item>
+                    {({ active }) => (
+                      <button
+                        onClick={() => navigate('/admin')}
+                        className={`${
+                          active ? 'bg-gray-50 dark:bg-gray-700' : ''
+                        } flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300`}
+                      >
+                        <Shield className="h-4 w-4 mr-3" />
+                        Administration
+                      </button>
+                    )}
+                  </Menu.Item>
+                )}
                 <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
                 <Menu.Item>
                   {({ active }) => (
