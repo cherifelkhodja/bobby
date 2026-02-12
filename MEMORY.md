@@ -144,6 +144,13 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-12
+- **feat(admin)**: Suppression permanente (admin only) pour cooptations et opportunités publiées
+  - Backend : `DELETE /cooptations/{id}` (admin only, status 204)
+  - Backend : `DELETE /published-opportunities/{id}` (admin only, status 204)
+  - Frontend : Boutons de suppression avec modales de confirmation sur les pages détail et liste
+  - Frontend : Suppression de cooptation depuis le tableau candidats
+  - Les annonces RH avaient déjà la fonctionnalité de suppression
+  - Fichiers modifiés : `cooptations.py` (routes), `published_opportunities.py` (routes), `cooptations.ts`, `publishedOpportunities.ts`, `MyBoondOpportunities.tsx`, `PublishedOpportunityDetail.tsx`
 - **feat(published-opportunities)**: Filtrage par défaut et tous les états Boond
   - Backend : `ALL_OPPORTUNITY_STATES` ajouté au client Boond (11 états : 0-10)
   - Backend : `get_manager_opportunities` utilise désormais tous les états par défaut
