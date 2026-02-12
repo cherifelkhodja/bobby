@@ -144,6 +144,12 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-12
+- **fix(cooptation)**: Téléphone et TJM rendus obligatoires dans le formulaire de cooptation
+  - Seul le champ note/commentaire reste optionnel
+  - Frontend : Zod schemas mis à jour dans `ProposeCandidate.tsx` et `CreateCooptationForm.tsx`
+  - Frontend : `CreateCooptationData` interface — `candidate_phone` et `candidate_daily_rate` non-optionnels
+  - Backend : `Form(default=None)` → `Form(...)` pour phone et daily_rate dans le route handler
+  - Fichiers modifiés : `ProposeCandidate.tsx`, `CreateCooptationForm.tsx`, `cooptations.ts`, `cooptations.py` (route + use case)
 - **feat(cooptation)**: Upload CV obligatoire + détail candidat avec téléchargement CV
   - **Backend** : `create_cooptation` accepte `multipart/form-data` avec CV (PDF/DOCX, max 10 Mo)
   - **Backend** : Validation CV (extension, MIME type, taille), upload S3 avec clé `cooptations/{opp_id}/{Prénom NOM - YYYYMMDD.ext}`
