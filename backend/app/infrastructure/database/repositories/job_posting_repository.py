@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities import JobPosting, JobPostingStatus
@@ -233,6 +233,15 @@ class JobPostingRepository:
         )
         return result.scalar() or 0
 
+    async def increment_view_count(self, token: str) -> None:
+        """Atomically increment the view count for a job posting by token."""
+        await self.session.execute(
+            update(JobPostingModel)
+            .where(JobPostingModel.application_token == token)
+            .values(view_count=JobPostingModel.view_count + 1)
+        )
+        await self.session.flush()
+
     def _to_entity(self, model: JobPostingModel) -> JobPosting:
         """Convert model to entity."""
         return JobPosting(
@@ -266,4 +275,5 @@ class JobPostingRepository:
             updated_at=model.updated_at,
             published_at=model.published_at,
             closed_at=model.closed_at,
+            view_count=model.view_count or 0,
         )

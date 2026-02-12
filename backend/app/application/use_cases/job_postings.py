@@ -308,6 +308,7 @@ class CreateJobPostingUseCase:
             updated_at=posting.updated_at,
             published_at=posting.published_at,
             closed_at=posting.closed_at,
+            view_count=posting.view_count,
         )
 
 
@@ -402,6 +403,7 @@ class GetJobPostingUseCase:
             closed_at=posting.closed_at,
             applications_total=stats.get("total", 0) if stats else 0,
             applications_new=stats.get("unread", 0) if stats else 0,
+            view_count=posting.view_count,
         )
 
 
@@ -529,6 +531,7 @@ class ListJobPostingsUseCase:
                     closed_at=posting.closed_at,
                     applications_total=stats.get("total", 0),
                     applications_new=stats.get("unread", 0),
+                    view_count=posting.view_count,
                 )
             )
 
@@ -670,6 +673,7 @@ class PublishJobPostingUseCase:
             updated_at=posting.updated_at,
             published_at=posting.published_at,
             closed_at=posting.closed_at,
+            view_count=posting.view_count,
         )
 
 
@@ -774,6 +778,7 @@ class CloseJobPostingUseCase:
             updated_at=posting.updated_at,
             published_at=posting.published_at,
             closed_at=posting.closed_at,
+            view_count=posting.view_count,
         )
 
 
@@ -876,6 +881,7 @@ class ReactivateJobPostingUseCase:
             updated_at=posting.updated_at,
             published_at=posting.published_at,
             closed_at=posting.closed_at,
+            view_count=posting.view_count,
         )
 
 
@@ -1047,4 +1053,5 @@ class UpdateJobPostingUseCase:
             updated_at=posting.updated_at,
             published_at=posting.published_at,
             closed_at=posting.closed_at,
+            view_count=posting.view_count,
         )

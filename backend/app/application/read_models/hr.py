@@ -217,6 +217,7 @@ class JobPostingReadModel(BaseModel):
     # Stats
     applications_total: int = 0
     applications_new: int = 0
+    view_count: int = 0
 
 
 class JobPostingListReadModel(BaseModel):

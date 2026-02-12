@@ -464,6 +464,7 @@ export interface JobPosting {
   applications_total: number;
   applications_new: number;
   new_applications_count: number;
+  view_count: number;
 }
 
 export interface JobPostingPublic {

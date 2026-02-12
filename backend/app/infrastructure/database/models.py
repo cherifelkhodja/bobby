@@ -328,6 +328,7 @@ class JobPostingModel(Base):
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     # Relationships
     opportunity: Mapped["OpportunityModel"] = relationship("OpportunityModel")
