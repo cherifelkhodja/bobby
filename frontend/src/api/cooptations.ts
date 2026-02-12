@@ -101,4 +101,8 @@ export const cooptationsApi = {
     const response = await apiClient.get<CooptationStats>('/cooptations/stats');
     return response.data;
   },
+
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/cooptations/${id}`);
+  },
 };

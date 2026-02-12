@@ -32,13 +32,16 @@ import {
   CheckCircle,
   Ban,
   ArrowRight,
+  Trash2,
 } from 'lucide-react';
 import {
   getPublishedOpportunity,
   closeOpportunity,
   reopenOpportunity,
   updatePublishedOpportunity,
+  deletePublishedOpportunity,
 } from '../api/publishedOpportunities';
+import { useAuthStore } from '../stores/authStore';
 import { cooptationsApi } from '../api/cooptations';
 import { getErrorMessage } from '../api/client';
 import { Card } from '../components/ui/Card';
@@ -566,8 +569,12 @@ export default function PublishedOpportunityDetail() {
   const { publishedId } = useParams<{ publishedId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.role === 'admin';
   const [selectedCooptation, setSelectedCooptation] = useState<Cooptation | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteCooptationId, setDeleteCooptationId] = useState<string | null>(null);
 
   // Fetch published opportunity
   const {
@@ -610,6 +617,35 @@ export default function PublishedOpportunityDetail() {
     },
     onError: () => {
       toast.error('Erreur lors de la reactivation');
+    },
+  });
+
+  // Delete opportunity mutation (admin only)
+  const deleteOpportunityMutation = useMutation({
+    mutationFn: () => deletePublishedOpportunity(publishedId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-boond-opportunities'] });
+      queryClient.invalidateQueries({ queryKey: ['published-opportunities'] });
+      toast.success('Opportunité supprimée');
+      navigate(-1);
+    },
+    onError: () => {
+      toast.error('Erreur lors de la suppression');
+    },
+  });
+
+  // Delete cooptation mutation (admin only)
+  const deleteCooptationMutation = useMutation({
+    mutationFn: (id: string) => cooptationsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cooptations-by-opportunity', publishedId] });
+      toast.success('Cooptation supprimée');
+      setDeleteCooptationId(null);
+      setSelectedCooptation(null);
+    },
+    onError: () => {
+      toast.error('Erreur lors de la suppression');
+      setDeleteCooptationId(null);
     },
   });
 
@@ -711,6 +747,17 @@ export default function PublishedOpportunityDetail() {
                 leftIcon={<RefreshCw className="h-4 w-4" />}
               >
                 {reopenMutation.isPending ? 'Reactivation...' : 'Reactiver'}
+              </Button>
+            )}
+            {isAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowDeleteConfirm(true)}
+                leftIcon={<Trash2 className="h-4 w-4" />}
+                className="text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/20"
+              >
+                Supprimer
               </Button>
             )}
           </div>
@@ -845,6 +892,11 @@ export default function PublishedOpportunityDetail() {
                   <th className="text-left py-2 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
                     Date
                   </th>
+                  {isAdmin && (
+                    <th className="text-right py-2 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
+                      Action
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -906,6 +958,20 @@ export default function PublishedOpportunityDetail() {
                       <td className="py-2.5 px-4 text-gray-600 dark:text-gray-400 text-xs">
                         {new Date(cooptation.submitted_at).toLocaleDateString('fr-FR')}
                       </td>
+                      {isAdmin && (
+                        <td className="py-2.5 px-4 text-right">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteCooptationId(cooptation.id);
+                            }}
+                            className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -932,6 +998,58 @@ export default function PublishedOpportunityDetail() {
           onSaved={handleOpportunitySaved}
         />
       )}
+
+      {/* Delete opportunity confirmation modal (admin only) */}
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        title="Supprimer l'opportunite"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Etes-vous sur de vouloir supprimer definitivement cette opportunite ?
+            Cette action est irreversible.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={() => deleteOpportunityMutation.mutate()}
+              isLoading={deleteOpportunityMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Supprimer
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete cooptation confirmation modal (admin only) */}
+      <Modal
+        isOpen={!!deleteCooptationId}
+        onClose={() => setDeleteCooptationId(null)}
+        title="Supprimer la cooptation"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Etes-vous sur de vouloir supprimer definitivement cette cooptation ?
+            Cette action est irreversible.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setDeleteCooptationId(null)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={() => deleteCooptationId && deleteCooptationMutation.mutate(deleteCooptationId)}
+              isLoading={deleteCooptationMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Supprimer
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

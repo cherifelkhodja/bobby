@@ -26,6 +26,7 @@ import {
   Layout,
   Users,
   Pencil,
+  Trash2,
 } from 'lucide-react';
 
 import {
@@ -35,7 +36,9 @@ import {
   publishOpportunity,
   updatePublishedOpportunity,
   getPublishedOpportunity,
+  deletePublishedOpportunity,
 } from '../api/publishedOpportunities';
+import { useAuthStore } from '../stores/authStore';
 import { getErrorMessage } from '../api/client';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -308,7 +311,10 @@ function EditPublishedOpportunityModal({
 
 export function MyBoondOpportunities() {
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.role === 'admin';
   const [searchInput, setSearchInput] = useState('');
+  const [deleteOpportunityId, setDeleteOpportunityId] = useState<string | null>(null);
   const [stateFilter, setStateFilter] = useState<number | 'all' | 'default'>('default');
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [managerFilter, setManagerFilter] = useState<string>('all');
@@ -428,6 +434,21 @@ export function MyBoondOpportunities() {
     onError: (error) => {
       setErrorMessage(getErrorMessage(error));
       setStep('error');
+    },
+  });
+
+  // Delete published opportunity mutation (admin only)
+  const deleteOpportunityMutation = useMutation({
+    mutationFn: (id: string) => deletePublishedOpportunity(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-boond-opportunities'] });
+      queryClient.invalidateQueries({ queryKey: ['published-opportunities'] });
+      toast.success('Opportunité supprimée');
+      setDeleteOpportunityId(null);
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+      setDeleteOpportunityId(null);
     },
   });
 
@@ -896,6 +917,15 @@ export function MyBoondOpportunities() {
                                 >
                                   Voir
                                 </Button>
+                                {isAdmin && (
+                                  <button
+                                    onClick={() => setDeleteOpportunityId(opportunity.published_opportunity_id!)}
+                                    className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                    title="Supprimer"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
                               </>
                             ) : (
                               <Button
@@ -1179,6 +1209,32 @@ export function MyBoondOpportunities() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Delete confirmation modal (admin only) */}
+      <Modal
+        isOpen={!!deleteOpportunityId}
+        onClose={() => setDeleteOpportunityId(null)}
+        title="Supprimer l'opportunite"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Etes-vous sur de vouloir supprimer definitivement cette opportunite publiee ?
+            Cette action est irreversible.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setDeleteOpportunityId(null)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={() => deleteOpportunityId && deleteOpportunityMutation.mutate(deleteOpportunityId)}
+              isLoading={deleteOpportunityMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Supprimer
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

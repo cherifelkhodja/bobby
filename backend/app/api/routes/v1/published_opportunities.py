@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 
-from app.api.dependencies import AdminOrCommercialUser, CurrentUserId
+from app.api.dependencies import AdminOrCommercialUser, AdminUser, CurrentUserId
 
 logger = logging.getLogger(__name__)
 from app.api.schemas.published_opportunity import (
@@ -379,3 +379,17 @@ async def reopen_opportunity(
         raise HTTPException(status_code=400, detail=str(e))
 
     return PublishedOpportunityResponse(**result.model_dump())
+
+
+@router.delete("/{opportunity_id}", status_code=204)
+async def delete_published_opportunity(
+    opportunity_id: UUID,
+    db: DbSession,
+    user_id: AdminUser,
+):
+    """Delete a published opportunity permanently (admin only)."""
+    published_repo = PublishedOpportunityRepository(db)
+
+    deleted = await published_repo.delete(opportunity_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Opportunité non trouvée")
