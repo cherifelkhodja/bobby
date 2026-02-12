@@ -179,9 +179,7 @@ def map_candidate_to_boond(
 
         # typeOf: 0=Salarié, 1=Freelance
         if context.employment_status:
-            attributes["typeOf"] = EMPLOYMENT_STATUS_TO_TYPEOF.get(
-                context.employment_status, 0
-            )
+            attributes["typeOf"] = EMPLOYMENT_STATUS_TO_TYPEOF.get(context.employment_status, 0)
 
         # Source: 6 = Annonce, sourceDetail = Boond opportunity ID
         attributes["source"] = 6
@@ -298,7 +296,9 @@ def format_analyses_as_boond_html(
     """
     parts: list[str] = []
 
-    parts.append(f"<div><b>[b0bby] Analyse candidature{f' - {candidate_name}' if candidate_name else ''}</b></div>")
+    parts.append(
+        f"<div><b>[b0bby] Analyse candidature{f' - {candidate_name}' if candidate_name else ''}</b></div>"
+    )
     if job_title:
         parts.append(f"<div>Poste : {job_title}</div>")
     parts.append("<div>&nbsp;</div>")
@@ -328,19 +328,21 @@ def format_analyses_as_boond_html(
         competences_matchees = matching_details.get("competences_matchees", [])
         if competences_matchees:
             parts.append("<div>&nbsp;</div>")
-            parts.append(f"<div><u>Comp\u00e9tences match\u00e9es :</u> {', '.join(competences_matchees)}</div>")
+            parts.append(
+                f"<div><u>Comp\u00e9tences match\u00e9es :</u> {', '.join(competences_matchees)}</div>"
+            )
 
         # Missing skills
         competences_manquantes = matching_details.get(
             "competences_manquantes", matching_details.get("gaps", [])
         )
         if competences_manquantes:
-            parts.append(f"<div><u>Comp\u00e9tences manquantes :</u> {', '.join(competences_manquantes)}</div>")
+            parts.append(
+                f"<div><u>Comp\u00e9tences manquantes :</u> {', '.join(competences_manquantes)}</div>"
+            )
 
         # Strengths
-        points_forts = matching_details.get(
-            "points_forts", matching_details.get("strengths", [])
-        )
+        points_forts = matching_details.get("points_forts", matching_details.get("strengths", []))
         if points_forts:
             parts.append("<div>&nbsp;</div>")
             parts.append("<div><u>Points forts :</u></div>")
@@ -388,10 +390,7 @@ def format_analyses_as_boond_html(
 
         parts.append(f"<div><b>QUALIT\u00c9 CV : {note_globale}/20 ({classification})</b></div>")
         if niveau_exp or annees:
-            parts.append(
-                f"<div>Niveau : {niveau_exp}"
-                f"{f' ({annees} ans)' if annees else ''}</div>"
-            )
+            parts.append(f"<div>Niveau : {niveau_exp}{f' ({annees} ans)' if annees else ''}</div>")
 
         # Detail scores
         details_notes = cv_quality.get("details_notes", {})

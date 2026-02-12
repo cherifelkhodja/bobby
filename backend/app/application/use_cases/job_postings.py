@@ -573,9 +573,7 @@ class PublishJobPostingUseCase:
         agency_id = None
         if opportunity and opportunity.external_id:
             try:
-                boond_opp = await self.boond_client.get_opportunity_info(
-                    opportunity.external_id
-                )
+                boond_opp = await self.boond_client.get_opportunity_info(opportunity.external_id)
                 agency_id = boond_opp.get("agency_id") if boond_opp else None
             except Exception:
                 pass  # Fallback to default prefix

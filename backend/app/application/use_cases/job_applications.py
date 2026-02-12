@@ -767,18 +767,14 @@ class UpdateApplicationStatusUseCase:
                     changed_by=command.changed_by,
                 )
 
-                external_id = await self.boond_client.create_candidate(
-                    candidate, boond_context
-                )
+                external_id = await self.boond_client.create_candidate(candidate, boond_context)
                 saved.boond_candidate_id = external_id
                 saved.boond_synced_at = datetime.utcnow()
                 saved.boond_sync_error = None
 
                 # Update administrative data (salary/TJM/contract)
                 admin_data = BoondAdministrativeData.from_application(application)
-                await self.boond_client.update_candidate_administrative(
-                    external_id, admin_data
-                )
+                await self.boond_client.update_candidate_administrative(external_id, admin_data)
 
                 # Upload CV to Boond
                 await self._upload_cv_to_boond(application, external_id)
@@ -882,7 +878,9 @@ class UpdateApplicationStatusUseCase:
             filename = application.cv_filename or "cv.pdf"
             content_type = "application/pdf"
             if filename.lower().endswith((".docx",)):
-                content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                content_type = (
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
             elif filename.lower().endswith((".doc",)):
                 content_type = "application/msword"
 
@@ -1187,9 +1185,7 @@ class CreateCandidateInBoondUseCase:
 
         # Create in Boond
         try:
-            external_id = await self.boond_client.create_candidate(
-                candidate, boond_context
-            )
+            external_id = await self.boond_client.create_candidate(candidate, boond_context)
             application.boond_candidate_id = external_id
             application.boond_synced_at = datetime.utcnow()
             application.boond_sync_error = None
@@ -1198,9 +1194,7 @@ class CreateCandidateInBoondUseCase:
 
             # Update administrative data (salary/TJM/contract)
             admin_data = BoondAdministrativeData.from_application(application)
-            await self.boond_client.update_candidate_administrative(
-                external_id, admin_data
-            )
+            await self.boond_client.update_candidate_administrative(external_id, admin_data)
 
             # Upload CV to Boond
             await self._upload_cv_to_boond(application, external_id)
@@ -1297,7 +1291,9 @@ class CreateCandidateInBoondUseCase:
             filename = application.cv_filename or "cv.pdf"
             content_type = "application/pdf"
             if filename.lower().endswith((".docx",)):
-                content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                content_type = (
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
             elif filename.lower().endswith((".doc",)):
                 content_type = "application/msword"
 
