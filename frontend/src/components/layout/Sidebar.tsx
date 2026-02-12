@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Users, Settings, Shield, FileText, FileSpreadsheet, UserCheck, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Users, Shield, FileText, FileSpreadsheet, UserCheck, Sparkles } from 'lucide-react';
 
 import { useAuthStore } from '../../stores/authStore';
 
@@ -7,7 +7,6 @@ const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
   { to: '/opportunities', icon: Briefcase, label: 'Opportunités' },
   { to: '/my-cooptations', icon: Users, label: 'Mes cooptations' },
-  { to: '/profile', icon: Settings, label: 'Mon profil' },
 ];
 
 const commercialItems = [
