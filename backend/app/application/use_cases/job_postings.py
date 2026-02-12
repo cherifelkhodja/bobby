@@ -584,7 +584,15 @@ class PublishJobPostingUseCase:
         posting.generate_turnoverit_reference(agency_id)
 
         # Build Turnover-IT payload
-        application_base_url = f"{settings.frontend_url}/postuler"
+        frontend_url = settings.frontend_url
+        # Validate FRONTEND_URL is properly configured (not just protocol)
+        if not frontend_url or frontend_url in ("https://", "http://"):
+            raise ValueError(
+                "FRONTEND_URL n'est pas configuré. "
+                "Définissez la variable d'environnement FRONTEND_URL avec l'URL du frontend "
+                "(ex: https://bobby-frontend.railway.app)"
+            )
+        application_base_url = f"{frontend_url}/postuler"
         payload = posting.to_turnoverit_payload(application_base_url)
 
         try:
