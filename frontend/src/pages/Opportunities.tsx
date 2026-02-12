@@ -8,15 +8,11 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PageSpinner } from '../components/ui/Spinner';
-import { Modal } from '../components/ui/Modal';
-import { CreateCooptationForm } from '../components/cooptations/CreateCooptationForm';
-import type { PublishedOpportunity, Opportunity } from '../types';
 
 export function Opportunities() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['published-opportunities', page, search],
@@ -31,30 +27,6 @@ export function Opportunities() {
       year: 'numeric',
     });
   };
-
-  // Convert PublishedOpportunity to Opportunity format for the cooptation form
-  const toOpportunityFormat = (pub: PublishedOpportunity): Opportunity => ({
-    id: pub.id,
-    external_id: pub.boond_opportunity_id,
-    title: pub.title,
-    reference: `PUB-${pub.boond_opportunity_id}`,
-    budget: null,
-    start_date: null,
-    end_date: pub.end_date,
-    response_deadline: null,
-    manager_name: null,
-    manager_boond_id: null,
-    client_name: null,
-    description: pub.description,
-    skills: pub.skills,
-    location: null,
-    is_open: pub.status === 'published',
-    is_shared: true,
-    owner_id: null,
-    days_until_deadline: null,
-    synced_at: pub.created_at,
-    created_at: pub.created_at,
-  });
 
   if (isLoading) {
     return <PageSpinner />;
@@ -170,7 +142,7 @@ export function Opportunities() {
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedOpportunity(toOpportunityFormat(opportunity));
+                        navigate(`/opportunities/${opportunity.id}/proposer`);
                       }}
                       leftIcon={<Plus className="h-4 w-4" />}
                       disabled={opportunity.status !== 'published'}
@@ -222,22 +194,6 @@ export function Opportunities() {
           </Button>
         </div>
       )}
-
-      {/* Cooptation Form Modal */}
-      <Modal
-        isOpen={!!selectedOpportunity}
-        onClose={() => setSelectedOpportunity(null)}
-        title="Proposer un candidat"
-        size="lg"
-      >
-        {selectedOpportunity && (
-          <CreateCooptationForm
-            opportunity={selectedOpportunity}
-            onSuccess={() => setSelectedOpportunity(null)}
-            onCancel={() => setSelectedOpportunity(null)}
-          />
-        )}
-      </Modal>
     </div>
   );
 }

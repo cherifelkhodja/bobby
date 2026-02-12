@@ -131,6 +131,35 @@ class CooptationRepository:
         )
         return [self._to_entity(m) for m in result.scalars().all()]
 
+    async def list_by_opportunity(
+        self,
+        opportunity_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[Cooptation]:
+        """List cooptations for a specific opportunity."""
+        result = await self.session.execute(
+            select(CooptationModel)
+            .options(
+                selectinload(CooptationModel.candidate),
+                selectinload(CooptationModel.opportunity),
+            )
+            .where(CooptationModel.opportunity_id == opportunity_id)
+            .offset(skip)
+            .limit(limit)
+            .order_by(CooptationModel.submitted_at.desc())
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def count_by_opportunity(self, opportunity_id: UUID) -> int:
+        """Count cooptations for a specific opportunity."""
+        result = await self.session.execute(
+            select(func.count(CooptationModel.id)).where(
+                CooptationModel.opportunity_id == opportunity_id
+            )
+        )
+        return result.scalar() or 0
+
     async def list_by_status(
         self,
         status: CooptationStatus,

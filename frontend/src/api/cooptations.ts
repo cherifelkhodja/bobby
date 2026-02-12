@@ -22,6 +22,16 @@ export const cooptationsApi = {
     return response.data;
   },
 
+  listByOpportunity: async (
+    opportunityId: string,
+    params?: PaginationParams
+  ): Promise<CooptationListResponse> => {
+    const response = await apiClient.get<CooptationListResponse>('/cooptations', {
+      params: { ...params, opportunity_id: opportunityId },
+    });
+    return response.data;
+  },
+
   listMine: async (params?: PaginationParams): Promise<CooptationListResponse> => {
     const response = await apiClient.get<CooptationListResponse>('/cooptations/me', {
       params,

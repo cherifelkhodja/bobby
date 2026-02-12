@@ -144,6 +144,14 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-12
+- **feat(cooptation)**: Page dédiée de proposition de candidat (`/opportunities/:id/proposer`)
+  - Nouvelle page `ProposeCandidate.tsx` avec layout 2 colonnes : résumé opportunité + formulaire + liste des candidats déjà proposés
+  - Backend : ajout `list_by_opportunity` et `count_by_opportunity` au `CooptationRepository`, filtre `opportunity_id` sur `GET /cooptations`
+  - Frontend : `listByOpportunity` ajouté à `cooptationsApi`
+  - `OpportunityDetail.tsx` et `Opportunities.tsx` : navigation vers la page dédiée au lieu du modal
+  - Suppression des modals de cooptation dans `OpportunityDetail` et `Opportunities`
+  - Route ajoutée dans `App.tsx`
+  - Fichiers modifiés : `cooptation_repository.py`, `cooptations.py` (use case + route), `cooptations.ts` (API), `ProposeCandidate.tsx` (new), `OpportunityDetail.tsx`, `Opportunities.tsx`, `App.tsx`
 - **fix(hr)**: Correction publication Turnover-IT - URL invalide et chargement infini
   - **URL invalide** : L'`application.url` (option payante) n'est envoyée que si c'est une URL HTTPS publique (pas localhost). En dev, le champ est omis car Turnover-IT rejette les URLs localhost.
   - **Chargement infini** : Ajout du callback `onError` au `publishMutation` dans `CreateJobPosting.tsx` pour revenir au formulaire en cas d'erreur (comme `EditJobPosting.tsx` le faisait déjà).

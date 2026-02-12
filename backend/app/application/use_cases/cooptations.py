@@ -213,11 +213,19 @@ class ListCooptationsUseCase:
         page_size: int = 20,
         submitter_id: UUID | None = None,
         status: CooptationStatus | None = None,
+        opportunity_id: UUID | None = None,
     ) -> CooptationListReadModel:
         """List cooptations with pagination and filters."""
         skip = (page - 1) * page_size
 
-        if submitter_id:
+        if opportunity_id:
+            cooptations = await self.cooptation_repository.list_by_opportunity(
+                opportunity_id=opportunity_id,
+                skip=skip,
+                limit=page_size,
+            )
+            total = await self.cooptation_repository.count_by_opportunity(opportunity_id)
+        elif submitter_id:
             cooptations = await self.cooptation_repository.list_by_submitter(
                 submitter_id=submitter_id,
                 skip=skip,

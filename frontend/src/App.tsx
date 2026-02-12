@@ -21,6 +21,7 @@ import JobPostingDetails from './pages/JobPostingDetails';
 import PublicApplication from './pages/PublicApplication';
 import { MyBoondOpportunities } from './pages/MyBoondOpportunities';
 import { OpportunityDetail } from './pages/OpportunityDetail';
+import ProposeCandidate from './pages/ProposeCandidate';
 import type { UserRole } from './types';
 
 interface ProtectedRouteProps {
@@ -71,6 +72,7 @@ function App() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="opportunities" element={<Opportunities />} />
         <Route path="opportunities/:id" element={<OpportunityDetail />} />
+        <Route path="opportunities/:id/proposer" element={<ProposeCandidate />} />
         <Route path="my-cooptations" element={<MyCooptations />} />
         <Route path="profile" element={<Profile />} />
         <Route

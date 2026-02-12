@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Calendar, Briefcase, Plus, Clock, CheckCircle } from 'lucide-react';
@@ -6,15 +5,11 @@ import { ArrowLeft, Calendar, Briefcase, Plus, Clock, CheckCircle } from 'lucide
 import { getPublishedOpportunity } from '../api/publishedOpportunities';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
-import { CreateCooptationForm } from '../components/cooptations/CreateCooptationForm';
-import type { Opportunity } from '../types';
 
 export function OpportunityDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [showCooptationForm, setShowCooptationForm] = useState(false);
 
   const { data: opportunity, isLoading, error } = useQuery({
     queryKey: ['published-opportunity', id],
@@ -29,33 +24,6 @@ export function OpportunityDetail() {
       month: 'long',
       year: 'numeric',
     });
-  };
-
-  // Convert to Opportunity format for the cooptation form
-  const toOpportunityFormat = (): Opportunity | null => {
-    if (!opportunity) return null;
-    return {
-      id: opportunity.id,
-      external_id: opportunity.boond_opportunity_id,
-      title: opportunity.title,
-      reference: `PUB-${opportunity.boond_opportunity_id}`,
-      budget: null,
-      start_date: null,
-      end_date: opportunity.end_date,
-      response_deadline: null,
-      manager_name: null,
-      manager_boond_id: null,
-      client_name: null,
-      description: opportunity.description,
-      skills: opportunity.skills,
-      location: null,
-      is_open: opportunity.status === 'published',
-      is_shared: true,
-      owner_id: null,
-      days_until_deadline: null,
-      synced_at: opportunity.created_at,
-      created_at: opportunity.created_at,
-    };
   };
 
   if (isLoading) {
@@ -77,8 +45,6 @@ export function OpportunityDetail() {
       </div>
     );
   }
-
-  const opportunityForForm = toOpportunityFormat();
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -116,7 +82,7 @@ export function OpportunityDetail() {
 
             <Button
               size="lg"
-              onClick={() => setShowCooptationForm(true)}
+              onClick={() => navigate(`/opportunities/${id}/proposer`)}
               leftIcon={<Plus className="h-5 w-5" />}
               disabled={opportunity.status !== 'published'}
               className="shrink-0"
@@ -187,7 +153,7 @@ export function OpportunityDetail() {
           </div>
           <Button
             size="lg"
-            onClick={() => setShowCooptationForm(true)}
+            onClick={() => navigate(`/opportunities/${id}/proposer`)}
             leftIcon={<Plus className="h-5 w-5" />}
             disabled={opportunity.status !== 'published'}
           >
@@ -195,22 +161,6 @@ export function OpportunityDetail() {
           </Button>
         </div>
       </Card>
-
-      {/* Cooptation Form Modal */}
-      <Modal
-        isOpen={showCooptationForm}
-        onClose={() => setShowCooptationForm(false)}
-        title="Proposer un candidat"
-        size="lg"
-      >
-        {opportunityForForm && (
-          <CreateCooptationForm
-            opportunity={opportunityForForm}
-            onSuccess={() => setShowCooptationForm(false)}
-            onCancel={() => setShowCooptationForm(false)}
-          />
-        )}
-      </Modal>
     </div>
   );
 }

@@ -93,20 +93,24 @@ async def list_cooptations(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: str | None = Query(None),
+    opportunity_id: str | None = Query(None),
     authorization: str = Header(default=""),
 ):
-    """List all cooptations (admin view)."""
-    # In production, would check for admin role
+    """List all cooptations with optional filters."""
+    get_user_id_from_auth(authorization)
+
     cooptation_repo = CooptationRepository(db)
     user_repo = UserRepository(db)
 
     status_filter = CooptationStatus(status) if status else None
+    opp_id = UUID(opportunity_id) if opportunity_id else None
 
     use_case = ListCooptationsUseCase(cooptation_repo, user_repo)
     result = await use_case.execute(
         page=page,
         page_size=page_size,
         status=status_filter,
+        opportunity_id=opp_id,
     )
 
     return CooptationListResponse(
