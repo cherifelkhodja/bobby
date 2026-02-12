@@ -1,7 +1,7 @@
 """BoondManager API client with retry and timeout."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -928,7 +928,7 @@ class BoondClient:
             The created action ID.
         """
         if start_date is None:
-            start_date = datetime.now(timezone.utc)
+            start_date = datetime.now(UTC)
 
         # Format date as required: YYYY-MM-DDTHH:MM:SS+HHMM
         date_str = start_date.strftime("%Y-%m-%dT%H:%M:%S%z")
