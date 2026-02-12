@@ -42,14 +42,26 @@ class PublishedOpportunity:
         self.status = OpportunityStatus.CLOSED
         self.updated_at = datetime.utcnow()
 
+    def reopen(self) -> None:
+        """Reopen a closed opportunity."""
+        self.status = OpportunityStatus.PUBLISHED
+        self.updated_at = datetime.utcnow()
+
     def publish(self) -> None:
         """Publish the opportunity (from draft)."""
         self.status = OpportunityStatus.PUBLISHED
         self.updated_at = datetime.utcnow()
 
-    def update_content(self, title: str, description: str, skills: list[str]) -> None:
+    def update_content(
+        self,
+        title: str,
+        description: str,
+        skills: list[str],
+        end_date: date | None = None,
+    ) -> None:
         """Update the anonymized content."""
         self.title = title
         self.description = description
         self.skills = skills
+        self.end_date = end_date
         self.updated_at = datetime.utcnow()

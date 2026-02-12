@@ -160,6 +160,9 @@ class JobPosting:
     published_at: datetime | None = None
     closed_at: datetime | None = None
 
+    # Analytics
+    view_count: int = 0
+
     def generate_turnoverit_reference(self, agency_id: str | None = None) -> str:
         """Generate a unique Turnover-IT reference based on agency.
 

@@ -30,6 +30,14 @@ class StatusChangeResponse(BaseModel):
     comment: str | None = None
 
 
+class CvDownloadUrlResponse(BaseModel):
+    """Presigned URL for CV download."""
+
+    url: str
+    filename: str
+    expires_in: int
+
+
 class CooptationResponse(BaseModel):
     """Cooptation response schema."""
 
@@ -41,6 +49,8 @@ class CooptationResponse(BaseModel):
     candidate_email: str
     candidate_phone: str | None = None
     candidate_daily_rate: float | None = None
+    candidate_cv_filename: str | None = None
+    candidate_note: str | None = None
     opportunity_id: str
     opportunity_title: str
     opportunity_reference: str

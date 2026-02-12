@@ -8,6 +8,7 @@ import type {
   PublishedOpportunity,
   PublishedOpportunityListResponse,
   PublishRequest,
+  UpdatePublishedOpportunityData,
 } from '../types';
 
 const BASE_PATH = '/published-opportunities';
@@ -91,6 +92,21 @@ export async function getPublishedOpportunity(
 }
 
 /**
+ * Update a published opportunity.
+ * Can only be updated by the publisher or an admin.
+ */
+export async function updatePublishedOpportunity(
+  id: string,
+  data: UpdatePublishedOpportunityData
+): Promise<PublishedOpportunity> {
+  const response = await apiClient.patch<PublishedOpportunity>(
+    `${BASE_PATH}/${id}`,
+    data
+  );
+  return response.data;
+}
+
+/**
  * Close a published opportunity.
  * Can only be closed by the publisher or an admin.
  */
@@ -99,6 +115,19 @@ export async function closeOpportunity(
 ): Promise<PublishedOpportunity> {
   const response = await apiClient.patch<PublishedOpportunity>(
     `${BASE_PATH}/${id}/close`
+  );
+  return response.data;
+}
+
+/**
+ * Reopen a closed published opportunity.
+ * Can only be reopened by the publisher or an admin.
+ */
+export async function reopenOpportunity(
+  id: string
+): Promise<PublishedOpportunity> {
+  const response = await apiClient.patch<PublishedOpportunity>(
+    `${BASE_PATH}/${id}/reopen`
   );
   return response.data;
 }

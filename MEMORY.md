@@ -27,7 +27,7 @@
 | Panel Admin | ✅ Done | Users, invitations, Boond, templates |
 | Dark Mode | ✅ Done | System/Light/Dark |
 | CV Generator | ✅ Done | PDF/DOCX → Word via Claude, templates locaux (Gemini/Craftmania) |
-| Opportunités publiées | ✅ Done | Anonymisation IA |
+| Opportunités publiées | ✅ Done | Anonymisation IA, cooptation avec CV |
 | Quotation Generator (Thales) | ✅ Done | Excel + PDF merge |
 | Recrutement RH | ✅ Done | Turnover-IT, matching IA |
 | Rate Limiting | ✅ Done | Redis + slowapi |
@@ -144,6 +144,91 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-12
+- **feat(hr)**: Compteur de vues sur les pages de candidature publiques `/postuler/{token}`
+  - Backend : Migration 023 ajoute `view_count` (integer, default 0) à `job_postings`
+  - Backend : Incrémentation atomique du compteur à chaque `GET /api/v1/postuler/{token}`
+  - Backend : `view_count` exposé dans `JobPostingReadModel` pour les pages RH
+  - Frontend : Nouvelle carte "Vues" dans la page `/rh/annonces/:postingId` (grille 5 colonnes)
+  - Fichiers modifiés : migration 023, `models.py`, `job_posting.py` (entity), `job_posting_repository.py`, `public_applications.py`, `hr.py` (read models), `job_postings.py` (use cases), `types/index.ts`, `JobPostingDetails.tsx`
+- **feat(ui)**: Réorganisation navigation sidebar/header
+  - "Administration" déplacée du sidebar vers le dropdown du header (admin uniquement)
+  - "Génération Devis" renommée en "Génération Devis Thales" et déplacée dans la rubrique Outils
+  - Section "Admin" du sidebar supprimée (vide)
+  - Fichiers modifiés : `Sidebar.tsx`, `Header.tsx`
+- **feat(ui)**: Déplacement "Mon profil" du sidebar vers dropdown header
+  - Sidebar : suppression entrée "Mon profil" de la navigation
+  - Header : remplacement nom utilisateur statique + bouton déconnexion par dropdown menu (Headless UI `Menu`)
+  - Dropdown contient "Mon profil" (navigation) et "Déconnexion" (rouge, avec séparateur)
+  - Animation enter/leave avec `Transition`
+  - Fichiers modifiés : `Sidebar.tsx`, `Header.tsx`
+- **fix(ui)**: Page profil centrée correctement
+  - Ajout `mx-auto` au conteneur `max-w-2xl` pour centrer la page
+  - Fichier modifié : `Profile.tsx`
+- **feat(published-opportunities)**: Modification d'une opportunité publiée
+  - Backend : `PATCH /published-opportunities/{id}` — titre, description, compétences, date de fin
+  - Backend : Schema `UpdatePublishedOpportunityRequest`, entity `update_content` avec `end_date`
+  - Frontend : Bouton "Modifier" sur la page détail (`PublishedOpportunityDetail.tsx`) et la liste (`MyBoondOpportunities.tsx`)
+  - Frontend : Modal d'édition avec champs titre, description, compétences, date de fin
+  - Frontend : API `updatePublishedOpportunity()` + type `UpdatePublishedOpportunityData`
+  - Fichiers modifiés : `published_opportunity.py` (entity + schema + route), `publishedOpportunities.ts`, `PublishedOpportunityDetail.tsx`, `MyBoondOpportunities.tsx`, `types/index.ts`
+- **feat(cooptation)**: Validation/rejet de cooptation depuis le drawer candidat
+  - Actions de changement de statut dans le `CandidateDrawer` : boutons contextuels selon l'état courant
+  - Transitions valides : pending→in_review/rejected, in_review→interview/accepted/rejected, interview→accepted/rejected
+  - Commentaire obligatoire pour le rejet, optionnel pour les autres transitions
+  - Formulaire inline avec confirmation, appel `cooptationsApi.updateStatus()`
+  - Invalidation des queries après succès, fermeture du drawer
+  - Fichiers modifiés : `PublishedOpportunityDetail.tsx`
+- **fix(cooptation)**: Téléphone et TJM rendus obligatoires dans le formulaire de cooptation
+  - Seul le champ note/commentaire reste optionnel
+  - Frontend : Zod schemas mis à jour dans `ProposeCandidate.tsx` et `CreateCooptationForm.tsx`
+  - Frontend : `CreateCooptationData` interface — `candidate_phone` et `candidate_daily_rate` non-optionnels
+  - Backend : `Form(default=None)` → `Form(...)` pour phone et daily_rate dans le route handler
+  - Fichiers modifiés : `ProposeCandidate.tsx`, `CreateCooptationForm.tsx`, `cooptations.ts`, `cooptations.py` (route + use case)
+- **feat(cooptation)**: Upload CV obligatoire + détail candidat avec téléchargement CV
+  - **Backend** : `create_cooptation` accepte `multipart/form-data` avec CV (PDF/DOCX, max 10 Mo)
+  - **Backend** : Validation CV (extension, MIME type, taille), upload S3 avec clé `cooptations/{opp_id}/{Prénom NOM - YYYYMMDD.ext}`
+  - **Backend** : Nouvel endpoint `GET /cooptations/{id}/cv` retourne presigned URL S3 (1h), accès admin + commercial owner
+  - **Backend** : `CreateCooptationCommand` étendu avec `cv_s3_key` et `cv_filename`
+  - **Backend** : Read model + schema enrichis : `candidate_cv_filename`, `candidate_note`
+  - **Frontend** : `CreateCooptationForm` et `ProposeCandidate` avec upload CV drag-and-drop (obligatoire)
+  - **Frontend** : API client `cooptationsApi.create()` envoie FormData, `getCvDownloadUrl()` ajouté
+  - **Frontend** : `CandidateDrawer` slide-over dans `PublishedOpportunityDetail` : nom, statut, email, tel, TJM, CV download, note, historique
+  - **Frontend** : Table cooptations cliquable avec colonne CV
+  - Fichiers modifiés : `cooptations.py` (route + use case), `cooptation.py` (schema + read model), `cooptations.ts`, `CreateCooptationForm.tsx`, `ProposeCandidate.tsx`, `PublishedOpportunityDetail.tsx`, `types/index.ts`
+- **fix(ui)**: Label rôle "Consultant" → "Utilisateur" sur la page d'inscription après invitation
+  - `AcceptInvitation.tsx` : `roleLabels.user` corrigé de "Consultant" à "Utilisateur" (cohérent avec admin panel)
+- **feat(cooptation)**: Page dédiée de proposition de candidat (`/opportunities/:id/proposer`)
+  - Nouvelle page `ProposeCandidate.tsx` avec layout 2 colonnes : résumé opportunité + formulaire + liste des candidats déjà proposés
+  - Backend : ajout `list_by_opportunity` et `count_by_opportunity` au `CooptationRepository`, filtre `opportunity_id` sur `GET /cooptations`
+  - Frontend : `listByOpportunity` ajouté à `cooptationsApi`
+  - `OpportunityDetail.tsx` et `Opportunities.tsx` : navigation vers la page dédiée au lieu du modal
+  - Suppression des modals de cooptation dans `OpportunityDetail` et `Opportunities`
+  - Route ajoutée dans `App.tsx`
+  - Fichiers modifiés : `cooptation_repository.py`, `cooptations.py` (use case + route), `cooptations.ts` (API), `ProposeCandidate.tsx` (new), `OpportunityDetail.tsx`, `Opportunities.tsx`, `App.tsx`
+- **feat(published-opportunities)**: Redesign MyBoondOpportunities + Page détail opportunité publiée
+  - Présentation alignée sur le module RH (HRDashboard) : stats card, filtres (état, client, manager, publication), display mode selector (modal/drawer/split/inline)
+  - Table enrichie avec colonnes : Opportunité, Client, État Boond, Publication (badge), Cooptations (compteur), Action
+  - Backend : endpoint `PATCH /{id}/reopen` pour réactiver une opportunité clôturée
+  - Backend : `get_published_boond_data()` avec LEFT JOIN pour enrichir la réponse `/my-boond` (published_opportunity_id, published_status, cooptations_count)
+  - Nouvelle page `PublishedOpportunityDetail.tsx` : header avec actions (clôturer/réactiver), stats cards, compétences, description, table des cooptations
+  - Route `/my-boond-opportunities/:publishedId` ajoutée
+  - Fichiers modifiés : `published_opportunity_repository.py`, `published_opportunities.py` (use case + route), `published_opportunity.py` (entity + read model + schema), `types/index.ts`, `publishedOpportunities.ts`, `MyBoondOpportunities.tsx`, `PublishedOpportunityDetail.tsx` (new), `App.tsx`
+- **fix(cooptation)**: Correction 500 Internal Server Error lors de la soumission d'une cooptation
+  - **Cause racine** : `CreateCooptationUseCase` tentait de créer un `Opportunity` à partir du `PublishedOpportunity` avec `external_id = boond_opportunity_id`, mais cette `external_id` existait déjà dans la table `opportunities` (synced depuis Boond) → violation contrainte UNIQUE → 500
+  - Fix : ajout lookup `get_by_external_id(published.boond_opportunity_id)` avant de créer une nouvelle entrée — réutilise l'opportunité existante si elle existe
+  - Ajout error handling dans le route handler : `OpportunityNotFoundError` → 404, `CandidateAlreadyExistsError` → 409, générique → 500 avec logging
+  - Fichiers modifiés : `cooptations.py` (use case + route)
+- **fix(cooptation)**: Les cooptations n'apparaissaient pas dans la page détail opportunité publiée
+  - **Cause racine** : La cooptation était liée à l'opportunité syncée Boond (UUID différent de `published_opportunity.id`). Les requêtes par `publishedId` ne trouvaient rien.
+  - Fix 1 : `get_published_boond_data()` — JOIN via `opportunities.external_id = published.boond_opportunity_id` au lieu de `published.id = cooptations.opportunity_id`
+  - Fix 2 : `list_cooptations` route — résolution de l'ID publié vers l'ID réel via `get_by_external_id()` avant la requête
+  - Fichiers modifiés : `published_opportunity_repository.py`, `cooptations.py` (route)
+- **fix(published-opportunities)**: Correction 500 Internal Server Error lors de la publication d'opportunité
+  - **Cause racine** : Mismatch de type colonne `skills` — migration 008 crée `ARRAY(varchar(100))` mais le modèle SQLAlchemy utilisait `JSON`, causant une erreur asyncpg lors de l'INSERT
+  - Fix : `mapped_column(JSON)` → `mapped_column(ARRAY(String(100)))` dans `PublishedOpportunityModel`
+  - Fix : annotation `Mapped[datetime | None]` → `Mapped[date | None]` pour `end_date`
+  - Ajout gestion `IntegrityError` (409) et exception générique (500 avec logging) dans le route handler
+  - Fichiers modifiés : `models.py`, `published_opportunities.py` (route)
 - **fix(hr)**: Correction publication Turnover-IT - URL invalide et chargement infini
   - **URL invalide** : L'`application.url` (option payante) n'est envoyée que si c'est une URL HTTPS publique (pas localhost). En dev, le champ est omis car Turnover-IT rejette les URLs localhost.
   - **Chargement infini** : Ajout du callback `onError` au `publishMutation` dans `CreateJobPosting.tsx` pour revenir au formulaire en cas d'erreur (comme `EditJobPosting.tsx` le faisait déjà).

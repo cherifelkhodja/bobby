@@ -187,6 +187,8 @@ export interface Cooptation {
   candidate_email: string;
   candidate_phone: string | null;
   candidate_daily_rate: number | null;
+  candidate_cv_filename: string | null;
+  candidate_note: string | null;
   opportunity_id: string;
   opportunity_title: string;
   opportunity_reference: string;
@@ -199,6 +201,12 @@ export interface Cooptation {
   status_history: StatusChange[];
   submitted_at: string;
   updated_at: string;
+}
+
+export interface CvDownloadUrlResponse {
+  url: string;
+  filename: string;
+  expires_in: number;
 }
 
 export interface CooptationListResponse {
@@ -275,6 +283,9 @@ export interface BoondOpportunity {
   manager_id: string | null;
   manager_name: string | null;
   is_published: boolean;
+  published_opportunity_id: string | null;
+  published_status: PublishedOpportunityStatus | null;
+  cooptations_count: number;
 }
 
 export interface BoondOpportunityListResponse {
@@ -344,6 +355,13 @@ export interface PublishedOpportunity {
   status_display: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface UpdatePublishedOpportunityData {
+  title: string;
+  description: string;
+  skills: string[];
+  end_date?: string | null;
 }
 
 export interface PublishedOpportunityListResponse {
@@ -446,6 +464,7 @@ export interface JobPosting {
   applications_total: number;
   applications_new: number;
   new_applications_count: number;
+  view_count: number;
 }
 
 export interface JobPostingPublic {

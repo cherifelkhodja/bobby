@@ -8,7 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities import PublishedOpportunity
 from app.domain.value_objects.status import OpportunityStatus
-from app.infrastructure.database.models import PublishedOpportunityModel
+from app.infrastructure.database.models import (
+    CooptationModel,
+    OpportunityModel,
+    PublishedOpportunityModel,
+)
 
 
 class PublishedOpportunityRepository:
@@ -158,6 +162,49 @@ class PublishedOpportunityRepository:
         """Get set of all Boond opportunity IDs that have been published."""
         result = await self.session.execute(select(PublishedOpportunityModel.boond_opportunity_id))
         return {row[0] for row in result.all()}
+
+    async def get_published_boond_data(
+        self,
+    ) -> dict[str, dict]:
+        """Get enriched publication data for all published opportunities.
+
+        Returns a dict mapping boond_opportunity_id to {id, status, cooptations_count}.
+        Uses a LEFT JOIN with cooptations to count candidates per opportunity.
+        """
+        # Join through opportunities table to handle case where cooptation's
+        # opportunity_id points to a synced opportunity (different UUID than
+        # published_opportunity.id), linked via external_id/boond_opportunity_id.
+        query = (
+            select(
+                PublishedOpportunityModel.boond_opportunity_id,
+                PublishedOpportunityModel.id,
+                PublishedOpportunityModel.status,
+                func.count(CooptationModel.id).label("cooptations_count"),
+            )
+            .outerjoin(
+                OpportunityModel,
+                OpportunityModel.external_id
+                == PublishedOpportunityModel.boond_opportunity_id,
+            )
+            .outerjoin(
+                CooptationModel,
+                CooptationModel.opportunity_id == OpportunityModel.id,
+            )
+            .group_by(
+                PublishedOpportunityModel.boond_opportunity_id,
+                PublishedOpportunityModel.id,
+                PublishedOpportunityModel.status,
+            )
+        )
+        result = await self.session.execute(query)
+        return {
+            row.boond_opportunity_id: {
+                "id": str(row.id),
+                "status": row.status,
+                "cooptations_count": row.cooptations_count,
+            }
+            for row in result.all()
+        }
 
     def _to_entity(self, model: PublishedOpportunityModel) -> PublishedOpportunity:
         """Convert model to entity."""

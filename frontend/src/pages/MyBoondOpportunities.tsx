@@ -1,12 +1,40 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Sparkles, Check, AlertCircle, Loader2, Filter, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import {
+  Search,
+  Sparkles,
+  Check,
+  AlertCircle,
+  Loader2,
+  Filter,
+  TrendingUp,
+  Eye,
+  ChevronDown,
+  ChevronRight,
+  MapPin,
+  Calendar,
+  Building2,
+  User,
+  FileText,
+  ExternalLink,
+  X,
+  Square,
+  PanelRight,
+  Columns,
+  Layout,
+  Users,
+  Pencil,
+} from 'lucide-react';
 
 import {
   getMyBoondOpportunities,
   getBoondOpportunityDetail,
   anonymizeOpportunity,
   publishOpportunity,
+  updatePublishedOpportunity,
+  getPublishedOpportunity,
 } from '../api/publishedOpportunities';
 import { getErrorMessage } from '../api/client';
 import { Card } from '../components/ui/Card';
@@ -14,29 +42,273 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { PageSpinner } from '../components/ui/Spinner';
-import type { BoondOpportunity, BoondOpportunityDetail, AnonymizedPreview } from '../types';
+import type { BoondOpportunity, BoondOpportunityDetail, AnonymizedPreview, PublishedOpportunityStatus } from '../types';
 
 type ViewStep = 'list' | 'loading-detail' | 'anonymizing' | 'preview' | 'publishing' | 'success' | 'error';
 
+// Display modes for opportunity details
+type DisplayMode = 'modal' | 'drawer' | 'split' | 'inline';
+
+const DISPLAY_MODE_OPTIONS: { value: DisplayMode; label: string; icon: typeof Layout }[] = [
+  { value: 'modal', label: 'Pop-up', icon: Square },
+  { value: 'drawer', label: 'Panel latéral', icon: PanelRight },
+  { value: 'split', label: 'Vue split', icon: Columns },
+  { value: 'inline', label: 'Expansion', icon: Layout },
+];
+
 // State configuration for open/active opportunities only (0, 5, 6, 7, 10)
-const STATE_CONFIG: Record<number, { name: string; color: string; bgClass: string; textClass: string }> = {
-  0: { name: 'En cours', color: 'blue', bgClass: 'bg-blue-100 dark:bg-blue-900/30', textClass: 'text-blue-700 dark:text-blue-400' },
-  5: { name: 'Piste identifiée', color: 'yellow', bgClass: 'bg-yellow-100 dark:bg-yellow-900/30', textClass: 'text-yellow-700 dark:text-yellow-400' },
-  6: { name: 'Récurrent', color: 'green', bgClass: 'bg-teal-100 dark:bg-teal-900/30', textClass: 'text-teal-700 dark:text-teal-400' },
-  7: { name: 'AO ouvert', color: 'cyan', bgClass: 'bg-cyan-100 dark:bg-cyan-900/30', textClass: 'text-cyan-700 dark:text-cyan-400' },
-  10: { name: 'Besoin en avant de phase', color: 'sky', bgClass: 'bg-sky-100 dark:bg-sky-900/30', textClass: 'text-sky-700 dark:text-sky-400' },
+const STATE_CONFIG: Record<number, { name: string; bgClass: string; textClass: string }> = {
+  0: { name: 'En cours', bgClass: 'bg-blue-100 dark:bg-blue-900/30', textClass: 'text-blue-700 dark:text-blue-400' },
+  5: { name: 'Piste identifiée', bgClass: 'bg-yellow-100 dark:bg-yellow-900/30', textClass: 'text-yellow-700 dark:text-yellow-400' },
+  6: { name: 'Récurrent', bgClass: 'bg-teal-100 dark:bg-teal-900/30', textClass: 'text-teal-700 dark:text-teal-400' },
+  7: { name: 'AO ouvert', bgClass: 'bg-cyan-100 dark:bg-cyan-900/30', textClass: 'text-cyan-700 dark:text-cyan-400' },
+  10: { name: 'Besoin en avant de phase', bgClass: 'bg-sky-100 dark:bg-sky-900/30', textClass: 'text-sky-700 dark:text-sky-400' },
 };
 
+const PUBLISHED_STATUS_BADGES: Record<PublishedOpportunityStatus, { label: string; bgClass: string; textClass: string }> = {
+  draft: {
+    label: 'Brouillon',
+    bgClass: 'bg-gray-100 dark:bg-gray-700',
+    textClass: 'text-gray-800 dark:text-gray-300',
+  },
+  published: {
+    label: 'Publiée',
+    bgClass: 'bg-green-100 dark:bg-green-900/30',
+    textClass: 'text-green-800 dark:text-green-300',
+  },
+  closed: {
+    label: 'Clôturée',
+    bgClass: 'bg-red-100 dark:bg-red-900/30',
+    textClass: 'text-red-800 dark:text-red-300',
+  },
+};
+
+// Opportunity detail content component (same as HRDashboard)
+function OpportunityDetailContent({
+  detail,
+  opportunityId,
+  isLoading,
+  compact = false,
+}: {
+  detail: BoondOpportunityDetail | undefined;
+  opportunityId: string;
+  isLoading: boolean;
+  compact?: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+        <span className="ml-2 text-sm text-gray-500">Chargement...</span>
+      </div>
+    );
+  }
+
+  if (!detail) {
+    return <p className="text-sm text-gray-500 py-4">Aucun détail disponible</p>;
+  }
+
+  return (
+    <div className={`${compact ? 'p-4' : 'p-6'} space-y-4`}>
+      <div>
+        <h3 className={`font-semibold text-gray-900 dark:text-white ${compact ? 'text-base' : 'text-lg'}`}>
+          {detail.title}
+        </h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{detail.reference}</p>
+      </div>
+
+      {detail.description && (
+        <div>
+          <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            <FileText className="h-3.5 w-3.5" />
+            Description
+          </div>
+          <p className={`text-gray-700 dark:text-gray-300 whitespace-pre-line ${compact ? 'text-xs line-clamp-6' : 'text-sm'}`}>
+            {detail.description}
+          </p>
+        </div>
+      )}
+
+      {detail.criteria && (
+        <div>
+          <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            <FileText className="h-3.5 w-3.5" />
+            Critères
+          </div>
+          <p className={`text-gray-700 dark:text-gray-300 whitespace-pre-line ${compact ? 'text-xs line-clamp-4' : 'text-sm'}`}>
+            {detail.criteria}
+          </p>
+        </div>
+      )}
+
+      <div className={`grid ${compact ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-3'} text-sm`}>
+        {detail.place && (
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+            <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <span>{detail.place}</span>
+          </div>
+        )}
+        {(detail.start_date || detail.end_date) && (
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+            <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <span>
+              {detail.start_date && new Date(detail.start_date).toLocaleDateString('fr-FR')}
+              {detail.start_date && detail.end_date && ' → '}
+              {detail.end_date && new Date(detail.end_date).toLocaleDateString('fr-FR')}
+              {detail.duration && ` (${detail.duration} j)`}
+            </span>
+          </div>
+        )}
+        {detail.company_name && (
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+            <Building2 className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <span>{detail.company_name}</span>
+          </div>
+        )}
+        {detail.manager_name && (
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+            <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <span>Resp: {detail.manager_name}</span>
+          </div>
+        )}
+        {detail.contact_name && (
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+            <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <span>Contact: {detail.contact_name}</span>
+          </div>
+        )}
+        {detail.expertise_area && (
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+            <Sparkles className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <span>{detail.expertise_area}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+        <a
+          href={`https://ui.boondmanager.com/#opportunity/${opportunityId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400"
+        >
+          <ExternalLink className="h-3 w-3" />
+          Voir sur BoondManager
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function EditPublishedOpportunityModal({
+  opportunity,
+  isOpen,
+  onClose,
+  onSaved,
+}: {
+  opportunity: { id: string; title: string; description: string; skills: string[]; end_date: string | null };
+  isOpen: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState(opportunity.title);
+  const [description, setDescription] = useState(opportunity.description);
+  const [skillsText, setSkillsText] = useState(opportunity.skills.join(', '));
+  const [endDate, setEndDate] = useState(opportunity.end_date || '');
+
+  const queryClient = useQueryClient();
+
+  const updateMutation = useMutation({
+    mutationFn: () =>
+      updatePublishedOpportunity(opportunity.id, {
+        title,
+        description,
+        skills: skillsText
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        end_date: endDate || null,
+      }),
+    onSuccess: () => {
+      toast.success('Opportunite mise a jour');
+      queryClient.invalidateQueries({ queryKey: ['my-boond-opportunities'] });
+      queryClient.invalidateQueries({ queryKey: ['published-opportunities'] });
+      onSaved();
+      onClose();
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Modifier l'opportunite" size="lg">
+      <div className="space-y-4">
+        <Input
+          label="Titre"
+          value={title}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
+        />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Description
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm min-h-[200px] focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Competences (separees par des virgules)
+          </label>
+          <Input
+            value={skillsText}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSkillsText(e.target.value)}
+            placeholder="React, TypeScript, Node.js"
+          />
+        </div>
+        <Input
+          label="Date de fin"
+          type="date"
+          value={endDate}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndDate(e.target.value)}
+        />
+        <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+          <Button variant="secondary" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button
+            onClick={() => updateMutation.mutate()}
+            isLoading={updateMutation.isPending}
+            disabled={!title.trim() || !description.trim()}
+          >
+            Enregistrer
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function MyBoondOpportunities() {
+  const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState('');
   const [stateFilter, setStateFilter] = useState<number | 'all'>('all');
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [managerFilter, setManagerFilter] = useState<string>('all');
+  const [publicationFilter, setPublicationFilter] = useState<string>('all');
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('drawer');
   const [selectedOpportunity, setSelectedOpportunity] = useState<BoondOpportunity | null>(null);
-  const [selectedOpportunityDetail, setSelectedOpportunityDetail] = useState<BoondOpportunityDetail | null>(null);
-  const [detailModalOpportunity, setDetailModalOpportunity] = useState<BoondOpportunity | null>(null);
-  const [detailModalData, setDetailModalData] = useState<BoondOpportunityDetail | null>(null);
-  const [detailModalLoading, setDetailModalLoading] = useState(false);
+  const [expandedOpportunityId, setExpandedOpportunityId] = useState<string | null>(null);
+
+  // Edit modal state
+  const [editOpportunity, setEditOpportunity] = useState<{ id: string; title: string; description: string; skills: string[]; end_date: string | null } | null>(null);
+
+  // Anonymization modal state
+  const [anonymizeOpportunity_, setAnonymizeOpportunity] = useState<BoondOpportunity | null>(null);
+  const [anonymizeDetail, setAnonymizeDetail] = useState<BoondOpportunityDetail | null>(null);
   const [step, setStep] = useState<ViewStep>('list');
   const [preview, setPreview] = useState<AnonymizedPreview | null>(null);
   const [editedTitle, setEditedTitle] = useState('');
@@ -51,53 +323,63 @@ export function MyBoondOpportunities() {
     queryFn: getMyBoondOpportunities,
   });
 
+  // Fetch selected/expanded opportunity details
+  const activeOpportunityId = selectedOpportunity?.id || expandedOpportunityId;
+  const { data: opportunityDetail, isLoading: isLoadingDetail } = useQuery({
+    queryKey: ['boond-opportunity-detail', activeOpportunityId],
+    queryFn: () => getBoondOpportunityDetail(activeOpportunityId!),
+    enabled: !!activeOpportunityId,
+  });
+
   // Calculate stats and available filters
   const { stats, availableStates, availableClients, availableManagers } = useMemo(() => {
     if (!data?.items) {
       return {
-        stats: { total: 0, byState: {} as Record<number, number> },
-        availableStates: [],
-        availableClients: [],
-        availableManagers: [],
+        stats: { total: 0, published: 0, totalCooptations: 0, byState: {} as Record<number, number> },
+        availableStates: [] as { state: number; count: number }[],
+        availableClients: [] as { name: string; count: number }[],
+        availableManagers: [] as { name: string; count: number }[],
       };
     }
 
     const byState: Record<number, number> = {};
     const clientsMap: Record<string, number> = {};
     const managersMap: Record<string, number> = {};
+    let published = 0;
+    let totalCooptations = 0;
 
     data.items.forEach((opp) => {
-      // Count by state
       if (opp.state !== null) {
         byState[opp.state] = (byState[opp.state] || 0) + 1;
       }
 
-      // Count by client
       const clientName = opp.company_name || 'Sans client';
       clientsMap[clientName] = (clientsMap[clientName] || 0) + 1;
 
-      // Count by manager
       const managerName = opp.manager_name || 'Sans manager';
       managersMap[managerName] = (managersMap[managerName] || 0) + 1;
+
+      if (opp.published_status === 'published') {
+        published++;
+      }
+
+      totalCooptations += opp.cooptations_count;
     });
 
-    // Sort states by count
     const states = Object.entries(byState)
       .map(([state, count]) => ({ state: parseInt(state), count }))
       .sort((a, b) => b.count - a.count);
 
-    // Sort clients by count
     const clients = Object.entries(clientsMap)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count);
 
-    // Sort managers by count
     const managers = Object.entries(managersMap)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count);
 
     return {
-      stats: { total: data.items.length, byState },
+      stats: { total: data.items.length, published, totalCooptations, byState },
       availableStates: states,
       availableClients: clients,
       availableManagers: managers,
@@ -124,7 +406,6 @@ export function MyBoondOpportunities() {
     mutationFn: publishOpportunity,
     onSuccess: () => {
       setStep('success');
-      // Defer query invalidation to avoid render interference
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['my-boond-opportunities'] });
       }, 100);
@@ -135,10 +416,9 @@ export function MyBoondOpportunities() {
     },
   });
 
-  // Filter opportunities by search, state, client and manager
+  // Filter opportunities
   const filteredOpportunities = useMemo(() => {
     return data?.items.filter((opp) => {
-      // Search filter
       if (searchInput) {
         const searchLower = searchInput.toLowerCase();
         const matchesSearch =
@@ -148,38 +428,53 @@ export function MyBoondOpportunities() {
         if (!matchesSearch) return false;
       }
 
-      // State filter
       if (stateFilter !== 'all' && opp.state !== stateFilter) return false;
 
-      // Client filter
       if (clientFilter !== 'all') {
         const clientName = opp.company_name || 'Sans client';
         if (clientName !== clientFilter) return false;
       }
 
-      // Manager filter
       if (managerFilter !== 'all') {
         const managerName = opp.manager_name || 'Sans manager';
         if (managerName !== managerFilter) return false;
       }
 
+      // Publication filter
+      if (publicationFilter === 'published' && opp.published_status !== 'published') return false;
+      if (publicationFilter === 'unpublished' && opp.is_published) return false;
+      if (publicationFilter === 'closed' && opp.published_status !== 'closed') return false;
+
       return true;
     }) || [];
-  }, [data?.items, searchInput, stateFilter, clientFilter, managerFilter]);
+  }, [data?.items, searchInput, stateFilter, clientFilter, managerFilter, publicationFilter]);
+
+  const handleOpenOpportunity = (opportunity: BoondOpportunity) => {
+    if (displayMode === 'inline') {
+      setExpandedOpportunityId(prev => prev === opportunity.id ? null : opportunity.id);
+      setSelectedOpportunity(null);
+    } else {
+      setSelectedOpportunity(opportunity);
+      setExpandedOpportunityId(null);
+    }
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedOpportunity(null);
+    setExpandedOpportunityId(null);
+  };
 
   const handlePropose = async (opportunity: BoondOpportunity) => {
-    setSelectedOpportunity(opportunity);
-    setSelectedOpportunityDetail(null);
+    setAnonymizeOpportunity(opportunity);
+    setAnonymizeDetail(null);
     setErrorMessage(null);
     setStep('loading-detail');
 
     try {
-      // Fetch detailed info (with description and criteria)
       const detail = await getBoondOpportunityDetail(opportunity.id);
-      setSelectedOpportunityDetail(detail);
+      setAnonymizeDetail(detail);
       setStep('anonymizing');
 
-      // Build full description by combining description and criteria
       const fullDescription = [detail.description, detail.criteria]
         .filter(Boolean)
         .join('\n\nCritères:\n');
@@ -196,47 +491,45 @@ export function MyBoondOpportunities() {
   };
 
   const handleRegenerate = () => {
-    if (!selectedOpportunity) return;
+    if (!anonymizeOpportunity_) return;
     setStep('anonymizing');
     setErrorMessage(null);
 
-    // Use detail data if available
-    const detail = selectedOpportunityDetail;
+    const detail = anonymizeDetail;
     const fullDescription = detail
       ? [detail.description, detail.criteria].filter(Boolean).join('\n\nCritères:\n')
-      : selectedOpportunity.description;
+      : anonymizeOpportunity_.description;
 
     anonymizeMutation.mutate({
-      boond_opportunity_id: selectedOpportunity.id,
-      title: selectedOpportunity.title,
+      boond_opportunity_id: anonymizeOpportunity_.id,
+      title: anonymizeOpportunity_.title,
       description: fullDescription || null,
     });
   };
 
   const handlePublish = () => {
-    if (!selectedOpportunity || !preview) return;
+    if (!anonymizeOpportunity_ || !preview) return;
     setStep('publishing');
     setErrorMessage(null);
 
     publishMutation.mutate({
-      boond_opportunity_id: selectedOpportunity.id,
+      boond_opportunity_id: anonymizeOpportunity_.id,
       title: editedTitle,
       description: editedDescription,
       skills: preview.skills,
-      original_title: selectedOpportunity.title,
+      original_title: anonymizeOpportunity_.title,
       original_data: {
-        reference: selectedOpportunity.reference,
-        company_name: selectedOpportunity.company_name,
-        description: selectedOpportunity.description,
+        reference: anonymizeOpportunity_.reference,
+        company_name: anonymizeOpportunity_.company_name,
+        description: anonymizeOpportunity_.description,
       },
-      // Send null if end_date is empty string (Pydantic can't parse "" as date)
-      end_date: selectedOpportunity.end_date || null,
+      end_date: anonymizeOpportunity_.end_date || null,
     });
   };
 
   const handleCloseModal = () => {
-    setSelectedOpportunity(null);
-    setSelectedOpportunityDetail(null);
+    setAnonymizeOpportunity(null);
+    setAnonymizeDetail(null);
     setPreview(null);
     setStep('list');
     setErrorMessage(null);
@@ -244,38 +537,12 @@ export function MyBoondOpportunities() {
     setEditedDescription('');
   };
 
-  const handleOpenDetailModal = async (opportunity: BoondOpportunity) => {
-    setDetailModalOpportunity(opportunity);
-    setDetailModalData(null);
-    setDetailModalLoading(true);
-
-    try {
-      const detail = await getBoondOpportunityDetail(opportunity.id);
-      setDetailModalData(detail);
-    } catch {
-      // If detail fetch fails, just show basic info
-    } finally {
-      setDetailModalLoading(false);
-    }
-  };
-
-  const handleCloseDetailModal = () => {
-    setDetailModalOpportunity(null);
-    setDetailModalData(null);
-    setDetailModalLoading(false);
-  };
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('fr-FR');
-  };
-
   const getStateBadge = (state: number | null, stateName: string | null) => {
     const config = state !== null ? STATE_CONFIG[state] : null;
     if (!config) {
       return (
         <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
-          {stateName || 'Inconnu'}
+          {stateName || '-'}
         </span>
       );
     }
@@ -318,7 +585,7 @@ export function MyBoondOpportunities() {
 
       {/* Stats Card */}
       <Card className="!p-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center">
             <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
               <TrendingUp className="h-4 w-4 text-primary-600 dark:text-primary-400" />
@@ -328,18 +595,26 @@ export function MyBoondOpportunities() {
               <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</p>
             </div>
           </div>
-          {availableStates.length > 0 && (
-            <div className="flex gap-2 flex-wrap">
-              {availableStates.map(({ state, count }) => (
-                <span
-                  key={state}
-                  className={`px-2 py-1 text-xs font-medium rounded-full ${STATE_CONFIG[state]?.bgClass || 'bg-gray-100'} ${STATE_CONFIG[state]?.textClass || 'text-gray-600'}`}
-                >
-                  {STATE_CONFIG[state]?.name || `État ${state}`}: {count}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="flex gap-2 flex-wrap">
+            {stats.published > 0 && (
+              <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                {stats.published} publiée{stats.published > 1 ? 's' : ''}
+              </span>
+            )}
+            {stats.totalCooptations > 0 && (
+              <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                {stats.totalCooptations} cooptation{stats.totalCooptations > 1 ? 's' : ''}
+              </span>
+            )}
+            {availableStates.map(({ state, count }) => (
+              <span
+                key={state}
+                className={`px-2 py-1 text-xs font-medium rounded-full ${STATE_CONFIG[state]?.bgClass || 'bg-gray-100'} ${STATE_CONFIG[state]?.textClass || 'text-gray-600'}`}
+              >
+                {STATE_CONFIG[state]?.name || `État ${state}`}: {count}
+              </span>
+            ))}
+          </div>
         </div>
       </Card>
 
@@ -372,6 +647,7 @@ export function MyBoondOpportunities() {
               </option>
             ))}
           </select>
+
           <select
             value={clientFilter}
             onChange={(e) => setClientFilter(e.target.value)}
@@ -384,6 +660,7 @@ export function MyBoondOpportunities() {
               </option>
             ))}
           </select>
+
           {availableManagers.length > 1 && (
             <select
               value={managerFilter}
@@ -398,6 +675,46 @@ export function MyBoondOpportunities() {
               ))}
             </select>
           )}
+
+          {/* Publication filter */}
+          <select
+            value={publicationFilter}
+            onChange={(e) => setPublicationFilter(e.target.value)}
+            className="min-w-[160px] px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          >
+            <option value="all">Toutes publications</option>
+            <option value="published">Publiées</option>
+            <option value="unpublished">Non publiées</option>
+            <option value="closed">Clôturées</option>
+          </select>
+
+          {/* Separator */}
+          <span className="text-gray-300 dark:text-gray-600">|</span>
+
+          {/* Display mode selector */}
+          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded p-0.5">
+            {DISPLAY_MODE_OPTIONS.map((opt) => {
+              const Icon = opt.icon;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => {
+                    setDisplayMode(opt.value);
+                    if (opt.value !== 'inline') setExpandedOpportunityId(null);
+                    if (opt.value === 'inline') setSelectedOpportunity(null);
+                  }}
+                  className={`p-1 rounded transition-colors ${
+                    displayMode === opt.value
+                      ? 'bg-white dark:bg-gray-600 shadow-sm text-blue-600 dark:text-blue-400'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}
+                  title={opt.label}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </button>
+              );
+            })}
+          </div>
         </div>
       </Card>
 
@@ -423,16 +740,19 @@ export function MyBoondOpportunities() {
               <thead className="bg-gray-50 dark:bg-gray-800/50">
                 <tr>
                   <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
-                    Titre
-                  </th>
-                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
-                    Référence
+                    Opportunité
                   </th>
                   <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     Client
                   </th>
                   <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
-                    État
+                    État Boond
+                  </th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
+                    Publication
+                  </th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
+                    Cooptations
                   </th>
                   <th className="text-right py-2 px-3 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">
                     Action
@@ -440,181 +760,241 @@ export function MyBoondOpportunities() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {filteredOpportunities.map((opportunity) => (
-                  <tr
-                    key={opportunity.id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
-                  >
-                    <td className="py-2 px-3">
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => handleOpenDetailModal(opportunity)}
-                          className="text-left text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 font-medium"
-                        >
-                          {opportunity.title}
-                        </button>
-                        {opportunity.is_published && (
-                          <span className="px-1 py-0.5 text-[10px] font-medium rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                            Publiée
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-2 px-3">
-                      <span className="text-gray-500 dark:text-gray-400 font-mono text-[11px]">
-                        {opportunity.reference}
-                      </span>
-                    </td>
-                    <td className="py-2 px-3 text-gray-600 dark:text-gray-400">
-                      {opportunity.company_name || '-'}
-                    </td>
-                    <td className="py-2 px-3">
-                      {getStateBadge(opportunity.state, opportunity.state_name)}
-                    </td>
-                    <td className="py-2 px-3">
-                      <div className="flex justify-end">
-                        <Button
-                          size="sm"
-                          onClick={() => handlePropose(opportunity)}
-                          disabled={opportunity.is_published}
-                          leftIcon={<Sparkles className="h-3 w-3" />}
-                          className="text-xs px-2 py-1"
-                        >
-                          {opportunity.is_published ? 'Publiée' : 'Proposer'}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filteredOpportunities.map((opportunity) => {
+                  const isExpanded = displayMode === 'inline' && expandedOpportunityId === opportunity.id;
+                  const isSelected = selectedOpportunity?.id === opportunity.id;
+                  return (
+                    <Fragment key={opportunity.id}>
+                      <tr
+                        className={`transition-colors ${
+                          isExpanded || isSelected
+                            ? 'bg-blue-50 dark:bg-blue-900/20'
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-800/30'
+                        }`}
+                      >
+                        <td className="py-2 px-3">
+                          <div className="flex items-start gap-2">
+                            {displayMode === 'inline' && (
+                              <button
+                                onClick={() => handleOpenOpportunity(opportunity)}
+                                className="mt-0.5 p-0.5 text-gray-400 dark:text-gray-500"
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </button>
+                            )}
+                            <div>
+                              <button
+                                onClick={() => handleOpenOpportunity(opportunity)}
+                                className={`font-medium text-left ${
+                                  isExpanded || isSelected
+                                    ? 'text-blue-700 dark:text-blue-300'
+                                    : 'text-gray-900 dark:text-gray-100'
+                                }`}
+                              >
+                                {opportunity.title}
+                              </button>
+                              <p className="text-gray-500 dark:text-gray-400 font-mono text-[11px]">
+                                {opportunity.reference}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-gray-600 dark:text-gray-400">
+                          {opportunity.company_name || '-'}
+                        </td>
+                        <td className="py-2 px-3">
+                          {getStateBadge(opportunity.state, opportunity.state_name)}
+                        </td>
+                        <td className="py-2 px-3">
+                          {opportunity.is_published && opportunity.published_status ? (
+                            <span
+                              className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                                PUBLISHED_STATUS_BADGES[opportunity.published_status].bgClass
+                              } ${PUBLISHED_STATUS_BADGES[opportunity.published_status].textClass}`}
+                            >
+                              {PUBLISHED_STATUS_BADGES[opportunity.published_status].label}
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 dark:text-gray-400 text-xs">-</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3">
+                          {opportunity.is_published ? (
+                            <div className="flex items-center gap-1.5">
+                              <Users className="h-3 w-3 text-gray-400" />
+                              <span className="text-gray-900 dark:text-gray-100">
+                                {opportunity.cooptations_count}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-500 dark:text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3">
+                          <div className="flex justify-end gap-1">
+                            {opportunity.is_published && opportunity.published_opportunity_id ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={async () => {
+                                    try {
+                                      const pub = await getPublishedOpportunity(opportunity.published_opportunity_id!);
+                                      setEditOpportunity({
+                                        id: pub.id,
+                                        title: pub.title,
+                                        description: pub.description,
+                                        skills: pub.skills,
+                                        end_date: pub.end_date,
+                                      });
+                                    } catch (err) {
+                                      toast.error(getErrorMessage(err));
+                                    }
+                                  }}
+                                  leftIcon={<Pencil className="h-3 w-3" />}
+                                  className="text-xs px-2 py-1"
+                                >
+                                  Modifier
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => navigate(`/my-boond-opportunities/${opportunity.published_opportunity_id}`)}
+                                  leftIcon={<Eye className="h-3 w-3" />}
+                                  className="text-xs px-2 py-1"
+                                >
+                                  Voir
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={() => handlePropose(opportunity)}
+                                leftIcon={<Sparkles className="h-3 w-3" />}
+                                className="text-xs px-2 py-1"
+                              >
+                                Proposer
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {/* Inline expanded details row */}
+                      {isExpanded && (
+                        <tr className="bg-blue-50/50 dark:bg-blue-900/10">
+                          <td colSpan={6} className="p-0">
+                            <div className="border-l-4 border-blue-500">
+                              <OpportunityDetailContent
+                                detail={opportunityDetail}
+                                opportunityId={opportunity.id}
+                                isLoading={isLoadingDetail}
+                                compact
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
           <div className="px-3 py-2 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/30">
             <p className="text-[10px] text-gray-500 dark:text-gray-400">
-              {filteredOpportunities.length} opportunité{filteredOpportunities.length > 1 ? 's' : ''}
+              {filteredOpportunities.length === data?.items.length
+                ? `${stats.total} opportunité${stats.total > 1 ? 's' : ''}`
+                : `${filteredOpportunities.length} résultat${filteredOpportunities.length > 1 ? 's' : ''} sur ${stats.total}`}
             </p>
           </div>
         </Card>
       )}
 
-      {/* Detail Modal */}
-      <Modal
-        isOpen={!!detailModalOpportunity}
-        onClose={handleCloseDetailModal}
-        title="Détail de l'opportunité"
-        size="3xl"
-      >
-        {detailModalOpportunity && (
-          <div className="space-y-4">
-            {detailModalLoading && (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="h-5 w-5 text-primary-500 animate-spin mr-2" />
-                <span className="text-sm text-gray-500">Chargement des détails...</span>
-              </div>
-            )}
-            <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Titre
-              </label>
-              <p className="text-gray-900 dark:text-gray-100">
-                {detailModalOpportunity.title}
-              </p>
+      {/* Modal view */}
+      {selectedOpportunity && displayMode === 'modal' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="font-semibold text-gray-900 dark:text-white">
+                Détails de l'opportunité
+              </h2>
+              <button
+                onClick={handleCloseDetail}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Référence
-                </label>
-                <p className="text-gray-900 dark:text-gray-100 font-mono text-sm">
-                  {detailModalOpportunity.reference}
-                </p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Client
-                </label>
-                <p className="text-gray-900 dark:text-gray-100">
-                  {(detailModalData?.company_name || detailModalOpportunity.company_name) || '-'}
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  État
-                </label>
-                <div className="mt-1">
-                  {getStateBadge(detailModalOpportunity.state, detailModalOpportunity.state_name)}
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Date de fin
-                </label>
-                <p className="text-gray-900 dark:text-gray-100">
-                  {formatDate(detailModalData?.end_date || detailModalOpportunity.end_date)}
-                </p>
-              </div>
-            </div>
-            {detailModalData && (
-              <div className="grid grid-cols-2 gap-4">
-                {detailModalData.contact_name && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Contact
-                    </label>
-                    <p className="text-gray-900 dark:text-gray-100">
-                      {detailModalData.contact_name}
-                    </p>
-                  </div>
-                )}
-                {detailModalData.agency_name && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Agence
-                    </label>
-                    <p className="text-gray-900 dark:text-gray-100">
-                      {detailModalData.agency_name}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-            <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Description
-              </label>
-              <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap mt-1 max-h-48 overflow-y-auto text-sm bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md">
-                {(detailModalData?.description || detailModalOpportunity.description) || 'Aucune description'}
-              </p>
-            </div>
-            {detailModalData?.criteria && (
-              <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Critères
-                </label>
-                <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap mt-1 max-h-48 overflow-y-auto text-sm bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md">
-                  {detailModalData.criteria}
-                </p>
-              </div>
-            )}
-            {detailModalData?.expertise_area && (
-              <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Domaine d'expertise
-                </label>
-                <p className="text-gray-900 dark:text-gray-100">
-                  {detailModalData.expertise_area}
-                </p>
-              </div>
-            )}
+            <OpportunityDetailContent
+              detail={opportunityDetail}
+              opportunityId={selectedOpportunity.id}
+              isLoading={isLoadingDetail}
+            />
           </div>
-        )}
-      </Modal>
+        </div>
+      )}
+
+      {/* Drawer view */}
+      {selectedOpportunity && displayMode === 'drawer' && (
+        <div className="fixed inset-y-0 right-0 z-50 w-96 bg-white dark:bg-gray-800 shadow-xl border-l border-gray-200 dark:border-gray-700 overflow-y-auto">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800">
+            <h2 className="font-semibold text-gray-900 dark:text-white">
+              Détails de l'opportunité
+            </h2>
+            <button
+              onClick={handleCloseDetail}
+              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <OpportunityDetailContent
+            detail={opportunityDetail}
+            opportunityId={selectedOpportunity.id}
+            isLoading={isLoadingDetail}
+          />
+        </div>
+      )}
+
+      {/* Split view */}
+      {selectedOpportunity && displayMode === 'split' && (
+        <Card className="mt-4 !p-0 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+            <h2 className="font-semibold text-gray-900 dark:text-white">
+              {selectedOpportunity.title}
+            </h2>
+            <button
+              onClick={handleCloseDetail}
+              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <OpportunityDetailContent
+            detail={opportunityDetail}
+            opportunityId={selectedOpportunity.id}
+            isLoading={isLoadingDetail}
+          />
+        </Card>
+      )}
+
+      {/* Edit Published Opportunity Modal */}
+      {editOpportunity && (
+        <EditPublishedOpportunityModal
+          opportunity={editOpportunity}
+          isOpen={!!editOpportunity}
+          onClose={() => setEditOpportunity(null)}
+          onSaved={() => setEditOpportunity(null)}
+        />
+      )}
 
       {/* Anonymization/Preview Modal */}
       <Modal
-        isOpen={!!selectedOpportunity && step !== 'list'}
+        isOpen={!!anonymizeOpportunity_ && step !== 'list'}
         onClose={handleCloseModal}
         title={
           step === 'loading-detail'
@@ -631,7 +1011,6 @@ export function MyBoondOpportunities() {
         }
         size="lg"
       >
-        {/* Loading detail state */}
         {step === 'loading-detail' && (
           <div className="text-center py-8">
             <Loader2 className="h-12 w-12 text-primary-500 animate-spin mx-auto mb-4" />
@@ -641,7 +1020,6 @@ export function MyBoondOpportunities() {
           </div>
         )}
 
-        {/* Anonymizing state */}
         {step === 'anonymizing' && (
           <div className="text-center py-8">
             <Loader2 className="h-12 w-12 text-primary-500 animate-spin mx-auto mb-4" />
@@ -651,7 +1029,6 @@ export function MyBoondOpportunities() {
           </div>
         )}
 
-        {/* Preview state */}
         {step === 'preview' && preview && (
           <div className="space-y-6">
             <div>
@@ -716,7 +1093,6 @@ export function MyBoondOpportunities() {
           </div>
         )}
 
-        {/* Publishing state */}
         {step === 'publishing' && (
           <div className="text-center py-8">
             <Loader2 className="h-12 w-12 text-primary-500 animate-spin mx-auto mb-4" />
@@ -726,7 +1102,6 @@ export function MyBoondOpportunities() {
           </div>
         )}
 
-        {/* Success state */}
         {step === 'success' && (
           <div className="text-center py-8">
             <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -742,7 +1117,6 @@ export function MyBoondOpportunities() {
           </div>
         )}
 
-        {/* Error state */}
         {step === 'error' && (
           <div className="text-center py-8">
             <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">

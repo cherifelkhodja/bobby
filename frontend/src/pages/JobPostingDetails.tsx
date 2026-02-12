@@ -489,7 +489,7 @@ export default function JobPostingDetails() {
       )}
 
       {/* Posting Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <div className="flex items-center gap-3">
             <Building2 className="h-5 w-5 text-gray-500 dark:text-gray-400" />
@@ -509,6 +509,17 @@ export default function JobPostingDetails() {
               <p className="font-medium text-gray-900 dark:text-white">
                 {[posting.location_city, posting.location_country].filter(Boolean).join(', ') ||
                   posting.location_country}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <div className="flex items-center gap-3">
+            <Eye className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <div>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Vues</p>
+              <p className="font-medium text-gray-900 dark:text-white">
+                {posting.view_count}
               </p>
             </div>
           </div>

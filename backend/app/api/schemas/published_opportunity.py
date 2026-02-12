@@ -23,6 +23,9 @@ class BoondOpportunityResponse(BaseModel):
     manager_id: str | None = None
     manager_name: str | None = None
     is_published: bool = False
+    published_opportunity_id: str | None = None
+    published_status: str | None = None
+    cooptations_count: int = 0
 
 
 class BoondOpportunityListResponse(BaseModel):
@@ -94,6 +97,15 @@ class PublishRequest(BaseModel):
     skills: list[str] = []
     original_title: str
     original_data: dict | None = None
+    end_date: date | None = None
+
+
+class UpdatePublishedOpportunityRequest(BaseModel):
+    """Request to update a published opportunity."""
+
+    title: str
+    description: str
+    skills: list[str] = []
     end_date: date | None = None
 
 

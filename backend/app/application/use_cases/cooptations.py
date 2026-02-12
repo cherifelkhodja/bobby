@@ -37,9 +37,11 @@ class CreateCooptationCommand:
     candidate_last_name: str
     candidate_email: str
     candidate_civility: str = "M"
-    candidate_phone: str | None = None
-    candidate_daily_rate: float | None = None
+    candidate_phone: str = ""
+    candidate_daily_rate: float = 0.0
     candidate_note: str | None = None
+    cv_s3_key: str | None = None
+    cv_filename: str | None = None
 
 
 class CreateCooptationUseCase:
@@ -74,23 +76,28 @@ class CreateCooptationUseCase:
                 command.opportunity_id
             )
             if published:
-                # Convert PublishedOpportunity to Opportunity for the cooptation
-                opportunity = Opportunity(
-                    id=published.id,
-                    title=published.title,
-                    reference=f"PUB-{published.boond_opportunity_id}",
-                    external_id=published.boond_opportunity_id,
-                    description=published.description,
-                    skills=published.skills,
-                    end_date=published.end_date,
-                    is_active=published.status.is_visible_to_consultants,
-                    is_shared=True,
-                    owner_id=published.published_by,
-                    created_at=published.created_at,
-                    updated_at=published.updated_at,
+                # Check if opportunity already exists by Boond ID (from sync)
+                opportunity = await self.opportunity_repository.get_by_external_id(
+                    published.boond_opportunity_id
                 )
-                # Save to opportunities table for foreign key constraint
-                opportunity = await self.opportunity_repository.save(opportunity)
+                if not opportunity:
+                    # Convert PublishedOpportunity to Opportunity for the cooptation
+                    opportunity = Opportunity(
+                        id=published.id,
+                        title=published.title,
+                        reference=f"PUB-{published.boond_opportunity_id}",
+                        external_id=published.boond_opportunity_id,
+                        description=published.description,
+                        skills=published.skills,
+                        end_date=published.end_date,
+                        is_active=published.status.is_visible_to_consultants,
+                        is_shared=True,
+                        owner_id=published.published_by,
+                        created_at=published.created_at,
+                        updated_at=published.updated_at,
+                    )
+                    # Save to opportunities table for foreign key constraint
+                    opportunity = await self.opportunity_repository.save(opportunity)
 
         if not opportunity:
             raise OpportunityNotFoundError(str(command.opportunity_id))
@@ -114,7 +121,13 @@ class CreateCooptationUseCase:
                 phone=Phone(command.candidate_phone) if command.candidate_phone else None,
                 daily_rate=command.candidate_daily_rate,
                 note=command.candidate_note,
+                cv_filename=command.cv_filename,
+                cv_path=command.cv_s3_key,
             )
+            candidate = await self.candidate_repository.save(candidate)
+        elif command.cv_s3_key:
+            # Update CV even if candidate already exists
+            candidate.update_cv(command.cv_filename or "", command.cv_s3_key)
             candidate = await self.candidate_repository.save(candidate)
 
         # Create candidate in Boond if not exists
@@ -182,6 +195,8 @@ class CreateCooptationUseCase:
                 str(cooptation.candidate.phone) if cooptation.candidate.phone else None
             ),
             candidate_daily_rate=cooptation.candidate.daily_rate,
+            candidate_cv_filename=cooptation.candidate.cv_filename,
+            candidate_note=cooptation.candidate.note,
             opportunity_id=str(cooptation.opportunity.id),
             opportunity_title=cooptation.opportunity.title,
             opportunity_reference=cooptation.opportunity.reference,
@@ -213,11 +228,19 @@ class ListCooptationsUseCase:
         page_size: int = 20,
         submitter_id: UUID | None = None,
         status: CooptationStatus | None = None,
+        opportunity_id: UUID | None = None,
     ) -> CooptationListReadModel:
         """List cooptations with pagination and filters."""
         skip = (page - 1) * page_size
 
-        if submitter_id:
+        if opportunity_id:
+            cooptations = await self.cooptation_repository.list_by_opportunity(
+                opportunity_id=opportunity_id,
+                skip=skip,
+                limit=page_size,
+            )
+            total = await self.cooptation_repository.count_by_opportunity(opportunity_id)
+        elif submitter_id:
             cooptations = await self.cooptation_repository.list_by_submitter(
                 submitter_id=submitter_id,
                 skip=skip,
@@ -278,6 +301,8 @@ class ListCooptationsUseCase:
                 str(cooptation.candidate.phone) if cooptation.candidate.phone else None
             ),
             candidate_daily_rate=cooptation.candidate.daily_rate,
+            candidate_cv_filename=cooptation.candidate.cv_filename,
+            candidate_note=cooptation.candidate.note,
             opportunity_id=str(cooptation.opportunity.id),
             opportunity_title=cooptation.opportunity.title,
             opportunity_reference=cooptation.opportunity.reference,
@@ -327,6 +352,8 @@ class GetCooptationUseCase:
                 str(cooptation.candidate.phone) if cooptation.candidate.phone else None
             ),
             candidate_daily_rate=cooptation.candidate.daily_rate,
+            candidate_cv_filename=cooptation.candidate.cv_filename,
+            candidate_note=cooptation.candidate.note,
             opportunity_id=str(cooptation.opportunity.id),
             opportunity_title=cooptation.opportunity.title,
             opportunity_reference=cooptation.opportunity.reference,
@@ -386,6 +413,7 @@ class UpdateCooptationStatusUseCase:
                 candidate_name=cooptation.candidate.full_name,
                 opportunity_title=cooptation.opportunity.title,
                 new_status=str(new_status),
+                comment=comment,
             )
 
         return self._to_read_model(saved)
@@ -411,6 +439,8 @@ class UpdateCooptationStatusUseCase:
                 str(cooptation.candidate.phone) if cooptation.candidate.phone else None
             ),
             candidate_daily_rate=cooptation.candidate.daily_rate,
+            candidate_cv_filename=cooptation.candidate.cv_filename,
+            candidate_note=cooptation.candidate.note,
             opportunity_id=str(cooptation.opportunity.id),
             opportunity_title=cooptation.opportunity.title,
             opportunity_reference=cooptation.opportunity.reference,

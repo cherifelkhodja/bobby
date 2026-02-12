@@ -20,7 +20,9 @@ import EditJobPosting from './pages/EditJobPosting';
 import JobPostingDetails from './pages/JobPostingDetails';
 import PublicApplication from './pages/PublicApplication';
 import { MyBoondOpportunities } from './pages/MyBoondOpportunities';
+import PublishedOpportunityDetail from './pages/PublishedOpportunityDetail';
 import { OpportunityDetail } from './pages/OpportunityDetail';
+import ProposeCandidate from './pages/ProposeCandidate';
 import type { UserRole } from './types';
 
 interface ProtectedRouteProps {
@@ -71,6 +73,7 @@ function App() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="opportunities" element={<Opportunities />} />
         <Route path="opportunities/:id" element={<OpportunityDetail />} />
+        <Route path="opportunities/:id/proposer" element={<ProposeCandidate />} />
         <Route path="my-cooptations" element={<MyCooptations />} />
         <Route path="profile" element={<Profile />} />
         <Route
@@ -86,6 +89,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin', 'commercial']}>
               <MyBoondOpportunities />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="my-boond-opportunities/:publishedId"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'commercial']}>
+              <PublishedOpportunityDetail />
             </ProtectedRoute>
           }
         />

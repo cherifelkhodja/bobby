@@ -17,7 +17,7 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -266,10 +266,10 @@ class PublishedOpportunityModel(Base):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    skills: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    skills: Mapped[list | None] = mapped_column(ARRAY(String(100)), nullable=True)
     original_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     original_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    end_date: Mapped[datetime | None] = mapped_column(Date, nullable=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="published", index=True)
     published_by: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
@@ -328,6 +328,7 @@ class JobPostingModel(Base):
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     # Relationships
     opportunity: Mapped["OpportunityModel"] = relationship("OpportunityModel")

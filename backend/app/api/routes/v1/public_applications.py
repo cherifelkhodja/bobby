@@ -76,6 +76,7 @@ async def get_public_job_posting(
 
     This endpoint is public and does not require authentication.
     Returns only the information needed for the application form.
+    Increments the view counter for analytics.
     """
     job_posting_repo = JobPostingRepository(db)
 
@@ -84,7 +85,10 @@ async def get_public_job_posting(
     )
 
     try:
-        return await use_case.execute(token)
+        result = await use_case.execute(token)
+        # Increment view count (fire and forget, don't fail the request)
+        await job_posting_repo.increment_view_count(token)
+        return result
     except JobPostingNotFoundError:
         raise HTTPException(
             status_code=404,

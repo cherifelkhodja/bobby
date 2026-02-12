@@ -23,6 +23,9 @@ class BoondOpportunityReadModel(BaseModel):
     manager_id: str | None = None
     manager_name: str | None = None
     is_published: bool = False
+    published_opportunity_id: str | None = None
+    published_status: str | None = None
+    cooptations_count: int = 0
 
 
 class BoondOpportunityDetailReadModel(BaseModel):
