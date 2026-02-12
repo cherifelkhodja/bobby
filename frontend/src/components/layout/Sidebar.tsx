@@ -14,7 +14,7 @@ const commercialItems = [
 ];
 
 const toolsItems = [
-  { to: '/cv-generator', icon: FileText, label: 'CV Generator' },
+  { to: '/cv-generator', icon: FileText, label: 'Générateur de CV' },
 ];
 
 const hrItems = [
