@@ -1,6 +1,7 @@
 import { useState, useMemo, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   Search,
   Sparkles,
@@ -24,6 +25,7 @@ import {
   Columns,
   Layout,
   Users,
+  Pencil,
 } from 'lucide-react';
 
 import {
@@ -31,6 +33,8 @@ import {
   getBoondOpportunityDetail,
   anonymizeOpportunity,
   publishOpportunity,
+  updatePublishedOpportunity,
+  getPublishedOpportunity,
 } from '../api/publishedOpportunities';
 import { getErrorMessage } from '../api/client';
 import { Card } from '../components/ui/Card';
@@ -196,6 +200,98 @@ function OpportunityDetailContent({
   );
 }
 
+function EditPublishedOpportunityModal({
+  opportunity,
+  isOpen,
+  onClose,
+  onSaved,
+}: {
+  opportunity: { id: string; title: string; description: string; skills: string[]; end_date: string | null };
+  isOpen: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState(opportunity.title);
+  const [description, setDescription] = useState(opportunity.description);
+  const [skillsText, setSkillsText] = useState(opportunity.skills.join(', '));
+  const [endDate, setEndDate] = useState(opportunity.end_date || '');
+
+  const queryClient = useQueryClient();
+
+  const updateMutation = useMutation({
+    mutationFn: () =>
+      updatePublishedOpportunity(opportunity.id, {
+        title,
+        description,
+        skills: skillsText
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        end_date: endDate || null,
+      }),
+    onSuccess: () => {
+      toast.success('Opportunite mise a jour');
+      queryClient.invalidateQueries({ queryKey: ['my-boond-opportunities'] });
+      queryClient.invalidateQueries({ queryKey: ['published-opportunities'] });
+      onSaved();
+      onClose();
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Modifier l'opportunite" size="lg">
+      <div className="space-y-4">
+        <Input
+          label="Titre"
+          value={title}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
+        />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Description
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm min-h-[200px] focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Competences (separees par des virgules)
+          </label>
+          <Input
+            value={skillsText}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSkillsText(e.target.value)}
+            placeholder="React, TypeScript, Node.js"
+          />
+        </div>
+        <Input
+          label="Date de fin"
+          type="date"
+          value={endDate}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndDate(e.target.value)}
+        />
+        <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+          <Button variant="secondary" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button
+            onClick={() => updateMutation.mutate()}
+            isLoading={updateMutation.isPending}
+            disabled={!title.trim() || !description.trim()}
+          >
+            Enregistrer
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function MyBoondOpportunities() {
   const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState('');
@@ -206,6 +302,9 @@ export function MyBoondOpportunities() {
   const [displayMode, setDisplayMode] = useState<DisplayMode>('drawer');
   const [selectedOpportunity, setSelectedOpportunity] = useState<BoondOpportunity | null>(null);
   const [expandedOpportunityId, setExpandedOpportunityId] = useState<string | null>(null);
+
+  // Edit modal state
+  const [editOpportunity, setEditOpportunity] = useState<{ id: string; title: string; description: string; skills: string[]; end_date: string | null } | null>(null);
 
   // Anonymization modal state
   const [anonymizeOpportunity_, setAnonymizeOpportunity] = useState<BoondOpportunity | null>(null);
@@ -736,17 +835,41 @@ export function MyBoondOpportunities() {
                           )}
                         </td>
                         <td className="py-2 px-3">
-                          <div className="flex justify-end">
+                          <div className="flex justify-end gap-1">
                             {opportunity.is_published && opportunity.published_opportunity_id ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => navigate(`/my-boond-opportunities/${opportunity.published_opportunity_id}`)}
-                                leftIcon={<Eye className="h-3 w-3" />}
-                                className="text-xs px-2 py-1"
-                              >
-                                Voir
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={async () => {
+                                    try {
+                                      const pub = await getPublishedOpportunity(opportunity.published_opportunity_id!);
+                                      setEditOpportunity({
+                                        id: pub.id,
+                                        title: pub.title,
+                                        description: pub.description,
+                                        skills: pub.skills,
+                                        end_date: pub.end_date,
+                                      });
+                                    } catch (err) {
+                                      toast.error(getErrorMessage(err));
+                                    }
+                                  }}
+                                  leftIcon={<Pencil className="h-3 w-3" />}
+                                  className="text-xs px-2 py-1"
+                                >
+                                  Modifier
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => navigate(`/my-boond-opportunities/${opportunity.published_opportunity_id}`)}
+                                  leftIcon={<Eye className="h-3 w-3" />}
+                                  className="text-xs px-2 py-1"
+                                >
+                                  Voir
+                                </Button>
+                              </>
                             ) : (
                               <Button
                                 size="sm"
@@ -857,6 +980,16 @@ export function MyBoondOpportunities() {
             isLoading={isLoadingDetail}
           />
         </Card>
+      )}
+
+      {/* Edit Published Opportunity Modal */}
+      {editOpportunity && (
+        <EditPublishedOpportunityModal
+          opportunity={editOpportunity}
+          isOpen={!!editOpportunity}
+          onClose={() => setEditOpportunity(null)}
+          onSaved={() => setEditOpportunity(null)}
+        />
       )}
 
       {/* Anonymization/Preview Modal */}

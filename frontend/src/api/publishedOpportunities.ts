@@ -8,6 +8,7 @@ import type {
   PublishedOpportunity,
   PublishedOpportunityListResponse,
   PublishRequest,
+  UpdatePublishedOpportunityData,
 } from '../types';
 
 const BASE_PATH = '/published-opportunities';
@@ -86,6 +87,21 @@ export async function getPublishedOpportunity(
 ): Promise<PublishedOpportunity> {
   const response = await apiClient.get<PublishedOpportunity>(
     `${BASE_PATH}/${id}`
+  );
+  return response.data;
+}
+
+/**
+ * Update a published opportunity.
+ * Can only be updated by the publisher or an admin.
+ */
+export async function updatePublishedOpportunity(
+  id: string,
+  data: UpdatePublishedOpportunityData
+): Promise<PublishedOpportunity> {
+  const response = await apiClient.patch<PublishedOpportunity>(
+    `${BASE_PATH}/${id}`,
+    data
   );
   return response.data;
 }

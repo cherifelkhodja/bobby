@@ -357,6 +357,13 @@ export interface PublishedOpportunity {
   updated_at: string;
 }
 
+export interface UpdatePublishedOpportunityData {
+  title: string;
+  description: string;
+  skills: string[];
+  end_date?: string | null;
+}
+
 export interface PublishedOpportunityListResponse {
   items: PublishedOpportunity[];
   total: number;

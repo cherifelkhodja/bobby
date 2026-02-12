@@ -28,17 +28,24 @@ import {
   MessageSquare,
   Clock,
   ChevronRight,
+  Pencil,
+  CheckCircle,
+  Ban,
+  ArrowRight,
 } from 'lucide-react';
 import {
   getPublishedOpportunity,
   closeOpportunity,
   reopenOpportunity,
+  updatePublishedOpportunity,
 } from '../api/publishedOpportunities';
 import { cooptationsApi } from '../api/cooptations';
 import { getErrorMessage } from '../api/client';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import type { Cooptation, PublishedOpportunityStatus } from '../types';
+import { Modal } from '../components/ui/Modal';
+import { Input } from '../components/ui/Input';
+import type { Cooptation, CooptationStatus, PublishedOpportunity, PublishedOpportunityStatus } from '../types';
 
 const STATUS_BADGES: Record<PublishedOpportunityStatus, { label: string; bgClass: string; textClass: string }> = {
   draft: {
@@ -86,16 +93,53 @@ const COOPTATION_STATUS_BADGES: Record<string, { label: string; bgClass: string;
   },
 };
 
+// Valid status transitions
+const VALID_TRANSITIONS: Record<CooptationStatus, CooptationStatus[]> = {
+  pending: ['in_review', 'rejected'],
+  in_review: ['interview', 'accepted', 'rejected'],
+  interview: ['accepted', 'rejected'],
+  accepted: [],
+  rejected: [],
+};
+
+const STATUS_ACTION_CONFIG: Record<CooptationStatus, { label: string; icon: typeof CheckCircle; colorClass: string }> = {
+  pending: { label: 'En attente', icon: Clock, colorClass: 'text-yellow-600' },
+  in_review: { label: 'En examen', icon: ArrowRight, colorClass: 'text-blue-600 border-blue-300 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-700 dark:hover:bg-blue-900/20' },
+  interview: { label: 'Entretien', icon: ArrowRight, colorClass: 'text-purple-600 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-700 dark:hover:bg-purple-900/20' },
+  accepted: { label: 'Accepter', icon: CheckCircle, colorClass: 'text-green-600 border-green-300 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-900/20' },
+  rejected: { label: 'Refuser', icon: Ban, colorClass: 'text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/20' },
+};
+
 function CandidateDrawer({
   cooptation,
   isOpen,
   onClose,
+  onStatusUpdated,
 }: {
   cooptation: Cooptation | null;
   isOpen: boolean;
   onClose: () => void;
+  onStatusUpdated: () => void;
 }) {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [statusAction, setStatusAction] = useState<CooptationStatus | null>(null);
+  const [statusComment, setStatusComment] = useState('');
+  const [statusError, setStatusError] = useState<string | null>(null);
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status, comment }: { id: string; status: string; comment?: string }) =>
+      cooptationsApi.updateStatus(id, status, comment || undefined),
+    onSuccess: () => {
+      toast.success('Statut mis a jour');
+      setStatusAction(null);
+      setStatusComment('');
+      setStatusError(null);
+      onStatusUpdated();
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
 
   const handleDownloadCv = async () => {
     if (!cooptation) return;
@@ -110,9 +154,43 @@ function CandidateDrawer({
     }
   };
 
+  const handleStatusChange = (newStatus: CooptationStatus) => {
+    if (newStatus === 'rejected') {
+      setStatusAction(newStatus);
+      setStatusComment('');
+      setStatusError(null);
+    } else {
+      setStatusAction(newStatus);
+      setStatusComment('');
+      setStatusError(null);
+    }
+  };
+
+  const handleConfirmStatus = () => {
+    if (!cooptation || !statusAction) return;
+
+    if (statusAction === 'rejected' && !statusComment.trim()) {
+      setStatusError('Le commentaire est obligatoire pour un rejet');
+      return;
+    }
+
+    statusMutation.mutate({
+      id: cooptation.id,
+      status: statusAction,
+      comment: statusComment.trim() || undefined,
+    });
+  };
+
+  const handleCancelStatus = () => {
+    setStatusAction(null);
+    setStatusComment('');
+    setStatusError(null);
+  };
+
   if (!cooptation) return null;
 
   const statusBadge = COOPTATION_STATUS_BADGES[cooptation.status] || COOPTATION_STATUS_BADGES.pending;
+  const nextStatuses = VALID_TRANSITIONS[cooptation.status] || [];
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -170,6 +248,76 @@ function CandidateDrawer({
 
                     {/* Content */}
                     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+                      {/* Status actions */}
+                      {nextStatuses.length > 0 && (
+                        <div>
+                          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                            Actions
+                          </h3>
+                          {!statusAction ? (
+                            <div className="flex flex-wrap gap-2">
+                              {nextStatuses.map((nextStatus) => {
+                                const config = STATUS_ACTION_CONFIG[nextStatus];
+                                const Icon = config.icon;
+                                return (
+                                  <button
+                                    key={nextStatus}
+                                    onClick={() => handleStatusChange(nextStatus)}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border rounded-lg transition-colors ${config.colorClass}`}
+                                  >
+                                    <Icon className="h-3.5 w-3.5" />
+                                    {config.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="space-y-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-700 dark:text-gray-300">
+                                  Changer le statut vers :
+                                </span>
+                                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${COOPTATION_STATUS_BADGES[statusAction]?.bgClass} ${COOPTATION_STATUS_BADGES[statusAction]?.textClass}`}>
+                                  {COOPTATION_STATUS_BADGES[statusAction]?.label}
+                                </span>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                  Commentaire {statusAction === 'rejected' ? <span className="text-red-500">*</span> : '(optionnel)'}
+                                </label>
+                                <textarea
+                                  value={statusComment}
+                                  onChange={(e) => {
+                                    setStatusComment(e.target.value);
+                                    if (statusError) setStatusError(null);
+                                  }}
+                                  placeholder={statusAction === 'rejected' ? 'Motif du rejet...' : 'Commentaire...'}
+                                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm min-h-[60px] focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                />
+                                {statusError && (
+                                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{statusError}</p>
+                                )}
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={handleCancelStatus}
+                                  className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                                >
+                                  Annuler
+                                </button>
+                                <Button
+                                  size="sm"
+                                  onClick={handleConfirmStatus}
+                                  isLoading={statusMutation.isPending}
+                                >
+                                  Confirmer
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Contact */}
                       <div>
                         <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
@@ -291,19 +439,23 @@ function CandidateDrawer({
                             {cooptation.status_history.map((change, i) => {
                               const toBadge = COOPTATION_STATUS_BADGES[change.to_status] || COOPTATION_STATUS_BADGES.pending;
                               return (
-                                <div key={i} className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                  <ChevronRight className="h-3 w-3 flex-shrink-0" />
-                                  <span className={`px-1.5 py-0.5 rounded-full ${toBadge.bgClass} ${toBadge.textClass}`}>
-                                    {toBadge.label}
-                                  </span>
-                                  <span>
-                                    {new Date(change.changed_at).toLocaleDateString('fr-FR')}
-                                  </span>
-                                  {change.comment && (
-                                    <span className="text-gray-600 dark:text-gray-400 italic truncate">
-                                      - {change.comment}
-                                    </span>
-                                  )}
+                                <div key={i} className="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                  <ChevronRight className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`px-1.5 py-0.5 rounded-full ${toBadge.bgClass} ${toBadge.textClass}`}>
+                                        {toBadge.label}
+                                      </span>
+                                      <span>
+                                        {new Date(change.changed_at).toLocaleDateString('fr-FR')}
+                                      </span>
+                                    </div>
+                                    {change.comment && (
+                                      <p className="text-gray-600 dark:text-gray-400 italic mt-0.5">
+                                        {change.comment}
+                                      </p>
+                                    )}
+                                  </div>
                                 </div>
                               );
                             })}
@@ -322,11 +474,100 @@ function CandidateDrawer({
   );
 }
 
+function EditOpportunityModal({
+  opportunity,
+  isOpen,
+  onClose,
+  onSaved,
+}: {
+  opportunity: PublishedOpportunity;
+  isOpen: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState(opportunity.title);
+  const [description, setDescription] = useState(opportunity.description);
+  const [skillsText, setSkillsText] = useState(opportunity.skills.join(', '));
+  const [endDate, setEndDate] = useState(opportunity.end_date || '');
+
+  const updateMutation = useMutation({
+    mutationFn: () =>
+      updatePublishedOpportunity(opportunity.id, {
+        title,
+        description,
+        skills: skillsText
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        end_date: endDate || null,
+      }),
+    onSuccess: () => {
+      toast.success('Opportunite mise a jour');
+      onSaved();
+      onClose();
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Modifier l'opportunite" size="lg">
+      <div className="space-y-4">
+        <Input
+          label="Titre"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Description
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm min-h-[200px] focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Competences (separees par des virgules)
+          </label>
+          <Input
+            value={skillsText}
+            onChange={(e) => setSkillsText(e.target.value)}
+            placeholder="React, TypeScript, Node.js"
+          />
+        </div>
+        <Input
+          label="Date de fin"
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+        />
+        <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+          <Button variant="secondary" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button
+            onClick={() => updateMutation.mutate()}
+            isLoading={updateMutation.isPending}
+            disabled={!title.trim() || !description.trim()}
+          >
+            Enregistrer
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function PublishedOpportunityDetail() {
   const { publishedId } = useParams<{ publishedId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedCooptation, setSelectedCooptation] = useState<Cooptation | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   // Fetch published opportunity
   const {
@@ -371,6 +612,17 @@ export default function PublishedOpportunityDetail() {
       toast.error('Erreur lors de la reactivation');
     },
   });
+
+  const handleStatusUpdated = () => {
+    queryClient.invalidateQueries({ queryKey: ['cooptations-by-opportunity', publishedId] });
+    setSelectedCooptation(null);
+  };
+
+  const handleOpportunitySaved = () => {
+    queryClient.invalidateQueries({ queryKey: ['published-opportunity', publishedId] });
+    queryClient.invalidateQueries({ queryKey: ['my-boond-opportunities'] });
+    queryClient.invalidateQueries({ queryKey: ['published-opportunities'] });
+  };
 
   if (isLoading) {
     return (
@@ -430,6 +682,14 @@ export default function PublishedOpportunityDetail() {
             </p>
           </div>
           <div className="flex gap-2 flex-shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowEditModal(true)}
+              leftIcon={<Pencil className="h-4 w-4" />}
+            >
+              Modifier
+            </Button>
             {opportunity.status === 'published' && (
               <Button
                 size="sm"
@@ -660,7 +920,18 @@ export default function PublishedOpportunityDetail() {
         cooptation={selectedCooptation}
         isOpen={!!selectedCooptation}
         onClose={() => setSelectedCooptation(null)}
+        onStatusUpdated={handleStatusUpdated}
       />
+
+      {/* Edit opportunity modal */}
+      {showEditModal && opportunity && (
+        <EditOpportunityModal
+          opportunity={opportunity}
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          onSaved={handleOpportunitySaved}
+        />
+      )}
     </div>
   );
 }

@@ -18,6 +18,7 @@ from app.api.schemas.published_opportunity import (
     PublishedOpportunityListResponse,
     PublishedOpportunityResponse,
     PublishRequest,
+    UpdatePublishedOpportunityRequest,
 )
 from app.application.use_cases.published_opportunities import (
     AnonymizeOpportunityUseCase,
@@ -243,6 +244,57 @@ async def get_published_opportunity(
         raise HTTPException(status_code=404, detail="Opportunité non trouvée")
 
     return PublishedOpportunityResponse(**result.model_dump())
+
+
+@router.patch("/{opportunity_id}", response_model=PublishedOpportunityResponse)
+async def update_published_opportunity(
+    opportunity_id: UUID,
+    request: UpdatePublishedOpportunityRequest,
+    db: DbSession,
+    user_id: AdminOrCommercialUser,
+):
+    """Update a published opportunity.
+
+    Can only be updated by the publisher or an admin.
+    Requires admin or commercial role.
+    """
+    published_repo = PublishedOpportunityRepository(db)
+    user_repo = UserRepository(db)
+
+    user = await user_repo.get_by_id(user_id)
+    is_admin = user and user.role == "admin"
+
+    opportunity = await published_repo.get_by_id(opportunity_id)
+    if not opportunity:
+        raise HTTPException(status_code=404, detail="Opportunité non trouvée")
+
+    if not is_admin and opportunity.published_by != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Vous ne pouvez modifier que vos propres opportunités",
+        )
+
+    opportunity.update_content(
+        title=request.title,
+        description=request.description,
+        skills=request.skills,
+        end_date=request.end_date,
+    )
+
+    saved = await published_repo.save(opportunity)
+
+    return PublishedOpportunityResponse(
+        id=str(saved.id),
+        boond_opportunity_id=saved.boond_opportunity_id,
+        title=saved.title,
+        description=saved.description,
+        skills=saved.skills,
+        end_date=saved.end_date,
+        status=str(saved.status),
+        status_display=saved.status.display_name,
+        created_at=saved.created_at,
+        updated_at=saved.updated_at,
+    )
 
 
 @router.patch("/{opportunity_id}/close", response_model=PublishedOpportunityResponse)

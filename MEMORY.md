@@ -144,6 +144,20 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-12
+- **feat(published-opportunities)**: Modification d'une opportunité publiée
+  - Backend : `PATCH /published-opportunities/{id}` — titre, description, compétences, date de fin
+  - Backend : Schema `UpdatePublishedOpportunityRequest`, entity `update_content` avec `end_date`
+  - Frontend : Bouton "Modifier" sur la page détail (`PublishedOpportunityDetail.tsx`) et la liste (`MyBoondOpportunities.tsx`)
+  - Frontend : Modal d'édition avec champs titre, description, compétences, date de fin
+  - Frontend : API `updatePublishedOpportunity()` + type `UpdatePublishedOpportunityData`
+  - Fichiers modifiés : `published_opportunity.py` (entity + schema + route), `publishedOpportunities.ts`, `PublishedOpportunityDetail.tsx`, `MyBoondOpportunities.tsx`, `types/index.ts`
+- **feat(cooptation)**: Validation/rejet de cooptation depuis le drawer candidat
+  - Actions de changement de statut dans le `CandidateDrawer` : boutons contextuels selon l'état courant
+  - Transitions valides : pending→in_review/rejected, in_review→interview/accepted/rejected, interview→accepted/rejected
+  - Commentaire obligatoire pour le rejet, optionnel pour les autres transitions
+  - Formulaire inline avec confirmation, appel `cooptationsApi.updateStatus()`
+  - Invalidation des queries après succès, fermeture du drawer
+  - Fichiers modifiés : `PublishedOpportunityDetail.tsx`
 - **fix(cooptation)**: Téléphone et TJM rendus obligatoires dans le formulaire de cooptation
   - Seul le champ note/commentaire reste optionnel
   - Frontend : Zod schemas mis à jour dans `ProposeCandidate.tsx` et `CreateCooptationForm.tsx`

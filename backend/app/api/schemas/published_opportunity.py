@@ -100,6 +100,15 @@ class PublishRequest(BaseModel):
     end_date: date | None = None
 
 
+class UpdatePublishedOpportunityRequest(BaseModel):
+    """Request to update a published opportunity."""
+
+    title: str
+    description: str
+    skills: list[str] = []
+    end_date: date | None = None
+
+
 class PublishedOpportunityResponse(BaseModel):
     """Published opportunity response."""
 
