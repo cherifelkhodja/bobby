@@ -99,11 +99,11 @@ const VALID_TRANSITIONS: Record<CooptationStatus, CooptationStatus[]> = {
   in_review: ['interview', 'accepted', 'rejected'],
   interview: ['accepted', 'rejected'],
   accepted: [],
-  rejected: [],
+  rejected: ['pending'],
 };
 
 const STATUS_ACTION_CONFIG: Record<CooptationStatus, { label: string; icon: typeof CheckCircle; colorClass: string }> = {
-  pending: { label: 'En attente', icon: Clock, colorClass: 'text-yellow-600' },
+  pending: { label: 'Remettre en attente', icon: RefreshCw, colorClass: 'text-yellow-600 border-yellow-300 hover:bg-yellow-50 dark:text-yellow-400 dark:border-yellow-700 dark:hover:bg-yellow-900/20' },
   in_review: { label: 'En cours d\'examen', icon: ArrowRight, colorClass: 'text-blue-600 border-blue-300 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-700 dark:hover:bg-blue-900/20' },
   interview: { label: 'Entretien', icon: ArrowRight, colorClass: 'text-purple-600 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-700 dark:hover:bg-purple-900/20' },
   accepted: { label: 'Accepter', icon: CheckCircle, colorClass: 'text-green-600 border-green-300 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-900/20' },
