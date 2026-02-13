@@ -226,6 +226,7 @@ class PublishedOpportunityRepository:
         await self.session.flush()
         return result.rowcount
 
+
     def _to_entity(self, model: PublishedOpportunityModel) -> PublishedOpportunity:
         """Convert model to entity."""
         return PublishedOpportunity(

@@ -650,6 +650,7 @@ export default function PublishedOpportunityDetail() {
     },
   });
 
+
   const handleStatusUpdated = () => {
     queryClient.invalidateQueries({ queryKey: ['cooptations-by-opportunity', publishedId] });
     setSelectedCooptation(null);
@@ -999,6 +1000,7 @@ export default function PublishedOpportunityDetail() {
           onSaved={handleOpportunitySaved}
         />
       )}
+
 
       {/* Delete opportunity confirmation modal (admin only) */}
       <Modal

@@ -77,6 +77,7 @@ const STATE_CONFIG: Record<number, { name: string; bgClass: string; textClass: s
 // Default state filter: En cours (0), Récurrent (6), Besoin en avant de phase (10)
 const DEFAULT_STATE_FILTER = new Set([0, 6, 10]);
 
+
 const PUBLISHED_STATUS_BADGES: Record<PublishedOpportunityStatus, { label: string; bgClass: string; textClass: string }> = {
   draft: {
     label: 'Brouillon',
@@ -451,6 +452,7 @@ export function MyBoondOpportunities() {
       setDeleteOpportunityId(null);
     },
   });
+
 
   // Filter opportunities
   const filteredOpportunities = useMemo(() => {

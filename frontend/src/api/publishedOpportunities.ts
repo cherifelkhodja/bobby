@@ -132,6 +132,7 @@ export async function reopenOpportunity(
   return response.data;
 }
 
+
 /**
  * Delete a published opportunity permanently (admin only).
  */

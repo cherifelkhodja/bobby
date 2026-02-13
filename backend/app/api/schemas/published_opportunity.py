@@ -109,6 +109,15 @@ class UpdatePublishedOpportunityRequest(BaseModel):
     end_date: date  # Mandatory: opportunity must have an end date
 
 
+class UpdatePublishedOpportunityRequest(BaseModel):
+    """Request to update a published opportunity."""
+
+    title: str
+    description: str
+    skills: list[str] = []
+    end_date: date | None = None
+
+
 class PublishedOpportunityResponse(BaseModel):
     """Published opportunity response."""
 
