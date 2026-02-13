@@ -74,9 +74,6 @@ const STATE_CONFIG: Record<number, { name: string; bgClass: string; textClass: s
   10: { name: 'Besoin en avant de phase', bgClass: 'bg-sky-100 dark:bg-sky-900/30', textClass: 'text-sky-700 dark:text-sky-400' },
 };
 
-// Default state filter: En cours (0), Récurrent (6), Besoin en avant de phase (10)
-const DEFAULT_STATE_FILTER = new Set([0, 6, 10]);
-
 
 const PUBLISHED_STATUS_BADGES: Record<PublishedOpportunityStatus, { label: string; bgClass: string; textClass: string }> = {
   draft: {
@@ -316,7 +313,7 @@ export function MyBoondOpportunities() {
   const isAdmin = user?.role === 'admin';
   const [searchInput, setSearchInput] = useState('');
   const [deleteOpportunityId, setDeleteOpportunityId] = useState<string | null>(null);
-  const [stateFilter, setStateFilter] = useState<number | 'all' | 'default'>('default');
+  const [stateFilter, setStateFilter] = useState<number | 'all'>(0);
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [managerFilter, setManagerFilter] = useState<string>('all');
   const [publicationFilter, setPublicationFilter] = useState<string>('all');
@@ -466,9 +463,7 @@ export function MyBoondOpportunities() {
         if (!matchesSearch) return false;
       }
 
-      if (stateFilter === 'default') {
-        if (opp.state === null || !DEFAULT_STATE_FILTER.has(opp.state)) return false;
-      } else if (stateFilter !== 'all' && opp.state !== stateFilter) {
+      if (stateFilter !== 'all' && opp.state !== stateFilter) {
         return false;
       }
 
@@ -684,12 +679,11 @@ export function MyBoondOpportunities() {
             value={stateFilter}
             onChange={(e) => {
               const val = e.target.value;
-              if (val === 'all' || val === 'default') setStateFilter(val);
+              if (val === 'all') setStateFilter(val);
               else setStateFilter(parseInt(val));
             }}
             className="min-w-[160px] px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           >
-            <option value="default">En cours, Récurrent, Avant de phase</option>
             <option value="all">Tous les états ({stats.total})</option>
             {availableStates.map(({ state, count }) => (
               <option key={state} value={state}>

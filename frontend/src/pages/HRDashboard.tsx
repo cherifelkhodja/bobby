@@ -206,7 +206,7 @@ const STATE_CONFIG: Record<number, { name: string; bgClass: string; textClass: s
 export default function HRDashboard() {
   const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState('');
-  const [stateFilter, setStateFilter] = useState<number | 'all'>('all');
+  const [stateFilter, setStateFilter] = useState<number | 'all'>(0);
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [postingFilter, setPostingFilter] = useState<string>('all');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('drawer');
