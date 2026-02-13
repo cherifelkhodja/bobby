@@ -143,6 +143,18 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-02-13
+- **fix(hr)**: Correction labels d'état dans la page "Gestion des annonces" (HRDashboard)
+  - `STATE_CONFIG` ne contenait que 5 états (0, 5, 6, 7, 10), les autres affichaient "État {n}" au lieu du libellé
+  - Ajout des 6 états manquants : 1 (Gagné), 2 (Perdu), 3 (Abandonné), 4 (Gagné attente contrat), 8 (AO clos), 9 (Reporté)
+  - Alignement complet avec `MyBoondOpportunities.tsx` (11 états avec couleurs)
+  - Fichier modifié : `HRDashboard.tsx`
+- **fix(ui)**: Filtre état par défaut sur "En cours" (état 0) pour les deux pages
+  - `HRDashboard.tsx` : filtre initialisé à `0` au lieu de `'all'`
+  - `MyBoondOpportunities.tsx` : filtre initialisé à `0` au lieu de `'default'` (ancien filtre multi-états supprimé)
+  - Suppression de `DEFAULT_STATE_FILTER` et de l'option "En cours, Récurrent, Avant de phase"
+  - Fichiers modifiés : `HRDashboard.tsx`, `MyBoondOpportunities.tsx`
+
 ### 2026-02-12
 - **feat(admin)**: Suppression permanente (admin only) pour cooptations et opportunités publiées
   - Backend : `DELETE /cooptations/{id}` (admin only, status 204)

@@ -188,19 +188,25 @@ const JOB_POSTING_STATUS_BADGES: Record<JobPostingStatus, { label: string; bgCla
   },
 };
 
-// State configuration for open/active opportunities (same as MyBoondOpportunities)
+// All Boond opportunity states (same as MyBoondOpportunities)
 const STATE_CONFIG: Record<number, { name: string; bgClass: string; textClass: string }> = {
   0: { name: 'En cours', bgClass: 'bg-blue-100 dark:bg-blue-900/30', textClass: 'text-blue-700 dark:text-blue-400' },
+  1: { name: 'Gagné', bgClass: 'bg-green-100 dark:bg-green-900/30', textClass: 'text-green-700 dark:text-green-400' },
+  2: { name: 'Perdu', bgClass: 'bg-red-100 dark:bg-red-900/30', textClass: 'text-red-700 dark:text-red-400' },
+  3: { name: 'Abandonné', bgClass: 'bg-gray-200 dark:bg-gray-700', textClass: 'text-gray-700 dark:text-gray-400' },
+  4: { name: 'Gagné attente contrat', bgClass: 'bg-emerald-100 dark:bg-emerald-900/30', textClass: 'text-emerald-700 dark:text-emerald-400' },
   5: { name: 'Piste identifiée', bgClass: 'bg-yellow-100 dark:bg-yellow-900/30', textClass: 'text-yellow-700 dark:text-yellow-400' },
   6: { name: 'Récurrent', bgClass: 'bg-teal-100 dark:bg-teal-900/30', textClass: 'text-teal-700 dark:text-teal-400' },
   7: { name: 'AO ouvert', bgClass: 'bg-cyan-100 dark:bg-cyan-900/30', textClass: 'text-cyan-700 dark:text-cyan-400' },
+  8: { name: 'AO clos', bgClass: 'bg-indigo-100 dark:bg-indigo-900/30', textClass: 'text-indigo-700 dark:text-indigo-400' },
+  9: { name: 'Reporté', bgClass: 'bg-pink-100 dark:bg-pink-900/30', textClass: 'text-pink-700 dark:text-pink-400' },
   10: { name: 'Besoin en avant de phase', bgClass: 'bg-sky-100 dark:bg-sky-900/30', textClass: 'text-sky-700 dark:text-sky-400' },
 };
 
 export default function HRDashboard() {
   const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState('');
-  const [stateFilter, setStateFilter] = useState<number | 'all'>('all');
+  const [stateFilter, setStateFilter] = useState<number | 'all'>(0);
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [postingFilter, setPostingFilter] = useState<string>('all');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('drawer');
