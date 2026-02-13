@@ -379,7 +379,6 @@ async def reopen_opportunity(
         raise HTTPException(status_code=400, detail=str(e))
 
     return PublishedOpportunityResponse(**result.model_dump())
-<<<<<<< HEAD
 
 
 @router.delete("/{opportunity_id}", status_code=204)
