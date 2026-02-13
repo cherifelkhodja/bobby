@@ -7,6 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, File, Form, Header, HTTPException, Query, UploadFile
 
+from app.api.dependencies import AdminUser
 from app.api.schemas.cooptation import (
     CooptationListResponse,
     CooptationResponse,
@@ -396,3 +397,17 @@ async def update_cooptation_status(
     )
 
     return CooptationResponse(**result.model_dump())
+
+
+@router.delete("/{cooptation_id}", status_code=204)
+async def delete_cooptation(
+    cooptation_id: UUID,
+    db: DbSession,
+    user_id: AdminUser,
+):
+    """Delete a cooptation permanently (admin only)."""
+    cooptation_repo = CooptationRepository(db)
+
+    deleted = await cooptation_repo.delete(cooptation_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Cooptation non trouvée")

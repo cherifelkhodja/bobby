@@ -97,7 +97,16 @@ class PublishRequest(BaseModel):
     skills: list[str] = []
     original_title: str
     original_data: dict | None = None
-    end_date: date | None = None
+    end_date: date  # Mandatory: opportunity must have an end date
+
+
+class UpdatePublishedOpportunityRequest(BaseModel):
+    """Request to update a published opportunity."""
+
+    title: str
+    description: str
+    skills: list[str] = []
+    end_date: date  # Mandatory: opportunity must have an end date
 
 
 class UpdatePublishedOpportunityRequest(BaseModel):

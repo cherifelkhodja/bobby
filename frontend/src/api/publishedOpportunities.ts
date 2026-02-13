@@ -131,3 +131,13 @@ export async function reopenOpportunity(
   );
   return response.data;
 }
+
+
+/**
+ * Delete a published opportunity permanently (admin only).
+ */
+export async function deletePublishedOpportunity(
+  id: string
+): Promise<void> {
+  await apiClient.delete(`${BASE_PATH}/${id}`);
+}
