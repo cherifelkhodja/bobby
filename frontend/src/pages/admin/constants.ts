@@ -8,6 +8,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   user: 'Utilisateur',
   commercial: 'Commercial',
   rh: 'RH',
+  adv: 'ADV',
   admin: 'Administrateur',
 };
 
@@ -15,6 +16,7 @@ export const ROLE_COLORS: Record<UserRole, 'default' | 'primary' | 'success' | '
   user: 'default',
   commercial: 'primary',
   rh: 'success',
+  adv: 'primary',
   admin: 'warning',
 };
 
