@@ -24,6 +24,9 @@ import PublishedOpportunityDetail from './pages/PublishedOpportunityDetail';
 import { OpportunityDetail } from './pages/OpportunityDetail';
 import ProposeCandidate from './pages/ProposeCandidate';
 import { ContractManagement } from './pages/ContractManagement';
+import ContractDetail from './pages/ContractDetail';
+import ComplianceDashboard from './pages/ComplianceDashboard';
+import Portal from './pages/Portal';
 import type { UserRole } from './types';
 
 interface ProtectedRouteProps {
@@ -60,6 +63,7 @@ function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/accept-invitation" element={<AcceptInvitation />} />
       <Route path="/postuler/:token" element={<PublicApplication />} />
+      <Route path="/portal/:token" element={<Portal />} />
 
       {/* Protected routes */}
       <Route
@@ -106,6 +110,22 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin', 'adv', 'commercial']}>
               <ContractManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="contracts/:id"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'adv', 'commercial']}>
+              <ContractDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="compliance"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'adv']}>
+              <ComplianceDashboard />
             </ProtectedRoute>
           }
         />

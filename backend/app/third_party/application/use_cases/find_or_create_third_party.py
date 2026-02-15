@@ -52,8 +52,9 @@ class FindOrCreateThirdPartyUseCase:
     Otherwise a new one is created with PENDING compliance status.
     """
 
-    def __init__(self, third_party_repository) -> None:
+    def __init__(self, third_party_repository, insee_client=None) -> None:
         self._third_party_repo = third_party_repository
+        self._insee_client = insee_client
 
     async def execute(self, command: FindOrCreateThirdPartyCommand) -> ThirdParty:
         """Execute the use case.
@@ -72,6 +73,16 @@ class FindOrCreateThirdPartyUseCase:
                 siren=command.siren,
             )
             return existing
+
+        # Verify SIREN with INSEE if client is available
+        if self._insee_client:
+            insee_info = await self._insee_client.verify_siren(command.siren)
+            if insee_info and not insee_info.is_active:
+                from app.third_party.domain.exceptions import InvalidSirenError
+
+                raise InvalidSirenError(
+                    f"Le SIREN {command.siren} correspond à une entreprise inactive."
+                )
 
         third_party = ThirdParty(
             company_name=command.company_name,

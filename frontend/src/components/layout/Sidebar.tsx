@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Users, FileText, FileSpreadsheet, UserCheck, Sparkles, FileSignature } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Users, FileText, FileSpreadsheet, UserCheck, Sparkles, FileSignature, ShieldCheck } from 'lucide-react';
 
 import { useAuthStore } from '../../stores/authStore';
 
@@ -15,6 +15,7 @@ const commercialItems = [
 
 const contractItems = [
   { to: '/contracts', icon: FileSignature, label: 'Gestion des contrats' },
+  { to: '/compliance', icon: ShieldCheck, label: 'Conformité' },
 ];
 
 const toolsItems = [
@@ -34,6 +35,7 @@ export function Sidebar() {
   const isAdmin = user?.role === 'admin';
   const isCommercialOrAdmin = user?.role && ['admin', 'commercial'].includes(user.role);
   const canAccessContracts = user?.role && ['admin', 'commercial', 'adv'].includes(user.role);
+  const isAdvOrAdmin = user?.role && ['admin', 'adv'].includes(user.role);
   const canAccessTools = user?.role && ['admin', 'commercial', 'rh'].includes(user.role);
   const canAccessHR = user?.role && ['admin', 'rh'].includes(user.role);
 
@@ -158,7 +160,7 @@ export function Sidebar() {
                 Contrats
               </p>
             </div>
-            {contractItems.map(({ to, icon: Icon, label }) => (
+            {contractItems.filter(({ to }) => to !== '/compliance' || isAdvOrAdmin).map(({ to, icon: Icon, label }) => (
               <NavLink
                 key={to}
                 to={to}

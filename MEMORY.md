@@ -128,9 +128,6 @@
 - [ ] Notifications push
 - [ ] Tests intégration contractualisation & vigilance (repos, API routes)
 - [ ] Template DOCX contrat AT (`backend/templates/contrat_at.docx`)
-- [ ] Frontend pages contractualisation (formulaire validation commerciale, config contrat, dashboard ADV)
-- [ ] Frontend pages vigilance (dashboard conformité, gestion documents)
-- [ ] Frontend portail tiers (upload documents, review contrat)
 
 ---
 
@@ -163,6 +160,71 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-02-15 (intégration complète)
+- **feat(backend)**: Câblage complet ServiceFactory pour les 3 bounded contexts
+  - **InseeClient** : Instancié dans ServiceFactory, injecté dans FindOrCreateThirdPartyUseCase (vérification SIREN actif avant création)
+  - **YouSignClient** : Instancié dans ServiceFactory, injecté dans SendForSignatureUseCase et HandleSignatureCompletedUseCase
+  - **S3StorageClient** : Instancié dans ServiceFactory pour génération et stockage des contrats
+  - **BoondCrmAdapter** : Instancié dans ServiceFactory pour push contrats vers BoondManager
+  - Use cases exposés : GenerateDraft, SendDraftToPartner, SendForSignature, HandleSignatureCompleted, PushToCrm, FindOrCreateThirdParty, GenerateMagicLink
+  - Fichier modifié : `service_factory.py`
+
+- **feat(backend)**: 5 nouvelles routes contract management
+  - `POST /{id}/generate-draft` : Génère le brouillon DOCX, upload S3 (ADV/admin)
+  - `POST /{id}/send-draft-to-partner` : Envoi magic link au partenaire pour review (ADV/admin)
+  - `POST /{id}/send-for-signature` : Envoi YouSign pour signature électronique (ADV/admin)
+  - `POST /{id}/push-to-crm` : Création provider + purchase order dans BoondManager (ADV/admin)
+  - `GET /{id}/contracts` : Liste des documents contractuels d'une demande
+  - Fichier modifié : `contract_management/api/routes.py`
+
+- **feat(backend)**: Webhook YouSign câblé avec HandleSignatureCompletedUseCase
+  - Le webhook `/webhooks/yousign/signature-completed` traite maintenant les événements `signature_request.done`
+  - Télécharge le PDF signé depuis YouSign, upload S3, transition vers SIGNED
+  - Fichier modifié : `contract_management/api/webhook_routes.py`
+
+- **feat(frontend)**: Page détail contrat (`/contracts/:id`)
+  - Header avec référence, statut, client
+  - Cards info : type tiers, TJM, date début, commercial
+  - Actions contextuelles par statut (générer brouillon, envoyer partenaire, signature, push CRM)
+  - Gestion compliance override (forçage conformité avec motif)
+  - Liste des documents contractuels (versions, statut signature)
+  - Fichier créé : `pages/ContractDetail.tsx`
+
+- **feat(frontend)**: Dashboard conformité documentaire (`/compliance`)
+  - Stats : conformes, non conformes, à valider, expirent bientôt, taux de conformité (barre)
+  - Liste tiers avec recherche et filtre par statut conformité
+  - Panneau documents avec validation/rejet inline
+  - Demande de documents manquants
+  - Accès ADV/admin uniquement
+  - Fichier créé : `pages/ComplianceDashboard.tsx`
+
+- **feat(frontend)**: Portail tiers public (`/portal/:token`)
+  - Upload documents de conformité (drag-and-drop, 10 Mo max)
+  - Review contrat (approuver / demander modifications)
+  - Layout public sans authentification (magic link)
+  - Gestion lien expiré/invalide
+  - Fichier créé : `pages/Portal.tsx`
+
+- **feat(frontend)**: API clients complets
+  - `api/contracts.ts` : get, validateCommercial, configure, complianceOverride, generateDraft, sendDraftToPartner, sendForSignature, pushToCrm, listContracts
+  - `api/vigilance.ts` : listThirdParties, getThirdPartyDocuments, requestDocuments, validateDocument, rejectDocument, getDashboard
+  - `api/portal.ts` : verifyToken, getDocuments, uploadDocument, getContractDraft, submitContractReview
+  - Fichiers créés/modifiés : `api/contracts.ts`, `api/vigilance.ts` (new), `api/portal.ts` (new)
+
+- **feat(frontend)**: Types TypeScript et config
+  - Types : Contract, ThirdParty, ThirdPartyListResponse, ThirdPartyWithDocuments, ComplianceDashboard, VigilanceDocument, PortalInfo, PortalDocument
+  - Config : COMPLIANCE_STATUS_CONFIG, DOCUMENT_STATUS_CONFIG
+  - Fichier modifié : `types/index.ts`
+
+- **feat(frontend)**: Routes et navigation
+  - Routes : `/contracts/:id`, `/compliance`, `/portal/:token`
+  - Sidebar : lien "Conformité" dans section Contrats (ADV/admin)
+  - ContractManagement : lignes cliquables vers page détail
+  - Fichiers modifiés : `App.tsx`, `Sidebar.tsx`, `ContractManagement.tsx`
+
+- **fix(config)**: `.env.example` complété avec toutes les variables manquantes
+  - Ajout : YouSign, INSEE, S3, Portal, Company info, Resend, Gemini AI, Anthropic, Turnover-IT, AWS Secrets Manager
 
 ### 2026-02-15 (suite)
 - **feat(insee)**: Migration INSEE Sirene API vers OAuth2 client_credentials

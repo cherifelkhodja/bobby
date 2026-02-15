@@ -162,6 +162,42 @@ class ServiceFactory:
 
         return GeminiAnonymizer(self._settings)
 
+    @cached_property
+    def s3_service(self):
+        """Get or create S3StorageClient."""
+        from app.infrastructure.storage.s3_client import S3StorageClient
+
+        return S3StorageClient(self._settings)
+
+    @cached_property
+    def insee_client(self):
+        """Get or create InseeClient."""
+        from app.third_party.infrastructure.adapters.insee_client import InseeClient
+
+        return InseeClient(
+            consumer_key=self._settings.INSEE_CONSUMER_KEY,
+            consumer_secret=self._settings.INSEE_CONSUMER_SECRET,
+        )
+
+    @cached_property
+    def yousign_client(self):
+        """Get or create YouSignClient."""
+        from app.contract_management.infrastructure.adapters.yousign_client import YouSignClient
+
+        return YouSignClient(
+            api_key=self._settings.YOUSIGN_API_KEY,
+            base_url=self._settings.YOUSIGN_API_BASE_URL,
+        )
+
+    @cached_property
+    def boond_crm_adapter(self):
+        """Get or create BoondCrmAdapter."""
+        from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+            BoondCrmAdapter,
+        )
+
+        return BoondCrmAdapter(self.boond_client)
+
     # =========================================================================
     # Use Cases - Auth
     # =========================================================================
@@ -458,3 +494,107 @@ class ServiceFactory:
         if "webhook_event" not in self._repositories_cache:
             self._repositories_cache["webhook_event"] = WebhookEventRepository(self._db)
         return self._repositories_cache["webhook_event"]
+
+    # =========================================================================
+    # Use Cases - Third Party
+    # =========================================================================
+
+    def create_find_or_create_third_party_use_case(self):
+        """Create FindOrCreateThirdPartyUseCase."""
+        from app.third_party.application.use_cases.find_or_create_third_party import (
+            FindOrCreateThirdPartyUseCase,
+        )
+
+        return FindOrCreateThirdPartyUseCase(
+            third_party_repository=self.third_party_repository,
+            insee_client=self.insee_client,
+        )
+
+    def create_generate_magic_link_use_case(self):
+        """Create GenerateMagicLinkUseCase."""
+        from app.third_party.application.use_cases.generate_magic_link import (
+            GenerateMagicLinkUseCase,
+        )
+
+        return GenerateMagicLinkUseCase(
+            third_party_repository=self.third_party_repository,
+            magic_link_repository=self.magic_link_repository,
+            email_service=self.email_service,
+            portal_base_url=self._settings.BOBBY_PORTAL_BASE_URL,
+        )
+
+    # =========================================================================
+    # Use Cases - Contract Management
+    # =========================================================================
+
+    def create_generate_draft_use_case(self):
+        """Create GenerateDraftUseCase."""
+        from app.contract_management.application.use_cases.generate_draft import (
+            GenerateDraftUseCase,
+        )
+        from app.contract_management.infrastructure.adapters.docx_contract_generator import (
+            DocxContractGenerator,
+        )
+
+        return GenerateDraftUseCase(
+            contract_request_repository=self.contract_request_repository,
+            contract_repository=self.contract_repository,
+            third_party_repository=self.third_party_repository,
+            contract_generator=DocxContractGenerator(),
+            s3_service=self.s3_service,
+            settings=self._settings,
+        )
+
+    def create_send_draft_to_partner_use_case(self):
+        """Create SendDraftToPartnerUseCase."""
+        from app.contract_management.application.use_cases.send_draft_to_partner import (
+            SendDraftToPartnerUseCase,
+        )
+
+        return SendDraftToPartnerUseCase(
+            contract_request_repository=self.contract_request_repository,
+            third_party_repository=self.third_party_repository,
+            generate_magic_link_use_case=self.create_generate_magic_link_use_case(),
+        )
+
+    def create_send_for_signature_use_case(self):
+        """Create SendForSignatureUseCase."""
+        from app.contract_management.application.use_cases.send_for_signature import (
+            SendForSignatureUseCase,
+        )
+
+        return SendForSignatureUseCase(
+            contract_request_repository=self.contract_request_repository,
+            contract_repository=self.contract_repository,
+            third_party_repository=self.third_party_repository,
+            s3_service=self.s3_service,
+            signature_service=self.yousign_client,
+            settings=self._settings,
+        )
+
+    def create_handle_signature_completed_use_case(self):
+        """Create HandleSignatureCompletedUseCase."""
+        from app.contract_management.application.use_cases.handle_signature_completed import (
+            HandleSignatureCompletedUseCase,
+        )
+
+        return HandleSignatureCompletedUseCase(
+            contract_request_repository=self.contract_request_repository,
+            contract_repository=self.contract_repository,
+            signature_service=self.yousign_client,
+            s3_service=self.s3_service,
+            email_service=self.email_service,
+        )
+
+    def create_push_to_crm_use_case(self):
+        """Create PushToCrmUseCase."""
+        from app.contract_management.application.use_cases.push_to_crm import (
+            PushToCrmUseCase,
+        )
+
+        return PushToCrmUseCase(
+            contract_request_repository=self.contract_request_repository,
+            contract_repository=self.contract_repository,
+            third_party_repository=self.third_party_repository,
+            crm_service=self.boond_crm_adapter,
+        )

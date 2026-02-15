@@ -134,10 +134,44 @@ async def handle_yousign_webhook(
         procedure_id=procedure_id,
     )
 
-    audit_logger.log(
-        AuditAction.CONTRACT_SIGNED,
-        AuditResource.CONTRACT,
-        details={"procedure_id": procedure_id},
-    )
+    # Process signature completion
+    try:
+        from app.contract_management.application.use_cases.handle_signature_completed import (
+            HandleSignatureCompletedUseCase,
+        )
+        from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+            ContractRepository,
+        )
+        from app.contract_management.infrastructure.adapters.yousign_client import YouSignClient
+        from app.infrastructure.email.sender import EmailService
+        from app.infrastructure.storage.s3_client import S3StorageClient
 
-    return WebhookResponse(status="ok", message="Signature processed")
+        cr_repo = ContractRequestRepository(db)
+        contract_repo = ContractRepository(db)
+        yousign = YouSignClient(
+            api_key=settings.YOUSIGN_API_KEY,
+            base_url=settings.YOUSIGN_API_BASE_URL,
+        )
+        s3_service = S3StorageClient(settings)
+        email_service = EmailService(settings)
+
+        use_case = HandleSignatureCompletedUseCase(
+            contract_request_repository=cr_repo,
+            contract_repository=contract_repo,
+            signature_service=yousign,
+            s3_service=s3_service,
+            email_service=email_service,
+        )
+
+        await use_case.execute(procedure_id)
+
+        audit_logger.log(
+            AuditAction.CONTRACT_SIGNED,
+            AuditResource.CONTRACT,
+            details={"procedure_id": procedure_id},
+        )
+
+        return WebhookResponse(status="ok", message="Signature processed")
+    except Exception as exc:
+        logger.error("yousign_webhook_processing_error", error=str(exc))
+        return WebhookResponse(status="ok", message="Processing error")

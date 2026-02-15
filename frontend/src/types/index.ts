@@ -764,3 +764,129 @@ export interface ContractRequestListResponse {
   skip: number;
   limit: number;
 }
+
+export interface Contract {
+  id: string;
+  contract_request_id: string;
+  reference: string;
+  version: number;
+  s3_key_draft: string;
+  s3_key_signed: string | null;
+  yousign_status: string | null;
+  partner_comments: string | null;
+  created_at: string;
+  signed_at: string | null;
+}
+
+// Vigilance
+export type ComplianceStatus = 'pending' | 'compliant' | 'expiring_soon' | 'non_compliant';
+
+export type DocumentStatus = 'requested' | 'received' | 'validated' | 'rejected' | 'expiring_soon' | 'expired';
+
+export interface VigilanceDocument {
+  id: string;
+  third_party_id: string;
+  document_type: string;
+  document_type_display: string;
+  status: DocumentStatus;
+  s3_key: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  uploaded_at: string | null;
+  validated_at: string | null;
+  validated_by: string | null;
+  rejected_at: string | null;
+  rejection_reason: string | null;
+  expires_at: string | null;
+  auto_check_results: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ThirdParty {
+  id: string;
+  boond_provider_id: number | null;
+  type: string;
+  company_name: string;
+  legal_form: string;
+  capital: string | null;
+  siren: string;
+  siret: string;
+  rcs_city: string;
+  rcs_number: string;
+  head_office_address: string;
+  representative_name: string;
+  representative_title: string;
+  contact_email: string;
+  compliance_status: ComplianceStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ThirdPartyListResponse {
+  items: ThirdParty[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface ThirdPartyWithDocuments {
+  id: string;
+  company_name: string;
+  siren: string;
+  type: string;
+  compliance_status: string;
+  contact_email: string;
+  documents: VigilanceDocument[];
+  document_counts: Record<string, number>;
+}
+
+export interface ComplianceDashboard {
+  total_third_parties: number;
+  compliant: number;
+  non_compliant: number;
+  expiring_soon: number;
+  pending: number;
+  compliance_rate: number;
+  documents_pending_review: number;
+  documents_expiring_soon: number;
+}
+
+export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, { label: string; color: string }> = {
+  pending: { label: 'En attente', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
+  compliant: { label: 'Conforme', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
+  expiring_soon: { label: 'Expire bientôt', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' },
+  non_compliant: { label: 'Non conforme', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
+};
+
+export const DOCUMENT_STATUS_CONFIG: Record<DocumentStatus, { label: string; color: string }> = {
+  requested: { label: 'Demandé', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' },
+  received: { label: 'Reçu', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
+  validated: { label: 'Validé', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
+  rejected: { label: 'Rejeté', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
+  expiring_soon: { label: 'Expire bientôt', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' },
+  expired: { label: 'Expiré', color: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' },
+};
+
+// Portal
+export interface PortalInfo {
+  third_party: {
+    id: string;
+    company_name: string;
+    contact_email: string;
+    compliance_status: string;
+    type: string;
+  };
+  purpose: string;
+  contract_request_id: string | null;
+}
+
+export interface PortalDocument {
+  id: string;
+  document_type: string;
+  status: string;
+  file_name: string | null;
+  uploaded_at: string | null;
+  rejected_at: string | null;
+  rejection_reason: string | null;
+}

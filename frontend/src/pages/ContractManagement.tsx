@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { FileSignature } from 'lucide-react';
 
 import { contractsApi } from '../api/contracts';
@@ -19,6 +20,7 @@ const THIRD_PARTY_TYPE_LABELS: Record<string, string> = {
 type FilterTab = 'all' | 'active' | 'done';
 
 export function ContractManagement() {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const [page, setPage] = useState(0);
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
@@ -133,7 +135,7 @@ export function ContractManagement() {
             {filteredItems.map((cr) => {
               const config = CONTRACT_STATUS_CONFIG[cr.status];
               return (
-                <Card key={cr.id} className="hover:shadow-md transition-shadow">
+                <Card key={cr.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/contracts/${cr.id}`)}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4 min-w-0">
                       {/* Reference */}

@@ -7,12 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import AdvOrAdminUser, ContractAccessUser
+from app.config import get_settings
 from app.contract_management.api.schemas import (
     CommercialValidationRequest,
     ComplianceOverrideRequest,
     ContractConfigRequest,
     ContractRequestListResponse,
     ContractRequestResponse,
+    ContractResponse,
 )
 from app.contract_management.application.use_cases.configure_contract import (
     ConfigureContractUseCase,
@@ -242,3 +244,254 @@ async def get_next_reference(
     cr_repo = ContractRequestRepository(db)
     reference = await cr_repo.get_next_reference()
     return {"reference": reference}
+
+
+@router.post(
+    "/{contract_request_id}/generate-draft",
+    response_model=ContractResponse,
+    summary="Generate contract draft",
+)
+async def generate_draft(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate a DOCX contract draft. ADV/admin only."""
+    from app.contract_management.application.use_cases.generate_draft import (
+        GenerateDraftUseCase,
+    )
+    from app.contract_management.infrastructure.adapters.docx_contract_generator import (
+        DocxContractGenerator,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        ContractRepository,
+    )
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+    cr_repo = ContractRequestRepository(db)
+    contract_repo = ContractRepository(db)
+    tp_repo = ThirdPartyRepository(db)
+    s3_service = S3StorageClient(settings)
+
+    use_case = GenerateDraftUseCase(
+        contract_request_repository=cr_repo,
+        contract_repository=contract_repo,
+        third_party_repository=tp_repo,
+        contract_generator=DocxContractGenerator(),
+        s3_service=s3_service,
+        settings=settings,
+    )
+
+    try:
+        contract = await use_case.execute(contract_request_id)
+    except Exception as exc:
+        logger.error("generate_draft_failed", error=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    audit_logger.log(
+        AuditAction.DRAFT_GENERATED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(contract_request_id),
+    )
+
+    return ContractResponse(
+        id=contract.id,
+        contract_request_id=contract.contract_request_id,
+        reference=contract.reference,
+        version=contract.version,
+        s3_key_draft=contract.s3_key_draft,
+        s3_key_signed=contract.s3_key_signed,
+        yousign_status=contract.yousign_status,
+        partner_comments=contract.partner_comments,
+        created_at=contract.created_at,
+        signed_at=contract.signed_at,
+    )
+
+
+@router.post(
+    "/{contract_request_id}/send-draft-to-partner",
+    response_model=ContractRequestResponse,
+    summary="Send draft to partner for review",
+)
+async def send_draft_to_partner(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Send the contract draft to the partner via magic link. ADV/admin only."""
+    from app.infrastructure.email.sender import EmailService
+    from app.third_party.application.use_cases.generate_magic_link import (
+        GenerateMagicLinkUseCase,
+    )
+    from app.third_party.infrastructure.adapters.postgres_magic_link_repo import (
+        MagicLinkRepository,
+    )
+
+    from app.contract_management.application.use_cases.send_draft_to_partner import (
+        SendDraftToPartnerUseCase,
+    )
+
+    settings = get_settings()
+    cr_repo = ContractRequestRepository(db)
+    tp_repo = ThirdPartyRepository(db)
+    ml_repo = MagicLinkRepository(db)
+    email_service = EmailService(settings)
+
+    magic_link_uc = GenerateMagicLinkUseCase(
+        third_party_repository=tp_repo,
+        magic_link_repository=ml_repo,
+        email_service=email_service,
+        portal_base_url=settings.BOBBY_PORTAL_BASE_URL,
+    )
+
+    use_case = SendDraftToPartnerUseCase(
+        contract_request_repository=cr_repo,
+        third_party_repository=tp_repo,
+        generate_magic_link_use_case=magic_link_uc,
+    )
+
+    try:
+        cr = await use_case.execute(contract_request_id)
+    except Exception as exc:
+        logger.error("send_draft_to_partner_failed", error=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return _cr_to_response(cr)
+
+
+@router.post(
+    "/{contract_request_id}/send-for-signature",
+    response_model=ContractRequestResponse,
+    summary="Send contract for electronic signature",
+)
+async def send_for_signature(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Send the contract to YouSign for signature. ADV/admin only."""
+    from app.contract_management.application.use_cases.send_for_signature import (
+        SendForSignatureUseCase,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        ContractRepository,
+    )
+    from app.contract_management.infrastructure.adapters.yousign_client import YouSignClient
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+    cr_repo = ContractRequestRepository(db)
+    contract_repo = ContractRepository(db)
+    tp_repo = ThirdPartyRepository(db)
+    s3_service = S3StorageClient(settings)
+    yousign = YouSignClient(
+        api_key=settings.YOUSIGN_API_KEY,
+        base_url=settings.YOUSIGN_API_BASE_URL,
+    )
+
+    use_case = SendForSignatureUseCase(
+        contract_request_repository=cr_repo,
+        contract_repository=contract_repo,
+        third_party_repository=tp_repo,
+        s3_service=s3_service,
+        signature_service=yousign,
+        settings=settings,
+    )
+
+    try:
+        cr = await use_case.execute(contract_request_id)
+    except Exception as exc:
+        logger.error("send_for_signature_failed", error=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return _cr_to_response(cr)
+
+
+@router.post(
+    "/{contract_request_id}/push-to-crm",
+    response_model=ContractRequestResponse,
+    summary="Push contract to BoondManager CRM",
+)
+async def push_to_crm(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create provider + purchase order in BoondManager. ADV/admin only."""
+    from app.contract_management.application.use_cases.push_to_crm import PushToCrmUseCase
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        ContractRepository,
+    )
+    from app.infrastructure.boond.client import BoondClient
+
+    settings = get_settings()
+    cr_repo = ContractRequestRepository(db)
+    contract_repo = ContractRepository(db)
+    tp_repo = ThirdPartyRepository(db)
+    crm_service = BoondCrmAdapter(BoondClient(settings))
+
+    use_case = PushToCrmUseCase(
+        contract_request_repository=cr_repo,
+        contract_repository=contract_repo,
+        third_party_repository=tp_repo,
+        crm_service=crm_service,
+    )
+
+    try:
+        cr = await use_case.execute(contract_request_id)
+    except Exception as exc:
+        logger.error("push_to_crm_failed", error=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return _cr_to_response(cr)
+
+
+@router.get(
+    "/{contract_request_id}/contracts",
+    response_model=list[ContractResponse],
+    summary="List contracts for a request",
+)
+async def list_contracts(
+    contract_request_id: UUID,
+    auth: ContractAccessUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """List all contract documents for a request."""
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        ContractRepository,
+    )
+
+    _user_id, role, email = auth
+    cr_repo = ContractRequestRepository(db)
+    contract_repo = ContractRepository(db)
+
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+
+    if role == "commercial" and cr.commercial_email != email:
+        raise HTTPException(status_code=403, detail="Accès non autorisé.")
+
+    contract = await contract_repo.get_by_request_id(contract_request_id)
+    if not contract:
+        return []
+
+    return [
+        ContractResponse(
+            id=contract.id,
+            contract_request_id=contract.contract_request_id,
+            reference=contract.reference,
+            version=contract.version,
+            s3_key_draft=contract.s3_key_draft,
+            s3_key_signed=contract.s3_key_signed,
+            yousign_status=contract.yousign_status,
+            partner_comments=contract.partner_comments,
+            created_at=contract.created_at,
+            signed_at=contract.signed_at,
+        )
+    ]
