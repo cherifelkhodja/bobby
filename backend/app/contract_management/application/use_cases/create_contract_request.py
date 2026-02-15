@@ -18,6 +18,34 @@ class CreateContractRequestUseCase:
 
     Parses the webhook payload (positioning update), checks for
     idempotence, fetches Boond data, and creates a contract request.
+
+    BoondManager webhook payload format:
+    ```json
+    [
+      {
+        "data": {
+          "id": "3_abc123...",       // webhook event ID (NOT positioning ID)
+          "type": "webhookevent",
+          "attributes": {"type": "update", ...},
+          "relationships": {
+            "dependsOn": {"id": "433", "type": "positioning"},
+            "log": {"id": "117497", "type": "log"}
+          },
+          "included": [
+            {
+              "id": "117497", "type": "log",
+              "attributes": {
+                "content": {
+                  "context": {"id": "433"},
+                  "diff": {"state": {"old": 0, "new": 7}}
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+    ```
     """
 
     def __init__(
@@ -34,11 +62,11 @@ class CreateContractRequestUseCase:
         self._email_service = email_service
         self._frontend_url = frontend_url
 
-    async def execute(self, payload: dict[str, Any]) -> ContractRequest | None:
+    async def execute(self, payload: dict[str, Any] | list) -> ContractRequest | None:
         """Execute the use case.
 
         Args:
-            payload: Raw webhook payload from BoondManager.
+            payload: Raw webhook payload from BoondManager (array of events).
 
         Returns:
             The created contract request, or None if filtered out.
@@ -46,31 +74,45 @@ class CreateContractRequestUseCase:
         Raises:
             WebhookDuplicateError: If the event was already processed.
         """
-        # Parse payload — Boond sends array of updated entities
+        # Boond sends an array of webhook events
         entries = payload if isinstance(payload, list) else [payload]
 
         for entry in entries:
             data = entry.get("data", entry)
-            attributes = data.get("attributes", {})
-            positioning_id = int(data.get("id", 0))
-            state = attributes.get("state")
+            webhook_event_id = data.get("id", "")
+            data_type = data.get("type", "")
 
-            # Filter: only process state 7
-            if state != BOOND_STATE_WON_AWAITING_CONTRACT:
-                logger.info(
-                    "webhook_positioning_state_filtered",
-                    positioning_id=positioning_id,
-                    state=state,
+            # Parse depending on payload format
+            positioning_id, new_state = self._parse_webhook_event(data)
+
+            if not positioning_id:
+                logger.warning(
+                    "webhook_no_positioning_id",
+                    webhook_event_id=webhook_event_id,
+                    data_type=data_type,
                 )
                 continue
 
-            # Idempotence check
-            event_id = f"positioning_update_{positioning_id}_{state}"
-            if await self._webhook_repo.exists(event_id):
+            logger.info(
+                "webhook_parsed",
+                webhook_event_id=webhook_event_id,
+                positioning_id=positioning_id,
+                new_state=new_state,
+            )
+
+            # Filter: only process state 7
+            if new_state != BOOND_STATE_WON_AWAITING_CONTRACT:
                 logger.info(
-                    "webhook_duplicate_event",
-                    event_id=event_id,
+                    "webhook_positioning_state_filtered",
+                    positioning_id=positioning_id,
+                    state=new_state,
                 )
+                continue
+
+            # Idempotence check using webhook event ID
+            event_id = f"positioning_update_{positioning_id}_{new_state}"
+            if await self._webhook_repo.exists(event_id):
+                logger.info("webhook_duplicate_event", event_id=event_id)
                 raise WebhookDuplicateError(event_id)
 
             # Check if CR already exists for this positioning
@@ -98,7 +140,6 @@ class CreateContractRequestUseCase:
             # Get commercial info from need manager
             commercial_email = ""
             commercial_name = ""
-            need_data = None
             if need_id:
                 need_data = await self._crm.get_need(need_id)
                 if need_data:
@@ -147,3 +188,57 @@ class CreateContractRequestUseCase:
             return saved
 
         return None
+
+    @staticmethod
+    def _parse_webhook_event(data: dict[str, Any]) -> tuple[int | None, int | None]:
+        """Parse a BoondManager webhook event to extract positioning ID and new state.
+
+        BoondManager sends webhook events with type "webhookevent". The actual
+        positioning ID is in relationships.dependsOn, and the state change is
+        in the included log entry's content.diff.
+
+        Args:
+            data: The "data" object from the webhook payload.
+
+        Returns:
+            Tuple of (positioning_id, new_state). Either may be None.
+        """
+        data_type = data.get("type", "")
+
+        if data_type == "webhookevent":
+            # Extract positioning ID from relationships.dependsOn
+            relationships = data.get("relationships", {})
+            depends_on = relationships.get("dependsOn", {})
+            entity_type = depends_on.get("type", "")
+            entity_id_str = str(depends_on.get("id", ""))
+
+            if entity_type != "positioning" or not entity_id_str:
+                return None, None
+
+            try:
+                positioning_id = int(entity_id_str)
+            except (ValueError, TypeError):
+                return None, None
+
+            # Extract new state from included log entry
+            new_state = None
+            for included in data.get("included", []):
+                if included.get("type") != "log":
+                    continue
+                content = included.get("attributes", {}).get("content", {})
+                diff = content.get("diff", {})
+                state_diff = diff.get("state", {})
+                if "new" in state_diff:
+                    new_state = state_diff["new"]
+                    break
+
+            return positioning_id, new_state
+
+        # Fallback: direct positioning data (e.g., from manual test)
+        attributes = data.get("attributes", {})
+        try:
+            positioning_id = int(data.get("id", 0))
+        except (ValueError, TypeError):
+            return None, None
+        state = attributes.get("state")
+        return positioning_id if positioning_id else None, state

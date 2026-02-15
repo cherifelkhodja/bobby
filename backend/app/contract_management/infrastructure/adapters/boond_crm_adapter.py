@@ -35,7 +35,7 @@ class BoondCrmAdapter:
             relationships = data.get("relationships", {})
 
             return {
-                "id": int(data.get("id", positioning_id)),
+                "id": positioning_id,
                 "state": attributes.get("state"),
                 "candidate_id": self._extract_relationship_id(relationships, "resource"),
                 "need_id": self._extract_relationship_id(relationships, "delivery"),
@@ -74,12 +74,12 @@ class BoondCrmAdapter:
             commercial_name = ""
             manager_id = self._extract_relationship_id(relationships, "mainManager")
 
-            # Check included data for manager info
+            # Check included data for manager info (compare as strings)
+            manager_id_str = str(manager_id) if manager_id else ""
             for included in response.get("included", []):
                 if (
                     included.get("type") == "resource"
-                    and included.get("id")
-                    and int(included["id"]) == manager_id
+                    and str(included.get("id", "")) == manager_id_str
                 ):
                     inc_attrs = included.get("attributes", {})
                     commercial_email = inc_attrs.get("email1", "") or inc_attrs.get("email2", "")
@@ -107,20 +107,20 @@ class BoondCrmAdapter:
                         error=str(exc),
                     )
 
-            # Extract client name from included company
+            # Extract client name from included company (compare as strings)
             client_name = ""
             company_id = self._extract_relationship_id(relationships, "company")
+            company_id_str = str(company_id) if company_id else ""
             for included in response.get("included", []):
                 if (
                     included.get("type") == "company"
-                    and included.get("id")
-                    and int(included["id"]) == company_id
+                    and str(included.get("id", "")) == company_id_str
                 ):
                     client_name = included.get("attributes", {}).get("name", "")
                     break
 
             return {
-                "id": int(data.get("id", need_id)),
+                "id": need_id,
                 "title": attributes.get("title", ""),
                 "client_id": company_id,
                 "client_name": client_name,
@@ -149,7 +149,7 @@ class BoondCrmAdapter:
             attributes = data.get("attributes", {})
 
             return {
-                "id": int(data.get("id", candidate_id)),
+                "id": candidate_id,
                 "first_name": attributes.get("firstName", ""),
                 "last_name": attributes.get("lastName", ""),
                 "email": attributes.get("email1", ""),
@@ -191,13 +191,13 @@ class BoondCrmAdapter:
         }
 
         response = await self._boond._make_request("POST", "/companies", json=payload)
-        provider_id = int(response.get("data", {}).get("id", 0))
+        result_id = response.get("data", {}).get("id")
         logger.info(
             "boond_provider_created",
-            provider_id=provider_id,
+            provider_id=result_id,
             company_name=company_name,
         )
-        return provider_id
+        return int(result_id) if result_id else 0
 
     async def create_purchase_order(
         self,
@@ -232,13 +232,13 @@ class BoondCrmAdapter:
         }
 
         response = await self._boond._make_request("POST", "/purchase-orders", json=payload)
-        po_id = int(response.get("data", {}).get("id", 0))
+        result_id = response.get("data", {}).get("id")
         logger.info(
             "boond_purchase_order_created",
-            purchase_order_id=po_id,
+            purchase_order_id=result_id,
             reference=reference,
         )
-        return po_id
+        return int(result_id) if result_id else 0
 
     @staticmethod
     def _extract_relationship_id(relationships: dict, key: str) -> int | None:
