@@ -92,9 +92,16 @@ class UserRepository:
         return self._to_entity(model)
 
     async def get_by_boond_resource_id(self, boond_resource_id: str) -> User | None:
-        """Get user by BoondManager resource ID."""
+        """Get user by BoondManager resource ID.
+
+        Returns the first active match if multiple users share the same
+        boond_resource_id (can happen with duplicate invitations).
+        """
         result = await self.session.execute(
-            select(UserModel).where(UserModel.boond_resource_id == boond_resource_id)
+            select(UserModel)
+            .where(UserModel.boond_resource_id == boond_resource_id)
+            .order_by(UserModel.is_active.desc(), UserModel.created_at.desc())
+            .limit(1)
         )
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
