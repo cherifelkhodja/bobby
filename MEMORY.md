@@ -175,6 +175,7 @@ docker-compose up # Start all services
   - **Migration 026** : contrainte unique `uq_cm_contract_requests_boond_positioning` remplacée par un index unique partiel (`WHERE status != 'cancelled'`) — cause réelle du ROLLBACK en prod (violation unique constraint à l'INSERT)
   - **Formulaire validation commerciale** : formulaire intégré dans ContractDetail pour le statut `pending_commercial_validation` (type tiers, TJM, date début, email contact, client, lieu, description)
   - Backend `validate-commercial` endpoint utilise `ContractAccessUser` (commercial/adv/admin) au lieu de `AdvOrAdminUser`
+  - **Liste commerciale** : comparaison email case-insensitive (`func.lower()`) dans `list_by_commercial_email` et `count_by_commercial_email`
   - Frontend ContractDetail : bouton "Annuler" + modale de confirmation
   - Frontend ContractManagement : bouton X sur chaque ligne (sauf statuts terminaux) + modale
   - Fichiers modifiés : `routes.py`, `audit/logger.py`, `postgres_contract_repo.py`, `contracts.ts`, `ContractDetail.tsx`, `ContractManagement.tsx`
