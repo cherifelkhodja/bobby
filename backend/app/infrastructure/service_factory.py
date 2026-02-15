@@ -388,3 +388,73 @@ class ServiceFactory:
             cv_template_repository=self.cv_template_repository,
             cv_transformation_log_repository=self.cv_transformation_log_repository,
         )
+
+    # =========================================================================
+    # Repositories - Third Party / Vigilance / Contract Management
+    # =========================================================================
+
+    @property
+    def third_party_repository(self):
+        """Get or create ThirdPartyRepository."""
+        from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
+            ThirdPartyRepository,
+        )
+
+        if "third_party" not in self._repositories_cache:
+            self._repositories_cache["third_party"] = ThirdPartyRepository(self._db)
+        return self._repositories_cache["third_party"]
+
+    @property
+    def magic_link_repository(self):
+        """Get or create MagicLinkRepository."""
+        from app.third_party.infrastructure.adapters.postgres_magic_link_repo import (
+            MagicLinkRepository,
+        )
+
+        if "magic_link" not in self._repositories_cache:
+            self._repositories_cache["magic_link"] = MagicLinkRepository(self._db)
+        return self._repositories_cache["magic_link"]
+
+    @property
+    def document_repository(self):
+        """Get or create DocumentRepository."""
+        from app.vigilance.infrastructure.adapters.postgres_document_repo import (
+            DocumentRepository,
+        )
+
+        if "document" not in self._repositories_cache:
+            self._repositories_cache["document"] = DocumentRepository(self._db)
+        return self._repositories_cache["document"]
+
+    @property
+    def contract_request_repository(self):
+        """Get or create ContractRequestRepository."""
+        from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+            ContractRequestRepository,
+        )
+
+        if "contract_request" not in self._repositories_cache:
+            self._repositories_cache["contract_request"] = ContractRequestRepository(self._db)
+        return self._repositories_cache["contract_request"]
+
+    @property
+    def contract_repository(self):
+        """Get or create ContractRepository."""
+        from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+            ContractRepository,
+        )
+
+        if "contract" not in self._repositories_cache:
+            self._repositories_cache["contract"] = ContractRepository(self._db)
+        return self._repositories_cache["contract"]
+
+    @property
+    def webhook_event_repository(self):
+        """Get or create WebhookEventRepository."""
+        from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+            WebhookEventRepository,
+        )
+
+        if "webhook_event" not in self._repositories_cache:
+            self._repositories_cache["webhook_event"] = WebhookEventRepository(self._db)
+        return self._repositories_cache["webhook_event"]

@@ -371,3 +371,263 @@ class EmailService:
         """
 
         return await self._send_email(to_email, subject, html_body)
+
+    # =========================================================================
+    # Contractualisation & Vigilance emails
+    # =========================================================================
+
+    async def send_commercial_validation_request(
+        self,
+        to: str,
+        commercial_name: str,
+        contract_ref: str,
+        link: str,
+    ) -> bool:
+        """Send commercial validation request for a contract."""
+        subject = f"Validation commerciale requise - {contract_ref}"
+        html_body = f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #0ea5e9;">Validation commerciale</h1>
+                <p>Bonjour {commercial_name},</p>
+                <p>Une demande de contrat <strong>{contract_ref}</strong> nécessite votre validation.</p>
+                <p>Veuillez compléter les informations commerciales (type de tiers, TJM, date de début, email de contact).</p>
+                <p style="text-align: center; margin: 30px 0;">
+                    <a href="{link}" style="background-color: #0ea5e9; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                        Valider la demande
+                    </a>
+                </p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby.</p>
+            </div>
+        </body></html>
+        """
+        return await self._send_email(to, subject, html_body)
+
+    async def send_document_collection_request(
+        self,
+        to: str,
+        third_party_name: str,
+        portal_link: str,
+    ) -> bool:
+        """Send document collection request to a third party via portal link."""
+        subject = "Documents requis pour votre dossier - Bobby"
+        html_body = f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #0ea5e9;">Documents requis</h1>
+                <p>Bonjour,</p>
+                <p>Dans le cadre de notre collaboration avec <strong>{third_party_name}</strong>, nous avons besoin de documents légaux pour constituer votre dossier.</p>
+                <p>Veuillez accéder à votre portail sécurisé pour consulter la liste des documents attendus et les téléverser :</p>
+                <p style="text-align: center; margin: 30px 0;">
+                    <a href="{portal_link}" style="background-color: #0ea5e9; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                        Accéder au portail
+                    </a>
+                </p>
+                <p style="color: #666; font-size: 13px;">Ce lien est valable 7 jours.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby - Gemini Consulting.</p>
+            </div>
+        </body></html>
+        """
+        return await self._send_email(to, subject, html_body)
+
+    async def send_document_reminder(
+        self,
+        to: str,
+        third_party_name: str,
+        reminder_number: int,
+        portal_link: str,
+    ) -> bool:
+        """Send document collection reminder."""
+        subject = f"Rappel : documents en attente ({reminder_number}e relance) - Bobby"
+        urgency = ""
+        if reminder_number >= 3:
+            urgency = "<p style='color: #ef4444; font-weight: bold;'>Dernier rappel avant blocage de votre dossier.</p>"
+
+        html_body = f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #f59e0b;">Rappel - Documents en attente</h1>
+                <p>Bonjour,</p>
+                <p>Nous n'avons pas encore reçu tous les documents requis pour <strong>{third_party_name}</strong>.</p>
+                {urgency}
+                <p style="text-align: center; margin: 30px 0;">
+                    <a href="{portal_link}" style="background-color: #f59e0b; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                        Compléter mon dossier
+                    </a>
+                </p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby - Gemini Consulting.</p>
+            </div>
+        </body></html>
+        """
+        return await self._send_email(to, subject, html_body)
+
+    async def send_document_rejected(
+        self,
+        to: str,
+        third_party_name: str,
+        doc_type: str,
+        reason: str,
+        portal_link: str,
+    ) -> bool:
+        """Send notification that a document was rejected."""
+        subject = f"Document refusé : {doc_type} - Bobby"
+        html_body = f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #ef4444;">Document refusé</h1>
+                <p>Bonjour,</p>
+                <p>Le document <strong>{doc_type}</strong> soumis pour <strong>{third_party_name}</strong> a été refusé.</p>
+                <div style="background-color: #fef2f2; padding: 15px; border-radius: 5px; border-left: 4px solid #ef4444; margin: 20px 0;">
+                    <p><strong>Motif :</strong> {reason}</p>
+                </div>
+                <p>Veuillez soumettre un nouveau document via votre portail :</p>
+                <p style="text-align: center; margin: 30px 0;">
+                    <a href="{portal_link}" style="background-color: #0ea5e9; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                        Accéder au portail
+                    </a>
+                </p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby - Gemini Consulting.</p>
+            </div>
+        </body></html>
+        """
+        return await self._send_email(to, subject, html_body)
+
+    async def send_contract_draft_review(
+        self,
+        to: str,
+        third_party_name: str,
+        contract_ref: str,
+        portal_link: str,
+    ) -> bool:
+        """Send contract draft for partner review via portal."""
+        subject = f"Contrat à relire - {contract_ref or 'Nouveau contrat'}"
+        html_body = f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #0ea5e9;">Contrat à valider</h1>
+                <p>Bonjour,</p>
+                <p>Un projet de contrat a été préparé pour <strong>{third_party_name}</strong>.</p>
+                <p>Veuillez le relire et nous indiquer si vous l'approuvez ou si des modifications sont nécessaires.</p>
+                <p style="text-align: center; margin: 30px 0;">
+                    <a href="{portal_link}" style="background-color: #0ea5e9; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                        Relire le contrat
+                    </a>
+                </p>
+                <p style="color: #666; font-size: 13px;">Ce lien est valable 7 jours.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby - Gemini Consulting.</p>
+            </div>
+        </body></html>
+        """
+        return await self._send_email(to, subject, html_body)
+
+    async def send_contract_changes_requested(
+        self,
+        to: str,
+        contract_ref: str,
+        comments: str,
+    ) -> bool:
+        """Notify ADV that the partner requested contract changes."""
+        subject = f"Modifications demandées sur le contrat {contract_ref}"
+        html_body = f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #f59e0b;">Modifications demandées</h1>
+                <p>Le partenaire a demandé des modifications sur le contrat <strong>{contract_ref}</strong>.</p>
+                <div style="background-color: #fffbeb; padding: 15px; border-radius: 5px; border-left: 4px solid #f59e0b; margin: 20px 0;">
+                    <p><strong>Commentaires :</strong></p>
+                    <p>{comments}</p>
+                </div>
+                <p>Veuillez traiter cette demande dans Bobby.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby.</p>
+            </div>
+        </body></html>
+        """
+        return await self._send_email(to, subject, html_body)
+
+    async def send_contract_signed_notification(
+        self,
+        to: str,
+        contract_ref: str,
+        third_party_name: str,
+    ) -> bool:
+        """Notify that a contract has been signed."""
+        subject = f"Contrat signé - {contract_ref}"
+        html_body = f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #10b981;">Contrat signé</h1>
+                <p>Le contrat <strong>{contract_ref}</strong> avec <strong>{third_party_name}</strong> a été signé avec succès.</p>
+                <p>Le document signé est archivé dans Bobby.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby.</p>
+            </div>
+        </body></html>
+        """
+        return await self._send_email(to, subject, html_body)
+
+    async def send_document_expiring(
+        self,
+        to: str,
+        third_party_name: str,
+        doc_type: str,
+        days_left: int,
+    ) -> bool:
+        """Notify that a document is expiring soon."""
+        subject = f"Document expirant bientôt : {doc_type} ({days_left}j) - Bobby"
+        html_body = f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #f59e0b;">Document expirant</h1>
+                <p>Le document <strong>{doc_type}</strong> de <strong>{third_party_name}</strong> expire dans <strong>{days_left} jour(s)</strong>.</p>
+                <p>Veuillez demander un renouvellement au partenaire.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby.</p>
+            </div>
+        </body></html>
+        """
+        return await self._send_email(to, subject, html_body)
+
+    async def send_document_expired(
+        self,
+        to: str,
+        third_party_name: str,
+        doc_type: str,
+    ) -> bool:
+        """Notify that a document has expired."""
+        subject = f"Document expiré : {doc_type} - Bobby"
+        html_body = f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #ef4444;">Document expiré</h1>
+                <p>Le document <strong>{doc_type}</strong> de <strong>{third_party_name}</strong> a expiré.</p>
+                <p>Le statut de conformité du tiers a été mis à jour. Un renouvellement est nécessaire.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby.</p>
+            </div>
+        </body></html>
+        """
+        return await self._send_email(to, subject, html_body)

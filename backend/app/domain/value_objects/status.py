@@ -9,6 +9,7 @@ class UserRole(str, Enum):
     USER = "user"
     COMMERCIAL = "commercial"
     RH = "rh"
+    ADV = "adv"
     ADMIN = "admin"
 
     def __str__(self) -> str:
@@ -21,6 +22,7 @@ class UserRole(str, Enum):
             UserRole.USER: "Utilisateur",
             UserRole.COMMERCIAL: "Commercial",
             UserRole.RH: "RH",
+            UserRole.ADV: "ADV",
             UserRole.ADMIN: "Administrateur",
         }
         return names[self]
@@ -44,6 +46,26 @@ class UserRole(str, Enum):
     def can_change_cooptation_status(self) -> bool:
         """Check if role can change cooptation status."""
         return self in (UserRole.ADMIN, UserRole.RH, UserRole.COMMERCIAL)
+
+    @property
+    def can_manage_vigilance(self) -> bool:
+        """Check if role can manage vigilance documents (validate/reject)."""
+        return self in (UserRole.ADMIN, UserRole.ADV)
+
+    @property
+    def can_view_vigilance(self) -> bool:
+        """Check if role can view vigilance documents and compliance dashboard."""
+        return self in (UserRole.ADMIN, UserRole.ADV)
+
+    @property
+    def can_manage_contracts(self) -> bool:
+        """Check if role can configure contracts and generate drafts."""
+        return self in (UserRole.ADMIN, UserRole.ADV)
+
+    @property
+    def can_validate_commercial(self) -> bool:
+        """Check if role can validate contract requests as commercial."""
+        return self in (UserRole.COMMERCIAL,)
 
 
 class CooptationStatus(str, Enum):

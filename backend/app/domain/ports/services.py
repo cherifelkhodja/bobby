@@ -78,6 +78,62 @@ class EmailServicePort(Protocol):
         """Send invitation email to join the platform."""
         ...
 
+    # Contractualisation & Vigilance emails
+
+    async def send_commercial_validation_request(
+        self, to: str, commercial_name: str, contract_ref: str, link: str
+    ) -> bool:
+        """Send commercial validation request for a contract."""
+        ...
+
+    async def send_document_collection_request(
+        self, to: str, third_party_name: str, portal_link: str
+    ) -> bool:
+        """Send document collection request to third party."""
+        ...
+
+    async def send_document_reminder(
+        self, to: str, third_party_name: str, reminder_number: int, portal_link: str
+    ) -> bool:
+        """Send document collection reminder."""
+        ...
+
+    async def send_document_rejected(
+        self, to: str, third_party_name: str, doc_type: str, reason: str, portal_link: str
+    ) -> bool:
+        """Notify that a document was rejected."""
+        ...
+
+    async def send_contract_draft_review(
+        self, to: str, third_party_name: str, contract_ref: str, portal_link: str
+    ) -> bool:
+        """Send contract draft for partner review."""
+        ...
+
+    async def send_contract_changes_requested(
+        self, to: str, contract_ref: str, comments: str
+    ) -> bool:
+        """Notify ADV that partner requested contract changes."""
+        ...
+
+    async def send_contract_signed_notification(
+        self, to: str, contract_ref: str, third_party_name: str
+    ) -> bool:
+        """Notify that a contract has been signed."""
+        ...
+
+    async def send_document_expiring(
+        self, to: str, third_party_name: str, doc_type: str, days_left: int
+    ) -> bool:
+        """Notify that a document is expiring soon."""
+        ...
+
+    async def send_document_expired(
+        self, to: str, third_party_name: str, doc_type: str
+    ) -> bool:
+        """Notify that a document has expired."""
+        ...
+
 
 class CacheServicePort(Protocol):
     """Port for caching operations."""

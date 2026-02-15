@@ -1,0 +1,143 @@
+"""Webhook routes for BoondManager and YouSign."""
+
+
+import structlog
+from fastapi import APIRouter, Depends, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import get_settings
+from app.contract_management.api.schemas import WebhookResponse
+from app.contract_management.application.use_cases.create_contract_request import (
+    CreateContractRequestUseCase,
+)
+from app.contract_management.domain.exceptions import WebhookDuplicateError
+from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+    ContractRequestRepository,
+    WebhookEventRepository,
+)
+from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
+from app.infrastructure.database.connection import get_db
+
+logger = structlog.get_logger()
+
+router = APIRouter(tags=["Webhooks"])
+
+
+@router.post(
+    "/boondmanager/positioning-update",
+    response_model=WebhookResponse,
+    summary="Handle BoondManager positioning update webhook",
+)
+async def handle_boond_positioning_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Handle positioning update from BoondManager.
+
+    Always returns 200 OK to prevent retries from Boond.
+    """
+    settings = get_settings()
+
+    try:
+        payload = await request.json()
+    except Exception:
+        logger.warning("webhook_invalid_json")
+        return WebhookResponse(status="ok", message="Invalid JSON")
+
+    audit_logger.log(
+        AuditAction.WEBHOOK_RECEIVED,
+        AuditResource.CONTRACT_REQUEST,
+        details={"source": "boondmanager", "type": "positioning_update"},
+    )
+
+    cr_repo = ContractRequestRepository(db)
+    webhook_repo = WebhookEventRepository(db)
+
+    from app.infrastructure.email.sender import EmailService
+
+    email_service = EmailService(settings)
+
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.infrastructure.boond.client import BoondClient
+
+    boond_client = BoondClient(settings)
+    crm_service = BoondCrmAdapter(boond_client)
+
+    use_case = CreateContractRequestUseCase(
+        contract_request_repository=cr_repo,
+        webhook_event_repository=webhook_repo,
+        crm_service=crm_service,
+        email_service=email_service,
+    )
+
+    try:
+        result = await use_case.execute(payload)
+        if result:
+            return WebhookResponse(
+                status="ok",
+                message=f"Contract request {result.reference} created",
+            )
+        return WebhookResponse(status="ok", message="No action taken")
+    except WebhookDuplicateError:
+        return WebhookResponse(status="ok", message="Duplicate event")
+    except Exception as exc:
+        logger.error("webhook_processing_error", error=str(exc))
+        return WebhookResponse(status="ok", message="Processing error")
+
+
+@router.post(
+    "/yousign/signature-completed",
+    response_model=WebhookResponse,
+    summary="Handle YouSign signature completed webhook",
+)
+async def handle_yousign_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Handle signature completed event from YouSign."""
+    settings = get_settings()
+
+    try:
+        payload = await request.json()
+    except Exception:
+        logger.warning("yousign_webhook_invalid_json")
+        return WebhookResponse(status="ok", message="Invalid JSON")
+
+    # Verify webhook secret if configured
+    webhook_secret = settings.YOUSIGN_WEBHOOK_SECRET
+    if webhook_secret:
+        # YouSign sends signature in header
+        signature = request.headers.get("x-yousign-signature", "")
+        if not signature:
+            logger.warning("yousign_webhook_no_signature")
+            return WebhookResponse(status="ok", message="Missing signature")
+
+    audit_logger.log(
+        AuditAction.WEBHOOK_RECEIVED,
+        AuditResource.CONTRACT,
+        details={"source": "yousign", "type": "signature_completed"},
+    )
+
+    event_type = payload.get("event_name", "")
+    if event_type != "signature_request.done":
+        return WebhookResponse(status="ok", message=f"Ignored event: {event_type}")
+
+    procedure_id = payload.get("data", {}).get("signature_request", {}).get("id", "")
+    if not procedure_id:
+        logger.warning("yousign_webhook_no_procedure_id")
+        return WebhookResponse(status="ok", message="No procedure ID")
+
+    logger.info(
+        "yousign_signature_completed",
+        procedure_id=procedure_id,
+    )
+
+    audit_logger.log(
+        AuditAction.CONTRACT_SIGNED,
+        AuditResource.CONTRACT,
+        details={"procedure_id": procedure_id},
+    )
+
+    return WebhookResponse(status="ok", message="Signature processed")

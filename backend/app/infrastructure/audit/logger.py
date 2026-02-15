@@ -52,6 +52,26 @@ class AuditAction(str, Enum):
     ADMIN_ACCESS = "admin_access"
     BOOND_SYNC = "boond_sync"
 
+    # Third party / Portal
+    PORTAL_ACCESSED = "portal_accessed"
+    MAGIC_LINK_GENERATED = "magic_link_generated"
+
+    # Vigilance documentaire
+    DOCUMENT_UPLOADED = "document_uploaded"
+    DOCUMENT_VALIDATED = "document_validated"
+    DOCUMENT_REJECTED = "document_rejected"
+    COMPLIANCE_OVERRIDDEN = "compliance_overridden"
+
+    # Contract management
+    WEBHOOK_RECEIVED = "webhook_received"
+    CONTRACT_REQUEST_CREATED = "contract_request_created"
+    COMMERCIAL_VALIDATED = "commercial_validated"
+    DRAFT_GENERATED = "draft_generated"
+    CONTRACT_SIGNED = "contract_signed"
+
+    # RGPD
+    RGPD_PURGE = "rgpd_purge"
+
     # Security events
     RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
     UNAUTHORIZED_ACCESS = "unauthorized_access"
@@ -71,6 +91,11 @@ class AuditResource(str, Enum):
     APPLICATION = "application"
     SESSION = "session"
     SYSTEM = "system"
+    THIRD_PARTY = "third_party"
+    MAGIC_LINK = "magic_link"
+    VIGILANCE_DOCUMENT = "vigilance_document"
+    CONTRACT_REQUEST = "contract_request"
+    CONTRACT = "contract"
 
 
 class AuditLogger:

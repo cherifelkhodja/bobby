@@ -27,10 +27,16 @@ from app.api.routes.v1 import (
     users_router,
 )
 from app.config import settings
+from app.contract_management.api.routes import router as contract_routes_router
+from app.contract_management.api.webhook_routes import router as webhook_router
 from app.infrastructure.database.connection import engine
 from app.infrastructure.database.seed import seed_admin_user
 from app.infrastructure.logging import configure_logging
 from app.quotation_generator.api import router as quotation_generator_router
+from app.shared.scheduling.cron_jobs import scheduler, setup_scheduler
+from app.third_party.api.routes import router as portal_router
+from app.vigilance.api.dashboard_routes import router as compliance_dashboard_router
+from app.vigilance.api.routes import router as vigilance_router
 
 
 @asynccontextmanager
@@ -43,9 +49,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if not settings.is_production:
         await seed_admin_user()
 
+    # Start scheduler for CRON jobs
+    setup_scheduler()
+    scheduler.start()
+
     yield
 
     # Shutdown
+    scheduler.shutdown(wait=False)
     await engine.dispose()
 
 
@@ -101,3 +112,14 @@ app.include_router(
 )
 app.include_router(settings_router, prefix="/api/v1/settings", tags=["Settings"])
 app.include_router(quotation_generator_router, prefix="/api/v1", tags=["Quotation Generator"])
+
+# Contractualisation & Vigilance routes
+app.include_router(portal_router, prefix="/api/v1", tags=["Portal"])
+app.include_router(vigilance_router, prefix="/api/v1/vigilance", tags=["Vigilance"])
+app.include_router(
+    compliance_dashboard_router, prefix="/api/v1/compliance", tags=["Compliance"]
+)
+app.include_router(
+    contract_routes_router, prefix="/api/v1/contract-requests", tags=["Contract Management"]
+)
+app.include_router(webhook_router, prefix="/api/v1/webhooks", tags=["Webhooks"])

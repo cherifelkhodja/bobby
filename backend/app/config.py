@@ -84,6 +84,32 @@ class Settings(BaseSettings):
     S3_ACCESS_KEY: str = ""
     S3_SECRET_KEY: str = ""
 
+    # YouSign
+    YOUSIGN_API_KEY: str = ""
+    YOUSIGN_API_BASE_URL: str = "https://api.yousign.app/v3"
+    YOUSIGN_WEBHOOK_SECRET: str = ""
+
+    # INSEE / Sirene
+    INSEE_API_KEY: str = ""
+
+    # Bobby Portal
+    BOBBY_BASE_URL: str = "https://bobby.geminiconsulting.fr"
+    BOBBY_PORTAL_BASE_URL: str = "https://bobby.geminiconsulting.fr/portal"
+    MAGIC_LINK_EXPIRY_DAYS: int = 7
+    MAGIC_LINK_SECRET_KEY: str = ""
+
+    # Gemini company info (pour contrats)
+    GEMINI_COMPANY_NAME_CONTRACT: str = "GEMINI"
+    GEMINI_LEGAL_FORM: str = "SAS"
+    GEMINI_CAPITAL: str = "10 000"
+    GEMINI_HEAD_OFFICE: str = "54 Avenue Hoche - 75008 Paris"
+    GEMINI_RCS_CITY: str = "Paris"
+    GEMINI_RCS_NUMBER: str = "842 799 959"
+    GEMINI_REPRESENTATIVE_ENTITY: str = "la société SC Holding"
+    GEMINI_REPRESENTATIVE_QUALITY: str = "Président"
+    GEMINI_REPRESENTATIVE_SUB: str = "Représentée par sa Présidente Madame Selma HIZEM"
+    GEMINI_SIGNATORY_NAME: str = "Mme Selma HIZEM"
+
     # Feature flags
     FEATURE_MAGIC_LINK: bool = True
     FEATURE_EMAIL_NOTIFICATIONS: bool = True

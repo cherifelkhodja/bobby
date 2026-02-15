@@ -32,6 +32,8 @@ dependencies = [
     "boto3>=1.35.0",
     # Security (rate limiting)
     "slowapi>=0.1.9",
+    # Scheduling (CRON jobs)
+    "apscheduler>=3.10.0",
 ]
 
 [project.optional-dependencies]

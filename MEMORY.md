@@ -34,6 +34,10 @@
 | Security Headers | ✅ Done | HSTS, CSP, etc. |
 | Row Level Security | ✅ Done | PostgreSQL RLS |
 | Audit Logging | ✅ Done | Structuré |
+| Contractualisation | ✅ Done | Workflow BoondManager → validation → contrat → signature YouSign → push Boond |
+| Vigilance documentaire | ✅ Done | Cycle de vie docs légaux tiers (request → upload → validate/reject → expiration) |
+| Portail tiers (magic link) | ✅ Done | Upload documents + review contrat via lien sécurisé |
+| CRON jobs (APScheduler) | ✅ Done | Expirations documents, relances, purge magic links |
 
 ---
 
@@ -83,6 +87,18 @@
 - **Décision** : Intégrer JobConnect v2 pour publier les offres
 - **Raison** : Visibilité sur Free-Work, intégration existante Gemini
 
+### ADR-008 : Bounded Contexts pour Contractualisation & Vigilance
+- **Date** : 2026-02
+- **Décision** : Organiser les nouvelles features en 3 bounded contexts (`third_party`, `vigilance`, `contract_management`) sous `app/`, chacun avec sa propre arborescence hexagonale (domain/application/infrastructure/api)
+- **Raison** : Séparation claire des responsabilités, éviter le couplage entre les modules existants et les nouveaux, faciliter la maintenance et les tests
+- **Architecture** :
+  - `third_party/` : Entités ThirdParty et MagicLink partagées par vigilance et contractualisation
+  - `vigilance/` : Documents légaux, compliance checker, dashboard conformité
+  - `contract_management/` : Workflow contrat (14 statuts), génération DOCX, signature YouSign, push BoondManager
+  - `shared/` : Scheduler APScheduler, event bus in-process
+- **Rôle ADV** : Nouveau rôle `adv` dans UserRole pour la gestion des contrats et de la vigilance (Direction = admin)
+- **Pattern suivi** : Identique à `quotation_generator/` (module top-level sous `app/`)
+
 ---
 
 ## Problèmes connus
@@ -110,6 +126,11 @@
 - [ ] Améliorer couverture tests E2E
 - [ ] Dashboard analytics cooptations
 - [ ] Notifications push
+- [ ] Tests intégration contractualisation & vigilance (repos, API routes)
+- [ ] Template DOCX contrat AT (`backend/templates/contrat_at.docx`)
+- [ ] Frontend pages contractualisation (formulaire validation commerciale, config contrat, dashboard ADV)
+- [ ] Frontend pages vigilance (dashboard conformité, gestion documents)
+- [ ] Frontend portail tiers (upload documents, review contrat)
 
 ---
 
@@ -142,6 +163,59 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-02-15
+- **feat(contract-management)**: Implémentation complète du workflow de contractualisation
+  - **Domain** : Entités ContractRequest (14 statuts), Contract, ContractConfig avec state machine complète
+  - **Value Objects** : ContractRequestStatus, PaymentTerms, InvoiceSubmissionMethod avec transitions validées
+  - **Services** : Numérotation dynamique des articles de contrat selon clauses actives/inactives
+  - **Ports** : ContractRepository, ContractGenerator, SignatureService, CrmService (Protocol-based)
+  - **Use cases** : create_contract_request (webhook Boond, idempotent), validate_commercial (salarié→PayFit redirect), configure_contract, generate_draft (compliance check), send_draft_to_partner (magic link), process_partner_review, send_for_signature (LibreOffice DOCX→PDF + YouSign), handle_signature_completed, push_to_crm (Boond provider + purchase order)
+  - **Infrastructure** : PostgresContractRepo (avec get_next_reference), DocxContractGenerator (docxtpl), YouSignClient (API v3), BoondCrmAdapter
+  - **API** : Routes ADV/admin CRUD contract-requests + webhooks Boond/YouSign (toujours 200 OK)
+  - **Migration 025** : Tables cm_contract_requests, cm_contracts, cm_webhook_events avec RLS policies
+  - Fichiers créés : 25+ fichiers sous `app/contract_management/`
+
+- **feat(vigilance)**: Implémentation complète de la vigilance documentaire
+  - **Domain** : Entité VigilanceDocument avec state machine (REQUESTED→RECEIVED→VALIDATED/REJECTED→EXPIRING_SOON→EXPIRED)
+  - **Référentiel** : VIGILANCE_REQUIREMENTS par type de tiers (freelance, sous-traitant, salarié) avec périodicité et checks
+  - **Compliance checker** : Calcul automatique du ComplianceStatus basé sur les documents vs requirements
+  - **Use cases** : request_documents, upload_document (validation format/taille/RGPD), validate_document, reject_document, check_compliance, process_expirations (CRON)
+  - **API** : Routes ADV/admin pour gestion documents + dashboard conformité
+  - **Migration 025** : Table vig_documents avec RLS policies
+  - Fichiers créés : 20+ fichiers sous `app/vigilance/`
+
+- **feat(third-party)**: Implémentation du contexte tiers partagé
+  - **Entités** : ThirdParty (freelance, sous-traitant, salarié) et MagicLink (token sécurisé 64 chars)
+  - **Use cases** : find_or_create_third_party (par SIREN), generate_magic_link (révocation anciens + envoi email), verify_magic_link
+  - **Portail** : Routes publiques GET /portal/{token}, GET /portal/{token}/documents, POST /portal/{token}/documents/{id}/upload, GET /portal/{token}/contract-draft, POST /portal/{token}/contract-review
+  - **Infrastructure** : PostgresThirdPartyRepo, PostgresMagicLinkRepo, INSEEClient (API Sirene)
+  - **Migration 025** : Tables tp_third_parties (unique SIREN), tp_magic_links
+  - Fichiers créés : 20+ fichiers sous `app/third_party/`
+
+- **feat(shared)**: Scheduler CRON et event bus
+  - **APScheduler** : AsyncIOScheduler intégré au lifespan FastAPI — check_document_expirations (8h quotidien), revoke_expired_magic_links (minuit quotidien)
+  - **Event bus** : Mediator in-process avec DomainEvent base class, events ContractRequestCreated, ComplianceStatusChanged, ContractSigned, DocumentExpired
+  - Fichiers créés : `app/shared/scheduling/cron_jobs.py`, `app/shared/events/event_bus.py`
+
+- **feat(auth)**: Ajout rôle ADV (Administration des Ventes)
+  - `UserRole.ADV = "adv"` avec propriétés can_manage_vigilance, can_view_vigilance, can_manage_contracts, can_validate_commercial
+  - Dependency `require_adv_or_admin()` pour protéger les routes
+  - Fichiers modifiés : `status.py`, `dependencies.py`
+
+- **feat(audit)**: Extension audit logger pour nouveaux contextes
+  - Nouveaux AuditAction : PORTAL_ACCESSED, MAGIC_LINK_GENERATED, DOCUMENT_UPLOADED/VALIDATED/REJECTED, COMPLIANCE_OVERRIDDEN, WEBHOOK_RECEIVED, CONTRACT_REQUEST_CREATED, COMMERCIAL_VALIDATED, DRAFT_GENERATED, CONTRACT_SIGNED, RGPD_PURGE
+  - Nouveaux AuditResource : THIRD_PARTY, MAGIC_LINK, VIGILANCE_DOCUMENT, CONTRACT_REQUEST, CONTRACT
+
+- **feat(email)**: 9 nouvelles méthodes d'envoi email
+  - send_commercial_validation_request, send_document_collection_request, send_document_reminder, send_document_rejected, send_contract_draft_review, send_contract_changes_requested, send_contract_signed_notification, send_document_expiring, send_document_expired
+
+- **feat(config)**: Variables d'environnement YouSign, INSEE, Portal, Gemini company info
+
+- **test**: 34 tests unitaires pour les 3 bounded contexts
+  - test_magic_link_entity (7 tests), test_document_status_transitions (10 tests), test_compliance_checker (5 tests), test_contract_request_status_transitions (9 tests), test_article_numbering (3 tests)
+
+- **deps**: Ajout `apscheduler>=3.10.0` aux dépendances backend
 
 ### 2026-02-13
 - **fix(hr)**: Correction labels d'état dans la page "Gestion des annonces" (HRDashboard)
