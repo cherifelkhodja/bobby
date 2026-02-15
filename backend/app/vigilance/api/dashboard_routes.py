@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import AdvOrAdminUser
-from app.infrastructure.database.connection import get_db
+from app.dependencies import get_db
 from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
     ThirdPartyRepository,
 )

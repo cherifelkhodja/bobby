@@ -15,8 +15,8 @@ from app.contract_management.infrastructure.adapters.postgres_contract_repo impo
     ContractRequestRepository,
     WebhookEventRepository,
 )
+from app.dependencies import get_db
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
-from app.infrastructure.database.connection import get_db
 
 logger = structlog.get_logger()
 

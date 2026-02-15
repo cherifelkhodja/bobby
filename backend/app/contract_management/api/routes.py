@@ -27,8 +27,8 @@ from app.contract_management.domain.value_objects.contract_request_status import
 from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
     ContractRequestRepository,
 )
+from app.dependencies import get_db
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
-from app.infrastructure.database.connection import get_db
 from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
     ThirdPartyRepository,
 )

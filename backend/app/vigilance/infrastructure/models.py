@@ -7,7 +7,7 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.infrastructure.database.connection import Base
+from app.infrastructure.database.models import Base
 
 
 class VigilanceDocumentModel(Base):

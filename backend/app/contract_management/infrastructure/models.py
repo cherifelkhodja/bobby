@@ -8,7 +8,7 @@ from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, St
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.infrastructure.database.connection import Base
+from app.infrastructure.database.models import Base
 
 
 class ContractRequestModel(Base):

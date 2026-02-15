@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import AdvOrAdminUser
 from app.config import get_settings
+from app.dependencies import get_db
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
-from app.infrastructure.database.connection import get_db
 from app.third_party.api.schemas import (
     ThirdPartyListResponse,
     ThirdPartyResponse,

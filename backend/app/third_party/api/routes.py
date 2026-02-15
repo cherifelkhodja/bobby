@@ -6,8 +6,8 @@ import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.dependencies import get_db
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
-from app.infrastructure.database.connection import get_db
 from app.third_party.api.schemas import (
     ContractReviewRequest,
     ContractReviewResponse,
