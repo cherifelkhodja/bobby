@@ -112,6 +112,13 @@ export const contractsApi = {
     return response.data;
   },
 
+  cancel: async (id: string): Promise<ContractRequest> => {
+    const response = await apiClient.delete<ContractRequest>(
+      `/contract-requests/${id}`,
+    );
+    return response.data;
+  },
+
   listContracts: async (id: string): Promise<Contract[]> => {
     const response = await apiClient.get<Contract[]>(
       `/contract-requests/${id}/contracts`,

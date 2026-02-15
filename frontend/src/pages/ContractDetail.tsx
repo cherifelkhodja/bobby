@@ -9,6 +9,7 @@ import {
   Upload,
   CheckCircle,
   AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -16,6 +17,7 @@ import { contractsApi } from '../api/contracts';
 import { useAuthStore } from '../stores/authStore';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
 import { getErrorMessage } from '../api/client';
 import { CONTRACT_STATUS_CONFIG } from '../types';
@@ -65,6 +67,7 @@ export default function ContractDetail() {
 
   const [overrideReason, setOverrideReason] = useState('');
   const [showOverride, setShowOverride] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   const { data: cr, isLoading } = useQuery({
     queryKey: ['contract-request', id],
@@ -116,6 +119,21 @@ export default function ContractDetail() {
     },
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: () => contractsApi.cancel(id!),
+    onSuccess: () => {
+      toast.success('Demande de contrat annulée.');
+      setShowCancelModal(false);
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  const canCancel = cr && isAdv && cr.status !== 'cancelled' && cr.status !== 'signed' && cr.status !== 'archived' && cr.status !== 'redirected_payfit';
+
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('fr-FR', {
       day: 'numeric',
@@ -161,15 +179,26 @@ export default function ContractDetail() {
             </div>
           </div>
 
-          {actionConfig && (
-            <Button
-              onClick={() => actionMutation.mutate(actionConfig.action)}
-              disabled={actionMutation.isPending}
-            >
-              <actionConfig.icon className="h-4 w-4 mr-2" />
-              {actionMutation.isPending ? 'En cours...' : actionConfig.label}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {actionConfig && (
+              <Button
+                onClick={() => actionMutation.mutate(actionConfig.action)}
+                disabled={actionMutation.isPending}
+              >
+                <actionConfig.icon className="h-4 w-4 mr-2" />
+                {actionMutation.isPending ? 'En cours...' : actionConfig.label}
+              </Button>
+            )}
+            {canCancel && (
+              <Button
+                variant="secondary"
+                onClick={() => setShowCancelModal(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Annuler
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -331,6 +360,39 @@ export default function ContractDetail() {
           <dd className="text-gray-900 dark:text-white">{formatDate(cr.updated_at)}</dd>
         </dl>
       </Card>
+
+      {/* Cancel confirmation modal */}
+      <Modal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        title="Annuler la demande de contrat"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Voulez-vous vraiment annuler la demande <span className="font-semibold">{cr.reference}</span> ?
+          </p>
+          <p className="text-sm text-red-600 dark:text-red-400">
+            Cette action est irréversible.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="secondary"
+              onClick={() => setShowCancelModal(false)}
+              disabled={cancelMutation.isPending}
+            >
+              Non, garder
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => cancelMutation.mutate()}
+              isLoading={cancelMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Oui, annuler
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

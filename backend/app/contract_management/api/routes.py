@@ -232,6 +232,51 @@ async def compliance_override(
     return _cr_to_response(saved)
 
 
+@router.delete(
+    "/{contract_request_id}",
+    response_model=ContractRequestResponse,
+    summary="Cancel a contract request",
+)
+async def cancel_contract_request(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancel a contract request (soft delete). ADV/admin only.
+
+    Sets the status to 'cancelled'. Not allowed for signed/archived requests.
+    """
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+
+    if not cr.can_transition_to(ContractRequestStatus.CANCELLED):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Impossible d'annuler une demande au statut '{cr.status.display_name}'.",
+        )
+
+    cr.transition_to(ContractRequestStatus.CANCELLED)
+    saved = await cr_repo.save(cr)
+
+    audit_logger.log(
+        AuditAction.CONTRACT_REQUEST_CANCELLED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(contract_request_id),
+        details={"previous_status": cr.status.value},
+    )
+
+    logger.info(
+        "contract_request_cancelled",
+        cr_id=str(contract_request_id),
+        reference=saved.reference,
+    )
+
+    return _cr_to_response(saved)
+
+
 @router.get(
     "/next-reference",
     summary="Get next contract request reference",

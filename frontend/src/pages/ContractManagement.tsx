@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FileSignature } from 'lucide-react';
+import { FileSignature, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { contractsApi } from '../api/contracts';
 import { useAuthStore } from '../stores/authStore';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
+import { getErrorMessage } from '../api/client';
 import type { ContractRequestStatus } from '../types';
 import { CONTRACT_STATUS_CONFIG } from '../types';
 
@@ -19,12 +22,16 @@ const THIRD_PARTY_TYPE_LABELS: Record<string, string> = {
 
 type FilterTab = 'all' | 'active' | 'done';
 
+const TERMINAL_STATUSES = new Set(['cancelled', 'signed', 'archived', 'redirected_payfit']);
+
 export function ContractManagement() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const [page, setPage] = useState(0);
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [statusFilter, setStatusFilter] = useState<ContractRequestStatus | ''>('');
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; reference: string } | null>(null);
   const pageSize = 20;
 
   const isAdv = user?.role === 'adv' || user?.role === 'admin';
@@ -37,6 +44,18 @@ export function ContractManagement() {
         limit: pageSize,
         ...(statusFilter ? { status_filter: statusFilter } : {}),
       }),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => contractsApi.cancel(id),
+    onSuccess: () => {
+      toast.success('Demande de contrat annulée.');
+      setCancelTarget(null);
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
   });
 
   const formatDate = (dateStr: string) =>
@@ -168,14 +187,28 @@ export function ContractManagement() {
                     </div>
 
                     {/* Right side */}
-                    <div className="text-right shrink-0 ml-4">
-                      <p className="text-xs text-gray-400 dark:text-gray-500">
-                        {formatDate(cr.created_at)}
-                      </p>
-                      {isAdv && (
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                          {cr.commercial_email}
+                    <div className="flex items-center gap-3 shrink-0 ml-4">
+                      <div className="text-right">
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                          {formatDate(cr.created_at)}
                         </p>
+                        {isAdv && (
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                            {cr.commercial_email}
+                          </p>
+                        )}
+                      </div>
+                      {isAdv && !TERMINAL_STATUSES.has(cr.status) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCancelTarget({ id: cr.id, reference: cr.reference });
+                          }}
+                          className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                          title="Annuler cette demande"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
                       )}
                     </div>
                   </div>
@@ -210,6 +243,41 @@ export function ContractManagement() {
           )}
         </>
       )}
+
+      {/* Cancel confirmation modal */}
+      <Modal
+        isOpen={!!cancelTarget}
+        onClose={() => setCancelTarget(null)}
+        title="Annuler la demande de contrat"
+      >
+        {cancelTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Voulez-vous vraiment annuler la demande <span className="font-semibold">{cancelTarget.reference}</span> ?
+            </p>
+            <p className="text-sm text-red-600 dark:text-red-400">
+              Cette action est irréversible.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => setCancelTarget(null)}
+                disabled={cancelMutation.isPending}
+              >
+                Non, garder
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => cancelMutation.mutate(cancelTarget.id)}
+                isLoading={cancelMutation.isPending}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Oui, annuler
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

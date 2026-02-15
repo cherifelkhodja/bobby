@@ -68,6 +68,7 @@ class AuditAction(str, Enum):
     COMMERCIAL_VALIDATED = "commercial_validated"
     DRAFT_GENERATED = "draft_generated"
     CONTRACT_SIGNED = "contract_signed"
+    CONTRACT_REQUEST_CANCELLED = "contract_request_cancelled"
 
     # RGPD
     RGPD_PURGE = "rgpd_purge"
