@@ -28,7 +28,7 @@ class BoondCrmAdapter:
         """
         try:
             response = await self._boond._make_request(
-                "GET", f"/positioning/{positioning_id}"
+                "GET", f"/positionings/{positioning_id}"
             )
             data = response.get("data", {})
             attributes = data.get("attributes", {})
@@ -53,11 +53,13 @@ class BoondCrmAdapter:
     async def get_need(self, need_id: int) -> dict[str, Any] | None:
         """Fetch a need/opportunity from BoondManager.
 
+        Extracts the commercial email from the mainManager relationship.
+
         Args:
             need_id: Boond need ID.
 
         Returns:
-            Need data or None.
+            Need data with commercial_email and commercial_name, or None.
         """
         try:
             response = await self._boond._make_request(
@@ -67,11 +69,64 @@ class BoondCrmAdapter:
             attributes = data.get("attributes", {})
             relationships = data.get("relationships", {})
 
+            # Extract commercial email from mainManager via included data
+            commercial_email = ""
+            commercial_name = ""
+            manager_id = self._extract_relationship_id(relationships, "mainManager")
+
+            # Check included data for manager info
+            for included in response.get("included", []):
+                if (
+                    included.get("type") == "resource"
+                    and included.get("id")
+                    and int(included["id"]) == manager_id
+                ):
+                    inc_attrs = included.get("attributes", {})
+                    commercial_email = inc_attrs.get("email1", "") or inc_attrs.get("email2", "")
+                    first_name = inc_attrs.get("firstName", "")
+                    last_name = inc_attrs.get("lastName", "")
+                    commercial_name = f"{first_name} {last_name}".strip()
+                    break
+
+            # If not in included, fetch the manager resource directly
+            if not commercial_email and manager_id:
+                try:
+                    mgr_response = await self._boond._make_request(
+                        "GET", f"/resources/{manager_id}"
+                    )
+                    mgr_data = mgr_response.get("data", {})
+                    mgr_attrs = mgr_data.get("attributes", {})
+                    commercial_email = mgr_attrs.get("email1", "") or mgr_attrs.get("email2", "")
+                    first_name = mgr_attrs.get("firstName", "")
+                    last_name = mgr_attrs.get("lastName", "")
+                    commercial_name = f"{first_name} {last_name}".strip()
+                except Exception as exc:
+                    logger.warning(
+                        "boond_get_manager_failed",
+                        manager_id=manager_id,
+                        error=str(exc),
+                    )
+
+            # Extract client name from included company
+            client_name = ""
+            company_id = self._extract_relationship_id(relationships, "company")
+            for included in response.get("included", []):
+                if (
+                    included.get("type") == "company"
+                    and included.get("id")
+                    and int(included["id"]) == company_id
+                ):
+                    client_name = included.get("attributes", {}).get("name", "")
+                    break
+
             return {
                 "id": int(data.get("id", need_id)),
                 "title": attributes.get("title", ""),
-                "client_id": self._extract_relationship_id(relationships, "company"),
+                "client_id": company_id,
+                "client_name": client_name,
                 "description": attributes.get("description", ""),
+                "commercial_email": commercial_email,
+                "commercial_name": commercial_name,
             }
         except Exception as exc:
             logger.error("boond_get_need_failed", need_id=need_id, error=str(exc))

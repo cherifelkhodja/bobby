@@ -26,11 +26,13 @@ class CreateContractRequestUseCase:
         webhook_event_repository,
         crm_service,
         email_service,
+        frontend_url: str = "",
     ) -> None:
         self._cr_repo = contract_request_repository
         self._webhook_repo = webhook_event_repository
         self._crm = crm_service
         self._email_service = email_service
+        self._frontend_url = frontend_url
 
     async def execute(self, payload: dict[str, Any]) -> ContractRequest | None:
         """Execute the use case.
@@ -93,12 +95,15 @@ class CreateContractRequestUseCase:
             candidate_id = positioning_data.get("candidate_id")
             need_id = positioning_data.get("need_id")
 
-            # Get commercial email from need manager
+            # Get commercial info from need manager
             commercial_email = ""
+            commercial_name = ""
+            need_data = None
             if need_id:
                 need_data = await self._crm.get_need(need_id)
                 if need_data:
                     commercial_email = need_data.get("commercial_email", "")
+                    commercial_name = need_data.get("commercial_name", "")
 
             # Generate reference
             reference = await self._cr_repo.get_next_reference()
@@ -125,11 +130,12 @@ class CreateContractRequestUseCase:
 
             # Send validation request to commercial
             if commercial_email:
+                contract_link = f"{self._frontend_url}/contracts/{saved.id}"
                 await self._email_service.send_commercial_validation_request(
                     to=commercial_email,
-                    commercial_name="",
+                    commercial_name=commercial_name,
                     contract_ref=reference,
-                    link="",
+                    link=contract_link,
                 )
 
             logger.info(

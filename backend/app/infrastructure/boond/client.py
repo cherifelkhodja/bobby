@@ -36,6 +36,27 @@ class BoondClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=4),
     )
+    async def _make_request(
+        self, method: str, endpoint: str, **kwargs
+    ) -> dict:
+        """Generic request method for Boond API.
+
+        Used by BoondCrmAdapter and other internal callers.
+        """
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.request(
+                method,
+                f"{self.base_url}{endpoint}",
+                auth=self._auth,
+                **kwargs,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+    )
     async def get_opportunities(self) -> list[Opportunity]:
         """Fetch opportunities from BoondManager."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:

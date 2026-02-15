@@ -70,6 +70,7 @@ async def handle_boond_positioning_webhook(
         webhook_event_repository=webhook_repo,
         crm_service=crm_service,
         email_service=email_service,
+        frontend_url=settings.frontend_url,
     )
 
     try:

@@ -299,6 +299,14 @@ docker-compose up # Start all services
 
 - **deps**: Ajout `apscheduler>=3.10.0` aux dépendances backend
 
+### 2026-02-15 (webhook fix)
+- **fix(contract-management)**: Correction 4 bugs bloquants dans le webhook BoondManager
+  - **Bug 1** : `BoondClient._make_request()` n'existait pas — `BoondCrmAdapter` appelait une méthode inexistante → `AttributeError` systématique. Ajout d'une méthode générique `_make_request()` sur `BoondClient` avec retry tenacity.
+  - **Bug 2** : Endpoint `/positioning/{id}` (singulier) → corrigé en `/positionings/{id}` (pluriel, cohérent avec `create_positioning`)
+  - **Bug 3** : `get_need()` ne retournait pas `commercial_email` — ajout extraction depuis `mainManager` (included data + fallback fetch `/resources/{id}`) + extraction `commercial_name` et `client_name`
+  - **Bug 4** : `send_commercial_validation_request()` appelé avec `link=""` et `commercial_name=""` — ajout `frontend_url` au use case, construction du lien `/contracts/{id}`, passage du nom commercial
+  - Fichiers modifiés : `boond/client.py`, `boond_crm_adapter.py`, `create_contract_request.py`, `webhook_routes.py`
+
 ### 2026-02-15 (tests)
 - **test(integration)**: Tests d'intégration API pour les 3 bounded contexts
   - `test_contract_management.py` : 29 tests — list (auth, pagination, status filter), get, compliance override, contracts list, Boond webhook (idempotence), YouSign webhook, validate commercial, configure contract
