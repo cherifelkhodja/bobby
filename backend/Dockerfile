@@ -50,7 +50,7 @@ RUN pip install --no-cache-dir \
     "anthropic>=0.40.0"
 
 # Force fresh copy - change this value to bust Docker cache
-RUN echo "build-20260209-v3"
+RUN echo "build-20260215-v1"
 
 # Copy application code
 COPY . .
