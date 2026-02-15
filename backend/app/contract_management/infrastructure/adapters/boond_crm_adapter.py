@@ -34,24 +34,26 @@ class BoondCrmAdapter:
             attributes = data.get("attributes", {})
             relationships = data.get("relationships", {})
 
-            # Log raw relationships to discover correct keys
-            logger.info(
-                "boond_positioning_relationships",
-                positioning_id=positioning_id,
-                relationship_keys=list(relationships.keys()),
-                attributes_keys=list(attributes.keys()),
-            )
-
-            # Try multiple possible relationship keys for candidate
+            # Boond positioning relationships:
+            # - opportunity: the need/delivery (confirmed key)
+            # - dependsOn: might be the candidate/resource
+            # - project, files, createdBy: other relationships
             candidate_id = (
-                self._extract_relationship_id(relationships, "resource")
+                self._extract_relationship_id(relationships, "dependsOn")
+                or self._extract_relationship_id(relationships, "resource")
                 or self._extract_relationship_id(relationships, "candidate")
             )
-            # Try multiple possible relationship keys for need/opportunity
             need_id = (
-                self._extract_relationship_id(relationships, "delivery")
-                or self._extract_relationship_id(relationships, "opportunity")
-                or self._extract_relationship_id(relationships, "need")
+                self._extract_relationship_id(relationships, "opportunity")
+                or self._extract_relationship_id(relationships, "delivery")
+            )
+
+            logger.info(
+                "boond_positioning_parsed",
+                positioning_id=positioning_id,
+                candidate_id=candidate_id,
+                need_id=need_id,
+                relationship_keys=list(relationships.keys()),
             )
 
             return {
