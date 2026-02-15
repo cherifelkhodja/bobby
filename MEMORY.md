@@ -164,6 +164,21 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-02-15 (suite)
+- **feat(frontend)**: Page "Gestion des contrats" pour commerciaux et ADV
+  - **Page** : `ContractManagement.tsx` — liste des demandes de contrat avec onglets (Tous / En cours / Finalisés), badges de statut colorés, pagination, filtre par statut pour ADV/admin
+  - **Scope par rôle** : Commercial voit ses contrats, ADV/admin voient tous les contrats
+  - **API client** : `api/contracts.ts` — appels vers `/contract-requests`
+  - **Types** : `ContractRequestStatus`, `CONTRACT_STATUS_CONFIG` (14 statuts avec couleurs et groupes), `ContractRequest`, `ContractRequestListResponse`
+  - **Route** : `/contracts` accessible par admin, adv, commercial
+  - **Navigation** : Section "Contrats" dans la sidebar pour admin/adv/commercial
+  - **UserRole** : Ajout `adv` au type TypeScript
+- **feat(backend)**: Ouverture endpoint contract-requests aux commerciaux
+  - Dependency `require_contract_access` retourne (user_id, role, email)
+  - GET `/contract-requests` : commercial voit ses contrats (filtre par email), adv/admin voient tout
+  - GET `/contract-requests/{id}` : commercial ne peut voir que ses propres contrats
+  - Méthodes repo : `list_by_commercial_email`, `count_by_commercial_email`
+
 ### 2026-02-15
 - **feat(contract-management)**: Implémentation complète du workflow de contractualisation
   - **Domain** : Entités ContractRequest (14 statuts), Contract, ContractConfig avec state machine complète

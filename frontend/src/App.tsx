@@ -23,6 +23,7 @@ import { MyBoondOpportunities } from './pages/MyBoondOpportunities';
 import PublishedOpportunityDetail from './pages/PublishedOpportunityDetail';
 import { OpportunityDetail } from './pages/OpportunityDetail';
 import ProposeCandidate from './pages/ProposeCandidate';
+import { ContractManagement } from './pages/ContractManagement';
 import type { UserRole } from './types';
 
 interface ProtectedRouteProps {
@@ -97,6 +98,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin', 'commercial']}>
               <PublishedOpportunityDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="contracts"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'adv', 'commercial']}>
+              <ContractManagement />
             </ProtectedRoute>
           }
         />

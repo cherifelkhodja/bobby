@@ -1,5 +1,5 @@
 // User types
-export type UserRole = 'user' | 'commercial' | 'rh' | 'admin';
+export type UserRole = 'user' | 'commercial' | 'rh' | 'adv' | 'admin';
 
 export interface User {
   id: string;
@@ -704,4 +704,63 @@ export interface CvDownloadUrlResponse {
   url: string;
   filename: string;
   expires_in: number;
+}
+
+// Contract Management
+export type ContractRequestStatus =
+  | 'pending_commercial_validation'
+  | 'commercial_validated'
+  | 'collecting_documents'
+  | 'compliance_blocked'
+  | 'configuring_contract'
+  | 'draft_generated'
+  | 'draft_sent_to_partner'
+  | 'partner_approved'
+  | 'partner_requested_changes'
+  | 'sent_for_signature'
+  | 'signed'
+  | 'archived'
+  | 'redirected_payfit'
+  | 'cancelled';
+
+export const CONTRACT_STATUS_CONFIG: Record<ContractRequestStatus, { label: string; color: string; group: 'active' | 'done' | 'blocked' }> = {
+  pending_commercial_validation: { label: 'Attente validation', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300', group: 'active' },
+  commercial_validated: { label: 'Validé', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300', group: 'active' },
+  collecting_documents: { label: 'Collecte documents', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300', group: 'active' },
+  compliance_blocked: { label: 'Bloqué conformité', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300', group: 'blocked' },
+  configuring_contract: { label: 'Configuration', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300', group: 'active' },
+  draft_generated: { label: 'Brouillon généré', color: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300', group: 'active' },
+  draft_sent_to_partner: { label: 'Envoyé partenaire', color: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300', group: 'active' },
+  partner_approved: { label: 'Approuvé', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300', group: 'active' },
+  partner_requested_changes: { label: 'Modifications demandées', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300', group: 'blocked' },
+  sent_for_signature: { label: 'En signature', color: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300', group: 'active' },
+  signed: { label: 'Signé', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300', group: 'done' },
+  archived: { label: 'Archivé', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300', group: 'done' },
+  redirected_payfit: { label: 'Redirigé PayFit', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300', group: 'done' },
+  cancelled: { label: 'Annulé', color: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400', group: 'done' },
+};
+
+export interface ContractRequest {
+  id: string;
+  reference: string;
+  boond_positioning_id: number;
+  status: ContractRequestStatus;
+  status_display: string;
+  third_party_type: string | null;
+  daily_rate: number | null;
+  start_date: string | null;
+  client_name: string | null;
+  mission_description: string | null;
+  commercial_email: string;
+  third_party_id: string | null;
+  compliance_override: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContractRequestListResponse {
+  items: ContractRequest[];
+  total: number;
+  skip: number;
+  limit: number;
 }

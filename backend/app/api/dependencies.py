@@ -190,9 +190,47 @@ async def require_adv_or_admin(
     return user_id
 
 
+async def require_contract_access(
+    db: DbSession,
+    authorization: str = Header(default=""),
+) -> tuple[UUID, str, str]:
+    """Verify user has contract management access.
+
+    Allowed roles: admin, adv, commercial.
+    Returns (user_id, role, email) so route handlers can scope results.
+
+    Returns:
+        Tuple of (user_id, user_role, user_email).
+
+    Raises:
+        HTTPException: If not authenticated or not authorized.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    token = authorization[7:]
+    try:
+        payload = decode_token(token, expected_type="access")
+    except InvalidTokenError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+    user_id = UUID(payload.sub)
+    user_repo = UserRepository(db)
+    user = await user_repo.get_by_id(user_id)
+
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    if user.role not in ("admin", "adv", "commercial"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return user_id, user.role, user.email
+
+
 # Type aliases for dependencies
 AdminUser = Annotated[UUID, Depends(require_admin)]
 AdminOrRhUser = Annotated[UUID, Depends(require_admin_or_rh)]
 AdminOrCommercialUser = Annotated[UUID, Depends(require_admin_or_commercial)]
 AdvOrAdminUser = Annotated[UUID, Depends(require_adv_or_admin)]
+ContractAccessUser = Annotated[tuple[UUID, str, str], Depends(require_contract_access)]
 CurrentUserId = Annotated[UUID, Depends(get_current_user_id)]

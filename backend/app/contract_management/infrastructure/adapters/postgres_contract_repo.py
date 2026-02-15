@@ -96,6 +96,37 @@ class ContractRequestRepository:
         result = await self.session.execute(query)
         return result.scalar_one()
 
+    async def list_by_commercial_email(
+        self,
+        email: str,
+        skip: int = 0,
+        limit: int = 50,
+        status: ContractRequestStatus | None = None,
+    ) -> list[ContractRequest]:
+        """List contract requests for a specific commercial."""
+        query = select(ContractRequestModel).where(
+            ContractRequestModel.commercial_email == email
+        )
+        if status:
+            query = query.where(ContractRequestModel.status == status.value)
+        query = query.order_by(ContractRequestModel.created_at.desc()).offset(skip).limit(limit)
+        result = await self.session.execute(query)
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def count_by_commercial_email(
+        self,
+        email: str,
+        status: ContractRequestStatus | None = None,
+    ) -> int:
+        """Count contract requests for a specific commercial."""
+        query = select(func.count(ContractRequestModel.id)).where(
+            ContractRequestModel.commercial_email == email
+        )
+        if status:
+            query = query.where(ContractRequestModel.status == status.value)
+        result = await self.session.execute(query)
+        return result.scalar_one()
+
     async def get_next_reference(self) -> str:
         """Generate the next contract request reference."""
         year = datetime.utcnow().year

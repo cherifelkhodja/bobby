@@ -6,7 +6,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import AdvOrAdminUser
+from app.api.dependencies import AdvOrAdminUser, ContractAccessUser
 from app.contract_management.api.schemas import (
     CommercialValidationRequest,
     ComplianceOverrideRequest,
@@ -65,13 +65,14 @@ def _cr_to_response(cr) -> ContractRequestResponse:
     summary="List contract requests",
 )
 async def list_contract_requests(
-    user_id: AdvOrAdminUser,
+    auth: ContractAccessUser,
     skip: int = 0,
     limit: int = 50,
     status_filter: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """List contract requests with optional status filter. ADV/admin only."""
+    """List contract requests. Commercial sees own, ADV/admin see all."""
+    _user_id, role, email = auth
     cr_repo = ContractRequestRepository(db)
 
     status_obj = None
@@ -84,8 +85,14 @@ async def list_contract_requests(
                 detail=f"Statut invalide : {status_filter}",
             )
 
-    items = await cr_repo.list_all(skip=skip, limit=limit, status=status_obj)
-    total = await cr_repo.count(status=status_obj)
+    if role == "commercial":
+        items = await cr_repo.list_by_commercial_email(
+            email, skip=skip, limit=limit, status=status_obj
+        )
+        total = await cr_repo.count_by_commercial_email(email, status=status_obj)
+    else:
+        items = await cr_repo.list_all(skip=skip, limit=limit, status=status_obj)
+        total = await cr_repo.count(status=status_obj)
 
     return ContractRequestListResponse(
         items=[_cr_to_response(cr) for cr in items],
@@ -102,14 +109,19 @@ async def list_contract_requests(
 )
 async def get_contract_request(
     contract_request_id: UUID,
-    user_id: AdvOrAdminUser,
+    auth: ContractAccessUser,
     db: AsyncSession = Depends(get_db),
 ):
-    """Get a contract request by ID. ADV/admin only."""
+    """Get a contract request by ID. Commercial sees own, ADV/admin see all."""
+    _user_id, role, email = auth
     cr_repo = ContractRequestRepository(db)
     cr = await cr_repo.get_by_id(contract_request_id)
     if not cr:
         raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+
+    if role == "commercial" and cr.commercial_email != email:
+        raise HTTPException(status_code=403, detail="Accès non autorisé.")
+
     return _cr_to_response(cr)
 
 
