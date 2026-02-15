@@ -161,6 +161,15 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-02-15 (annulation demande de contrat)
+- **feat(contract-management)**: Possibilité d'annuler une demande de contrat
+  - Backend : `DELETE /api/v1/contract-requests/{id}` — soft delete (statut → `cancelled`), ADV/admin uniquement
+  - Bloqué pour les statuts terminaux (signed, archived, redirected_payfit)
+  - Audit : `CONTRACT_REQUEST_CANCELLED` ajouté aux actions d'audit
+  - Frontend ContractDetail : bouton "Annuler" + modale de confirmation
+  - Frontend ContractManagement : bouton X sur chaque ligne (sauf statuts terminaux) + modale
+  - Fichiers modifiés : `routes.py`, `audit/logger.py`, `contracts.ts`, `ContractDetail.tsx`, `ContractManagement.tsx`
+
 ### 2026-02-15 (déploiement Railway & corrections webhook)
 - **fix(webhook)**: Correction complète du flux webhook BoondManager → ContractRequest
   - **Bug 1** : Parsing payload webhook — format `webhookevent` avec positioning ID dans `data.relationships.dependsOn.id` et state change dans `included[log].attributes.content.diff.state.new`
