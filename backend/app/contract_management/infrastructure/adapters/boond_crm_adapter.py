@@ -34,11 +34,31 @@ class BoondCrmAdapter:
             attributes = data.get("attributes", {})
             relationships = data.get("relationships", {})
 
+            # Log raw relationships to discover correct keys
+            logger.info(
+                "boond_positioning_relationships",
+                positioning_id=positioning_id,
+                relationship_keys=list(relationships.keys()),
+                attributes_keys=list(attributes.keys()),
+            )
+
+            # Try multiple possible relationship keys for candidate
+            candidate_id = (
+                self._extract_relationship_id(relationships, "resource")
+                or self._extract_relationship_id(relationships, "candidate")
+            )
+            # Try multiple possible relationship keys for need/opportunity
+            need_id = (
+                self._extract_relationship_id(relationships, "delivery")
+                or self._extract_relationship_id(relationships, "opportunity")
+                or self._extract_relationship_id(relationships, "need")
+            )
+
             return {
                 "id": positioning_id,
                 "state": attributes.get("state"),
-                "candidate_id": self._extract_relationship_id(relationships, "resource"),
-                "need_id": self._extract_relationship_id(relationships, "delivery"),
+                "candidate_id": candidate_id,
+                "need_id": need_id,
                 "daily_rate": attributes.get("averageDailyPriceExcludingTax"),
                 "start_date": attributes.get("startDate"),
             }

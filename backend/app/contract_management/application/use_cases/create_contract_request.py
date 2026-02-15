@@ -136,6 +136,11 @@ class CreateContractRequestUseCase:
                 )
                 continue
 
+            logger.info(
+                "boond_positioning_data",
+                positioning_data=positioning_data,
+            )
+
             candidate_id = positioning_data.get("candidate_id")
             need_id = positioning_data.get("need_id")
 
@@ -178,16 +183,39 @@ class CreateContractRequestUseCase:
             # Generate reference
             reference = await self._cr_repo.get_next_reference()
 
+            # Sanitize Boond data — empty strings must be None for DB types
+            raw_daily_rate = positioning_data.get("daily_rate")
+            raw_start_date = positioning_data.get("start_date")
+
+            from datetime import date
+            from decimal import Decimal, InvalidOperation
+
+            daily_rate = None
+            if raw_daily_rate:
+                try:
+                    daily_rate = Decimal(str(raw_daily_rate))
+                except (InvalidOperation, ValueError, TypeError):
+                    daily_rate = None
+
+            start_date = None
+            if raw_start_date and isinstance(raw_start_date, str):
+                try:
+                    start_date = date.fromisoformat(raw_start_date[:10])
+                except (ValueError, TypeError):
+                    start_date = None
+            elif isinstance(raw_start_date, date):
+                start_date = raw_start_date
+
             # Create contract request
             cr = ContractRequest(
                 reference=reference,
                 boond_positioning_id=positioning_id,
                 boond_candidate_id=candidate_id,
                 boond_need_id=need_id,
-                commercial_email=commercial_email,
+                commercial_email=commercial_email or "",
                 client_name=client_name,
-                daily_rate=positioning_data.get("daily_rate"),
-                start_date=positioning_data.get("start_date"),
+                daily_rate=daily_rate,
+                start_date=start_date,
             )
 
             saved = await self._cr_repo.save(cr)
