@@ -173,6 +173,8 @@ docker-compose up # Start all services
   - **Dédup intelligente dans le use case** : si l'event de dédup existe mais qu'aucun CR actif n'existe (tous annulés), l'event est supprimé et la création continue — corrige le cas où l'annulation a eu lieu avant le déploiement du fix
   - **Email non-bloquant** : l'envoi d'email au commercial est wrappé dans try/except — un échec d'email ne cause plus le rollback de la transaction
   - **Migration 026** : contrainte unique `uq_cm_contract_requests_boond_positioning` remplacée par un index unique partiel (`WHERE status != 'cancelled'`) — cause réelle du ROLLBACK en prod (violation unique constraint à l'INSERT)
+  - **Formulaire validation commerciale** : formulaire intégré dans ContractDetail pour le statut `pending_commercial_validation` (type tiers, TJM, date début, email contact, client, lieu, description)
+  - Backend `validate-commercial` endpoint utilise `ContractAccessUser` (commercial/adv/admin) au lieu de `AdvOrAdminUser`
   - Frontend ContractDetail : bouton "Annuler" + modale de confirmation
   - Frontend ContractManagement : bouton X sur chaque ligne (sauf statuts terminaux) + modale
   - Fichiers modifiés : `routes.py`, `audit/logger.py`, `postgres_contract_repo.py`, `contracts.ts`, `ContractDetail.tsx`, `ContractManagement.tsx`

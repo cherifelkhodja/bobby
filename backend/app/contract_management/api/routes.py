@@ -135,10 +135,11 @@ async def get_contract_request(
 async def validate_commercial(
     contract_request_id: UUID,
     body: CommercialValidationRequest,
-    user_id: AdvOrAdminUser,
+    access: ContractAccessUser,
     db: AsyncSession = Depends(get_db),
 ):
-    """Apply commercial validation to a contract request. ADV/admin only."""
+    """Apply commercial validation to a contract request. Commercial/ADV/admin."""
+    user_id, _role, _email = access
     cr_repo = ContractRequestRepository(db)
     tp_repo = ThirdPartyRepository(db)
 

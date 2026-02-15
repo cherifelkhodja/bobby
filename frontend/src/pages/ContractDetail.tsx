@@ -64,10 +64,23 @@ export default function ContractDetail() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const isAdv = user?.role === 'adv' || user?.role === 'admin';
+  const isCommercialOrAdmin =
+    user?.role === 'commercial' || user?.role === 'admin' || user?.role === 'adv';
 
   const [overrideReason, setOverrideReason] = useState('');
   const [showOverride, setShowOverride] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+
+  // Commercial validation form state
+  const [validationForm, setValidationForm] = useState({
+    third_party_type: '',
+    daily_rate: '',
+    start_date: '',
+    contact_email: '',
+    client_name: '',
+    mission_description: '',
+    mission_location: '',
+  });
 
   const { data: cr, isLoading } = useQuery({
     queryKey: ['contract-request', id],
@@ -131,6 +144,34 @@ export default function ContractDetail() {
       toast.error(getErrorMessage(error));
     },
   });
+
+  const validateCommercialMutation = useMutation({
+    mutationFn: () =>
+      contractsApi.validateCommercial(id!, {
+        third_party_type: validationForm.third_party_type,
+        daily_rate: parseFloat(validationForm.daily_rate),
+        start_date: validationForm.start_date,
+        contact_email: validationForm.contact_email,
+        client_name: validationForm.client_name || undefined,
+        mission_description: validationForm.mission_description || undefined,
+        mission_location: validationForm.mission_location || undefined,
+      }),
+    onSuccess: () => {
+      toast.success('Validation commerciale effectuée.');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  const isValidationFormValid =
+    validationForm.third_party_type !== '' &&
+    validationForm.daily_rate !== '' &&
+    parseFloat(validationForm.daily_rate) > 0 &&
+    validationForm.start_date !== '' &&
+    validationForm.contact_email !== '';
 
   const canCancel = cr && isAdv && cr.status !== 'cancelled' && cr.status !== 'signed' && cr.status !== 'archived' && cr.status !== 'redirected_payfit';
 
@@ -231,6 +272,126 @@ export default function ContractDetail() {
           </p>
         </Card>
       </div>
+
+      {/* Commercial validation form */}
+      {isCommercialOrAdmin && cr.status === 'pending_commercial_validation' && (
+        <Card className="mb-6 border-yellow-200 dark:border-yellow-800">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
+            Validation commerciale
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Type de tiers *
+              </label>
+              <select
+                value={validationForm.third_party_type}
+                onChange={(e) =>
+                  setValidationForm((f) => ({ ...f, third_party_type: e.target.value }))
+                }
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              >
+                <option value="">Sélectionner...</option>
+                <option value="freelance">Freelance</option>
+                <option value="sous_traitant">Sous-traitant</option>
+                <option value="salarie">Salarié</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                TJM (€/j) *
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={validationForm.daily_rate}
+                onChange={(e) =>
+                  setValidationForm((f) => ({ ...f, daily_rate: e.target.value }))
+                }
+                placeholder={cr.daily_rate ? String(cr.daily_rate) : ''}
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Date de début *
+              </label>
+              <input
+                type="date"
+                value={validationForm.start_date}
+                onChange={(e) =>
+                  setValidationForm((f) => ({ ...f, start_date: e.target.value }))
+                }
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Email contact contractualisation *
+              </label>
+              <input
+                type="email"
+                value={validationForm.contact_email}
+                onChange={(e) =>
+                  setValidationForm((f) => ({ ...f, contact_email: e.target.value }))
+                }
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Client
+              </label>
+              <input
+                type="text"
+                value={validationForm.client_name}
+                onChange={(e) =>
+                  setValidationForm((f) => ({ ...f, client_name: e.target.value }))
+                }
+                placeholder={cr.client_name ?? ''}
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Lieu de mission
+              </label>
+              <input
+                type="text"
+                value={validationForm.mission_location}
+                onChange={(e) =>
+                  setValidationForm((f) => ({ ...f, mission_location: e.target.value }))
+                }
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Description de la mission
+              </label>
+              <textarea
+                value={validationForm.mission_description}
+                onChange={(e) =>
+                  setValidationForm((f) => ({ ...f, mission_description: e.target.value }))
+                }
+                rows={3}
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button
+              onClick={() => validateCommercialMutation.mutate()}
+              disabled={!isValidationFormValid || validateCommercialMutation.isPending}
+              isLoading={validateCommercialMutation.isPending}
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Valider
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Mission description */}
       {cr.mission_description && (
