@@ -723,41 +723,22 @@ export type ContractRequestStatus =
   | 'redirected_payfit'
   | 'cancelled';
 
-export type ContractVisualStatus = 'attente' | 'en_cours' | 'signature' | 'bloque' | 'finalise' | 'annule';
-
-export const CONTRACT_VISUAL_STATUS: Record<ContractVisualStatus, { label: string; color: string }> = {
-  attente: { label: 'En attente', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
-  en_cours: { label: 'En cours', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
-  signature: { label: 'En signature', color: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300' },
-  bloque: { label: 'Bloqué', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
-  finalise: { label: 'Finalisé', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
-  annule: { label: 'Annulé', color: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400' },
+export const CONTRACT_STATUS_CONFIG: Record<ContractRequestStatus, { label: string; color: string; group: 'active' | 'done' | 'blocked' }> = {
+  pending_commercial_validation: { label: 'Attente validation', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300', group: 'active' },
+  commercial_validated: { label: 'Validé', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300', group: 'active' },
+  collecting_documents: { label: 'Collecte documents', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300', group: 'active' },
+  compliance_blocked: { label: 'Bloqué conformité', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300', group: 'blocked' },
+  configuring_contract: { label: 'Configuration', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300', group: 'active' },
+  draft_generated: { label: 'Brouillon généré', color: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300', group: 'active' },
+  draft_sent_to_partner: { label: 'Envoyé partenaire', color: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300', group: 'active' },
+  partner_approved: { label: 'Approuvé', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300', group: 'active' },
+  partner_requested_changes: { label: 'Modifications demandées', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300', group: 'blocked' },
+  sent_for_signature: { label: 'En signature', color: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300', group: 'active' },
+  signed: { label: 'Signé', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300', group: 'done' },
+  archived: { label: 'Archivé', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300', group: 'done' },
+  redirected_payfit: { label: 'Redirigé PayFit', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300', group: 'done' },
+  cancelled: { label: 'Annulé', color: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400', group: 'done' },
 };
-
-export function getContractVisualStatus(status: ContractRequestStatus): ContractVisualStatus {
-  switch (status) {
-    case 'pending_commercial_validation':
-      return 'attente';
-    case 'commercial_validated':
-    case 'collecting_documents':
-    case 'configuring_contract':
-    case 'draft_generated':
-    case 'draft_sent_to_partner':
-    case 'partner_approved':
-      return 'en_cours';
-    case 'sent_for_signature':
-      return 'signature';
-    case 'compliance_blocked':
-    case 'partner_requested_changes':
-      return 'bloque';
-    case 'signed':
-    case 'archived':
-    case 'redirected_payfit':
-      return 'finalise';
-    case 'cancelled':
-      return 'annule';
-  }
-}
 
 export interface ContractRequest {
   id: string;
