@@ -89,8 +89,9 @@ class Settings(BaseSettings):
     YOUSIGN_API_BASE_URL: str = "https://api.yousign.app/v3"
     YOUSIGN_WEBHOOK_SECRET: str = ""
 
-    # INSEE / Sirene
-    INSEE_API_KEY: str = ""
+    # INSEE / Sirene (OAuth2 client credentials)
+    INSEE_CONSUMER_KEY: str = ""
+    INSEE_CONSUMER_SECRET: str = ""
 
     # Bobby Portal
     BOBBY_BASE_URL: str = "https://bobby.geminiconsulting.fr"
