@@ -169,6 +169,7 @@ docker-compose up # Start all services
   - Audit : `CONTRACT_REQUEST_CANCELLED` ajouté aux actions d'audit (inclut `boond_positioning_state`)
   - **Nettoyage dédup webhook** : lors de l'annulation, suppression des entrées `cm_webhook_events` (prefix `positioning_update_{id}_`) pour permettre au prochain webhook de re-créer un CR
   - `WebhookEventRepository.delete_by_prefix()` ajouté
+  - **Re-création après annulation** : `get_by_positioning_id()` exclut les CR annulés (`status != cancelled`) — un webhook peut maintenant créer un nouveau CR même si un ancien existe en statut annulé
   - Frontend ContractDetail : bouton "Annuler" + modale de confirmation
   - Frontend ContractManagement : bouton X sur chaque ligne (sauf statuts terminaux) + modale
   - Fichiers modifiés : `routes.py`, `audit/logger.py`, `postgres_contract_repo.py`, `contracts.ts`, `ContractDetail.tsx`, `ContractManagement.tsx`

@@ -36,10 +36,15 @@ class ContractRequestRepository:
         return self._to_entity(model) if model else None
 
     async def get_by_positioning_id(self, positioning_id: int) -> ContractRequest | None:
-        """Get a contract request by Boond positioning ID."""
+        """Get an active contract request by Boond positioning ID.
+
+        Cancelled CRs are excluded so that a new one can be created
+        for the same positioning after cancellation.
+        """
         result = await self.session.execute(
             select(ContractRequestModel).where(
-                ContractRequestModel.boond_positioning_id == positioning_id
+                ContractRequestModel.boond_positioning_id == positioning_id,
+                ContractRequestModel.status != ContractRequestStatus.CANCELLED.value,
             )
         )
         model = result.scalar_one_or_none()
