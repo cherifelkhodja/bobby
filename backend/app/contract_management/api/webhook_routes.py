@@ -96,10 +96,15 @@ async def handle_boond_positioning_webhook(
     try:
         result = await use_case.execute(payload)
         if result:
+            # Explicit commit to ensure data is persisted
+            await db.commit()
             logger.info(
                 "webhook_boond_contract_created",
                 reference=result.reference,
                 cr_id=str(result.id),
+                status=result.status.value,
+                commercial_email=result.commercial_email,
+                frontend_url=settings.frontend_url,
             )
             return WebhookResponse(
                 status="ok",
@@ -111,6 +116,7 @@ async def handle_boond_positioning_webhook(
         logger.info("webhook_boond_duplicate", event_id=str(exc))
         return WebhookResponse(status="ok", message="Duplicate event")
     except Exception as exc:
+        await db.rollback()
         logger.error(
             "webhook_processing_error",
             error=str(exc),
@@ -149,6 +155,46 @@ async def test_boond_webhook(request: Request):
         "body_length": len(raw_body),
         "payload_type": type(payload).__name__ if payload else "invalid_json",
         "payload": payload,
+    }
+
+
+@router.get(
+    "/boondmanager/debug-cr",
+    summary="Debug: check contract requests in DB",
+)
+async def debug_contract_requests(
+    db: AsyncSession = Depends(get_db),
+):
+    """List recent contract requests for debugging. Not available in production."""
+    settings = get_settings()
+    if settings.is_production:
+        return {"status": "error", "message": "Not available in production"}
+
+    cr_repo = ContractRequestRepository(db)
+    items = await cr_repo.list_all(skip=0, limit=10)
+
+    return {
+        "status": "ok",
+        "total": len(items),
+        "contract_requests": [
+            {
+                "id": str(cr.id),
+                "reference": cr.reference,
+                "status": cr.status.value,
+                "boond_positioning_id": cr.boond_positioning_id,
+                "commercial_email": cr.commercial_email,
+                "client_name": cr.client_name,
+                "created_at": str(cr.created_at) if cr.created_at else None,
+            }
+            for cr in items
+        ],
+        "email_config": {
+            "feature_enabled": settings.FEATURE_EMAIL_NOTIFICATIONS,
+            "has_resend_key": bool(settings.RESEND_API_KEY),
+            "smtp_host": settings.SMTP_HOST,
+            "from_email": settings.SMTP_FROM,
+            "frontend_url": settings.frontend_url,
+        },
     }
 
 

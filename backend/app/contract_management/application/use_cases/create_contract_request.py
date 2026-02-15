@@ -230,11 +230,29 @@ class CreateContractRequestUseCase:
             # Send validation request to commercial
             if commercial_email:
                 contract_link = f"{self._frontend_url}/contracts/{saved.id}"
-                await self._email_service.send_commercial_validation_request(
+                logger.info(
+                    "sending_commercial_validation_email",
                     to=commercial_email,
                     commercial_name=commercial_name,
                     contract_ref=reference,
                     link=contract_link,
+                )
+                email_sent = await self._email_service.send_commercial_validation_request(
+                    to=commercial_email,
+                    commercial_name=commercial_name,
+                    contract_ref=reference,
+                    link=contract_link,
+                )
+                logger.info(
+                    "commercial_validation_email_result",
+                    email_sent=email_sent,
+                    to=commercial_email,
+                )
+            else:
+                logger.warning(
+                    "no_commercial_email_for_notification",
+                    positioning_id=positioning_id,
+                    cr_id=str(saved.id),
                 )
 
             logger.info(
@@ -242,6 +260,7 @@ class CreateContractRequestUseCase:
                 cr_id=str(saved.id),
                 reference=reference,
                 positioning_id=positioning_id,
+                commercial_email=commercial_email,
             )
             return saved
 
