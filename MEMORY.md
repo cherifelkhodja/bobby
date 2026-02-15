@@ -167,9 +167,11 @@ docker-compose up # Start all services
   - **Condition Boond** : appel API BoondManager pour vérifier l'état du positionnement — annulation uniquement si state ≠ 7 et state ≠ 2
   - Bloqué aussi pour les statuts terminaux locaux (signed, archived, redirected_payfit)
   - Audit : `CONTRACT_REQUEST_CANCELLED` ajouté aux actions d'audit (inclut `boond_positioning_state`)
+  - **Nettoyage dédup webhook** : lors de l'annulation, suppression des entrées `cm_webhook_events` (prefix `positioning_update_{id}_`) pour permettre au prochain webhook de re-créer un CR
+  - `WebhookEventRepository.delete_by_prefix()` ajouté
   - Frontend ContractDetail : bouton "Annuler" + modale de confirmation
   - Frontend ContractManagement : bouton X sur chaque ligne (sauf statuts terminaux) + modale
-  - Fichiers modifiés : `routes.py`, `audit/logger.py`, `contracts.ts`, `ContractDetail.tsx`, `ContractManagement.tsx`
+  - Fichiers modifiés : `routes.py`, `audit/logger.py`, `postgres_contract_repo.py`, `contracts.ts`, `ContractDetail.tsx`, `ContractManagement.tsx`
 
 ### 2026-02-15 (déploiement Railway & corrections webhook)
 - **fix(webhook)**: Correction complète du flux webhook BoondManager → ContractRequest

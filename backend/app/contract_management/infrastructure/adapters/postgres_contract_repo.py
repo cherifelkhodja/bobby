@@ -309,3 +309,19 @@ class WebhookEventRepository:
         )
         self.session.add(model)
         await self.session.flush()
+
+    async def delete_by_prefix(self, prefix: str) -> int:
+        """Delete webhook events matching a prefix.
+
+        Returns:
+            Number of deleted rows.
+        """
+        from sqlalchemy import delete
+
+        result = await self.session.execute(
+            delete(WebhookEventModel).where(
+                WebhookEventModel.event_id.like(f"{prefix}%")
+            )
+        )
+        await self.session.flush()
+        return result.rowcount

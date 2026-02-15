@@ -288,6 +288,16 @@ async def cancel_contract_request(
     cr.transition_to(ContractRequestStatus.CANCELLED)
     saved = await cr_repo.save(cr)
 
+    # Remove webhook dedup entries so a new webhook can re-create a CR
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        WebhookEventRepository,
+    )
+
+    webhook_repo = WebhookEventRepository(db)
+    deleted = await webhook_repo.delete_by_prefix(
+        f"positioning_update_{cr.boond_positioning_id}_"
+    )
+
     audit_logger.log(
         AuditAction.CONTRACT_REQUEST_CANCELLED,
         AuditResource.CONTRACT_REQUEST,
@@ -304,6 +314,7 @@ async def cancel_contract_request(
         cr_id=str(contract_request_id),
         reference=saved.reference,
         boond_state=boond_state,
+        webhook_events_cleared=deleted,
     )
 
     return _cr_to_response(saved)
