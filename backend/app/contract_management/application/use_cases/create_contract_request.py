@@ -241,27 +241,36 @@ class CreateContractRequestUseCase:
                 payload=entry,
             )
 
-            # Send validation request to commercial
+            # Send validation request to commercial (non-blocking: email
+            # failure must never rollback the contract request creation)
             if commercial_email:
-                contract_link = f"{self._frontend_url}/contracts/{saved.id}"
-                logger.info(
-                    "sending_commercial_validation_email",
-                    to=commercial_email,
-                    commercial_name=commercial_name,
-                    contract_ref=reference,
-                    link=contract_link,
-                )
-                email_sent = await self._email_service.send_commercial_validation_request(
-                    to=commercial_email,
-                    commercial_name=commercial_name,
-                    contract_ref=reference,
-                    link=contract_link,
-                )
-                logger.info(
-                    "commercial_validation_email_result",
-                    email_sent=email_sent,
-                    to=commercial_email,
-                )
+                try:
+                    contract_link = f"{self._frontend_url}/contracts/{saved.id}"
+                    logger.info(
+                        "sending_commercial_validation_email",
+                        to=commercial_email,
+                        commercial_name=commercial_name,
+                        contract_ref=reference,
+                        link=contract_link,
+                    )
+                    email_sent = await self._email_service.send_commercial_validation_request(
+                        to=commercial_email,
+                        commercial_name=commercial_name,
+                        contract_ref=reference,
+                        link=contract_link,
+                    )
+                    logger.info(
+                        "commercial_validation_email_result",
+                        email_sent=email_sent,
+                        to=commercial_email,
+                    )
+                except Exception as email_exc:
+                    logger.error(
+                        "commercial_validation_email_failed",
+                        error=str(email_exc),
+                        to=commercial_email,
+                        cr_id=str(saved.id),
+                    )
             else:
                 logger.warning(
                     "no_commercial_email_for_notification",
