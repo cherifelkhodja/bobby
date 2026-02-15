@@ -47,7 +47,8 @@ RUN pip install --no-cache-dir \
     "aioboto3>=12.0.0" \
     "boto3>=1.34.0" \
     "slowapi>=0.1.9" \
-    "anthropic>=0.40.0"
+    "anthropic>=0.40.0" \
+    "apscheduler>=3.10.0"
 
 # Force fresh copy - change this value to bust Docker cache
 RUN echo "build-20260215-v1"
