@@ -30,7 +30,6 @@ export function UsersTab() {
     last_name: '',
     phone: '',
     boond_resource_id: '',
-    manager_boond_id: '',
   });
 
   const { data, isLoading } = useQuery({
@@ -68,7 +67,6 @@ export function UsersTab() {
       last_name: user.last_name,
       phone: user.phone || '',
       boond_resource_id: user.boond_resource_id || '',
-      manager_boond_id: user.manager_boond_id || '',
     });
     setIsDetailsModalOpen(true);
   };
@@ -82,7 +80,6 @@ export function UsersTab() {
         last_name: editForm.last_name,
         phone: editForm.phone || null,
         boond_resource_id: editForm.boond_resource_id || null,
-        manager_boond_id: editForm.manager_boond_id || null,
       },
     });
   };

@@ -45,7 +45,6 @@ export interface UpdateUserRequest {
   is_active?: boolean;
   role?: UserRole;
   boond_resource_id?: string | null;
-  manager_boond_id?: string | null;
 }
 
 export interface GeminiSettings {

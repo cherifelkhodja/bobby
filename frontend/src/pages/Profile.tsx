@@ -112,7 +112,7 @@ export function Profile() {
             <Input label="Email" value={user?.email} disabled />
 
             <Input
-              label="ID Ressource BoondManager"
+              label="ID BoondManager"
               placeholder="Optionnel"
               helperText="Votre identifiant dans BoondManager"
               {...profileForm.register('boond_resource_id')}
