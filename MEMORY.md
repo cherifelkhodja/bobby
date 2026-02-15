@@ -161,6 +161,21 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-02-15 (déploiement Railway & corrections webhook)
+- **fix(webhook)**: Correction complète du flux webhook BoondManager → ContractRequest
+  - **Bug 1** : Parsing payload webhook — format `webhookevent` avec positioning ID dans `data.relationships.dependsOn.id` et state change dans `included[log].attributes.content.diff.state.new`
+  - **Bug 2** : Transaction non persistée — ajout `await db.commit()` explicite dans le webhook handler après création CR (la session FastAPI commit après yield, mais le webhook pouvait échouer avant)
+  - **Bug 3** : `get_by_boond_resource_id()` crashait avec `scalar_one_or_none()` quand plusieurs users avaient le même `boond_resource_id` → changé en `LIMIT 1` avec `ORDER BY is_active DESC, created_at DESC`
+  - **Debug** : Ajout endpoint `GET /webhooks/boondmanager/debug-cr` (non-prod) pour vérifier l'état de la DB et la config email
+  - Fichiers modifiés : `webhook_routes.py`, `create_contract_request.py`, `user_repository.py`
+
+- **fix(frontend)**: Unification des labels ID BoondManager
+  - `UsersTab.tsx` : Retiré `manager_boond_id` du form state et de l'appel API update (doublon inutile)
+  - `InvitationsTab.tsx` : Label "ID Boond" renommé en "ID BoondManager"
+  - `Profile.tsx` : Label "ID Ressource BoondManager" renommé en "ID BoondManager"
+  - `admin.ts` : Retiré `manager_boond_id` de `UpdateUserRequest`
+  - Convention : Partout dans l'UI, "ID BoondManager" désigne le champ `boond_resource_id` (l'ID de la ressource dans Boond)
+
 ### 2026-02-15 (intégration complète)
 - **feat(backend)**: Câblage complet ServiceFactory pour les 3 bounded contexts
   - **InseeClient** : Instancié dans ServiceFactory, injecté dans FindOrCreateThirdPartyUseCase (vérification SIREN actif avant création)
