@@ -273,10 +273,15 @@ async def cancel_contract_request(
         )
 
     boond_state = positioning.get("state")
-    if boond_state in (7, 2):
+    BLOCKED_STATES = {
+        2: "Gagné",
+        7: "Gagné attente contrat",
+    }
+    if boond_state in BLOCKED_STATES:
+        label = BLOCKED_STATES[boond_state]
         raise HTTPException(
             status_code=400,
-            detail=f"Annulation impossible : le positionnement Boond est en état {boond_state}.",
+            detail=f"Annulation impossible : le positionnement Boond est en état « {label} » ({boond_state}).",
         )
 
     previous_status = cr.status.value
