@@ -127,6 +127,7 @@ class BoondCrmAdapter:
                 "description": attributes.get("description", ""),
                 "commercial_email": commercial_email,
                 "commercial_name": commercial_name,
+                "manager_id": manager_id,
             }
         except Exception as exc:
             logger.error("boond_get_need_failed", need_id=need_id, error=str(exc))

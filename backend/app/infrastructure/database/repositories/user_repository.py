@@ -91,6 +91,14 @@ class UserRepository:
         await self.session.flush()
         return self._to_entity(model)
 
+    async def get_by_boond_resource_id(self, boond_resource_id: str) -> User | None:
+        """Get user by BoondManager resource ID."""
+        result = await self.session.execute(
+            select(UserModel).where(UserModel.boond_resource_id == boond_resource_id)
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
     async def delete(self, user_id: UUID) -> bool:
         """Delete user by ID."""
         result = await self.session.execute(select(UserModel).where(UserModel.id == user_id))

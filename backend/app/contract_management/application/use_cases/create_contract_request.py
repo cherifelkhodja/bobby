@@ -54,12 +54,14 @@ class CreateContractRequestUseCase:
         webhook_event_repository,
         crm_service,
         email_service,
+        user_repository=None,
         frontend_url: str = "",
     ) -> None:
         self._cr_repo = contract_request_repository
         self._webhook_repo = webhook_event_repository
         self._crm = crm_service
         self._email_service = email_service
+        self._user_repo = user_repository
         self._frontend_url = frontend_url
 
     async def execute(self, payload: dict[str, Any] | list) -> ContractRequest | None:
@@ -137,14 +139,41 @@ class CreateContractRequestUseCase:
             candidate_id = positioning_data.get("candidate_id")
             need_id = positioning_data.get("need_id")
 
-            # Get commercial info from need manager
+            # Get commercial info: prefer Bobby DB, fallback to Boond API
             commercial_email = ""
             commercial_name = ""
+            client_name = None
             if need_id:
                 need_data = await self._crm.get_need(need_id)
                 if need_data:
-                    commercial_email = need_data.get("commercial_email", "")
-                    commercial_name = need_data.get("commercial_name", "")
+                    manager_id = need_data.get("manager_id")
+                    client_name = need_data.get("client_name")
+
+                    # Try Bobby DB first (commercial is a registered user)
+                    if manager_id and self._user_repo:
+                        bobby_user = await self._user_repo.get_by_boond_resource_id(
+                            str(manager_id)
+                        )
+                        if bobby_user:
+                            commercial_email = str(bobby_user.email)
+                            commercial_name = (
+                                f"{bobby_user.first_name} {bobby_user.last_name}".strip()
+                            )
+                            logger.info(
+                                "commercial_found_in_bobby",
+                                boond_resource_id=manager_id,
+                                email=commercial_email,
+                            )
+
+                    # Fallback to Boond API data
+                    if not commercial_email:
+                        commercial_email = need_data.get("commercial_email", "")
+                        commercial_name = need_data.get("commercial_name", "")
+                        if commercial_email:
+                            logger.info(
+                                "commercial_found_in_boond",
+                                email=commercial_email,
+                            )
 
             # Generate reference
             reference = await self._cr_repo.get_next_reference()
@@ -156,6 +185,7 @@ class CreateContractRequestUseCase:
                 boond_candidate_id=candidate_id,
                 boond_need_id=need_id,
                 commercial_email=commercial_email,
+                client_name=client_name,
                 daily_rate=positioning_data.get("daily_rate"),
                 start_date=positioning_data.get("start_date"),
             )

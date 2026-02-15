@@ -78,15 +78,18 @@ async def handle_boond_positioning_webhook(
         BoondCrmAdapter,
     )
     from app.infrastructure.boond.client import BoondClient
+    from app.infrastructure.database.repositories.user_repository import UserRepository
 
     boond_client = BoondClient(settings)
     crm_service = BoondCrmAdapter(boond_client)
+    user_repo = UserRepository(db)
 
     use_case = CreateContractRequestUseCase(
         contract_request_repository=cr_repo,
         webhook_event_repository=webhook_repo,
         crm_service=crm_service,
         email_service=email_service,
+        user_repository=user_repo,
         frontend_url=settings.frontend_url,
     )
 
