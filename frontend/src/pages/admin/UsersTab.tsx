@@ -430,26 +430,13 @@ export function UsersTab() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  ID Boond Resource
+                  ID BoondManager
                 </label>
                 <input
                   type="text"
                   value={editForm.boond_resource_id}
                   onChange={(e) => setEditForm({ ...editForm, boond_resource_id: e.target.value })}
                   placeholder="Non lie a BoondManager"
-                  className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  ID Boond Manager
-                </label>
-                <input
-                  type="text"
-                  value={editForm.manager_boond_id}
-                  onChange={(e) => setEditForm({ ...editForm, manager_boond_id: e.target.value })}
-                  placeholder="Non defini"
                   className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
                 />
               </div>
