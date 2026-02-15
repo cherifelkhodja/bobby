@@ -242,10 +242,16 @@ async def cancel_contract_request(
     user_id: AdvOrAdminUser,
     db: AsyncSession = Depends(get_db),
 ):
-    """Cancel a contract request (soft delete). ADV/admin only.
+    """Cancel a contract request. ADV/admin only.
 
-    Sets the status to 'cancelled'. Not allowed for signed/archived requests.
+    Only allowed when the Boond positioning state is no longer 7 or 2.
     """
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.infrastructure.boond.client import BoondClient
+
+    settings = get_settings()
     cr_repo = ContractRequestRepository(db)
     cr = await cr_repo.get_by_id(contract_request_id)
     if not cr:
@@ -257,6 +263,23 @@ async def cancel_contract_request(
             detail=f"Impossible d'annuler une demande au statut '{cr.status.display_name}'.",
         )
 
+    # Check Boond positioning state — only allow cancel if state is NOT 7 or 2
+    boond_crm = BoondCrmAdapter(BoondClient(settings))
+    positioning = await boond_crm.get_positioning(cr.boond_positioning_id)
+    if not positioning:
+        raise HTTPException(
+            status_code=502,
+            detail="Impossible de récupérer le positionnement depuis BoondManager.",
+        )
+
+    boond_state = positioning.get("state")
+    if boond_state in (7, 2):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Annulation impossible : le positionnement Boond est en état {boond_state}.",
+        )
+
+    previous_status = cr.status.value
     cr.transition_to(ContractRequestStatus.CANCELLED)
     saved = await cr_repo.save(cr)
 
@@ -265,13 +288,17 @@ async def cancel_contract_request(
         AuditResource.CONTRACT_REQUEST,
         user_id=user_id,
         resource_id=str(contract_request_id),
-        details={"previous_status": cr.status.value},
+        details={
+            "previous_status": previous_status,
+            "boond_positioning_state": boond_state,
+        },
     )
 
     logger.info(
         "contract_request_cancelled",
         cr_id=str(contract_request_id),
         reference=saved.reference,
+        boond_state=boond_state,
     )
 
     return _cr_to_response(saved)

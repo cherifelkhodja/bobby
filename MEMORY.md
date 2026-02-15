@@ -163,9 +163,10 @@ docker-compose up # Start all services
 
 ### 2026-02-15 (annulation demande de contrat)
 - **feat(contract-management)**: Possibilité d'annuler une demande de contrat
-  - Backend : `DELETE /api/v1/contract-requests/{id}` — soft delete (statut → `cancelled`), ADV/admin uniquement
-  - Bloqué pour les statuts terminaux (signed, archived, redirected_payfit)
-  - Audit : `CONTRACT_REQUEST_CANCELLED` ajouté aux actions d'audit
+  - Backend : `DELETE /api/v1/contract-requests/{id}` — annulation (statut → `cancelled`), ADV/admin uniquement
+  - **Condition Boond** : appel API BoondManager pour vérifier l'état du positionnement — annulation uniquement si state ≠ 7 et state ≠ 2
+  - Bloqué aussi pour les statuts terminaux locaux (signed, archived, redirected_payfit)
+  - Audit : `CONTRACT_REQUEST_CANCELLED` ajouté aux actions d'audit (inclut `boond_positioning_state`)
   - Frontend ContractDetail : bouton "Annuler" + modale de confirmation
   - Frontend ContractManagement : bouton X sur chaque ligne (sauf statuts terminaux) + modale
   - Fichiers modifiés : `routes.py`, `audit/logger.py`, `contracts.ts`, `ContractDetail.tsx`, `ContractManagement.tsx`
