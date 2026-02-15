@@ -126,7 +126,7 @@
 - [ ] Améliorer couverture tests E2E
 - [ ] Dashboard analytics cooptations
 - [ ] Notifications push
-- [ ] Tests intégration contractualisation & vigilance (repos, API routes)
+- [x] Tests intégration contractualisation & vigilance (repos, API routes)
 - [ ] Template DOCX contrat AT (`backend/templates/contrat_at.docx`)
 
 ---
@@ -294,10 +294,22 @@ docker-compose up # Start all services
 
 - **feat(config)**: Variables d'environnement YouSign, INSEE, Portal, Gemini company info
 
-- **test**: 34 tests unitaires pour les 3 bounded contexts
+- **test**: 34 tests unitaires pour les 3 bounded contexts (entity, state machine, compliance checker, article numbering)
   - test_magic_link_entity (7 tests), test_document_status_transitions (10 tests), test_compliance_checker (5 tests), test_contract_request_status_transitions (9 tests), test_article_numbering (3 tests)
 
 - **deps**: Ajout `apscheduler>=3.10.0` aux dépendances backend
+
+### 2026-02-15 (tests)
+- **test(integration)**: Tests d'intégration API pour les 3 bounded contexts
+  - `test_contract_management.py` : 29 tests — list (auth, pagination, status filter), get, compliance override, contracts list, Boond webhook (idempotence), YouSign webhook, validate commercial, configure contract
+  - `test_vigilance.py` : 24 tests — list third-parties (auth, compliance filter, search), documents CRUD, validate/reject documents, compliance dashboard
+  - `test_portal.py` : 19 tests — portal info (valid/invalid/expired/revoked tokens), documents list (purpose check), upload (ownership), contract draft, contract review (validation)
+  - Fixtures ajoutées : `adv_user`, `adv_headers` dans conftest.py
+  - Fichiers créés : `tests/integration/api/test_contract_management.py`, `tests/integration/api/test_vigilance.py`, `tests/integration/api/test_portal.py`
+
+- **test(unit)**: Tests unitaires ServiceFactory — câblage des 3 bounded contexts
+  - 26 tests : repositories (creation + caching pour 6 repos), external services (INSEE, YouSign, BoondCRM), use cases (7 use cases), independence (repos distincts, pas d'interférence)
+  - Fichier créé : `tests/unit/test_service_factory.py`
 
 ### 2026-02-13
 - **fix(hr)**: Correction labels d'état dans la page "Gestion des annonces" (HRDashboard)

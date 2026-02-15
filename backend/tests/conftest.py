@@ -184,6 +184,25 @@ async def rh_user(db_session: AsyncSession) -> UserModel:
 
 
 @pytest_asyncio.fixture
+async def adv_user(db_session: AsyncSession) -> UserModel:
+    """Create an ADV user in database."""
+    user = UserModel(
+        id=uuid4(),
+        email=f"adv-{uuid4().hex[:8]}@example.com",
+        first_name="ADV",
+        last_name="User",
+        password_hash=hash_password("AdvPassword123!"),
+        role=UserRole.ADV.value,
+        is_verified=True,
+        is_active=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
 async def unverified_user(db_session: AsyncSession) -> UserModel:
     """Create an unverified user in database."""
     user = UserModel(
@@ -255,6 +274,12 @@ def commercial_headers(commercial_user: UserModel) -> dict[str, str]:
 def rh_headers(rh_user: UserModel) -> dict[str, str]:
     """Get auth headers for RH user."""
     return get_auth_headers(rh_user.id)
+
+
+@pytest.fixture
+def adv_headers(adv_user: UserModel) -> dict[str, str]:
+    """Get auth headers for ADV user."""
+    return get_auth_headers(adv_user.id)
 
 
 # ============================================================================
