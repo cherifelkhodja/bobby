@@ -165,6 +165,11 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-15 (suite)
+- **feat(insee)**: Migration INSEE Sirene API vers OAuth2 client_credentials
+  - Remplacement `INSEE_API_KEY` (clé statique) par `INSEE_CONSUMER_KEY` + `INSEE_CONSUMER_SECRET` (OAuth2)
+  - Token URL : `https://auth.insee.net/auth/realms/apim-gravitee/protocol/openid-connect/token`
+  - Cache token en mémoire avec marge de sécurité 60s + retry automatique sur 401
+  - Fichiers modifiés : `config.py`, `insee_client.py`
 - **feat(frontend)**: Page "Gestion des contrats" pour commerciaux et ADV
   - **Page** : `ContractManagement.tsx` — liste des demandes de contrat avec onglets (Tous / En cours / Finalisés), badges de statut colorés, pagination, filtre par statut pour ADV/admin
   - **Scope par rôle** : Commercial voit ses contrats, ADV/admin voient tous les contrats
