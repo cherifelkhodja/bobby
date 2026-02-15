@@ -114,18 +114,32 @@ class CreateContractRequestUseCase:
             # Idempotence check using webhook event ID
             event_id = f"positioning_update_{positioning_id}_{new_state}"
             if await self._webhook_repo.exists(event_id):
-                logger.info("webhook_duplicate_event", event_id=event_id)
-                raise WebhookDuplicateError(event_id)
-
-            # Check if CR already exists for this positioning
-            existing = await self._cr_repo.get_by_positioning_id(positioning_id)
-            if existing:
-                logger.info(
-                    "contract_request_already_exists",
-                    positioning_id=positioning_id,
-                    cr_id=str(existing.id),
-                )
-                return existing
+                # Check if all CRs for this positioning are cancelled
+                # If so, allow re-creation by clearing old dedup entry
+                existing = await self._cr_repo.get_by_positioning_id(positioning_id)
+                if existing is None:
+                    # No active CR → previous one was cancelled, clear dedup
+                    await self._webhook_repo.delete_by_prefix(
+                        f"positioning_update_{positioning_id}_"
+                    )
+                    logger.info(
+                        "webhook_dedup_cleared_after_cancel",
+                        event_id=event_id,
+                        positioning_id=positioning_id,
+                    )
+                else:
+                    logger.info("webhook_duplicate_event", event_id=event_id)
+                    raise WebhookDuplicateError(event_id)
+            else:
+                # Check if CR already exists for this positioning
+                existing = await self._cr_repo.get_by_positioning_id(positioning_id)
+                if existing:
+                    logger.info(
+                        "contract_request_already_exists",
+                        positioning_id=positioning_id,
+                        cr_id=str(existing.id),
+                    )
+                    return existing
 
             # Fetch Boond data
             positioning_data = await self._crm.get_positioning(positioning_id)

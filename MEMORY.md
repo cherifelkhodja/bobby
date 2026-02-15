@@ -170,6 +170,7 @@ docker-compose up # Start all services
   - **Nettoyage dédup webhook** : lors de l'annulation, suppression des entrées `cm_webhook_events` (prefix `positioning_update_{id}_`) pour permettre au prochain webhook de re-créer un CR
   - `WebhookEventRepository.delete_by_prefix()` ajouté
   - **Re-création après annulation** : `get_by_positioning_id()` exclut les CR annulés (`status != cancelled`) — un webhook peut maintenant créer un nouveau CR même si un ancien existe en statut annulé
+  - **Dédup intelligente dans le use case** : si l'event de dédup existe mais qu'aucun CR actif n'existe (tous annulés), l'event est supprimé et la création continue — corrige le cas où l'annulation a eu lieu avant le déploiement du fix
   - Frontend ContractDetail : bouton "Annuler" + modale de confirmation
   - Frontend ContractManagement : bouton X sur chaque ligne (sauf statuts terminaux) + modale
   - Fichiers modifiés : `routes.py`, `audit/logger.py`, `postgres_contract_repo.py`, `contracts.ts`, `ContractDetail.tsx`, `ContractManagement.tsx`
