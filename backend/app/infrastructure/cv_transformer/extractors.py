@@ -4,10 +4,19 @@ Implements CvTextExtractorPort for dependency inversion.
 """
 
 import io
+import logging
 from typing import BinaryIO
 
 from docx import Document
 from pypdf import PdfReader
+
+logger = logging.getLogger(__name__)
+
+# DOCX XML namespaces for text box extraction
+_WPS_TXBX = "{http://schemas.microsoft.com/office/word/2010/wordprocessingShape}txbx"
+_VML_TEXTBOX = "{urn:schemas-microsoft-com:vml}textbox"
+_W_P = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+_W_T = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
 
 
 class PdfTextExtractor:
@@ -82,6 +91,32 @@ def extract_text_from_bytes(content: bytes, filename: str) -> str:
         raise ValueError(f"Format de fichier non supporté: {filename}")
 
 
+def _extract_textbox_text(document: Document) -> list[str]:
+    """Extract text from text boxes and shapes in a DOCX document.
+
+    Many CV templates store content in floating text boxes which are not
+    included in document.paragraphs or document.tables.
+
+    Handles:
+    - wps:txbx  (Word Processing Shapes — modern DOCX text boxes)
+    - v:textbox (VML — older format text boxes)
+    """
+    text_parts: list[str] = []
+
+    for container_tag in (_WPS_TXBX, _VML_TEXTBOX):
+        for container in document.element.iter(container_tag):
+            para_texts: list[str] = []
+            for para in container.iter(_W_P):
+                t_nodes = [t.text for t in para.iter(_W_T) if t.text]
+                para_text = "".join(t_nodes).strip()
+                if para_text:
+                    para_texts.append(para_text)
+            if para_texts:
+                text_parts.append("\n".join(para_texts))
+
+    return text_parts
+
+
 def extract_text_from_docx(file_content: bytes | BinaryIO) -> str:
     """Extract text content from a DOCX file.
 
@@ -89,7 +124,7 @@ def extract_text_from_docx(file_content: bytes | BinaryIO) -> str:
         file_content: DOCX file content as bytes or file-like object.
 
     Returns:
-        Extracted text from all paragraphs and tables.
+        Extracted text from all paragraphs, tables and text boxes.
 
     Raises:
         ValueError: If the DOCX cannot be read or is empty.
@@ -115,6 +150,18 @@ def extract_text_from_docx(file_content: bytes | BinaryIO) -> str:
                         row_text.append(cell.text.strip())
                 if row_text:
                     text_parts.append(" | ".join(row_text))
+
+        # Extract text from text boxes / shapes (wps:txbx, v:textbox).
+        # Many CV templates use floating text boxes that are invisible to
+        # document.paragraphs and document.tables.
+        textbox_parts = _extract_textbox_text(document)
+        if textbox_parts:
+            logger.debug(
+                "DOCX: extracted %d text box(es) in addition to %d paragraph/table block(s)",
+                len(textbox_parts),
+                len(text_parts),
+            )
+            text_parts.extend(textbox_parts)
 
         if not text_parts:
             raise ValueError("Le document Word ne contient pas de texte extractible")

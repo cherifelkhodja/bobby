@@ -96,6 +96,9 @@ export function CvGeneratorBeta() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stepRef = useRef<Step>(step);
   stepRef.current = step;
+  // Synchronously tracks whether onError was called during parseCvStream
+  // (stepRef.current is stale during async execution due to React batching)
+  const hadErrorRef = useRef(false);
 
   const isProcessing = ['uploading', 'extracting', 'ai_parsing', 'validating', 'generating'].includes(step);
   const elapsed = useElapsedTimer(isProcessing);
@@ -106,6 +109,7 @@ export function CvGeneratorBeta() {
     setStep('uploading');
     setProgress(5);
     setProgressMessage('Envoi du fichier...');
+    hadErrorRef.current = false;
 
     try {
       let cvData: Record<string, unknown> | null = null;
@@ -120,13 +124,14 @@ export function CvGeneratorBeta() {
           cvData = event.data;
         },
         onError: (message: string) => {
+          hadErrorRef.current = true;
           setStep('error');
           setErrorMessage(message);
         },
       });
 
       if (!cvData) {
-        if (stepRef.current !== 'error') {
+        if (!hadErrorRef.current) {
           setStep('error');
           setErrorMessage("Le flux s'est terminé sans résultat");
         }
