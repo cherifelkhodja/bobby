@@ -143,6 +143,14 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-02-24
+- **fix(cv-generator)**: Correction erreur "Le flux s'est terminé sans résultat" sur les DOCX
+  - **Cause 1 — DOCX text boxes** : Les CVs au format DOCX utilisant des zones de texte flottantes (`wps:txbx`, `v:textbox`) n'étaient pas extraits par `document.paragraphs`/`document.tables`. Le texte était vide → ValueError → SSE error event envoyé.
+  - **Cause 2 — Stale ref frontend** : `stepRef.current` est mis à jour uniquement au re-render. En React 18, `setStep('error')` appelé dans `onError` est batché et appliqué après la résolution de `parseCvStream`. Au moment du check `stepRef.current !== 'error'`, la ref était encore à l'ancienne valeur → le vrai message d'erreur était écrasé par "Le flux s'est terminé sans résultat".
+  - **Fix backend** : Ajout `_extract_textbox_text()` dans `extractors.py` — itère `wps:txbx` et `v:textbox` via l'API XML lxml pour extraire les paragraphes des zones de texte flottantes.
+  - **Fix frontend** : Remplacement du check `stepRef.current !== 'error'` par un `hadErrorRef` synchrone mis à jour directement dans `onError`.
+  - Fichiers modifiés : `extractors.py`, `CvGeneratorBeta.tsx`
+
 ### 2026-02-13
 - **fix(hr)**: Correction labels d'état dans la page "Gestion des annonces" (HRDashboard)
   - `STATE_CONFIG` ne contenait que 5 états (0, 5, 6, 7, 10), les autres affichaient "État {n}" au lieu du libellé
