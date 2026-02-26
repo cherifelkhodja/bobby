@@ -143,6 +143,14 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-02-26
+- **fix(quotation-generator)**: Correction erreur 422 BoondManager lors de la création de devis Thales
+  - **Cause** : Le format du payload `quotationRecords` envoyé à l'API BoondManager était incorrect. Les champs `amountExcludingTax`, `turnoverExcludingTax`, `turnoverIncludingTax`, `taxRates` ne sont pas reconnus par le schéma JSON de l'API `/apps/quotations/quotations`. L'API attend `unitPrice`, `unit`, `taxRate`.
+  - **Fix backend** : Remplacement des champs invalides dans `to_boond_record()` par le format correct : `unitPrice` (prix unitaire), `unit: "day"`, `taxRate` (taux TVA).
+  - **Fix backend** : Suppression du double-wrapping du message d'erreur dans `generate_batch.py` (le message affichait "BoondManager error: BoondManager API error..." rendant l'erreur réelle invisible).
+  - **Fix frontend** : Amélioration de l'affichage des erreurs dans `QuotationGenerator.tsx` (suppression de la troncature à 30 caractères, utilisation de CSS `truncate` avec tooltip au survol).
+  - Fichiers modifiés : `quotation_line.py`, `generate_batch.py`, `QuotationGenerator.tsx`
+
 ### 2026-02-24
 - **fix(cv-generator)**: Correction erreur "Le flux s'est terminé sans résultat" sur les DOCX
   - **Cause 1 — DOCX text boxes** : Les CVs au format DOCX utilisant des zones de texte flottantes (`wps:txbx`, `v:textbox`) n'étaient pas extraits par `document.paragraphs`/`document.tables`. Le texte était vide → ValueError → SSE error event envoyé.

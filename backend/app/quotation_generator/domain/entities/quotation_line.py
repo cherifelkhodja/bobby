@@ -84,12 +84,10 @@ class QuotationLine:
         """
         return {
             "description": self.description,
-            "taxRate": self.tax_rate_percent,
-            "taxRates": [self.tax_rate_percent],
             "quantity": self.quantity,
-            "amountExcludingTax": self.unit_price_ht.to_float(),
-            "turnoverExcludingTax": self.total_ht.to_float(),
-            "turnoverIncludingTax": self.total_ttc.to_float(),
+            "unitPrice": self.unit_price_ht.to_float(),
+            "unit": "day",
+            "taxRate": self.tax_rate_percent,
         }
 
     def __str__(self) -> str:
