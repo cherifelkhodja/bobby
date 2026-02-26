@@ -1047,8 +1047,8 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
                           PDF
                         </Button>
                       ) : q.error_message ? (
-                        <span className="text-xs text-red-500" title={q.error_message}>
-                          {q.error_message.substring(0, 30)}...
+                        <span className="text-xs text-red-500 max-w-[200px] inline-block truncate" title={q.error_message}>
+                          {q.error_message}
                         </span>
                       ) : (
                         <span className="text-gray-400">-</span>

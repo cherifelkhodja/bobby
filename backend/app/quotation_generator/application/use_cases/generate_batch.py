@@ -186,7 +186,7 @@ class GenerateBatchUseCase:
 
             except BoondManagerAPIError as e:
                 logger.error(f"BoondManager error for {quotation.resource_trigramme}: {e}")
-                quotation.mark_as_failed(f"BoondManager error: {e.message}")
+                quotation.mark_as_failed(f"Erreur Boond ({e.status_code}): {str(e)[:300]}")
                 await self._update_progress(batch)
 
             except PDFConversionError as e:
