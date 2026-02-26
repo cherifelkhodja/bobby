@@ -150,6 +150,10 @@ docker-compose up # Start all services
   - **Fix backend** (`quotation_line.py`) : Ajout `amountExcludingTax: self.total_ht.to_float()` et remplacement `taxRate: int` par `taxRates: [int]` dans `to_boond_record()`.
   - **Fix backend** (`quotation.py`) : Suppression de la relationship `billingDetail` dans `to_boond_payload()`.
   - Fichiers modifiés : `quotation_line.py`, `quotation.py`
+- **fix(alembic)**: Migration `026_partial_uniq_pos` manquante — placeholder créé
+  - **Cause** : La migration avait été appliquée sur la base prod mais le fichier n'a jamais été commité. Alembic ne trouvait plus le head → échec au démarrage (Railway).
+  - **Fix** : Création d'un fichier placeholder no-op `026_partial_uniq_pos.py` avec `down_revision = "024_reset_opps_coopts"`.
+  - Fichier créé : `backend/alembic/versions/026_partial_uniq_pos.py`
 - **fix(quotation-generator)**: Correction erreur 422 BoondManager lors de la création de devis Thales (1ère passe)
   - **Cause** : Les IDs dans les `relationships` JSON:API étaient envoyés en tant que `string` au lieu de `int`. Le type `billingDetail` utilisait `"detail"` au lieu de `"companyDetail"`.
   - **Fix backend** : Conversion de tous les IDs de relationships en entiers dans `to_boond_payload()`.
