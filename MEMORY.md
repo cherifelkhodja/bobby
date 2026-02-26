@@ -145,11 +145,15 @@ docker-compose up # Start all services
 
 ### 2026-02-26
 - **fix(quotation-generator)**: Correction erreur 422 BoondManager lors de la création de devis Thales
-  - **Cause** : Le format du payload `quotationRecords` envoyé à l'API BoondManager était incorrect. Les champs `amountExcludingTax`, `turnoverExcludingTax`, `turnoverIncludingTax`, `taxRates` ne sont pas reconnus par le schéma JSON de l'API `/apps/quotations/quotations`. L'API attend `unitPrice`, `unit`, `taxRate`.
-  - **Fix backend** : Remplacement des champs invalides dans `to_boond_record()` par le format correct : `unitPrice` (prix unitaire), `unit: "day"`, `taxRate` (taux TVA).
-  - **Fix backend** : Suppression du double-wrapping du message d'erreur dans `generate_batch.py` (le message affichait "BoondManager error: BoondManager API error..." rendant l'erreur réelle invisible).
-  - **Fix frontend** : Amélioration de l'affichage des erreurs dans `QuotationGenerator.tsx` (suppression de la troncature à 30 caractères, utilisation de CSS `truncate` avec tooltip au survol).
-  - Fichiers modifiés : `quotation_line.py`, `generate_batch.py`, `QuotationGenerator.tsx`
+  - **Cause 1** : Le format du payload `quotationRecords` envoyé à l'API BoondManager était incorrect. Les champs `amountExcludingTax`, `turnoverExcludingTax`, `turnoverIncludingTax`, `taxRates` ne sont pas reconnus par le schéma JSON de l'API `/apps/quotations/quotations`. L'API attend `unitPrice`, `unit`, `taxRate`.
+  - **Cause 2 (principale)** : Les IDs dans les `relationships` JSON:API étaient envoyés en tant que `string` (`"228"`) au lieu de `int` (`228`). Tous les autres endpoints BoondManager fonctionnels du projet (candidates, positionings, actions) utilisent `int()` pour les IDs des relationships. Le type `billingDetail` utilisait `"detail"` au lieu de `"companyDetail"`.
+  - **Fix backend** : Remplacement des champs invalides dans `to_boond_record()` par le format correct : `unitPrice`, `unit: "day"`, `taxRate`.
+  - **Fix backend** : Conversion de tous les IDs de relationships en entiers dans `to_boond_payload()` (opportunity, company, contact, billingDetail, mainManager).
+  - **Fix backend** : Suppression du double-wrapping du message d'erreur dans `generate_batch.py`.
+  - **Fix backend** : Ajout retry intelligent (skip 4xx, retry uniquement 5xx/network), logging complet payload+réponse, capture erreur étendue à 2000 chars.
+  - **Fix backend** : Ajout méthode `get_quotation()` et endpoint debug `GET /quotation-generator/debug/quotation/{id}` pour inspecter le format d'un devis existant.
+  - **Fix frontend** : Amélioration de l'affichage des erreurs dans `QuotationGenerator.tsx` (CSS `truncate` avec tooltip au survol).
+  - Fichiers modifiés : `quotation_line.py`, `quotation.py`, `boond_adapter.py`, `routes.py`, `generate_batch.py`, `QuotationGenerator.tsx`
 
 ### 2026-02-24
 - **fix(cv-generator)**: Correction erreur "Le flux s'est terminé sans résultat" sur les DOCX

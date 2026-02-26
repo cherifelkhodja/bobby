@@ -11,6 +11,7 @@ from app.quotation_generator.api.dependencies import (
     get_batch_details_use_case,
     get_batch_storage,
     get_download_batch_use_case,
+    get_erp_adapter,
     get_list_templates_use_case,
     get_list_user_batches_use_case,
     get_preview_batch_use_case,
@@ -51,7 +52,7 @@ from app.quotation_generator.domain.exceptions import (
     DownloadNotReadyError,
     MissingColumnsError,
 )
-from app.quotation_generator.infrastructure.adapters import RedisStorageAdapter
+from app.quotation_generator.infrastructure.adapters import BoondManagerAdapter, RedisStorageAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -515,6 +516,33 @@ async def update_quotation_contact(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update contact: {str(e)}",
+        )
+
+
+@router.get(
+    "/debug/quotation/{quotation_id}",
+    responses={
+        200: {"description": "Raw BoondManager quotation data"},
+        404: {"model": ErrorResponse, "description": "Quotation not found"},
+    },
+)
+async def debug_quotation(
+    quotation_id: str,
+    current_user: AdminUser,
+    boond_adapter: BoondManagerAdapter = Depends(get_erp_adapter),
+) -> dict:
+    """Fetch an existing quotation from BoondManager for debugging.
+
+    Returns the raw JSON:API response to compare expected format.
+    """
+    from app.quotation_generator.domain.exceptions import BoondManagerAPIError
+
+    try:
+        return await boond_adapter.get_quotation(quotation_id)
+    except BoondManagerAPIError as e:
+        raise HTTPException(
+            status_code=e.status_code or 500,
+            detail=e.message,
         )
 
 
