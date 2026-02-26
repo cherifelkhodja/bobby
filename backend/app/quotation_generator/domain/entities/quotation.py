@@ -241,17 +241,17 @@ class Quotation:
                     "showOpportunityReferenceOnPDF": True,
                 },
                 "relationships": {
-                    "mainManager": {"data": {"id": "1", "type": "resource"}},
+                    "mainManager": {"data": {"id": 1, "type": "resource"}},
                     "opportunity": {
                         "data": {
-                            "id": str(self.opportunity_id).replace("AO", ""),
+                            "id": int(str(self.opportunity_id).replace("AO", "")),
                             "type": "opportunity",
                         }
                     },
-                    "company": {"data": {"id": str(self.company_id), "type": "company"}},
-                    "contact": {"data": {"id": str(self.contact_id), "type": "contact"}},
+                    "company": {"data": {"id": int(self.company_id), "type": "company"}},
+                    "contact": {"data": {"id": int(self.contact_id), "type": "contact"}},
                     "billingDetail": {
-                        "data": {"id": str(self.company_detail_id), "type": "detail"}
+                        "data": {"id": int(self.company_detail_id), "type": "companyDetail"}
                     },
                 },
             }

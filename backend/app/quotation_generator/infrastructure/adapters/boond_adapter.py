@@ -1,10 +1,11 @@
 """BoondManager adapter implementing ERPPort for quotation operations."""
 
+import json
 import logging
 from datetime import date
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from app.config import Settings
 from app.quotation_generator.domain.entities import Quotation
@@ -36,9 +37,17 @@ class BoondManagerAdapter(ERPPort):
         """Create HTTP client with auth and timeout."""
         return httpx.AsyncClient(timeout=self.timeout)
 
+    @staticmethod
+    def _is_retryable_error(exception: BaseException) -> bool:
+        """Check if an error should be retried (skip 4xx client errors)."""
+        if isinstance(exception, BoondManagerAPIError):
+            return exception.status_code == 0 or exception.status_code >= 500
+        return isinstance(exception, httpx.RequestError)
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=4),
+        retry=retry_if_exception(_is_retryable_error),
         reraise=True,
     )
     async def create_quotation(self, quotation: Quotation) -> tuple[str, str]:
@@ -62,6 +71,9 @@ class BoondManagerAdapter(ERPPort):
                     f"Creating quotation for {quotation.resource_name} "
                     f"on opportunity {quotation.opportunity_id}"
                 )
+                logger.debug(
+                    f"Quotation payload: {json.dumps(payload, indent=2, ensure_ascii=False)}"
+                )
 
                 response = await client.post(
                     f"{self.base_url}/apps/quotations/quotations",
@@ -76,10 +88,14 @@ class BoondManagerAdapter(ERPPort):
                     )
 
                 if response.status_code >= 400:
-                    error_text = response.text[:500]
+                    logger.error(
+                        f"BoondManager quotation creation failed ({response.status_code}).\n"
+                        f"Sent payload: {json.dumps(payload, indent=2, ensure_ascii=False)}\n"
+                        f"Full response: {response.text}"
+                    )
                     raise BoondManagerAPIError(
                         status_code=response.status_code,
-                        message=f"Failed to create quotation: {error_text}",
+                        message=f"Failed to create quotation: {response.text[:2000]}",
                     )
 
                 data = response.json()
@@ -95,6 +111,39 @@ class BoondManagerAdapter(ERPPort):
 
             except httpx.RequestError as e:
                 logger.error(f"Network error creating quotation: {e}")
+                raise BoondManagerAPIError(
+                    status_code=0,
+                    message=f"Network error: {str(e)}",
+                ) from e
+
+    async def get_quotation(self, quotation_id: str) -> dict:
+        """Get a quotation from BoondManager (for debugging format).
+
+        Args:
+            quotation_id: The BoondManager quotation ID.
+
+        Returns:
+            Raw JSON response from BoondManager.
+
+        Raises:
+            BoondManagerAPIError: If the API call fails.
+        """
+        async with self._get_client() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/apps/quotations/quotations/{quotation_id}",
+                    auth=self._auth,
+                )
+
+                if response.status_code >= 400:
+                    raise BoondManagerAPIError(
+                        status_code=response.status_code,
+                        message=f"Error fetching quotation: {response.text[:500]}",
+                    )
+
+                return response.json()
+
+            except httpx.RequestError as e:
                 raise BoondManagerAPIError(
                     status_code=0,
                     message=f"Network error: {str(e)}",
