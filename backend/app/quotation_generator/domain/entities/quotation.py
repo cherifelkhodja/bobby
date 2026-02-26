@@ -250,9 +250,6 @@ class Quotation:
                     },
                     "company": {"data": {"id": int(self.company_id), "type": "company"}},
                     "contact": {"data": {"id": int(self.contact_id), "type": "contact"}},
-                    "billingDetail": {
-                        "data": {"id": int(self.company_detail_id), "type": "companyDetail"}
-                    },
                 },
             }
         }

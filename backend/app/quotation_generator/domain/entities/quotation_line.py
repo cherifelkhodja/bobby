@@ -86,8 +86,9 @@ class QuotationLine:
             "description": self.description,
             "quantity": self.quantity,
             "unitPrice": self.unit_price_ht.to_float(),
+            "amountExcludingTax": self.total_ht.to_float(),
             "unit": "day",
-            "taxRate": self.tax_rate_percent,
+            "taxRates": [self.tax_rate_percent],
         }
 
     def __str__(self) -> str:

@@ -144,11 +144,15 @@ docker-compose up # Start all services
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
 ### 2026-02-26
-- **fix(quotation-generator)**: Correction erreur 422 BoondManager lors de la création de devis Thales
-  - **Cause 1** : Le format du payload `quotationRecords` envoyé à l'API BoondManager était incorrect. Les champs `amountExcludingTax`, `turnoverExcludingTax`, `turnoverIncludingTax`, `taxRates` ne sont pas reconnus par le schéma JSON de l'API `/apps/quotations/quotations`. L'API attend `unitPrice`, `unit`, `taxRate`.
-  - **Cause 2 (principale)** : Les IDs dans les `relationships` JSON:API étaient envoyés en tant que `string` (`"228"`) au lieu de `int` (`228`). Tous les autres endpoints BoondManager fonctionnels du projet (candidates, positionings, actions) utilisent `int()` pour les IDs des relationships. Le type `billingDetail` utilisait `"detail"` au lieu de `"companyDetail"`.
-  - **Fix backend** : Remplacement des champs invalides dans `to_boond_record()` par le format correct : `unitPrice`, `unit: "day"`, `taxRate`.
-  - **Fix backend** : Conversion de tous les IDs de relationships en entiers dans `to_boond_payload()` (opportunity, company, contact, billingDetail, mainManager).
+- **fix(quotation-generator)**: Correction erreur 422 BoondManager lors de la création de devis Thales (2ème passe)
+  - **Cause 1** : L'API BoondManager exige `amountExcludingTax` (montant HT de la ligne = quantity * unitPrice) et `taxRates` (tableau, ex: `[20]`) dans chaque `quotationRecords`. Le fix précédent les avait retirés à tort. Le champ `taxRate` (singulier, scalaire) n'est PAS le bon format — l'API attend `taxRates` (pluriel, tableau).
+  - **Cause 2** : La relationship `billingDetail` n'est pas acceptée par l'API POST `/apps/quotations/quotations` (erreur 1000 "Incorrect request"). Elle a été retirée du payload.
+  - **Fix backend** (`quotation_line.py`) : Ajout `amountExcludingTax: self.total_ht.to_float()` et remplacement `taxRate: int` par `taxRates: [int]` dans `to_boond_record()`.
+  - **Fix backend** (`quotation.py`) : Suppression de la relationship `billingDetail` dans `to_boond_payload()`.
+  - Fichiers modifiés : `quotation_line.py`, `quotation.py`
+- **fix(quotation-generator)**: Correction erreur 422 BoondManager lors de la création de devis Thales (1ère passe)
+  - **Cause** : Les IDs dans les `relationships` JSON:API étaient envoyés en tant que `string` au lieu de `int`. Le type `billingDetail` utilisait `"detail"` au lieu de `"companyDetail"`.
+  - **Fix backend** : Conversion de tous les IDs de relationships en entiers dans `to_boond_payload()`.
   - **Fix backend** : Suppression du double-wrapping du message d'erreur dans `generate_batch.py`.
   - **Fix backend** : Ajout retry intelligent (skip 4xx, retry uniquement 5xx/network), logging complet payload+réponse, capture erreur étendue à 2000 chars.
   - **Fix backend** : Ajout méthode `get_quotation()` et endpoint debug `GET /quotation-generator/debug/quotation/{id}` pour inspecter le format d'un devis existant.
