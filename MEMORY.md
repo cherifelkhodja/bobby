@@ -177,6 +177,12 @@ docker-compose up # Start all services
   - Backend : ajout de `commercial_name` au schema de réponse, résolu depuis la table `users` par email
   - Frontend : affichage `commercial_name || commercial_email` dans l'encart info et la liste
   - Suppression de l'encart "Description de la mission" (affichage et formulaire validation)
+- **feat(contract-management)**: Ajout infos consultant + adresse mission, suppression `mission_location`
+  - **Nouveaux champs DB** (migration 028) : `consultant_civility`, `consultant_first_name`, `consultant_last_name`, `mission_site_name`, `mission_address`, `mission_postal_code`, `mission_city`
+  - **Colonne supprimée** : `mission_location` (remplacée par les 4 champs d'adresse)
+  - **Boond adapter** : `get_candidate_info()` retourne désormais la civilité (M./Mme) ; suppression de `_resolve_place_label()` et de la résolution du lieu dans `get_need()`
+  - **Sync consultant** : création CR et sync-from-boond récupèrent civilité/prénom/nom depuis le candidat du positionnement Boond
+  - **Frontend** : intitulé mission en 1er encart, encart consultant (civilité + prénom + nom), encart adresse complète (site, adresse, CP ville)
 
 ### 2026-03-03 (date de fin + intitulé mission + sync Boond sur demande de contrat)
 - **feat(contract-management)**: Ajout de `end_date` et `mission_title` à la demande de contrat

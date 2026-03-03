@@ -15,7 +15,6 @@ class ContractConfig:
 
     # Mission details
     mission_description: str = ""
-    mission_location: str = ""
     start_date: date | None = None
     end_date: date | None = None
     daily_rate: Decimal = Decimal("0")
@@ -46,7 +45,6 @@ class ContractConfig:
         """
         return {
             "mission_description": self.mission_description,
-            "mission_location": self.mission_location,
             "start_date": self.start_date.strftime("%d/%m/%Y") if self.start_date else "",
             "end_date": self.end_date.strftime("%d/%m/%Y") if self.end_date else "",
             "daily_rate": f"{self.daily_rate:,.2f}".replace(",", " "),

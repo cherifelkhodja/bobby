@@ -629,7 +629,6 @@ class TestConfigureContract:
             f"/api/v1/contract-requests/{cr.id}/configure",
             json={
                 "mission_description": "Mission de développement",
-                "mission_location": "Paris",
                 "daily_rate": 550,
                 "payment_terms": "net_30",
             },

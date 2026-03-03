@@ -139,19 +139,12 @@ class BoondCrmAdapter:
                     client_name = included.get("attributes", {}).get("name", "")
                     break
 
-            # Resolve place ID to label via dictionary
-            place_id = attributes.get("place", "")
-            location = place_id
-            if place_id:
-                location = await self._resolve_place_label(place_id)
-
             return {
                 "id": need_id,
                 "title": attributes.get("title", ""),
                 "client_id": company_id,
                 "client_name": client_name,
                 "description": attributes.get("description", ""),
-                "location": location,
                 "commercial_email": commercial_email,
                 "commercial_name": commercial_name,
                 "manager_id": manager_id,
@@ -174,8 +167,17 @@ class BoondCrmAdapter:
             data = response.get("data", {})
             attributes = data.get("attributes", {})
 
+            # civility: 1 = M., 2 = Mme
+            raw_civility = attributes.get("civility")
+            civility = None
+            if raw_civility == 1:
+                civility = "M."
+            elif raw_civility == 2:
+                civility = "Mme"
+
             return {
                 "id": candidate_id,
+                "civility": civility,
                 "first_name": attributes.get("firstName", ""),
                 "last_name": attributes.get("lastName", ""),
                 "email": attributes.get("email1", ""),
@@ -265,27 +267,6 @@ class BoondCrmAdapter:
             reference=reference,
         )
         return int(result_id) if result_id else 0
-
-    async def _resolve_place_label(self, place_id: str) -> str:
-        """Resolve a Boond place ID to its display label via the dictionary API.
-
-        The dictionary structure is:
-        data.setting.mobilityArea[].option[] where each option has id and value.
-
-        Falls back to the raw ID if the dictionary fetch fails.
-        """
-        try:
-            response = await self._boond._make_request(
-                "GET", "/application/dictionary/setting.place"
-            )
-            setting = response.get("data", {}).get("setting", {})
-            for area in setting.get("mobilityArea", []):
-                for option in area.get("option", []):
-                    if str(option.get("id")) == place_id:
-                        return option.get("value", place_id)
-        except Exception as exc:
-            logger.warning("boond_place_dictionary_fetch_failed", error=str(exc))
-        return place_id
 
     @staticmethod
     def _extract_relationship_id(relationships: dict, key: str) -> int | None:

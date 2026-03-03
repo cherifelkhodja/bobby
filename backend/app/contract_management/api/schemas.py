@@ -22,7 +22,13 @@ class ContractRequestResponse(BaseModel):
     client_name: str | None = None
     mission_title: str | None = None
     mission_description: str | None = None
-    mission_location: str | None = None
+    mission_site_name: str | None = None
+    mission_address: str | None = None
+    mission_postal_code: str | None = None
+    mission_city: str | None = None
+    consultant_civility: str | None = None
+    consultant_first_name: str | None = None
+    consultant_last_name: str | None = None
     commercial_email: str
     commercial_name: str | None = None
     third_party_id: UUID | None = None
@@ -51,14 +57,12 @@ class CommercialValidationRequest(BaseModel):
     client_name: str | None = Field(None, max_length=255)
     mission_title: str | None = Field(None, max_length=500)
     mission_description: str | None = None
-    mission_location: str | None = None
 
 
 class ContractConfigRequest(BaseModel):
     """Request to configure a contract."""
 
     mission_description: str = ""
-    mission_location: str = ""
     start_date: date | None = None
     end_date: date | None = None
     daily_rate: Decimal = Decimal("0")

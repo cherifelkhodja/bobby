@@ -35,7 +35,13 @@ class ContractRequest:
     client_name: str | None = None
     mission_title: str | None = None
     mission_description: str | None = None
-    mission_location: str | None = None
+    mission_site_name: str | None = None
+    mission_address: str | None = None
+    mission_postal_code: str | None = None
+    mission_city: str | None = None
+    consultant_civility: str | None = None
+    consultant_first_name: str | None = None
+    consultant_last_name: str | None = None
     contractualization_contact_email: str | None = None
     contract_config: dict[str, Any] | None = None
     commercial_validated_at: datetime | None = None
@@ -73,7 +79,6 @@ class ContractRequest:
         client_name: str | None = None,
         mission_title: str | None = None,
         mission_description: str | None = None,
-        mission_location: str | None = None,
     ) -> None:
         """Apply commercial validation data and transition status."""
         self.third_party_type = third_party_type
@@ -84,7 +89,6 @@ class ContractRequest:
         self.client_name = client_name
         self.mission_title = mission_title
         self.mission_description = mission_description
-        self.mission_location = mission_location
         self.commercial_validated_at = datetime.utcnow()
         self.transition_to(ContractRequestStatus.COMMERCIAL_VALIDATED)
 

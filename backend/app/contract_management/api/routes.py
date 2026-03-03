@@ -80,7 +80,13 @@ def _cr_to_response(cr, *, commercial_name: str | None = None) -> ContractReques
         client_name=cr.client_name,
         mission_title=cr.mission_title,
         mission_description=cr.mission_description,
-        mission_location=cr.mission_location,
+        mission_site_name=cr.mission_site_name,
+        mission_address=cr.mission_address,
+        mission_postal_code=cr.mission_postal_code,
+        mission_city=cr.mission_city,
+        consultant_civility=cr.consultant_civility,
+        consultant_first_name=cr.consultant_first_name,
+        consultant_last_name=cr.consultant_last_name,
         commercial_email=cr.commercial_email,
         commercial_name=commercial_name,
         third_party_id=cr.third_party_id,
@@ -248,11 +254,17 @@ async def sync_from_boond(
             description = need_data.get("description")
             if description:
                 cr.mission_description = description
-            location = need_data.get("location")
-            if location:
-                cr.mission_location = location
             if not cr.boond_need_id and need_id:
                 cr.boond_need_id = need_id
+
+    # Sync consultant info from positioning candidate
+    candidate_id = positioning_data.get("candidate_id")
+    if candidate_id:
+        candidate_info = await crm.get_candidate_info(candidate_id)
+        if candidate_info:
+            cr.consultant_civility = candidate_info.get("civility") or None
+            cr.consultant_first_name = candidate_info.get("first_name") or None
+            cr.consultant_last_name = candidate_info.get("last_name") or None
 
     saved = await cr_repo.save(cr)
     await db.commit()
@@ -301,7 +313,6 @@ async def validate_commercial(
                 client_name=body.client_name,
                 mission_title=body.mission_title,
                 mission_description=body.mission_description,
-                mission_location=body.mission_location,
             )
         )
     except Exception as exc:

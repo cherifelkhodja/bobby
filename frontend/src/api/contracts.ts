@@ -37,7 +37,6 @@ export const contractsApi = {
       client_name?: string;
       mission_title?: string;
       mission_description?: string;
-      mission_location?: string;
     },
   ): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
@@ -51,7 +50,6 @@ export const contractsApi = {
     id: string,
     data: {
       mission_description?: string;
-      mission_location?: string;
       start_date?: string;
       end_date?: string;
       daily_rate?: number;

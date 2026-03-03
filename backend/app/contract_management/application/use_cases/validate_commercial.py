@@ -26,7 +26,6 @@ class ValidateCommercialCommand:
         client_name: str | None = None,
         mission_title: str | None = None,
         mission_description: str | None = None,
-        mission_location: str | None = None,
     ) -> None:
         self.contract_request_id = contract_request_id
         self.third_party_type = third_party_type
@@ -37,7 +36,6 @@ class ValidateCommercialCommand:
         self.client_name = client_name
         self.mission_title = mission_title
         self.mission_description = mission_description
-        self.mission_location = mission_location
 
 
 class ValidateCommercialUseCase:
@@ -94,7 +92,6 @@ class ValidateCommercialUseCase:
             client_name=command.client_name,
             mission_title=command.mission_title,
             mission_description=command.mission_description,
-            mission_location=command.mission_location,
         )
 
         saved = await self._cr_repo.save(cr)

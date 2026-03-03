@@ -82,7 +82,6 @@ export default function ContractDetail() {
     client_name: '',
     mission_title: '',
     mission_description: '',
-    mission_location: '',
   });
   const [formInitialized, setFormInitialized] = useState(false);
 
@@ -109,7 +108,6 @@ export default function ContractDetail() {
         client_name: cr.client_name ?? '',
         mission_title: cr.mission_title ?? '',
         mission_description: cr.mission_description ?? '',
-        mission_location: cr.mission_location ?? '',
       }));
       setFormInitialized(true);
     }
@@ -189,7 +187,6 @@ export default function ContractDetail() {
         client_name: validationForm.client_name || undefined,
         mission_title: validationForm.mission_title || undefined,
         mission_description: validationForm.mission_description || undefined,
-        mission_location: validationForm.mission_location || undefined,
       }),
     onSuccess: () => {
       toast.success('Validation commerciale effectuée.');
@@ -286,18 +283,22 @@ export default function ContractDetail() {
         </div>
       </div>
 
-      {/* Mission title */}
-      {cr.mission_title && (
-        <Card className="mb-6">
-          <p className="text-xs text-gray-500 dark:text-gray-400">Intitulé de la mission</p>
-          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-            {cr.mission_title}
-          </p>
-        </Card>
-      )}
-
       {/* Info cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <Card>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Intitulé de la mission</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+            {cr.mission_title ?? '-'}
+          </p>
+        </Card>
+        <Card>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Consultant</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+            {cr.consultant_first_name || cr.consultant_last_name
+              ? `${cr.consultant_civility ? cr.consultant_civility + ' ' : ''}${cr.consultant_first_name ?? ''} ${cr.consultant_last_name ?? ''}`.trim()
+              : '-'}
+          </p>
+        </Card>
         <Card>
           <p className="text-xs text-gray-500 dark:text-gray-400">Type tiers</p>
           <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
@@ -334,6 +335,14 @@ export default function ContractDetail() {
           <p className="text-xs text-gray-500 dark:text-gray-400">Client</p>
           <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
             {cr.client_name ?? '-'}
+          </p>
+        </Card>
+        <Card>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Adresse de la mission</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+            {cr.mission_site_name || cr.mission_address || cr.mission_city
+              ? [cr.mission_site_name, cr.mission_address, [cr.mission_postal_code, cr.mission_city].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+              : '-'}
           </p>
         </Card>
       </div>
@@ -428,19 +437,6 @@ export default function ContractDetail() {
                   setValidationForm((f) => ({ ...f, client_name: e.target.value }))
                 }
                 placeholder={cr.client_name ?? ''}
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Lieu de mission
-              </label>
-              <input
-                type="text"
-                value={validationForm.mission_location}
-                onChange={(e) =>
-                  setValidationForm((f) => ({ ...f, mission_location: e.target.value }))
-                }
                 className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
               />
             </div>

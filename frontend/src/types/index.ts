@@ -753,7 +753,13 @@ export interface ContractRequest {
   client_name: string | null;
   mission_title: string | null;
   mission_description: string | null;
-  mission_location: string | null;
+  mission_site_name: string | null;
+  mission_address: string | null;
+  mission_postal_code: string | null;
+  mission_city: string | null;
+  consultant_civility: string | null;
+  consultant_first_name: string | null;
+  consultant_last_name: string | null;
   commercial_email: string;
   commercial_name: string | null;
   third_party_id: string | null;

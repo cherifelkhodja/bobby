@@ -122,7 +122,13 @@ class GenerateDraftUseCase:
             "start_date": cr.start_date.strftime("%d/%m/%Y") if cr.start_date else "",
             "client_name": cr.client_name or "",
             "mission_description": cr.mission_description or "",
-            "mission_location": cr.mission_location or "",
+            "mission_site_name": cr.mission_site_name or "",
+            "mission_address": cr.mission_address or "",
+            "mission_postal_code": cr.mission_postal_code or "",
+            "mission_city": cr.mission_city or "",
+            "consultant_civility": cr.consultant_civility or "",
+            "consultant_first_name": cr.consultant_first_name or "",
+            "consultant_last_name": cr.consultant_last_name or "",
         }
 
         # Partner info

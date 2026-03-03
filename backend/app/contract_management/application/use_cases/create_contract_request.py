@@ -164,7 +164,6 @@ class CreateContractRequestUseCase:
             client_name = None
             mission_title = None
             mission_description = None
-            mission_location = None
             if need_id:
                 need_data = await self._crm.get_need(need_id)
                 if need_data:
@@ -172,7 +171,6 @@ class CreateContractRequestUseCase:
                     client_name = need_data.get("client_name")
                     mission_title = need_data.get("title") or None
                     mission_description = need_data.get("description") or None
-                    mission_location = need_data.get("location") or None
 
                     # Try Bobby DB first (commercial is a registered user)
                     if manager_id and self._user_repo:
@@ -229,6 +227,17 @@ class CreateContractRequestUseCase:
             start_date = _parse_date(raw_start_date)
             end_date = _parse_date(raw_end_date)
 
+            # Fetch consultant info from Boond positioning candidate
+            consultant_civility = None
+            consultant_first_name = None
+            consultant_last_name = None
+            if candidate_id:
+                candidate_info = await self._crm.get_candidate_info(candidate_id)
+                if candidate_info:
+                    consultant_civility = candidate_info.get("civility") or None
+                    consultant_first_name = candidate_info.get("first_name") or None
+                    consultant_last_name = candidate_info.get("last_name") or None
+
             # Create contract request
             cr = ContractRequest(
                 reference=reference,
@@ -239,7 +248,9 @@ class CreateContractRequestUseCase:
                 client_name=client_name,
                 mission_title=mission_title,
                 mission_description=mission_description,
-                mission_location=mission_location,
+                consultant_civility=consultant_civility,
+                consultant_first_name=consultant_first_name,
+                consultant_last_name=consultant_last_name,
                 daily_rate=daily_rate,
                 start_date=start_date,
                 end_date=end_date,
