@@ -373,6 +373,88 @@ async def validate_commercial(
 
 
 @router.post(
+    "/{contract_request_id}/resend-collection-email",
+    response_model=ContractRequestResponse,
+    summary="Resend the document collection magic link to the third party",
+)
+async def resend_collection_email(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate a new magic link and resend the collection email to the tiers.
+    Can be called when status is COLLECTING_DOCUMENTS or COMPLIANCE_BLOCKED.
+    ADV/admin only.
+    """
+    from app.contract_management.domain.value_objects.contract_request_status import (
+        ContractRequestStatus as CRStatus,
+    )
+    from app.infrastructure.email.sender import EmailService
+    from app.third_party.application.use_cases.generate_magic_link import (
+        GenerateMagicLinkCommand,
+        GenerateMagicLinkUseCase,
+    )
+    from app.third_party.domain.value_objects.magic_link_purpose import MagicLinkPurpose
+    from app.third_party.infrastructure.adapters.postgres_magic_link_repo import (
+        MagicLinkRepository,
+    )
+
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+
+    allowed = {CRStatus.COLLECTING_DOCUMENTS, CRStatus.COMPLIANCE_BLOCKED}
+    if cr.status not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail="Le renvoi du lien n'est possible qu'en cours de collecte ou en conformité bloquée.",
+        )
+
+    if not cr.third_party_id or not cr.contractualization_contact_email:
+        raise HTTPException(
+            status_code=400,
+            detail="Aucun tiers ou email de contact associé à cette demande.",
+        )
+
+    settings = get_settings()
+    tp_repo = ThirdPartyRepository(db)
+    ml_repo = MagicLinkRepository(db)
+    email_service = EmailService(settings)
+
+    generate_magic_link_uc = GenerateMagicLinkUseCase(
+        third_party_repository=tp_repo,
+        magic_link_repository=ml_repo,
+        email_service=email_service,
+        portal_base_url=settings.BOBBY_PORTAL_BASE_URL,
+    )
+
+    try:
+        await generate_magic_link_uc.execute(
+            GenerateMagicLinkCommand(
+                third_party_id=cr.third_party_id,
+                purpose=MagicLinkPurpose.DOCUMENT_UPLOAD,
+                email=cr.contractualization_contact_email,
+                contract_request_id=cr.id,
+            )
+        )
+    except Exception as exc:
+        logger.error("resend_collection_email_failed", error=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    audit_logger.log(
+        AuditAction.DOCUMENT_COLLECTION_INITIATED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(contract_request_id),
+        details={"action": "resend_collection_email"},
+    )
+
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
+
+
+@router.post(
     "/{contract_request_id}/configure",
     response_model=ContractRequestResponse,
     summary="Configure contract details",

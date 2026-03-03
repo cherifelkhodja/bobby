@@ -133,6 +133,13 @@ export const contractsApi = {
     return response.data;
   },
 
+  resendCollectionEmail: async (id: string): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      `/contract-requests/${id}/resend-collection-email`,
+    );
+    return response.data;
+  },
+
   listContracts: async (id: string): Promise<Contract[]> => {
     const response = await apiClient.get<Contract[]>(
       `/contract-requests/${id}/contracts`,

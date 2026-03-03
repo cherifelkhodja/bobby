@@ -151,58 +151,6 @@ async def _verify_portal_token(
     return result
 
 
-@router.post(
-    "/portal/{token}/company-info",
-    summary="Submit company information via portal",
-)
-async def submit_company_info(
-    token: str,
-    body: CompanyInfoRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    """Tiers fills in their company details (SIREN, SIRET, etc.) via the portal.
-
-    Updates the stub ThirdParty created at commercial validation time.
-    This is a public endpoint — the magic link token acts as authentication.
-    """
-    from datetime import datetime
-
-    from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
-        ThirdPartyRepository,
-    )
-
-    result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
-
-    tp = result.third_party
-    tp.company_name = body.company_name
-    tp.legal_form = body.legal_form
-    tp.siren = body.siren
-    tp.siret = body.siret
-    tp.rcs_city = body.rcs_city
-    tp.rcs_number = body.rcs_number
-    tp.head_office_address = body.head_office_address
-    tp.representative_name = body.representative_name
-    tp.representative_title = body.representative_title
-    tp.capital = body.capital
-    tp.updated_at = datetime.utcnow()
-
-    tp_repo = ThirdPartyRepository(db)
-    await tp_repo.save(tp)
-
-    audit_logger.log(
-        AuditAction.PORTAL_ACCESSED,
-        AuditResource.MAGIC_LINK,
-        resource_id=str(result.magic_link.id),
-        details={
-            "action": "company_info_submitted",
-            "third_party_id": str(tp.id),
-            "siren": body.siren,
-        },
-    )
-
-    return {"message": "Informations enregistrées avec succès."}
-
-
 @router.get(
     "/portal/{token}/documents",
     response_model=PortalDocumentsListResponse,
@@ -407,3 +355,49 @@ async def submit_contract_review(
         decision=body.decision,
         message=decision_msg,
     )
+
+
+# ── Portal Company Info ─────────────────────────────────────────
+
+
+@router.post(
+    "/portal/{token}/company-info",
+    summary="Submit company identity info via portal",
+)
+async def submit_company_info(
+    token: str,
+    body: CompanyInfoRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Tiers fills in their company identity (SIREN, raison sociale, etc.).
+    Called when the ThirdParty stub was created without this data.
+    Once saved, the portal unlocks the document upload section.
+    """
+    result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
+    tp = result.third_party
+    tp_repo = ThirdPartyRepository(db)
+
+    tp.company_name = body.company_name
+    tp.legal_form = body.legal_form
+    tp.capital = body.capital
+    tp.siren = body.siren
+    tp.rcs_city = body.rcs_city
+    tp.rcs_number = body.rcs_number
+    tp.head_office_address = body.head_office_address
+    tp.representative_name = body.representative_name
+    tp.representative_title = body.representative_title
+
+    await tp_repo.save(tp)
+
+    audit_logger.log(
+        AuditAction.PORTAL_ACCESSED,
+        AuditResource.MAGIC_LINK,
+        resource_id=str(result.magic_link.id),
+        details={
+            "action": "company_info_submitted",
+            "third_party_id": str(tp.id),
+            "siren": body.siren,
+        },
+    )
+
+    return {"message": "Informations enregistrées avec succès."}

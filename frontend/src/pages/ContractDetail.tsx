@@ -10,7 +10,7 @@ import {
   CheckCircle,
   AlertTriangle,
   Trash2,
-  RefreshCw,
+  Mail,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -172,12 +172,10 @@ export default function ContractDetail() {
     },
   });
 
-  const syncMutation = useMutation({
-    mutationFn: () => contractsApi.syncFromBoond(id!),
+  const resendCollectionEmailMutation = useMutation({
+    mutationFn: () => contractsApi.resendCollectionEmail(id!),
     onSuccess: () => {
-      toast.success('Données Boond synchronisées.');
-      setFormInitialized(false);
-      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      toast.success('Email de collecte renvoyé.');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -268,14 +266,6 @@ export default function ContractDetail() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => syncMutation.mutate()}
-              disabled={syncMutation.isPending}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-              {syncMutation.isPending ? 'Sync...' : 'Sync Boond'}
-            </Button>
             {actionConfig && (
               <Button
                 onClick={() => actionMutation.mutate(actionConfig.action)}
@@ -521,6 +511,103 @@ export default function ContractDetail() {
             >
               <CheckCircle className="h-4 w-4 mr-2" />
               Valider
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Validated commercial data (read-only, shown after validation) */}
+      {cr.status !== 'pending_commercial_validation' && cr.third_party_type && (
+        <Card className="mb-6">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
+            Informations validées par le commercial
+          </h3>
+          <dl className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+            {cr.third_party_type && (
+              <>
+                <dt className="text-gray-500 dark:text-gray-400">Type de tiers</dt>
+                <dd className="text-gray-900 dark:text-white capitalize">
+                  {cr.third_party_type.replace('_', '-')}
+                </dd>
+              </>
+            )}
+            {cr.daily_rate && (
+              <>
+                <dt className="text-gray-500 dark:text-gray-400">TJM</dt>
+                <dd className="text-gray-900 dark:text-white">{cr.daily_rate} €/j</dd>
+              </>
+            )}
+            {cr.start_date && (
+              <>
+                <dt className="text-gray-500 dark:text-gray-400">Début</dt>
+                <dd className="text-gray-900 dark:text-white">{formatDate(cr.start_date)}</dd>
+              </>
+            )}
+            {cr.end_date && (
+              <>
+                <dt className="text-gray-500 dark:text-gray-400">Fin</dt>
+                <dd className="text-gray-900 dark:text-white">{formatDate(cr.end_date)}</dd>
+              </>
+            )}
+            {cr.contractualization_contact_email && (
+              <>
+                <dt className="text-gray-500 dark:text-gray-400">Email contact</dt>
+                <dd className="text-gray-900 dark:text-white">{cr.contractualization_contact_email}</dd>
+              </>
+            )}
+            {cr.mission_title && (
+              <>
+                <dt className="text-gray-500 dark:text-gray-400">Intitulé mission</dt>
+                <dd className="text-gray-900 dark:text-white">{cr.mission_title}</dd>
+              </>
+            )}
+            {(cr.consultant_first_name || cr.consultant_last_name) && (
+              <>
+                <dt className="text-gray-500 dark:text-gray-400">Consultant</dt>
+                <dd className="text-gray-900 dark:text-white">
+                  {[cr.consultant_civility, cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ')}
+                </dd>
+              </>
+            )}
+            {(cr.mission_address || cr.mission_city) && (
+              <>
+                <dt className="text-gray-500 dark:text-gray-400">Adresse mission</dt>
+                <dd className="text-gray-900 dark:text-white">
+                  {[cr.mission_site_name, cr.mission_address, cr.mission_postal_code, cr.mission_city].filter(Boolean).join(', ')}
+                </dd>
+              </>
+            )}
+          </dl>
+        </Card>
+      )}
+
+      {/* Collecting documents — info banner + resend button */}
+      {isAdv && (cr.status === 'collecting_documents' || cr.status === 'compliance_blocked') && (
+        <Card className="mb-6 border-indigo-200 dark:border-indigo-800">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <Mail className="h-5 w-5 text-indigo-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">
+                  Collecte de documents en cours
+                </h3>
+                {cr.contractualization_contact_email && (
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    Lien envoyé à{' '}
+                    <span className="font-medium">{cr.contractualization_contact_email}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => resendCollectionEmailMutation.mutate()}
+              disabled={resendCollectionEmailMutation.isPending}
+              isLoading={resendCollectionEmailMutation.isPending}
+            >
+              <Mail className="h-4 w-4 mr-2" />
+              Renvoyer le lien
             </Button>
           </div>
         </Card>

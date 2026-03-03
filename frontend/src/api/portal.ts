@@ -53,14 +53,13 @@ export const portalApi = {
     data: {
       company_name: string;
       legal_form: string;
+      capital?: string;
       siren: string;
-      siret: string;
       rcs_city: string;
       rcs_number: string;
       head_office_address: string;
       representative_name: string;
       representative_title: string;
-      capital?: string;
     },
   ): Promise<{ message: string }> => {
     const response = await portalClient.post(`/${token}/company-info`, data);
