@@ -313,6 +313,13 @@ async def validate_commercial(
                 client_name=body.client_name,
                 mission_title=body.mission_title,
                 mission_description=body.mission_description,
+                consultant_civility=body.consultant_civility,
+                consultant_first_name=body.consultant_first_name,
+                consultant_last_name=body.consultant_last_name,
+                mission_site_name=body.mission_site_name,
+                mission_address=body.mission_address,
+                mission_postal_code=body.mission_postal_code,
+                mission_city=body.mission_city,
             )
         )
     except Exception as exc:

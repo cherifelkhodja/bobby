@@ -182,7 +182,8 @@ docker-compose up # Start all services
   - **Colonne supprimée** : `mission_location` (remplacée par les 4 champs d'adresse)
   - **Boond adapter** : `get_candidate_info()` retourne désormais la civilité (M./Mme) ; suppression de `_resolve_place_label()` et de la résolution du lieu dans `get_need()`
   - **Sync consultant** : création CR et sync-from-boond récupèrent civilité/prénom/nom depuis le candidat du positionnement Boond
-  - **Frontend** : intitulé mission en 1er encart, encart consultant (civilité + prénom + nom), encart adresse complète (site, adresse, CP ville)
+  - **Frontend** : suppression des encarts info (lecture seule) ; champs consultant (civilité select + prénom + nom) et adresse (nom du site, adresse, CP, ville) ajoutés au formulaire de validation commerciale avec pré-remplissage Boond
+  - Les 7 nouveaux champs sont inclus dans `CommercialValidationRequest` et sauvés via `ValidateCommercialCommand`
 
 ### 2026-03-03 (date de fin + intitulé mission + sync Boond sur demande de contrat)
 - **feat(contract-management)**: Ajout de `end_date` et `mission_title` à la demande de contrat

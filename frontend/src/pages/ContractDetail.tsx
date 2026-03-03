@@ -24,12 +24,6 @@ import { getErrorMessage } from '../api/client';
 import { CONTRACT_STATUS_CONFIG } from '../types';
 import type { ContractRequestStatus } from '../types';
 
-const THIRD_PARTY_TYPE_LABELS: Record<string, string> = {
-  freelance: 'Freelance',
-  sous_traitant: 'Sous-traitant',
-  salarie: 'Salarié',
-};
-
 const ACTION_CONFIG: Partial<
   Record<ContractRequestStatus, { label: string; action: string; icon: typeof Send; variant: 'primary' | 'secondary' }>
 > = {
@@ -82,6 +76,13 @@ export default function ContractDetail() {
     client_name: '',
     mission_title: '',
     mission_description: '',
+    consultant_civility: '',
+    consultant_first_name: '',
+    consultant_last_name: '',
+    mission_site_name: '',
+    mission_address: '',
+    mission_postal_code: '',
+    mission_city: '',
   });
   const [formInitialized, setFormInitialized] = useState(false);
 
@@ -108,6 +109,13 @@ export default function ContractDetail() {
         client_name: cr.client_name ?? '',
         mission_title: cr.mission_title ?? '',
         mission_description: cr.mission_description ?? '',
+        consultant_civility: cr.consultant_civility ?? '',
+        consultant_first_name: cr.consultant_first_name ?? '',
+        consultant_last_name: cr.consultant_last_name ?? '',
+        mission_site_name: cr.mission_site_name ?? '',
+        mission_address: cr.mission_address ?? '',
+        mission_postal_code: cr.mission_postal_code ?? '',
+        mission_city: cr.mission_city ?? '',
       }));
       setFormInitialized(true);
     }
@@ -187,6 +195,13 @@ export default function ContractDetail() {
         client_name: validationForm.client_name || undefined,
         mission_title: validationForm.mission_title || undefined,
         mission_description: validationForm.mission_description || undefined,
+        consultant_civility: validationForm.consultant_civility || undefined,
+        consultant_first_name: validationForm.consultant_first_name || undefined,
+        consultant_last_name: validationForm.consultant_last_name || undefined,
+        mission_site_name: validationForm.mission_site_name || undefined,
+        mission_address: validationForm.mission_address || undefined,
+        mission_postal_code: validationForm.mission_postal_code || undefined,
+        mission_city: validationForm.mission_city || undefined,
       }),
     onSuccess: () => {
       toast.success('Validation commerciale effectuée.');
@@ -281,70 +296,6 @@ export default function ContractDetail() {
             )}
           </div>
         </div>
-      </div>
-
-      {/* Info cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <Card>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Intitulé de la mission</p>
-          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-            {cr.mission_title ?? '-'}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Consultant</p>
-          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-            {cr.consultant_first_name || cr.consultant_last_name
-              ? `${cr.consultant_civility ? cr.consultant_civility + ' ' : ''}${cr.consultant_first_name ?? ''} ${cr.consultant_last_name ?? ''}`.trim()
-              : '-'}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Type tiers</p>
-          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-            {cr.third_party_type
-              ? THIRD_PARTY_TYPE_LABELS[cr.third_party_type] ?? cr.third_party_type
-              : '-'}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs text-gray-500 dark:text-gray-400">TJM</p>
-          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-            {cr.daily_rate ? `${cr.daily_rate} €/j` : '-'}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Commercial</p>
-          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-            {cr.commercial_name || cr.commercial_email}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Date de début</p>
-          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-            {cr.start_date ? formatDate(cr.start_date) : '-'}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Date de fin</p>
-          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-            {cr.end_date ? formatDate(cr.end_date) : '-'}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Client</p>
-          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-            {cr.client_name ?? '-'}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Adresse de la mission</p>
-          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-            {cr.mission_site_name || cr.mission_address || cr.mission_city
-              ? [cr.mission_site_name, cr.mission_address, [cr.mission_postal_code, cr.mission_city].filter(Boolean).join(' ')].filter(Boolean).join(', ')
-              : '-'}
-          </p>
-        </Card>
       </div>
 
       {/* Commercial validation form */}
@@ -452,6 +403,114 @@ export default function ContractDetail() {
                 }
                 className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
               />
+            </div>
+
+            {/* Consultant */}
+            <div className="md:col-span-2 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">Consultant</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Civilité
+                  </label>
+                  <select
+                    value={validationForm.consultant_civility}
+                    onChange={(e) =>
+                      setValidationForm((f) => ({ ...f, consultant_civility: e.target.value }))
+                    }
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                  >
+                    <option value="">-</option>
+                    <option value="M.">M.</option>
+                    <option value="Mme">Mme</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Prénom
+                  </label>
+                  <input
+                    type="text"
+                    value={validationForm.consultant_first_name}
+                    onChange={(e) =>
+                      setValidationForm((f) => ({ ...f, consultant_first_name: e.target.value }))
+                    }
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Nom
+                  </label>
+                  <input
+                    type="text"
+                    value={validationForm.consultant_last_name}
+                    onChange={(e) =>
+                      setValidationForm((f) => ({ ...f, consultant_last_name: e.target.value }))
+                    }
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Adresse de la mission */}
+            <div className="md:col-span-2 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">Adresse de la mission</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Nom du site
+                  </label>
+                  <input
+                    type="text"
+                    value={validationForm.mission_site_name}
+                    onChange={(e) =>
+                      setValidationForm((f) => ({ ...f, mission_site_name: e.target.value }))
+                    }
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Adresse
+                  </label>
+                  <input
+                    type="text"
+                    value={validationForm.mission_address}
+                    onChange={(e) =>
+                      setValidationForm((f) => ({ ...f, mission_address: e.target.value }))
+                    }
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Code postal
+                  </label>
+                  <input
+                    type="text"
+                    value={validationForm.mission_postal_code}
+                    onChange={(e) =>
+                      setValidationForm((f) => ({ ...f, mission_postal_code: e.target.value }))
+                    }
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Ville
+                  </label>
+                  <input
+                    type="text"
+                    value={validationForm.mission_city}
+                    onChange={(e) =>
+                      setValidationForm((f) => ({ ...f, mission_city: e.target.value }))
+                    }
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                  />
+                </div>
+              </div>
             </div>
           </div>
           <div className="flex justify-end mt-4">

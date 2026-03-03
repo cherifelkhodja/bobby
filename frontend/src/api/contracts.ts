@@ -37,6 +37,13 @@ export const contractsApi = {
       client_name?: string;
       mission_title?: string;
       mission_description?: string;
+      consultant_civility?: string;
+      consultant_first_name?: string;
+      consultant_last_name?: string;
+      mission_site_name?: string;
+      mission_address?: string;
+      mission_postal_code?: string;
+      mission_city?: string;
     },
   ): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
