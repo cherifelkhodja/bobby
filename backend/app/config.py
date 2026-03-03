@@ -24,7 +24,7 @@ class Settings(BaseSettings):
 
     # AWS Secrets Manager (optional - set AWS_SECRETS_ENABLED=true to use)
     AWS_SECRETS_ENABLED: bool = False
-    AWS_SECRETS_NAME: str = "esn-cooptation/prod"
+    AWS_SECRETS_NAME: str = ""
     AWS_SECRETS_REGION: str = "eu-west-3"
 
     # Track if secrets were loaded from AWS (set at runtime)
@@ -198,7 +198,7 @@ def _load_aws_secrets() -> dict[str, Any]:
     try:
         from app.infrastructure.secrets import load_secrets_from_aws
 
-        secret_name = os.getenv("AWS_SECRETS_NAME", "esn-cooptation/prod")
+        secret_name = os.getenv("AWS_SECRETS_NAME", "")
         region = os.getenv("AWS_SECRETS_REGION", "eu-west-3")
 
         # Use AWS credentials (prefer AWS_ACCESS_KEY_ID over S3_ACCESS_KEY)
