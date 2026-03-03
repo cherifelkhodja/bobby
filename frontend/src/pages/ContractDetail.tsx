@@ -519,65 +519,78 @@ export default function ContractDetail() {
       {/* Validated commercial data (read-only, shown after validation) */}
       {cr.status !== 'pending_commercial_validation' && cr.third_party_type && (
         <Card className="mb-6">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-4">
             Informations validées par le commercial
           </h3>
-          <dl className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 text-sm">
-            {cr.third_party_type && (
-              <>
-                <dt className="text-gray-500 dark:text-gray-400">Type de tiers</dt>
-                <dd className="text-gray-900 dark:text-white capitalize">
-                  {cr.third_party_type.replace('_', '-')}
-                </dd>
-              </>
+          <div className="space-y-4">
+            {/* Ligne 1 — données contrat */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {cr.third_party_type && (
+                <div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Type de tiers</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">
+                    {cr.third_party_type === 'freelance' ? 'Freelance / EI' : cr.third_party_type === 'sous_traitant' ? 'Sous-traitant' : 'Salarié'}
+                  </p>
+                </div>
+              )}
+              {cr.daily_rate && (
+                <div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">TJM</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {cr.daily_rate.toLocaleString('fr-FR')} €/j
+                  </p>
+                </div>
+              )}
+              {cr.start_date && (
+                <div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Début</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{formatDate(cr.start_date)}</p>
+                </div>
+              )}
+              {cr.end_date && (
+                <div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Fin</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{formatDate(cr.end_date)}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Ligne 2 — mission + consultant + email */}
+            {(cr.mission_title || cr.consultant_first_name || cr.contractualization_contact_email) && (
+              <div className="pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-1 md:grid-cols-3 gap-4">
+                {cr.mission_title && (
+                  <div>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Intitulé mission</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{cr.mission_title}</p>
+                  </div>
+                )}
+                {(cr.consultant_first_name || cr.consultant_last_name) && (
+                  <div>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Consultant</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {[cr.consultant_civility, cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ')}
+                    </p>
+                  </div>
+                )}
+                {cr.contractualization_contact_email && (
+                  <div>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Email contact tiers</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{cr.contractualization_contact_email}</p>
+                  </div>
+                )}
+              </div>
             )}
-            {cr.daily_rate && (
-              <>
-                <dt className="text-gray-500 dark:text-gray-400">TJM</dt>
-                <dd className="text-gray-900 dark:text-white">{cr.daily_rate} €/j</dd>
-              </>
-            )}
-            {cr.start_date && (
-              <>
-                <dt className="text-gray-500 dark:text-gray-400">Début</dt>
-                <dd className="text-gray-900 dark:text-white">{formatDate(cr.start_date)}</dd>
-              </>
-            )}
-            {cr.end_date && (
-              <>
-                <dt className="text-gray-500 dark:text-gray-400">Fin</dt>
-                <dd className="text-gray-900 dark:text-white">{formatDate(cr.end_date)}</dd>
-              </>
-            )}
-            {cr.contractualization_contact_email && (
-              <>
-                <dt className="text-gray-500 dark:text-gray-400">Email contact</dt>
-                <dd className="text-gray-900 dark:text-white">{cr.contractualization_contact_email}</dd>
-              </>
-            )}
-            {cr.mission_title && (
-              <>
-                <dt className="text-gray-500 dark:text-gray-400">Intitulé mission</dt>
-                <dd className="text-gray-900 dark:text-white">{cr.mission_title}</dd>
-              </>
-            )}
-            {(cr.consultant_first_name || cr.consultant_last_name) && (
-              <>
-                <dt className="text-gray-500 dark:text-gray-400">Consultant</dt>
-                <dd className="text-gray-900 dark:text-white">
-                  {[cr.consultant_civility, cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ')}
-                </dd>
-              </>
-            )}
+
+            {/* Ligne 3 — adresse (pleine largeur si présente) */}
             {(cr.mission_address || cr.mission_city) && (
-              <>
-                <dt className="text-gray-500 dark:text-gray-400">Adresse mission</dt>
-                <dd className="text-gray-900 dark:text-white">
-                  {[cr.mission_site_name, cr.mission_address, cr.mission_postal_code, cr.mission_city].filter(Boolean).join(', ')}
-                </dd>
-              </>
+              <div className="pt-3 border-t border-gray-100 dark:border-gray-700">
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Adresse de mission</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {[cr.mission_site_name, cr.mission_address, cr.mission_postal_code, cr.mission_city].filter(Boolean).join(' · ')}
+                </p>
+              </div>
             )}
-          </dl>
+          </div>
         </Card>
       )}
 
