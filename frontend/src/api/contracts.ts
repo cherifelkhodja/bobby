@@ -32,8 +32,10 @@ export const contractsApi = {
       third_party_type: string;
       daily_rate: number;
       start_date: string;
+      end_date?: string;
       contact_email: string;
       client_name?: string;
+      mission_title?: string;
       mission_description?: string;
       mission_location?: string;
     },

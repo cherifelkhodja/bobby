@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -71,16 +71,19 @@ export default function ContractDetail() {
   const [showOverride, setShowOverride] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
 
-  // Commercial validation form state
+  // Commercial validation form state — pre-filled from Boond data
   const [validationForm, setValidationForm] = useState({
     third_party_type: '',
     daily_rate: '',
     start_date: '',
+    end_date: '',
     contact_email: '',
     client_name: '',
+    mission_title: '',
     mission_description: '',
     mission_location: '',
   });
+  const [formInitialized, setFormInitialized] = useState(false);
 
   const { data: cr, isLoading } = useQuery({
     queryKey: ['contract-request', id],
@@ -93,6 +96,22 @@ export default function ContractDetail() {
     queryFn: () => contractsApi.listContracts(id!),
     enabled: !!id,
   });
+
+  // Pre-fill validation form with Boond data when CR loads
+  useEffect(() => {
+    if (cr && !formInitialized) {
+      setValidationForm((f) => ({
+        ...f,
+        daily_rate: cr.daily_rate ? String(cr.daily_rate) : '',
+        start_date: cr.start_date ?? '',
+        end_date: cr.end_date ?? '',
+        client_name: cr.client_name ?? '',
+        mission_title: cr.mission_title ?? '',
+        mission_description: cr.mission_description ?? '',
+      }));
+      setFormInitialized(true);
+    }
+  }, [cr, formInitialized]);
 
   const actionMutation = useMutation({
     mutationFn: async (action: string) => {
@@ -151,8 +170,10 @@ export default function ContractDetail() {
         third_party_type: validationForm.third_party_type,
         daily_rate: parseFloat(validationForm.daily_rate),
         start_date: validationForm.start_date,
+        end_date: validationForm.end_date || undefined,
         contact_email: validationForm.contact_email,
         client_name: validationForm.client_name || undefined,
+        mission_title: validationForm.mission_title || undefined,
         mission_description: validationForm.mission_description || undefined,
         mission_location: validationForm.mission_location || undefined,
       }),
@@ -243,8 +264,18 @@ export default function ContractDetail() {
         </div>
       </div>
 
+      {/* Mission title */}
+      {cr.mission_title && (
+        <Card className="mb-6">
+          <p className="text-xs text-gray-500 dark:text-gray-400">Intitulé de la mission</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+            {cr.mission_title}
+          </p>
+        </Card>
+      )}
+
       {/* Info cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <Card>
           <p className="text-xs text-gray-500 dark:text-gray-400">Type tiers</p>
           <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
@@ -260,15 +291,27 @@ export default function ContractDetail() {
           </p>
         </Card>
         <Card>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Commercial</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+            {cr.commercial_email}
+          </p>
+        </Card>
+        <Card>
           <p className="text-xs text-gray-500 dark:text-gray-400">Date de début</p>
           <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
             {cr.start_date ? formatDate(cr.start_date) : '-'}
           </p>
         </Card>
         <Card>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Commercial</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Date de fin</p>
           <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-            {cr.commercial_email}
+            {cr.end_date ? formatDate(cr.end_date) : '-'}
+          </p>
+        </Card>
+        <Card>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Client</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+            {cr.client_name ?? '-'}
           </p>
         </Card>
       </div>
@@ -328,6 +371,19 @@ export default function ContractDetail() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Date de fin
+              </label>
+              <input
+                type="date"
+                value={validationForm.end_date}
+                onChange={(e) =>
+                  setValidationForm((f) => ({ ...f, end_date: e.target.value }))
+                }
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Email contact contractualisation *
               </label>
               <input
@@ -362,6 +418,19 @@ export default function ContractDetail() {
                 value={validationForm.mission_location}
                 onChange={(e) =>
                   setValidationForm((f) => ({ ...f, mission_location: e.target.value }))
+                }
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Intitulé de la mission
+              </label>
+              <input
+                type="text"
+                value={validationForm.mission_title}
+                onChange={(e) =>
+                  setValidationForm((f) => ({ ...f, mission_title: e.target.value }))
                 }
                 className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
               />

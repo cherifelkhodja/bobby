@@ -63,7 +63,9 @@ class ContractRequestRepository:
             model.third_party_type = request.third_party_type
             model.daily_rate = request.daily_rate
             model.start_date = request.start_date
+            model.end_date = request.end_date
             model.client_name = request.client_name
+            model.mission_title = request.mission_title
             model.mission_description = request.mission_description
             model.mission_location = request.mission_location
             model.contractualization_contact_email = request.contractualization_contact_email
@@ -168,7 +170,9 @@ class ContractRequestRepository:
             third_party_type=model.third_party_type,
             daily_rate=model.daily_rate,
             start_date=model.start_date,
+            end_date=model.end_date,
             client_name=model.client_name,
+            mission_title=model.mission_title,
             mission_description=model.mission_description,
             mission_location=model.mission_location,
             contractualization_contact_email=model.contractualization_contact_email,
@@ -194,7 +198,9 @@ class ContractRequestRepository:
             third_party_type=entity.third_party_type,
             daily_rate=entity.daily_rate,
             start_date=entity.start_date,
+            end_date=entity.end_date,
             client_name=entity.client_name,
+            mission_title=entity.mission_title,
             mission_description=entity.mission_description,
             mission_location=entity.mission_location,
             contractualization_contact_email=entity.contractualization_contact_email,

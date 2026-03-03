@@ -31,7 +31,9 @@ class ContractRequest:
     third_party_type: str | None = None
     daily_rate: Decimal | None = None
     start_date: date | None = None
+    end_date: date | None = None
     client_name: str | None = None
+    mission_title: str | None = None
     mission_description: str | None = None
     mission_location: str | None = None
     contractualization_contact_email: str | None = None
@@ -67,26 +69,20 @@ class ContractRequest:
         daily_rate: Decimal,
         start_date: date,
         contact_email: str,
+        end_date: date | None = None,
         client_name: str | None = None,
+        mission_title: str | None = None,
         mission_description: str | None = None,
         mission_location: str | None = None,
     ) -> None:
-        """Apply commercial validation data and transition status.
-
-        Args:
-            third_party_type: Type of third party (freelance, sous_traitant, salarie).
-            daily_rate: Daily rate in euros.
-            start_date: Mission start date.
-            contact_email: Contact email for contractualization.
-            client_name: Client name.
-            mission_description: Mission description.
-            mission_location: Mission location.
-        """
+        """Apply commercial validation data and transition status."""
         self.third_party_type = third_party_type
         self.daily_rate = daily_rate
         self.start_date = start_date
+        self.end_date = end_date
         self.contractualization_contact_email = contact_email
         self.client_name = client_name
+        self.mission_title = mission_title
         self.mission_description = mission_description
         self.mission_location = mission_location
         self.commercial_validated_at = datetime.utcnow()

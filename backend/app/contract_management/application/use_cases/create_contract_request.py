@@ -162,11 +162,15 @@ class CreateContractRequestUseCase:
             commercial_email = ""
             commercial_name = ""
             client_name = None
+            mission_title = None
+            mission_description = None
             if need_id:
                 need_data = await self._crm.get_need(need_id)
                 if need_data:
                     manager_id = need_data.get("manager_id")
                     client_name = need_data.get("client_name")
+                    mission_title = need_data.get("title") or None
+                    mission_description = need_data.get("description") or None
 
                     # Try Bobby DB first (commercial is a registered user)
                     if manager_id and self._user_repo:
@@ -198,6 +202,7 @@ class CreateContractRequestUseCase:
             # Sanitize Boond data — empty strings must be None for DB types
             raw_daily_rate = positioning_data.get("daily_rate")
             raw_start_date = positioning_data.get("start_date")
+            raw_end_date = positioning_data.get("end_date")
 
             from datetime import date
             from decimal import Decimal, InvalidOperation
@@ -209,14 +214,18 @@ class CreateContractRequestUseCase:
                 except (InvalidOperation, ValueError, TypeError):
                     daily_rate = None
 
-            start_date = None
-            if raw_start_date and isinstance(raw_start_date, str):
-                try:
-                    start_date = date.fromisoformat(raw_start_date[:10])
-                except (ValueError, TypeError):
-                    start_date = None
-            elif isinstance(raw_start_date, date):
-                start_date = raw_start_date
+            def _parse_date(raw: object) -> date | None:
+                if raw and isinstance(raw, str):
+                    try:
+                        return date.fromisoformat(raw[:10])
+                    except (ValueError, TypeError):
+                        return None
+                if isinstance(raw, date):
+                    return raw
+                return None
+
+            start_date = _parse_date(raw_start_date)
+            end_date = _parse_date(raw_end_date)
 
             # Create contract request
             cr = ContractRequest(
@@ -226,8 +235,11 @@ class CreateContractRequestUseCase:
                 boond_need_id=need_id,
                 commercial_email=commercial_email or "",
                 client_name=client_name,
+                mission_title=mission_title,
+                mission_description=mission_description,
                 daily_rate=daily_rate,
                 start_date=start_date,
+                end_date=end_date,
             )
 
             saved = await self._cr_repo.save(cr)

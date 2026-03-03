@@ -749,7 +749,9 @@ export interface ContractRequest {
   third_party_type: string | null;
   daily_rate: number | null;
   start_date: string | null;
+  end_date: string | null;
   client_name: string | null;
+  mission_title: string | null;
   mission_description: string | null;
   commercial_email: string;
   third_party_id: string | null;

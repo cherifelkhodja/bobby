@@ -161,6 +161,14 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-03 (date de fin + intitulé mission sur demande de contrat)
+- **feat(contract-management)**: Ajout de `end_date` et `mission_title` à la demande de contrat
+  - **Backend** : Nouveau champs sur entité, modèle SQLAlchemy, schémas Pydantic, ports, repository (save/to_entity/to_model)
+  - **Migration** : `027_add_end_date_mission_title_to_contract_requests.py`
+  - **Boond pre-fill** : `end_date` récupéré depuis `positioning.attributes.endDate`, `mission_title` et `mission_description` depuis `need.attributes.title/description`
+  - **Validation commerciale** : Les 2 champs ajoutés au formulaire de validation (Command, UseCase, schema, route)
+  - **Frontend** : Intitulé mission affiché en carte, date de fin dans les info cards, les 2 champs dans le formulaire de validation commerciale, pré-remplissage automatique depuis les données Boond
+
 ### 2026-03-03 (CI fixes)
 - **fix(models)**: `published_opportunities.skills` column changé de `ARRAY(String(100))` (PostgreSQL-only) vers `JSON` pour compatibilité SQLite dans les tests
 - **fix(domain)**: `CooptationStatus.REJECTED` marqué comme statut final (`is_final=True`) et transitions depuis REJECTED supprimées (était REJECTED→PENDING, maintenant aucune)

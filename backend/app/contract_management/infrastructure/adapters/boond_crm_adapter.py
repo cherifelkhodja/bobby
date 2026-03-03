@@ -60,6 +60,7 @@ class BoondCrmAdapter:
                 "need_id": need_id,
                 "daily_rate": attributes.get("averageDailyPriceExcludingTax"),
                 "start_date": attributes.get("startDate"),
+                "end_date": attributes.get("endDate"),
             }
         except Exception as exc:
             logger.error(

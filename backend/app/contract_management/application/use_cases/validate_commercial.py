@@ -22,7 +22,9 @@ class ValidateCommercialCommand:
         daily_rate: Decimal,
         start_date: date,
         contact_email: str,
+        end_date: date | None = None,
         client_name: str | None = None,
+        mission_title: str | None = None,
         mission_description: str | None = None,
         mission_location: str | None = None,
     ) -> None:
@@ -30,8 +32,10 @@ class ValidateCommercialCommand:
         self.third_party_type = third_party_type
         self.daily_rate = daily_rate
         self.start_date = start_date
+        self.end_date = end_date
         self.contact_email = contact_email
         self.client_name = client_name
+        self.mission_title = mission_title
         self.mission_description = mission_description
         self.mission_location = mission_location
 
@@ -85,8 +89,10 @@ class ValidateCommercialUseCase:
             third_party_type=command.third_party_type,
             daily_rate=command.daily_rate,
             start_date=command.start_date,
+            end_date=command.end_date,
             contact_email=command.contact_email,
             client_name=command.client_name,
+            mission_title=command.mission_title,
             mission_description=command.mission_description,
             mission_location=command.mission_location,
         )

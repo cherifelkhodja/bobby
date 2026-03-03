@@ -18,7 +18,9 @@ class ContractRequestResponse(BaseModel):
     third_party_type: str | None = None
     daily_rate: float | None = None
     start_date: date | None = None
+    end_date: date | None = None
     client_name: str | None = None
+    mission_title: str | None = None
     mission_description: str | None = None
     commercial_email: str
     third_party_id: UUID | None = None
@@ -42,8 +44,10 @@ class CommercialValidationRequest(BaseModel):
     third_party_type: str = Field(..., pattern=r"^(freelance|sous_traitant|salarie)$")
     daily_rate: Decimal = Field(..., gt=0)
     start_date: date
+    end_date: date | None = None
     contact_email: EmailStr
     client_name: str | None = Field(None, max_length=255)
+    mission_title: str | None = Field(None, max_length=500)
     mission_description: str | None = None
     mission_location: str | None = None
 
