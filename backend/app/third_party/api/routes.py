@@ -373,12 +373,22 @@ async def submit_company_info(
     Called when the ThirdParty stub was created without this data.
     Once saved, the portal unlocks the document upload section.
     """
+    from sqlalchemy.exc import IntegrityError
+
     from app.vigilance.application.use_cases.request_documents import RequestDocumentsUseCase
     from app.vigilance.infrastructure.adapters.postgres_document_repo import DocumentRepository
 
     result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
     tp = result.third_party
     tp_repo = ThirdPartyRepository(db)
+
+    # Check SIREN uniqueness upfront (another third party may already have it)
+    existing = await tp_repo.get_by_siren(body.siren)
+    if existing and existing.id != tp.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Le SIREN {body.siren} est déjà associé à un autre tiers.",
+        )
 
     tp.company_name = body.company_name
     tp.legal_form = body.legal_form
@@ -390,7 +400,14 @@ async def submit_company_info(
     tp.representative_name = body.representative_name
     tp.representative_title = body.representative_title
 
-    await tp_repo.save(tp)
+    try:
+        await tp_repo.save(tp)
+    except IntegrityError as exc:
+        logger.error("company_info_save_failed", error=str(exc), third_party_id=str(tp.id))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Une contrainte d'intégrité a empêché l'enregistrement. Vérifiez le SIREN.",
+        )
 
     # Create vigilance document stubs now that we know the entity category
     doc_repo = DocumentRepository(db)
