@@ -59,7 +59,7 @@ class RejectDocumentUseCase:
 
         # Recalculate compliance
         all_docs = await self._document_repo.list_by_third_party(document.third_party_id)
-        new_status = compute_compliance_status(third_party.type, all_docs)
+        new_status = compute_compliance_status(all_docs)
         if third_party.compliance_status != new_status:
             third_party.update_compliance_status(new_status)
             await self._third_party_repo.save(third_party)

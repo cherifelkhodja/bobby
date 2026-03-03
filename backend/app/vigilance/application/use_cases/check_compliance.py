@@ -39,7 +39,7 @@ class CheckComplianceUseCase:
             raise ThirdPartyNotFoundError(str(third_party_id))
 
         documents = await self._document_repo.list_by_third_party(third_party_id)
-        new_status = compute_compliance_status(third_party.type, documents)
+        new_status = compute_compliance_status(documents)
 
         if third_party.compliance_status != new_status:
             old_status = third_party.compliance_status

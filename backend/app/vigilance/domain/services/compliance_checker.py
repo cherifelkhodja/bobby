@@ -7,31 +7,44 @@ vs the requirements defined in vigilance_requirements.
 import structlog
 
 from app.third_party.domain.value_objects.compliance_status import ComplianceStatus
-from app.third_party.domain.value_objects.third_party_type import ThirdPartyType
 from app.vigilance.domain.entities.vigilance_document import VigilanceDocument
-from app.vigilance.domain.services.vigilance_requirements import VIGILANCE_REQUIREMENTS
+from app.vigilance.domain.services.vigilance_requirements import REQUIREMENTS_BY_ENTITY_CATEGORY
 from app.vigilance.domain.value_objects.document_status import DocumentStatus
+from app.vigilance.domain.value_objects.document_type import DocumentType
 
 logger = structlog.get_logger()
 
 
 def compute_compliance_status(
-    third_party_type: ThirdPartyType,
     documents: list[VigilanceDocument],
 ) -> ComplianceStatus:
     """Compute the compliance status based on documents vs requirements.
 
+    The entity category (ei / societe) is inferred from the document types
+    present in the list:
+    - KBIS present → societe requirements
+    - EXTRAIT_INSEE present → ei requirements
+    - Neither → company info not yet submitted → NON_COMPLIANT
+
     Args:
-        third_party_type: The type of third party.
         documents: The current documents for this third party.
 
     Returns:
         The computed compliance status.
     """
-    requirements = VIGILANCE_REQUIREMENTS.get(third_party_type, [])
+    doc_types = {doc.document_type for doc in documents}
+
+    if DocumentType.KBIS in doc_types:
+        entity_category = "societe"
+    elif DocumentType.EXTRAIT_INSEE in doc_types:
+        entity_category = "ei"
+    else:
+        # Company info not yet submitted — no documents requested yet
+        return ComplianceStatus.NON_COMPLIANT
+
+    requirements = REQUIREMENTS_BY_ENTITY_CATEGORY.get(entity_category, [])
 
     if not requirements:
-        # Salarié or type without requirements → compliant by default
         return ComplianceStatus.COMPLIANT
 
     mandatory_requirements = [r for r in requirements if r["mandatory"]]
@@ -39,10 +52,9 @@ def compute_compliance_status(
     if not mandatory_requirements:
         return ComplianceStatus.COMPLIANT
 
-    # Index documents by type for quick lookup
+    # Index documents by type, keeping the most recent per type
     doc_by_type: dict[str, VigilanceDocument] = {}
     for doc in documents:
-        # Keep the most recent document per type
         existing = doc_by_type.get(doc.document_type.value)
         if existing is None or doc.created_at > existing.created_at:
             doc_by_type[doc.document_type.value] = doc

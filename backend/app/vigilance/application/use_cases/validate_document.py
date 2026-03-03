@@ -7,7 +7,7 @@ import structlog
 
 from app.vigilance.domain.exceptions import DocumentNotFoundError
 from app.vigilance.domain.services.compliance_checker import compute_compliance_status
-from app.vigilance.domain.services.vigilance_requirements import VIGILANCE_REQUIREMENTS
+from app.vigilance.domain.services.vigilance_requirements import REQUIREMENTS_BY_ENTITY_CATEGORY
 
 logger = structlog.get_logger()
 
@@ -53,14 +53,14 @@ class ValidateDocumentUseCase:
             raise DocumentNotFoundError(str(document_id))
 
         # Compute expiration based on requirements
-        expires_at = self._compute_expiration(third_party.type, document.document_type)
+        expires_at = self._compute_expiration(document.document_type)
 
         document.validate(validated_by=validated_by, expires_at=expires_at)
         saved = await self._document_repo.save(document)
 
         # Recalculate compliance
         all_docs = await self._document_repo.list_by_third_party(document.third_party_id)
-        new_status = compute_compliance_status(third_party.type, all_docs)
+        new_status = compute_compliance_status(all_docs)
         if third_party.compliance_status != new_status:
             third_party.update_compliance_status(new_status)
             await self._third_party_repo.save(third_party)
@@ -78,18 +78,17 @@ class ValidateDocumentUseCase:
         )
         return saved
 
-    def _compute_expiration(self, third_party_type, document_type) -> datetime | None:
+    def _compute_expiration(self, document_type) -> datetime | None:
         """Compute the expiration date based on vigilance requirements.
 
         Args:
-            third_party_type: Type of the third party.
             document_type: Type of the document.
 
         Returns:
             Expiration datetime or None if no expiry.
         """
-        requirements = VIGILANCE_REQUIREMENTS.get(third_party_type, [])
-        for req in requirements:
-            if req["type"] == document_type and req["validity_months"]:
-                return datetime.utcnow() + timedelta(days=req["validity_months"] * 30)
+        for requirements in REQUIREMENTS_BY_ENTITY_CATEGORY.values():
+            for req in requirements:
+                if req["type"] == document_type and req["validity_months"]:
+                    return datetime.utcnow() + timedelta(days=req["validity_months"] * 30)
         return None
