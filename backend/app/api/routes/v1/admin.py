@@ -865,7 +865,7 @@ async def test_sirene_connection(
     test_siret = "12001401900424"
     url = f"{settings.SIRENE_API_URL}/siret/{test_siret}"
     headers = {
-        "Authorization": f"Bearer {settings.SIRENE_API_KEY}",
+        "X-INSEE-Api-Key-Integration": settings.SIRENE_API_KEY,
         "Accept": "application/json",
     }
 

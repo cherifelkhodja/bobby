@@ -549,7 +549,7 @@ async def lookup_siret(
 
     url = f"{settings.SIRENE_API_URL}/siret/{siret}"
     headers = {
-        "Authorization": f"Bearer {settings.SIRENE_API_KEY}",
+        "X-INSEE-Api-Key-Integration": settings.SIRENE_API_KEY,
         "Accept": "application/json",
     }
 
