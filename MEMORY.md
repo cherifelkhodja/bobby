@@ -194,19 +194,21 @@ docker-compose up # Start all services
   - **Frontend** : Intitulé mission affiché en carte, date de fin dans les info cards, champs dans le formulaire de validation commerciale, pré-remplissage automatique depuis les données Boond
 - **feat(contract-management)**: Endpoint `POST /contract-requests/{id}/sync-from-boond`
   - Re-fetch les données du positionnement et du besoin depuis Boond pour mettre à jour la CR
-  - Met à jour : `daily_rate`, `start_date`, `end_date`, `client_name`, `mission_title`, `mission_description`, `mission_location`
+  - Met à jour : `daily_rate`, `start_date`, `end_date`, `client_name`, `mission_title`, `mission_description`, `consultant_first_name`, `consultant_last_name`
   - Bouton "Sync Boond" dans le header de la page détail avec icône de rotation
   - Résout le problème des CR créées avant l'ajout des nouveaux champs (le webhook ne re-crée pas si CR active)
 
 ### 2026-03-03 (consultant + adresse mission sur demande de contrat)
 - **feat(contract-management)**: Ajout champs consultant et adresse de mission
   - **7 nouveaux champs** : `consultant_civility`, `consultant_first_name`, `consultant_last_name`, `mission_site_name`, `mission_address`, `mission_postal_code`, `mission_city`
-  - **Migration** : `028_add_consultant_address_to_contract_requests.py`
+  - **Colonne supprimée** : `mission_location` (remplacée par les 4 champs d'adresse structurés)
+  - **Migration** : `028_add_consultant_and_address_fields.py` (rev `028_cr_consultant_address`, down_rev `027_cr_end_date_title`)
   - **Toutes couches** : entité domaine, modèle SQLAlchemy, repo (save/to_entity/to_model), schema réponse, schema validation, command, use case, routes
-  - **Boond adapter** : `get_positioning()` extrait désormais `consultant_first_name`/`consultant_last_name` depuis le `included` du positionnement (relation `dependsOn`)
-  - **Création CR** : pré-rempli automatiquement depuis les données Boond du positionnement
-  - **Sync-from-boond** : met aussi à jour `consultant_first_name`/`consultant_last_name`
-  - **Frontend** : suppression de tous les encarts info (lecture seule), champs consultant (civilité select + prénom + nom) et adresse (nom du site, adresse, CP, ville) ajoutés au formulaire de validation commerciale avec pré-remplissage Boond
+  - **Boond adapter** : `get_positioning()` extrait `consultant_first_name`/`consultant_last_name` depuis le tableau `included` du positionnement JSON:API (type `resource`, ID = `dependsOn.data.id`). `get_candidate_info()` retourne la civilité (Boond 1=M., 2=Mme)
+  - **Création CR** : pré-rempli automatiquement — nom consultant depuis `included` du positionnement, civilité depuis `get_candidate_info(candidate_id)`
+  - **Sync-from-boond** : met aussi à jour `consultant_first_name`/`consultant_last_name` depuis les données positionnement
+  - **Frontend** : suppression de tous les encarts info (lecture seule), champs consultant (civilité select M./Mme + prénom + nom) et adresse (nom du site, adresse, CP, ville) ajoutés au formulaire de validation commerciale avec pré-remplissage Boond
+  - **Fix migration duplicate** : suppression de `028_add_consultant_address_to_contract_requests.py` (duplicate causant "Multiple head revisions" Alembic)
 
 ### 2026-03-03 (CI fixes)
 - **fix(models)**: `published_opportunities.skills` column changé de `ARRAY(String(100))` (PostgreSQL-only) vers `JSON` pour compatibilité SQLite dans les tests

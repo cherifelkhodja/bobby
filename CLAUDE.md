@@ -129,6 +129,7 @@ frontend/
 | `user` | Consultant | Soumettre cooptations, voir opportunités publiées |
 | `commercial` | Commercial | Publier opportunités, gérer ses opportunités Boond |
 | `rh` | RH | Créer annonces, gérer candidatures, voir toutes cooptations |
+| `adv` | Administration des Ventes | Gérer contrats, vigilance documentaire, conformité tiers |
 | `admin` | Administrateur | Accès complet à toutes les fonctionnalités |
 
 **Backend enum**: `backend/app/domain/value_objects/status.py`
@@ -137,6 +138,7 @@ class UserRole(str, Enum):
     USER = "user"
     COMMERCIAL = "commercial"
     RH = "rh"
+    ADV = "adv"
     ADMIN = "admin"
 ```
 
@@ -456,6 +458,39 @@ nouveau → en_cours → entretien → accepté
 - `DELETE /batches/{id}/quotations/{row}` - Delete quotation
 - `GET /batches/{id}/download/zip` - Download ZIP
 
+### Contract Management (`/api/v1/contract-requests`)
+- `GET /` - List contract requests (commercial: own, adv/admin: all)
+- `GET /{id}` - Get contract request detail
+- `POST /{id}/validate-commercial` - Commercial validation (type tiers, TJM, dates, consultant, address)
+- `POST /{id}/configure` - Configure contract (ADV/admin)
+- `POST /{id}/compliance-override` - Override compliance check (ADV/admin)
+- `POST /{id}/generate-draft` - Generate DOCX draft (ADV/admin)
+- `POST /{id}/send-draft-to-partner` - Send draft via magic link (ADV/admin)
+- `POST /{id}/send-for-signature` - Send to YouSign (ADV/admin)
+- `POST /{id}/push-to-crm` - Push to BoondManager (ADV/admin)
+- `POST /{id}/sync-from-boond` - Re-sync data from Boond (ADV/admin)
+- `GET /{id}/contracts` - List contract documents
+- `DELETE /{id}` - Cancel contract request (ADV/admin)
+
+### Webhooks (`/api/v1/webhooks`)
+- `POST /boondmanager/positioning-update` - Boond positioning webhook (always 200 OK)
+- `POST /yousign/signature-completed` - YouSign signature webhook
+
+### Vigilance (`/api/v1`)
+- `GET /third-parties` - List third parties (ADV/admin)
+- `GET /third-parties/{id}/documents` - List documents for a third party
+- `POST /third-parties/{id}/documents/{doc_id}/validate` - Validate document
+- `POST /third-parties/{id}/documents/{doc_id}/reject` - Reject document
+- `POST /third-parties/{id}/request-documents` - Request documents
+- `GET /compliance/dashboard` - Compliance dashboard
+
+### Portal (`/api/v1/portal`)
+- `GET /{token}` - Verify magic link and get portal info (public)
+- `GET /{token}/documents` - List documents for upload (public)
+- `POST /{token}/documents/{doc_id}/upload` - Upload document (public)
+- `GET /{token}/contract-draft` - Download contract draft (public)
+- `POST /{token}/contract-review` - Submit contract review (public)
+
 ## Database Models
 
 ### users
@@ -465,7 +500,7 @@ email: str (unique)
 hashed_password: str
 first_name: str
 last_name: str
-role: str  # user, commercial, rh, admin
+role: str  # user, commercial, rh, adv, admin
 is_verified: bool
 is_active: bool
 phone: str | None
@@ -691,6 +726,21 @@ updated_at: datetime
 | 011_add_turnoverit_skills_table.py | turnoverit_skills, metadata |
 | 012_add_app_settings_table.py | app_settings table |
 | 013_add_turnoverit_skills_table.py | Update turnoverit_skills |
+| 014_add_location_key_to_job_postings.py | Location key field |
+| 015_fix_contract_types_enum.py | Fix contract types |
+| 016_add_application_form_fields.py | Application form fields |
+| 017_add_cv_quality_fields.py | CV quality fields |
+| 018_simplify_application_status.py | Simplify application status |
+| 019_add_civility_and_boond_sync.py | Civility and Boond sync |
+| 020_reset_apps_for_revalidation.py | Reset apps for revalidation |
+| 021_delete_all_job_postings.py | Delete all job postings |
+| 022_reset_hr_postings_and_applications.py | Reset HR postings and applications |
+| 023_add_view_count_to_job_postings.py | View count on job postings |
+| 024_reset_published_opportunities_and_cooptations.py | Reset published opportunities and cooptations |
+| 025_add_contractualisation_vigilance_tables.py | tp_third_parties, tp_magic_links, vig_documents, cm_contract_requests, cm_contracts, cm_webhook_events + RLS |
+| 026_allow_duplicate_positioning_after_cancel.py | Partial unique index on boond_positioning_id (WHERE status != cancelled) |
+| 027_add_end_date_mission_title_to_contract_requests.py | end_date, mission_title on cm_contract_requests |
+| 028_add_consultant_and_address_fields.py | consultant/address fields, drop mission_location |
 
 ## Environment Variables
 
@@ -843,15 +893,23 @@ audit_logger.log(
 - `/rh/annonces/nouvelle/:oppId` - Create job posting
 - `/rh/annonces/:postingId` - Posting details + applications
 
+### ADV/Commercial/Admin Routes
+- `/contracts` - Contract requests list (commercial: own, adv/admin: all)
+- `/contracts/:id` - Contract request detail + validation form
+- `/compliance` - Compliance dashboard (ADV/admin)
+
 ### Admin Routes
 - `/admin` - Admin panel (tabs)
 - `/quotation-generator` - Thales quotations
+
+### Public Portal Routes
+- `/portal/:token` - Third-party portal (document upload, contract review)
 
 ## TypeScript Interfaces
 
 ### User Types
 ```typescript
-type UserRole = 'user' | 'commercial' | 'rh' | 'admin';
+type UserRole = 'user' | 'commercial' | 'rh' | 'adv' | 'admin';
 
 interface User {
   id: string;
