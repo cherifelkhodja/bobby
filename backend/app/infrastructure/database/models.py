@@ -17,7 +17,7 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -266,7 +266,7 @@ class PublishedOpportunityModel(Base):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    skills: Mapped[list | None] = mapped_column(ARRAY(String(100)), nullable=True)
+    skills: Mapped[list | None] = mapped_column(JSON, nullable=True)
     original_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     original_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)

@@ -83,7 +83,7 @@ class CooptationStatus(str, Enum):
     @property
     def is_final(self) -> bool:
         """Check if status is final (no more transitions)."""
-        return self == CooptationStatus.ACCEPTED
+        return self in (CooptationStatus.ACCEPTED, CooptationStatus.REJECTED)
 
     @property
     def display_name(self) -> str:
@@ -108,7 +108,7 @@ class CooptationStatus(str, Enum):
             },
             CooptationStatus.INTERVIEW: {CooptationStatus.ACCEPTED, CooptationStatus.REJECTED},
             CooptationStatus.ACCEPTED: set(),
-            CooptationStatus.REJECTED: {CooptationStatus.PENDING},
+            CooptationStatus.REJECTED: set(),
         }
         return new_status in valid_transitions.get(self, set())
 
