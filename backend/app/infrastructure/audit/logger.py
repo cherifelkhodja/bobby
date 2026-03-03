@@ -66,6 +66,7 @@ class AuditAction(str, Enum):
     WEBHOOK_RECEIVED = "webhook_received"
     CONTRACT_REQUEST_CREATED = "contract_request_created"
     COMMERCIAL_VALIDATED = "commercial_validated"
+    DOCUMENT_COLLECTION_INITIATED = "document_collection_initiated"
     DRAFT_GENERATED = "draft_generated"
     CONTRACT_SIGNED = "contract_signed"
     CONTRACT_REQUEST_CANCELLED = "contract_request_cancelled"

@@ -31,6 +31,7 @@ class ContractRequestResponse(BaseModel):
     mission_city: str | None = None
     commercial_email: str
     commercial_name: str | None = None
+    contractualization_contact_email: str | None = None
     third_party_id: UUID | None = None
     compliance_override: bool
     created_at: datetime
@@ -64,6 +65,22 @@ class CommercialValidationRequest(BaseModel):
     mission_address: str | None = Field(None, max_length=500)
     mission_postal_code: str | None = Field(None, max_length=10)
     mission_city: str | None = Field(None, max_length=255)
+
+
+class InitiateDocumentCollectionRequest(BaseModel):
+    """Request to initiate document collection for a third party."""
+
+    siren: str = Field(..., pattern=r"^\d{9}$", description="SIREN à 9 chiffres")
+    company_name: str = Field(..., min_length=1, max_length=255)
+    legal_form: str = Field(..., min_length=1, max_length=100)
+    siret: str = Field(..., pattern=r"^\d{14}$", description="SIRET à 14 chiffres")
+    rcs_city: str = Field(..., min_length=1, max_length=100)
+    rcs_number: str = Field(..., min_length=1, max_length=100)
+    head_office_address: str = Field(..., min_length=1, max_length=500)
+    representative_name: str = Field(..., min_length=1, max_length=255)
+    representative_title: str = Field(..., min_length=1, max_length=100)
+    capital: str | None = Field(None, max_length=100)
+    boond_provider_id: int | None = None
 
 
 class ContractConfigRequest(BaseModel):

@@ -161,6 +161,16 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-03 (initiation collecte documents via email contact commercial)
+- **feat(contract-management)**: Nouvel endpoint `POST /contract-requests/{id}/initiate-document-collection`
+  - **Use case** : `InitiateDocumentCollectionUseCase` dans `backend/app/contract_management/application/use_cases/initiate_document_collection.py`
+  - **Flux** : ADV appelle l'endpoint avec les infos légales du tiers (SIREN, raison sociale, forme juridique, SIRET, RCS, adresse siège, représentant) → `FindOrCreateThirdPartyUseCase` (idempotent par SIREN) → `RequestDocumentsUseCase` (crée les fiches documents requis) → `GenerateMagicLinkUseCase` (envoie le lien portail de collecte par email) → transition CR vers `COLLECTING_DOCUMENTS`
+  - **Email cible** : L'email de collecte est envoyé au `contractualization_contact_email` déjà saisi lors de la validation commerciale (étape 2) — l'ADV n'a pas à le resaisir
+  - **Idempotence** : Peut être appelé depuis `COMMERCIAL_VALIDATED`, `COLLECTING_DOCUMENTS` (re-envoi du lien) ou `COMPLIANCE_BLOCKED` (reprise après blocage)
+  - **Schéma** : `InitiateDocumentCollectionRequest` ajouté dans `schemas.py`
+  - **Audit** : Nouvelle action `DOCUMENT_COLLECTION_INITIATED` dans `AuditAction`
+  - **Response** : `contractualization_contact_email` ajouté à `ContractRequestResponse` (utile pour afficher l'email destinataire dans le frontend)
+
 ### 2026-03-03 (fix sync Boond opportunités + sync CR)
 - **fix(boond)**: Correction du bouton "Sync Boond" qui ne synchronisait aucune opportunité
   - **Cause racine** : `BoondClient.get_opportunities()` et `get_opportunity()` passaient les items JSON:API bruts au `BoondOpportunityDTO`, mais les champs sont imbriqués dans `item["attributes"]` — `title` (requis) absent au top-level → ValidationError → toutes les opportunités silencieusement ignorées → 0 synchro
