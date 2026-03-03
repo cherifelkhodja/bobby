@@ -17,9 +17,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.add_column("cm_contract_requests", sa.Column("end_date", sa.Date(), nullable=True))
-    op.add_column(
-        "cm_contract_requests", sa.Column("mission_title", sa.String(500), nullable=True)
-    )
+    op.add_column("cm_contract_requests", sa.Column("mission_title", sa.String(500), nullable=True))
 
 
 def downgrade() -> None:

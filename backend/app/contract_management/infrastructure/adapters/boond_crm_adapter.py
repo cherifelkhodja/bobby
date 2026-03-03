@@ -143,7 +143,7 @@ class BoondCrmAdapter:
                 "client_id": company_id,
                 "client_name": client_name,
                 "description": attributes.get("description", ""),
-                "location": attributes.get("location", ""),
+                "location": attributes.get("place", ""),
                 "commercial_email": commercial_email,
                 "commercial_name": commercial_name,
                 "manager_id": manager_id,
