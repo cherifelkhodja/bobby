@@ -15,7 +15,6 @@ from app.contract_management.api.schemas import (
     ContractRequestListResponse,
     ContractRequestResponse,
     ContractResponse,
-    InitiateDocumentCollectionRequest,
 )
 from app.contract_management.application.use_cases.configure_contract import (
     ConfigureContractUseCase,
@@ -367,104 +366,6 @@ async def validate_commercial(
         AuditResource.CONTRACT_REQUEST,
         user_id=user_id,
         resource_id=str(contract_request_id),
-    )
-
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
-
-
-@router.post(
-    "/{contract_request_id}/initiate-document-collection",
-    response_model=ContractRequestResponse,
-    summary="Initiate document collection for the third party",
-)
-async def initiate_document_collection(
-    contract_request_id: UUID,
-    body: InitiateDocumentCollectionRequest,
-    user_id: AdvOrAdminUser,
-    db: AsyncSession = Depends(get_db),
-):
-    """Find or create the third party, create vigilance document stubs, and send
-    the document collection portal link to the contact email from the commercial
-    validation step. Transitions the CR to COLLECTING_DOCUMENTS.
-
-    Can be called again from COLLECTING_DOCUMENTS or COMPLIANCE_BLOCKED
-    to re-send the portal link. ADV/admin only.
-    """
-    from app.contract_management.application.use_cases.initiate_document_collection import (
-        InitiateDocumentCollectionCommand,
-        InitiateDocumentCollectionUseCase,
-    )
-    from app.infrastructure.email.sender import EmailService
-    from app.third_party.application.use_cases.find_or_create_third_party import (
-        FindOrCreateThirdPartyUseCase,
-    )
-    from app.third_party.application.use_cases.generate_magic_link import (
-        GenerateMagicLinkUseCase,
-    )
-    from app.third_party.infrastructure.adapters.postgres_magic_link_repo import (
-        MagicLinkRepository,
-    )
-    from app.vigilance.application.use_cases.request_documents import (
-        RequestDocumentsUseCase,
-    )
-    from app.vigilance.infrastructure.adapters.postgres_document_repo import (
-        DocumentRepository,
-    )
-
-    settings = get_settings()
-    cr_repo = ContractRequestRepository(db)
-    tp_repo = ThirdPartyRepository(db)
-    ml_repo = MagicLinkRepository(db)
-    doc_repo = DocumentRepository(db)
-    email_service = EmailService(settings)
-
-    find_or_create_tp = FindOrCreateThirdPartyUseCase(third_party_repository=tp_repo)
-    request_documents = RequestDocumentsUseCase(
-        third_party_repository=tp_repo,
-        document_repository=doc_repo,
-    )
-    generate_magic_link = GenerateMagicLinkUseCase(
-        third_party_repository=tp_repo,
-        magic_link_repository=ml_repo,
-        email_service=email_service,
-        portal_base_url=settings.BOBBY_PORTAL_BASE_URL,
-    )
-
-    use_case = InitiateDocumentCollectionUseCase(
-        contract_request_repository=cr_repo,
-        find_or_create_third_party_use_case=find_or_create_tp,
-        request_documents_use_case=request_documents,
-        generate_magic_link_use_case=generate_magic_link,
-    )
-
-    try:
-        cr = await use_case.execute(
-            InitiateDocumentCollectionCommand(
-                contract_request_id=contract_request_id,
-                siren=body.siren,
-                company_name=body.company_name,
-                legal_form=body.legal_form,
-                siret=body.siret,
-                rcs_city=body.rcs_city,
-                rcs_number=body.rcs_number,
-                head_office_address=body.head_office_address,
-                representative_name=body.representative_name,
-                representative_title=body.representative_title,
-                capital=body.capital,
-                boond_provider_id=body.boond_provider_id,
-            )
-        )
-    except Exception as exc:
-        logger.error("initiate_document_collection_failed", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
-
-    audit_logger.log(
-        AuditAction.DOCUMENT_COLLECTION_INITIATED,
-        AuditResource.CONTRACT_REQUEST,
-        user_id=user_id,
-        resource_id=str(contract_request_id),
-        details={"siren": body.siren, "company_name": body.company_name},
     )
 
     name = await _resolve_commercial_name(db, cr.commercial_email)

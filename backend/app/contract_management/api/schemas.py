@@ -67,22 +67,6 @@ class CommercialValidationRequest(BaseModel):
     mission_city: str | None = Field(None, max_length=255)
 
 
-class InitiateDocumentCollectionRequest(BaseModel):
-    """Request to initiate document collection for a third party."""
-
-    siren: str = Field(..., pattern=r"^\d{9}$", description="SIREN à 9 chiffres")
-    company_name: str = Field(..., min_length=1, max_length=255)
-    legal_form: str = Field(..., min_length=1, max_length=100)
-    siret: str = Field(..., pattern=r"^\d{14}$", description="SIRET à 14 chiffres")
-    rcs_city: str = Field(..., min_length=1, max_length=100)
-    rcs_number: str = Field(..., min_length=1, max_length=100)
-    head_office_address: str = Field(..., min_length=1, max_length=500)
-    representative_name: str = Field(..., min_length=1, max_length=255)
-    representative_title: str = Field(..., min_length=1, max_length=100)
-    capital: str | None = Field(None, max_length=100)
-    boond_provider_id: int | None = None
-
-
 class ContractConfigRequest(BaseModel):
     """Request to configure a contract."""
 
