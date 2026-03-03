@@ -109,6 +109,7 @@ export default function ContractDetail() {
         client_name: cr.client_name ?? '',
         mission_title: cr.mission_title ?? '',
         mission_description: cr.mission_description ?? '',
+        mission_location: cr.mission_location ?? '',
       }));
       setFormInitialized(true);
     }

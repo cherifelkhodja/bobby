@@ -164,6 +164,7 @@ class CreateContractRequestUseCase:
             client_name = None
             mission_title = None
             mission_description = None
+            mission_location = None
             if need_id:
                 need_data = await self._crm.get_need(need_id)
                 if need_data:
@@ -171,6 +172,7 @@ class CreateContractRequestUseCase:
                     client_name = need_data.get("client_name")
                     mission_title = need_data.get("title") or None
                     mission_description = need_data.get("description") or None
+                    mission_location = need_data.get("location") or None
 
                     # Try Bobby DB first (commercial is a registered user)
                     if manager_id and self._user_repo:
@@ -237,6 +239,7 @@ class CreateContractRequestUseCase:
                 client_name=client_name,
                 mission_title=mission_title,
                 mission_description=mission_description,
+                mission_location=mission_location,
                 daily_rate=daily_rate,
                 start_date=start_date,
                 end_date=end_date,

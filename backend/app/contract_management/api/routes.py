@@ -55,6 +55,7 @@ def _cr_to_response(cr) -> ContractRequestResponse:
         client_name=cr.client_name,
         mission_title=cr.mission_title,
         mission_description=cr.mission_description,
+        mission_location=cr.mission_location,
         commercial_email=cr.commercial_email,
         third_party_id=cr.third_party_id,
         compliance_override=cr.compliance_override,
@@ -215,6 +216,9 @@ async def sync_from_boond(
             description = need_data.get("description")
             if description:
                 cr.mission_description = description
+            location = need_data.get("location")
+            if location:
+                cr.mission_location = location
             if not cr.boond_need_id and need_id:
                 cr.boond_need_id = need_id
 
