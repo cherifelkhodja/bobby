@@ -82,7 +82,9 @@ class BoondCrmAdapter:
             Need data with commercial_email and commercial_name, or None.
         """
         try:
-            response = await self._boond._make_request("GET", f"/opportunities/{need_id}")
+            response = await self._boond._make_request(
+                "GET", f"/opportunities/{need_id}/information"
+            )
             data = response.get("data", {})
             attributes = data.get("attributes", {})
             relationships = data.get("relationships", {})
