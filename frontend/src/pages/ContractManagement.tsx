@@ -194,7 +194,7 @@ export function ContractManagement() {
                         </p>
                         {isAdv && (
                           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                            {cr.commercial_email}
+                            {cr.commercial_name || cr.commercial_email}
                           </p>
                         )}
                       </div>

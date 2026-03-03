@@ -31,6 +31,7 @@ from app.contract_management.infrastructure.adapters.postgres_contract_repo impo
 )
 from app.dependencies import get_db
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
+from app.infrastructure.database.models import UserModel
 from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
     ThirdPartyRepository,
 )
@@ -40,7 +41,31 @@ logger = structlog.get_logger()
 router = APIRouter(tags=["Contract Management"])
 
 
-def _cr_to_response(cr) -> ContractRequestResponse:
+async def _resolve_commercial_name(db: AsyncSession, email: str) -> str | None:
+    """Resolve a commercial email to full name from users table."""
+    from sqlalchemy import select
+
+    stmt = select(UserModel.first_name, UserModel.last_name).where(UserModel.email == email)
+    row = (await db.execute(stmt)).first()
+    if row:
+        return f"{row.first_name} {row.last_name}".strip()
+    return None
+
+
+async def _resolve_commercial_names(db: AsyncSession, emails: list[str]) -> dict[str, str]:
+    """Resolve commercial emails to full names from users table."""
+    if not emails:
+        return {}
+    from sqlalchemy import select
+
+    stmt = select(UserModel.email, UserModel.first_name, UserModel.last_name).where(
+        UserModel.email.in_(emails)
+    )
+    result = await db.execute(stmt)
+    return {row.email: f"{row.first_name} {row.last_name}".strip() for row in result.all()}
+
+
+def _cr_to_response(cr, *, commercial_name: str | None = None) -> ContractRequestResponse:
     """Convert a ContractRequest entity to response."""
     return ContractRequestResponse(
         id=cr.id,
@@ -57,6 +82,7 @@ def _cr_to_response(cr) -> ContractRequestResponse:
         mission_description=cr.mission_description,
         mission_location=cr.mission_location,
         commercial_email=cr.commercial_email,
+        commercial_name=commercial_name,
         third_party_id=cr.third_party_id,
         compliance_override=cr.compliance_override,
         created_at=cr.created_at,
@@ -99,8 +125,13 @@ async def list_contract_requests(
         items = await cr_repo.list_all(skip=skip, limit=limit, status=status_obj)
         total = await cr_repo.count(status=status_obj)
 
+    emails = list({cr.commercial_email for cr in items})
+    name_map = await _resolve_commercial_names(db, emails)
+
     return ContractRequestListResponse(
-        items=[_cr_to_response(cr) for cr in items],
+        items=[
+            _cr_to_response(cr, commercial_name=name_map.get(cr.commercial_email)) for cr in items
+        ],
         total=total,
         skip=skip,
         limit=limit,
@@ -127,7 +158,8 @@ async def get_contract_request(
     if role == "commercial" and cr.commercial_email != email:
         raise HTTPException(status_code=403, detail="Accès non autorisé.")
 
-    return _cr_to_response(cr)
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
 
 
 @router.post(
@@ -231,7 +263,8 @@ async def sync_from_boond(
         positioning_id=cr.boond_positioning_id,
     )
 
-    return _cr_to_response(saved)
+    name = await _resolve_commercial_name(db, saved.commercial_email)
+    return _cr_to_response(saved, commercial_name=name)
 
 
 @router.post(
@@ -281,7 +314,8 @@ async def validate_commercial(
         resource_id=str(contract_request_id),
     )
 
-    return _cr_to_response(cr)
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
 
 
 @router.post(
@@ -305,7 +339,8 @@ async def configure_contract(
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    return _cr_to_response(cr)
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
 
 
 @router.post(
@@ -337,7 +372,8 @@ async def compliance_override(
         details={"reason": body.reason},
     )
 
-    return _cr_to_response(saved)
+    name = await _resolve_commercial_name(db, saved.commercial_email)
+    return _cr_to_response(saved, commercial_name=name)
 
 
 @router.delete(
@@ -423,7 +459,8 @@ async def cancel_contract_request(
         webhook_events_cleared=deleted,
     )
 
-    return _cr_to_response(saved)
+    name = await _resolve_commercial_name(db, saved.commercial_email)
+    return _cr_to_response(saved, commercial_name=name)
 
 
 @router.get(
@@ -551,7 +588,8 @@ async def send_draft_to_partner(
         logger.error("send_draft_to_partner_failed", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
 
-    return _cr_to_response(cr)
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
 
 
 @router.post(
@@ -599,7 +637,8 @@ async def send_for_signature(
         logger.error("send_for_signature_failed", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
 
-    return _cr_to_response(cr)
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
 
 
 @router.post(
@@ -641,7 +680,8 @@ async def push_to_crm(
         logger.error("push_to_crm_failed", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
 
-    return _cr_to_response(cr)
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
 
 
 @router.get(

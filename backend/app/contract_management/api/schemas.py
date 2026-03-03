@@ -24,6 +24,7 @@ class ContractRequestResponse(BaseModel):
     mission_description: str | None = None
     mission_location: str | None = None
     commercial_email: str
+    commercial_name: str | None = None
     third_party_id: UUID | None = None
     compliance_override: bool
     created_at: datetime

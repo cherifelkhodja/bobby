@@ -315,7 +315,7 @@ export default function ContractDetail() {
         <Card>
           <p className="text-xs text-gray-500 dark:text-gray-400">Commercial</p>
           <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-            {cr.commercial_email}
+            {cr.commercial_name || cr.commercial_email}
           </p>
         </Card>
         <Card>
@@ -457,19 +457,6 @@ export default function ContractDetail() {
                 className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
               />
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Description de la mission
-              </label>
-              <textarea
-                value={validationForm.mission_description}
-                onChange={(e) =>
-                  setValidationForm((f) => ({ ...f, mission_description: e.target.value }))
-                }
-                rows={3}
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-              />
-            </div>
           </div>
           <div className="flex justify-end mt-4">
             <Button
@@ -481,18 +468,6 @@ export default function ContractDetail() {
               Valider
             </Button>
           </div>
-        </Card>
-      )}
-
-      {/* Mission description */}
-      {cr.mission_description && (
-        <Card className="mb-6">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-            Description de la mission
-          </h3>
-          <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-            {cr.mission_description}
-          </p>
         </Card>
       )}
 

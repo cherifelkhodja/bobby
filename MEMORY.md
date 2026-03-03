@@ -172,6 +172,10 @@ docker-compose up # Start all services
   - **Fichier** : `backend/app/contract_management/infrastructure/adapters/boond_crm_adapter.py`
 - **fix(contract-management)**: Résolution du libellé `place` via le dictionnaire Boond `setting.place` — avant, l'ID brut (ex: `montreuilbnpp`) était stocké au lieu du libellé (ex: `Montreuil (BNPP)`)
   - Ajout de `_resolve_place_label()` dans `BoondCrmAdapter` qui appelle `GET /application/dictionary/setting.place`
+- **feat(contract-management)**: Affichage du nom complet du commercial au lieu de l'email dans la page détail CR
+  - Backend : ajout de `commercial_name` au schema de réponse, résolu depuis la table `users` par email
+  - Frontend : affichage `commercial_name || commercial_email` dans l'encart info et la liste
+  - Suppression de l'encart "Description de la mission" (affichage et formulaire validation)
 
 ### 2026-03-03 (date de fin + intitulé mission + sync Boond sur demande de contrat)
 - **feat(contract-management)**: Ajout de `end_date` et `mission_title` à la demande de contrat

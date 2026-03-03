@@ -755,6 +755,7 @@ export interface ContractRequest {
   mission_description: string | null;
   mission_location: string | null;
   commercial_email: string;
+  commercial_name: string | null;
   third_party_id: string | null;
   compliance_override: boolean;
   created_at: string;
