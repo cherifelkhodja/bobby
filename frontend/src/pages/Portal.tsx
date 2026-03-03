@@ -185,7 +185,7 @@ interface ContactFields {
 const EMPTY_CONTACT: ContactFields = { civility: '', first_name: '', last_name: '', email: '', phone: '' };
 
 function isContactValid(c: ContactFields): boolean {
-  return c.civility !== '' && c.first_name !== '' && c.last_name !== '' && /\S+@\S+\.\S+/.test(c.email) && c.phone !== '';
+  return c.civility !== '' && c.first_name !== '' && c.last_name !== '' && /\S+@\S+\.\S+/.test(c.email);
 }
 
 function CivilitySelect({ value, onChange }: { value: Civility | ''; onChange: (v: Civility) => void }) {
@@ -251,7 +251,7 @@ function ContactSection({
             <input type="email" value={contact.email} onChange={set('email')} className={INPUT_CLS} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone *</label>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone</label>
             <input type="tel" value={contact.phone} onChange={set('phone')} className={INPUT_CLS} />
           </div>
         </div>
@@ -505,7 +505,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone *</label>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone</label>
               <input
                 type="tel"
                 value={representative.phone}

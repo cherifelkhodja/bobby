@@ -184,7 +184,7 @@ class CompanyInfoRequest(BaseModel):
     representative_first_name: str = Field(..., max_length=100)
     representative_last_name: str = Field(..., max_length=100)
     representative_email: EmailStr
-    representative_phone: str = Field(..., max_length=50)
+    representative_phone: str | None = Field(None, max_length=50)
     representative_title: str = Field(..., max_length=255)
     # Signataire du contrat
     signatory_same_as_representative: bool = False
