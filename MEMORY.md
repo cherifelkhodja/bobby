@@ -170,6 +170,8 @@ docker-compose up # Start all services
   - **Fichiers** : `backend/app/infrastructure/boond/client.py`, `backend/app/application/use_cases/admin/boond.py`
 - **fix(contract-management)**: `get_need()` utilisait `/opportunities/{id}` au lieu de `/opportunities/{id}/information` — la description et la localisation du besoin n'étaient pas retournées par l'API
   - **Fichier** : `backend/app/contract_management/infrastructure/adapters/boond_crm_adapter.py`
+- **fix(contract-management)**: Résolution du libellé `place` via le dictionnaire Boond `setting.place` — avant, l'ID brut (ex: `montreuilbnpp`) était stocké au lieu du libellé (ex: `Montreuil (BNPP)`)
+  - Ajout de `_resolve_place_label()` dans `BoondCrmAdapter` qui appelle `GET /application/dictionary/setting.place`
 
 ### 2026-03-03 (date de fin + intitulé mission + sync Boond sur demande de contrat)
 - **feat(contract-management)**: Ajout de `end_date` et `mission_title` à la demande de contrat
