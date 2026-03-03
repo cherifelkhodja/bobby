@@ -349,10 +349,11 @@ class TestCreateCooptation:
         """Test that cooptation creation requires authentication."""
         response = await client.post(
             "/api/v1/cooptations",
-            json={
+            data={
                 **candidate_data,
                 "opportunity_id": str(uuid4()),
             },
+            files={"cv": ("test.pdf", b"fake-cv-content", "application/pdf")},
         )
 
         assert response.status_code == 401
