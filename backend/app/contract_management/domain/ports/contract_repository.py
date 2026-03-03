@@ -54,6 +54,10 @@ class ContractRepositoryPort(Protocol):
         """Get the latest contract for a request."""
         ...
 
+    async def list_by_contract_request(self, request_id: UUID) -> list[Contract]:
+        """List all contracts for a contract request, ordered by version."""
+        ...
+
     async def save(self, contract: Contract) -> Contract:
         """Save a contract (create or update)."""
         ...

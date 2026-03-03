@@ -233,6 +233,15 @@ class ContractRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
+    async def list_by_contract_request(self, request_id: UUID) -> list[Contract]:
+        """List all contracts for a contract request, ordered by version."""
+        result = await self.session.execute(
+            select(ContractModel)
+            .where(ContractModel.contract_request_id == request_id)
+            .order_by(ContractModel.version.asc())
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
     async def save(self, contract: Contract) -> Contract:
         """Save a contract (create or update)."""
         result = await self.session.execute(

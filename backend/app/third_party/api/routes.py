@@ -196,13 +196,16 @@ async def upload_portal_document(
     """Upload a document file via the portal magic link."""
     result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
 
+    from app.config import get_settings
+    from app.infrastructure.storage.s3_client import S3StorageClient
     from app.vigilance.application.use_cases.upload_document import (
         UploadDocumentCommand,
         UploadDocumentUseCase,
     )
 
     doc_repo = DocumentRepository(db)
-    storage = VigilanceDocumentStorage()
+    s3_client = S3StorageClient(get_settings())
+    storage = VigilanceDocumentStorage(s3_client)
 
     # Verify the document belongs to this third party
     doc = await doc_repo.get_by_id(document_id)

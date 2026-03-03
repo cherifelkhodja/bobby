@@ -22,19 +22,26 @@ class InvalidSirenError(DomainError):
 class MagicLinkExpiredError(DomainError):
     """Raised when a magic link has expired."""
 
-    def __init__(self) -> None:
-        super().__init__("Ce lien a expiré")
+    def __init__(self, identifier: str = "") -> None:
+        message = f"Ce lien a expiré: {identifier}" if identifier else "Ce lien a expiré"
+        super().__init__(message)
 
 
 class MagicLinkRevokedError(DomainError):
     """Raised when a magic link has been revoked."""
 
-    def __init__(self) -> None:
-        super().__init__("Ce lien a été révoqué")
+    def __init__(self, identifier: str = "") -> None:
+        message = f"Ce lien a été révoqué: {identifier}" if identifier else "Ce lien a été révoqué"
+        super().__init__(message)
 
 
 class MagicLinkNotFoundError(DomainError):
     """Raised when a magic link token is not found."""
 
-    def __init__(self) -> None:
-        super().__init__("Lien invalide ou non trouvé")
+    def __init__(self, identifier: str = "") -> None:
+        message = (
+            f"Lien invalide ou non trouvé: {identifier}"
+            if identifier
+            else "Lien invalide ou non trouvé"
+        )
+        super().__init__(message)

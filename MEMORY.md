@@ -164,6 +164,9 @@ docker-compose up # Start all services
 ### 2026-03-03 (CI fixes)
 - **fix(models)**: `published_opportunities.skills` column changé de `ARRAY(String(100))` (PostgreSQL-only) vers `JSON` pour compatibilité SQLite dans les tests
 - **fix(domain)**: `CooptationStatus.REJECTED` marqué comme statut final (`is_final=True`) et transitions depuis REJECTED supprimées (était REJECTED→PENDING, maintenant aucune)
+- **fix(third-party)**: Constructeurs d'exceptions `MagicLinkExpiredError`, `MagicLinkRevokedError`, `MagicLinkNotFoundError` corrigés pour accepter un argument `identifier` optionnel (le use case passait le token/id mais les constructeurs n'acceptaient aucun argument → TypeError → 500)
+- **fix(contract-management)**: Ajout de la méthode `list_by_contract_request()` au `ContractRepository` et au port `ContractRepositoryPort` (méthode appelée par la route portail contract-draft et le use case send_for_signature mais absente de l'implémentation → AttributeError → 500)
+- **fix(portal)**: Correction de l'instanciation de `VigilanceDocumentStorage` dans la route upload portail — ajout du paramètre `s3_service` requis via `S3StorageClient(get_settings())` (constructeur appelé sans argument → TypeError → 500)
 
 ### 2026-02-15 (annulation demande de contrat)
 - **feat(contract-management)**: Possibilité d'annuler une demande de contrat
