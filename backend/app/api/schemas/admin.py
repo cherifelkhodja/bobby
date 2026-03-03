@@ -268,3 +268,12 @@ class TurnoverITSyncResponse(BaseModel):
     success: bool
     synced_count: int
     message: str
+
+
+class SireneTestResponse(BaseModel):
+    """Response from INSEE Sirene API test."""
+
+    success: bool
+    configured: bool
+    response_time_ms: int
+    message: str

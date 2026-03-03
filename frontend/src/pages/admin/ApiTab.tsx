@@ -25,7 +25,7 @@ import {
 import { toast } from 'sonner';
 
 import { apiClient } from '../../api/client';
-import { adminApi, type CvAiTestResponse, type CvAiModelInfo, type CvGeneratorBetaSettings } from '../../api/admin';
+import { adminApi, type CvAiTestResponse, type CvAiModelInfo, type CvGeneratorBetaSettings, type SireneTestResponse } from '../../api/admin';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -89,6 +89,7 @@ export function ApiTab() {
   const [skillsSearch, setSkillsSearch] = useState('');
   const [betaModel, setBetaModel] = useState('');
   const [betaTestResult, setBetaTestResult] = useState<CvAiTestResponse | null>(null);
+  const [sireneTestResult, setSireneTestResult] = useState<SireneTestResponse | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch services status
@@ -209,6 +210,21 @@ export function ApiTab() {
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Erreur lors du test');
+    },
+  });
+
+  const sireneTestMutation = useMutation({
+    mutationFn: adminApi.testSirene,
+    onSuccess: (result) => {
+      setSireneTestResult(result);
+      if (result.success) {
+        toast.success(`INSEE Sirene fonctionne (${result.response_time_ms}ms)`);
+      } else {
+        toast.error(result.message);
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erreur lors du test INSEE');
     },
   });
 
@@ -455,6 +471,64 @@ export function ApiTab() {
             {saveBetaMutation.isPending ? 'Sauvegarde...' : 'Sauvegarder'}
           </Button>
         </div>
+      </Card>
+
+      {/* INSEE Sirene Settings */}
+      <Card>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+            <Key className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h3 className="font-medium text-gray-900 dark:text-white">
+              INSEE Sirene API
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Utilisée pour l'auto-remplissage SIRET dans le portail partenaire
+            </p>
+          </div>
+          {sireneTestResult && (
+            <Badge variant={sireneTestResult.success ? 'success' : 'error'} className="ml-auto">
+              {sireneTestResult.success ? 'Opérationnel' : 'Erreur'}
+            </Badge>
+          )}
+        </div>
+
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          La clé API est configurée via la variable d'environnement <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">SIRENE_API_KEY</code> (ou AWS Secrets Manager).
+        </p>
+
+        {/* Test Result */}
+        {sireneTestResult && (
+          <div
+            className={`mb-4 p-3 rounded-lg text-sm flex items-center gap-2 ${
+              sireneTestResult.success
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300'
+                : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300'
+            }`}
+          >
+            {sireneTestResult.success ? (
+              <CheckCircle className="h-4 w-4 flex-shrink-0" />
+            ) : (
+              <XCircle className="h-4 w-4 flex-shrink-0" />
+            )}
+            <span>
+              {sireneTestResult.message}
+              {sireneTestResult.success && ` (${sireneTestResult.response_time_ms}ms)`}
+            </span>
+          </div>
+        )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => sireneTestMutation.mutate()}
+          isLoading={sireneTestMutation.isPending}
+          leftIcon={sireneTestMutation.isPending ? undefined : <RefreshCw className="h-4 w-4" />}
+          disabled={sireneTestMutation.isPending}
+        >
+          {sireneTestMutation.isPending ? 'Test en cours...' : 'Tester INSEE Sirene'}
+        </Button>
       </Card>
 
       {/* Secrets Source Info */}

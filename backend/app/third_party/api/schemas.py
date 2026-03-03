@@ -168,6 +168,18 @@ class ContractReviewResponse(BaseModel):
 # ── Portal Company Info ─────────────────────────────────────────
 
 
+class SiretLookupResponse(BaseModel):
+    """Auto-fill data returned from INSEE Sirene lookup."""
+
+    siren: str | None = None
+    company_name: str | None = None
+    legal_form: str | None = None
+    entity_category: str | None = None
+    head_office_street: str | None = None
+    head_office_postal_code: str | None = None
+    head_office_city: str | None = None
+
+
 class CompanyInfoRequest(BaseModel):
     """Request from tiers to submit company identity via portal."""
 
@@ -175,7 +187,7 @@ class CompanyInfoRequest(BaseModel):
     company_name: str = Field(..., max_length=255)
     legal_form: str = Field(..., max_length=100)
     capital: str | None = Field(None, max_length=50)
-    siren: str = Field(..., min_length=9, max_length=9, pattern=r"^\d{9}$")
+    siret: str = Field(..., min_length=14, max_length=14, pattern=r"^\d{14}$")
     head_office_street: str = Field(..., max_length=255)
     head_office_postal_code: str = Field(..., min_length=5, max_length=5, pattern=r"^\d{5}$")
     head_office_city: str = Field(..., max_length=100)

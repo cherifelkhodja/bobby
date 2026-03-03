@@ -110,6 +110,13 @@ export interface TurnoverITSyncResponse {
   message: string;
 }
 
+export interface SireneTestResponse {
+  success: boolean;
+  configured: boolean;
+  response_time_ms: number;
+  message: string;
+}
+
 export const adminApi = {
   // BoondManager
   getBoondStatus: async (): Promise<BoondStatus> => {
@@ -257,6 +264,12 @@ export const adminApi = {
 
   syncTurnoverITSkills: async (): Promise<TurnoverITSyncResponse> => {
     const response = await apiClient.post<TurnoverITSyncResponse>('/admin/turnoverit/skills/sync');
+    return response.data;
+  },
+
+  // INSEE Sirene
+  testSirene: async (): Promise<SireneTestResponse> => {
+    const response = await apiClient.post<SireneTestResponse>('/admin/sirene/test');
     return response.data;
   },
 };

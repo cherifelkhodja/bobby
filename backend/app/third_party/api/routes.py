@@ -16,6 +16,7 @@ from app.third_party.api.schemas import (
     MagicLinkPortalResponse,
     PortalDocumentResponse,
     PortalDocumentsListResponse,
+    SiretLookupResponse,
     ThirdPartyPortalResponse,
 )
 from app.third_party.application.use_cases.verify_magic_link import (
@@ -382,18 +383,22 @@ async def submit_company_info(
     tp = result.third_party
     tp_repo = ThirdPartyRepository(db)
 
+    # Derive SIREN from first 9 digits of SIRET
+    siren = body.siret[:9]
+
     # Check SIREN uniqueness upfront (another third party may already have it)
-    existing = await tp_repo.get_by_siren(body.siren)
+    existing = await tp_repo.get_by_siren(siren)
     if existing and existing.id != tp.id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Le SIREN {body.siren} est déjà associé à un autre tiers.",
+            detail=f"Le SIREN {siren} est déjà associé à un autre tiers.",
         )
 
     tp.company_name = body.company_name
     tp.legal_form = body.legal_form
     tp.capital = body.capital
-    tp.siren = body.siren
+    tp.siren = siren
+    tp.siret = body.siret
     tp.rcs_city = body.head_office_city
     tp.rcs_number = None
     tp.head_office_address = (
@@ -471,9 +476,148 @@ async def submit_company_info(
         details={
             "action": "company_info_submitted",
             "third_party_id": str(tp.id),
-            "siren": body.siren,
+            "siret": body.siret,
+            "siren": siren,
             "entity_category": body.entity_category,
         },
     )
 
     return {"message": "Informations enregistrées avec succès."}
+
+
+# ── INSEE Sirene Lookup ─────────────────────────────────────────
+
+
+def _map_legal_form(code: str) -> str:
+    """Map INSEE categorieJuridiqueUniteLegale code to human-readable form."""
+    _MAPPING: dict[str, str] = {
+        "1000": "Entrepreneur individuel",
+        "1100": "Artisan-commerçant",
+        "1200": "Commerçant",
+        "1300": "Artisan",
+        "2110": "Société en nom collectif",
+        "2120": "Société en commandite simple",
+        "5110": "SAS unipersonnelle (SASU)",
+        "5120": "Société par actions simplifiée (SAS)",
+        "5422": "SARL de famille",
+        "5498": "EURL",
+        "5499": "Société à responsabilité limitée (SARL)",
+        "5599": "SA à conseil d'administration",
+        "5710": "Société anonyme (SA)",
+        "5720": "SA à directoire",
+        "5800": "Société en commandite par actions",
+        "6540": "Association loi 1901",
+        "9220": "Association déclarée",
+    }
+    return _MAPPING.get(code, code)
+
+
+@router.get(
+    "/portal/{token}/siret/{siret}",
+    response_model=SiretLookupResponse,
+    summary="Lookup SIRET via INSEE Sirene API (portal proxy)",
+)
+async def lookup_siret(
+    token: str,
+    siret: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Look up company information from INSEE Sirene API for auto-fill.
+
+    The magic link token authenticates the request.
+    The INSEE API key is read from server-side configuration.
+    """
+    import httpx
+
+    from app.config import get_settings
+
+    # Verify the portal token (any valid doc_upload link)
+    await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
+
+    settings = get_settings()
+    if not settings.SIRENE_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="INSEE Sirene API non configurée.",
+        )
+
+    if len(siret) != 14 or not siret.isdigit():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="SIRET invalide (14 chiffres requis).",
+        )
+
+    url = f"{settings.SIRENE_API_URL}/siret/{siret}"
+    headers = {
+        "Authorization": f"Bearer {settings.SIRENE_API_KEY}",
+        "Accept": "application/json",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, headers=headers)
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="L'API INSEE n'a pas répondu à temps.",
+        )
+    except Exception as exc:
+        logger.error("sirene_lookup_error", error=str(exc), siret=siret)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Erreur lors de la communication avec l'API INSEE.",
+        )
+
+    if resp.status_code == 404:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="SIRET introuvable dans la base INSEE.",
+        )
+    if resp.status_code == 401 or resp.status_code == 403:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Clé API INSEE invalide.",
+        )
+    if resp.status_code != 200:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Erreur INSEE ({resp.status_code}).",
+        )
+
+    data = resp.json()
+    etab = data.get("etablissement", {})
+    unite = etab.get("uniteLegale", {})
+    adresse = etab.get("adresseEtablissement", {})
+
+    def _clean(val: str | None) -> str | None:
+        """Return None if value is [ND] or empty."""
+        if not val or val == "[ND]":
+            return None
+        return val
+
+    siren = _clean(etab.get("siren"))
+    company_name = _clean(unite.get("denominationUniteLegale"))
+    categorie_code = _clean(unite.get("categorieJuridiqueUniteLegale")) or ""
+    legal_form = _map_legal_form(categorie_code) if categorie_code else None
+    entity_category = "ei" if categorie_code.startswith("1") else "societe"
+
+    # Build address
+    parts = [
+        _clean(adresse.get("numeroVoieEtablissement")),
+        _clean(adresse.get("indiceRepetitionEtablissement")),
+        _clean(adresse.get("typeVoieEtablissement")),
+        _clean(adresse.get("libelleVoieEtablissement")),
+    ]
+    street = " ".join(p for p in parts if p) or None
+    postal_code = _clean(adresse.get("codePostalEtablissement"))
+    city = _clean(adresse.get("libelleCommuneEtablissement"))
+
+    return SiretLookupResponse(
+        siren=siren,
+        company_name=company_name,
+        legal_form=legal_form,
+        entity_category=entity_category if categorie_code else None,
+        head_office_street=street,
+        head_office_postal_code=postal_code,
+        head_office_city=city,
+    )

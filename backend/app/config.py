@@ -77,6 +77,10 @@ class Settings(BaseSettings):
     TURNOVERIT_API_KEY: str = ""
     TURNOVERIT_API_URL: str = "https://api.turnover-it.com/jobconnect/v2"
 
+    # INSEE Sirene API
+    SIRENE_API_KEY: str = ""
+    SIRENE_API_URL: str = "https://api.insee.fr/api-sirene/3.11"
+
     # S3/MinIO Storage (Scaleway Object Storage)
     S3_ENDPOINT_URL: str = ""  # e.g., https://s3.fr-par.scw.cloud (empty for AWS S3)
     S3_BUCKET_NAME: str = "esn-cooptation-cvs"
@@ -252,6 +256,7 @@ def get_settings() -> Settings:
             "JWT_SECRET": "JWT_SECRET",
             "ADMIN_PASSWORD": "ADMIN_PASSWORD",
             "ANTHROPIC_API_KEY": "ANTHROPIC_API_KEY",
+            "SIRENE_API_KEY": "SIRENE_API_KEY",
             "SMTP_USER": "SMTP_USER",
             "SMTP_PASSWORD": "SMTP_PASSWORD",
             "FRONTEND_URL": "FRONTEND_URL",

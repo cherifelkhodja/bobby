@@ -10,6 +10,7 @@ import {
   Clock,
   AlertTriangle,
   Building2,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -110,7 +111,7 @@ export default function Portal() {
         </div>
       </div>
 
-      {/* Company info form — shown when SIREN not yet filled */}
+      {/* Company info form — shown when SIRET not yet filled */}
       {isDocumentUpload && !portalInfo.third_party.siren && (
         <CompanyInfoForm
           token={token!}
@@ -266,12 +267,13 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
     company_name: '',
     legal_form: '',
     capital: '',
-    siren: '',
+    siret: '',
     head_office_street: '',
     head_office_postal_code: '',
     head_office_city: '',
     representative_title: '',
   });
+  const [siretLoading, setSiretLoading] = useState(false);
   const [signatory, setSignatory] = useState<ContactFields>(EMPTY_CONTACT);
   const [advContact, setAdvContact] = useState<ContactFields>(EMPTY_CONTACT);
   const [advIsSame, setAdvIsSame] = useState(false);
@@ -279,8 +281,35 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
   const [billingIsSame, setBillingIsSame] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const handleSiretChange = async (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 14);
+    setForm((f) => ({ ...f, siret: digits }));
+    if (digits.length === 14) {
+      setSiretLoading(true);
+      try {
+        const data = await portalApi.lookupSiret(token, digits);
+        setForm((f) => ({
+          ...f,
+          company_name: data.company_name ?? f.company_name,
+          legal_form: data.legal_form ?? f.legal_form,
+          head_office_street: data.head_office_street ?? f.head_office_street,
+          head_office_postal_code: data.head_office_postal_code ?? f.head_office_postal_code,
+          head_office_city: data.head_office_city ?? f.head_office_city,
+        }));
+        if (data.entity_category === 'ei' || data.entity_category === 'societe') {
+          setEntityCategory(data.entity_category);
+        }
+        toast.success('Informations pré-remplies depuis INSEE Sirene.');
+      } catch {
+        // Silently ignore — user can fill manually
+      } finally {
+        setSiretLoading(false);
+      }
+    }
+  };
+
   const isValid =
-    /^\d{9}$/.test(form.siren) &&
+    /^\d{14}$/.test(form.siret) &&
     form.company_name !== '' &&
     form.legal_form !== '' &&
     form.head_office_street !== '' &&
@@ -300,7 +329,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
         company_name: form.company_name,
         legal_form: form.legal_form,
         capital: form.capital || undefined,
-        siren: form.siren,
+        siret: form.siret,
         head_office_street: form.head_office_street,
         head_office_postal_code: form.head_office_postal_code,
         head_office_city: form.head_office_city,
@@ -397,18 +426,24 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              SIREN *
+              SIRET *
             </label>
-            <input
-              type="text"
-              maxLength={9}
-              {...field('siren')}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, siren: e.target.value.replace(/\D/g, '') }))
-              }
-              placeholder="9 chiffres"
-              className={INPUT_CLS}
-            />
+            <div className="relative">
+              <input
+                type="text"
+                maxLength={14}
+                value={form.siret}
+                onChange={(e) => handleSiretChange(e.target.value)}
+                placeholder="14 chiffres"
+                className={INPUT_CLS}
+              />
+              {siretLoading && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary-500" />
+              )}
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Les informations seront pré-remplies automatiquement.
+            </p>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
