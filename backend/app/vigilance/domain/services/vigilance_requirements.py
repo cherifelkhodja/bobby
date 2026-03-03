@@ -1,30 +1,36 @@
-"""Vigilance document requirements per third party type."""
+"""Vigilance document requirements per entity category.
 
-from app.third_party.domain.value_objects.third_party_type import ThirdPartyType
+The entity_category discriminates based on the legal structure:
+  - "ei"      : Entreprise Individuelle / Micro-entreprise
+  - "societe" : Société dotée de la personnalité morale (SAS, SASU, SARL, EURL, SA…)
+
+A FREELANCE may be structured as either; a SOUS_TRAITANT is always a société.
+Documents must be determined from entity_category, not from third_party_type alone.
+"""
+
 from app.vigilance.domain.value_objects.document_type import DocumentType
 
-# Document requirements per third party type.
-# Each entry defines: document_type, validity_months (None = no expiry),
-# and whether it is mandatory.
-VIGILANCE_REQUIREMENTS: dict[ThirdPartyType, list[dict]] = {
+# Common documents required for all entity types that need vigilance.
+_COMMON = [
+    {"type": DocumentType.ATTESTATION_VIGILANCE, "validity_months": 6, "mandatory": True},
+    {"type": DocumentType.ATTESTATION_FISCALE, "validity_months": 6, "mandatory": True},
+    {"type": DocumentType.ATTESTATION_ASSURANCE_RC_PRO, "validity_months": None, "mandatory": True},
+    {"type": DocumentType.RIB, "validity_months": None, "mandatory": True},
+]
+
+# Document requirements by entity_category.
+# entity_category is submitted by the tiers on the portal company-info form.
+REQUIREMENTS_BY_ENTITY_CATEGORY: dict[str, list[dict]] = {
     # Entreprise Individuelle / Micro-entreprise
-    ThirdPartyType.FREELANCE: [
+    "ei": [
         {"type": DocumentType.EXTRAIT_INSEE, "validity_months": 3, "mandatory": True},
-        {"type": DocumentType.ATTESTATION_VIGILANCE, "validity_months": 6, "mandatory": True},
-        {"type": DocumentType.ATTESTATION_FISCALE, "validity_months": 6, "mandatory": True},
-        {"type": DocumentType.ATTESTATION_ASSURANCE_RC_PRO, "validity_months": None, "mandatory": True},
-        {"type": DocumentType.RIB, "validity_months": None, "mandatory": True},
+        *_COMMON,
     ],
-    # Société (SAS, SASU, SARL, EURL, SA, etc.)
-    ThirdPartyType.SOUS_TRAITANT: [
+    # Société avec personnalité morale (SAS, SASU, SARL, EURL, SA…)
+    "societe": [
         {"type": DocumentType.KBIS, "validity_months": 3, "mandatory": True},
-        {"type": DocumentType.ATTESTATION_VIGILANCE, "validity_months": 6, "mandatory": True},
-        {"type": DocumentType.ATTESTATION_FISCALE, "validity_months": 6, "mandatory": True},
-        {"type": DocumentType.ATTESTATION_ASSURANCE_RC_PRO, "validity_months": None, "mandatory": True},
-        {"type": DocumentType.RIB, "validity_months": None, "mandatory": True},
+        *_COMMON,
     ],
-    # Salarié porté — pas de collecte documentaire requise
-    ThirdPartyType.SALARIE: [],
 }
 
 # Maximum retention period for documents (RGPD)

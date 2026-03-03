@@ -6,50 +6,58 @@ import structlog
 
 from app.third_party.domain.exceptions import ThirdPartyNotFoundError
 from app.vigilance.domain.entities.vigilance_document import VigilanceDocument
-from app.vigilance.domain.services.vigilance_requirements import VIGILANCE_REQUIREMENTS
+from app.vigilance.domain.services.vigilance_requirements import REQUIREMENTS_BY_ENTITY_CATEGORY
 
 logger = structlog.get_logger()
 
 
 class RequestDocumentsUseCase:
-    """Create REQUESTED documents for a third party based on its type.
+    """Create REQUESTED documents for a third party based on entity category.
 
-    Looks up the vigilance requirements for the third party type and creates
-    a VigilanceDocument for each required document type that is not already
-    active (REQUESTED, RECEIVED, or VALIDATED).
+    The entity_category ("ei" or "societe") must be passed explicitly since it
+    cannot be inferred from third_party_type alone (a freelance may be either).
+
+    Idempotent: skips document types that already have an active document
+    (REQUESTED, RECEIVED, VALIDATED, EXPIRING_SOON).
     """
 
     def __init__(self, third_party_repository, document_repository) -> None:
         self._third_party_repo = third_party_repository
         self._document_repo = document_repository
 
-    async def execute(self, third_party_id: UUID) -> list[VigilanceDocument]:
+    async def execute(
+        self,
+        third_party_id: UUID,
+        entity_category: str,
+    ) -> list[VigilanceDocument]:
         """Execute the use case.
 
         Args:
             third_party_id: ID of the third party.
+            entity_category: "ei" (EI/Micro) or "societe" (SAS, SASU, SARL…).
 
         Returns:
             List of newly created document requests.
 
         Raises:
             ThirdPartyNotFoundError: If the third party does not exist.
+            ValueError: If entity_category is unknown.
         """
         third_party = await self._third_party_repo.get_by_id(third_party_id)
         if not third_party:
             raise ThirdPartyNotFoundError(str(third_party_id))
 
-        requirements = VIGILANCE_REQUIREMENTS.get(third_party.type, [])
-        if not requirements:
-            logger.info(
-                "no_vigilance_requirements",
-                third_party_id=str(third_party_id),
-                type=third_party.type.value,
+        requirements = REQUIREMENTS_BY_ENTITY_CATEGORY.get(entity_category)
+        if requirements is None:
+            raise ValueError(
+                f"Catégorie d'entité inconnue : '{entity_category}'. "
+                f"Valeurs acceptées : {list(REQUIREMENTS_BY_ENTITY_CATEGORY)}"
             )
+
+        if not requirements:
             return []
 
         existing_docs = await self._document_repo.list_by_third_party(third_party_id)
-        # Set of doc types that already have an active document
         active_types = {
             doc.document_type.value
             for doc in existing_docs
@@ -73,6 +81,7 @@ class RequestDocumentsUseCase:
             logger.info(
                 "documents_requested",
                 third_party_id=str(third_party_id),
+                entity_category=entity_category,
                 count=len(created),
                 types=[d.document_type.value for d in created],
             )

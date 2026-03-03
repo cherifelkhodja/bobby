@@ -51,6 +51,7 @@ export const portalApi = {
   submitCompanyInfo: async (
     token: string,
     data: {
+      entity_category: 'ei' | 'societe';
       company_name: string;
       legal_form: string;
       capital?: string;

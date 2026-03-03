@@ -373,6 +373,9 @@ async def submit_company_info(
     Called when the ThirdParty stub was created without this data.
     Once saved, the portal unlocks the document upload section.
     """
+    from app.vigilance.application.use_cases.request_documents import RequestDocumentsUseCase
+    from app.vigilance.infrastructure.adapters.postgres_document_repo import DocumentRepository
+
     result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
     tp = result.third_party
     tp_repo = ThirdPartyRepository(db)
@@ -389,6 +392,14 @@ async def submit_company_info(
 
     await tp_repo.save(tp)
 
+    # Create vigilance document stubs now that we know the entity category
+    doc_repo = DocumentRepository(db)
+    request_docs_uc = RequestDocumentsUseCase(
+        third_party_repository=tp_repo,
+        document_repository=doc_repo,
+    )
+    await request_docs_uc.execute(tp.id, entity_category=body.entity_category)
+
     audit_logger.log(
         AuditAction.PORTAL_ACCESSED,
         AuditResource.MAGIC_LINK,
@@ -397,6 +408,7 @@ async def submit_company_info(
             "action": "company_info_submitted",
             "third_party_id": str(tp.id),
             "siren": body.siren,
+            "entity_category": body.entity_category,
         },
     )
 

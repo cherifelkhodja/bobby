@@ -173,8 +173,8 @@ class ValidateCommercialUseCase:
 
         cr.third_party_id = stub_tp.id
 
-        # Create document request slots for the third party type
-        await self._request_documents_uc.execute(stub_tp.id)
+        # Documents are created later when the tiers submits the portal
+        # company-info form (entity_category determines ei vs societe list).
 
         # Send portal magic link to the contact email
         await self._generate_magic_link_uc.execute(

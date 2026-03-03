@@ -171,6 +171,7 @@ class ContractReviewResponse(BaseModel):
 class CompanyInfoRequest(BaseModel):
     """Request from tiers to submit company identity via portal."""
 
+    entity_category: str = Field(..., pattern=r"^(ei|societe)$")
     company_name: str = Field(..., max_length=255)
     legal_form: str = Field(..., max_length=100)
     capital: str | None = Field(None, max_length=50)

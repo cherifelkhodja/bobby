@@ -114,6 +114,7 @@ export default function Portal() {
       {isDocumentUpload && !portalInfo.third_party.siren && (
         <CompanyInfoForm
           token={token!}
+          thirdPartyType={portalInfo.third_party.type}
           onSuccess={() => queryClient.invalidateQueries({ queryKey: ['portal', token] })}
         />
       )}
@@ -169,7 +170,22 @@ export default function Portal() {
   );
 }
 
-function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () => void }) {
+const INPUT_CLS =
+  'w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500';
+
+function CompanyInfoForm({
+  token,
+  thirdPartyType,
+  onSuccess,
+}: {
+  token: string;
+  thirdPartyType: string;
+  onSuccess: () => void;
+}) {
+  // sous_traitant is always a société; freelance must choose
+  const [entityCategory, setEntityCategory] = useState<'ei' | 'societe'>(
+    thirdPartyType === 'sous_traitant' ? 'societe' : 'ei',
+  );
   const [form, setForm] = useState({
     company_name: '',
     legal_form: '',
@@ -182,6 +198,8 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
     representative_title: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isFreelance = thirdPartyType === 'freelance';
 
   const isValid =
     /^\d{9}$/.test(form.siren) &&
@@ -198,6 +216,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
     setIsSubmitting(true);
     try {
       await portalApi.submitCompanyInfo(token, {
+        entity_category: entityCategory,
         company_name: form.company_name,
         legal_form: form.legal_form,
         capital: form.capital || undefined,
@@ -211,7 +230,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
       toast.success('Informations enregistrées.');
       onSuccess();
     } catch {
-      toast.error('Erreur lors de l\'enregistrement.');
+      toast.error("Erreur lors de l'enregistrement.");
     } finally {
       setIsSubmitting(false);
     }
@@ -221,8 +240,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
     value: form[key],
     onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm((f) => ({ ...f, [key]: e.target.value })),
-    className:
-      'w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300',
+    className: INPUT_CLS,
   });
 
   return (
@@ -232,13 +250,44 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
           <Building2 className="h-6 w-6 text-primary-600" />
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Informations de votre société
+              Informations de votre structure
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Renseignez vos coordonnées légales pour démarrer la collecte de documents.
             </p>
           </div>
         </div>
+
+        {/* Entity category — only shown for freelance */}
+        {isFreelance && (
+          <div className="mb-5">
+            <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Structure juridique *
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {(
+                [
+                  { value: 'ei', label: 'Entreprise individuelle', sub: 'EI, Micro-entreprise' },
+                  { value: 'societe', label: 'Société', sub: 'SAS, SASU, EURL, SARL…' },
+                ] as const
+              ).map(({ value, label, sub }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setEntityCategory(value)}
+                  className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                    entityCategory === value
+                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sub}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -253,55 +302,68 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
                 setForm((f) => ({ ...f, siren: e.target.value.replace(/\D/g, '') }))
               }
               placeholder="9 chiffres"
+              className={INPUT_CLS}
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Raison sociale *
+              {entityCategory === 'ei' ? 'Nom commercial / Enseigne *' : 'Raison sociale *'}
             </label>
-            <input type="text" {...field('company_name')} />
+            <input type="text" {...field('company_name')} className={INPUT_CLS} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Forme juridique *
             </label>
-            <input type="text" {...field('legal_form')} placeholder="SAS, SASU, EURL..." />
+            <input
+              type="text"
+              {...field('legal_form')}
+              placeholder={entityCategory === 'ei' ? 'EI, Micro-entreprise…' : 'SAS, SASU, EURL…'}
+              className={INPUT_CLS}
+            />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Capital social
-            </label>
-            <input type="text" {...field('capital')} placeholder="Ex : 10 000 €" />
-          </div>
+          {entityCategory === 'societe' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Capital social
+              </label>
+              <input type="text" {...field('capital')} placeholder="Ex : 10 000 €" className={INPUT_CLS} />
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Ville RCS *
             </label>
-            <input type="text" {...field('rcs_city')} />
+            <input type="text" {...field('rcs_city')} className={INPUT_CLS} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Numéro RCS *
             </label>
-            <input type="text" {...field('rcs_number')} />
+            <input type="text" {...field('rcs_number')} className={INPUT_CLS} />
           </div>
           <div className="md:col-span-2">
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Adresse du siège social *
             </label>
-            <input type="text" {...field('head_office_address')} />
+            <input type="text" {...field('head_office_address')} className={INPUT_CLS} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Représentant légal *
+              {entityCategory === 'ei' ? 'Nom du dirigeant *' : 'Représentant légal *'}
             </label>
-            <input type="text" {...field('representative_name')} />
+            <input type="text" {...field('representative_name')} className={INPUT_CLS} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Qualité du représentant *
             </label>
-            <input type="text" {...field('representative_title')} placeholder="Président, Gérant..." />
+            <input
+              type="text"
+              {...field('representative_title')}
+              placeholder={entityCategory === 'ei' ? 'Entrepreneur individuel…' : 'Président, Gérant…'}
+              className={INPUT_CLS}
+            />
           </div>
         </div>
 

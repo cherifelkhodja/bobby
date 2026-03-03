@@ -3,7 +3,7 @@
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import AdvOrAdminUser
@@ -167,9 +167,10 @@ async def get_third_party_documents(
 async def request_documents(
     third_party_id: UUID,
     user_id: AdvOrAdminUser,
+    entity_category: str = Query(..., pattern="^(ei|societe)$", description="ei ou societe"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create document requests based on third party type. ADV/admin only."""
+    """Create document requests based on entity category. ADV/admin only."""
     tp_repo = ThirdPartyRepository(db)
     doc_repo = DocumentRepository(db)
 
@@ -179,7 +180,7 @@ async def request_documents(
     )
 
     try:
-        created = await use_case.execute(third_party_id)
+        created = await use_case.execute(third_party_id, entity_category=entity_category)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
