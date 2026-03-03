@@ -272,9 +272,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
     head_office_city: '',
     representative_title: '',
   });
-  const [representative, setRepresentative] = useState<ContactFields>(EMPTY_CONTACT);
   const [signatory, setSignatory] = useState<ContactFields>(EMPTY_CONTACT);
-  const [signatoryIsSame, setSignatoryIsSame] = useState(false);
   const [advContact, setAdvContact] = useState<ContactFields>(EMPTY_CONTACT);
   const [advIsSame, setAdvIsSame] = useState(false);
   const [billingContact, setBillingContact] = useState<ContactFields>(EMPTY_CONTACT);
@@ -289,8 +287,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
     /^\d{5}$/.test(form.head_office_postal_code) &&
     form.head_office_city !== '' &&
     form.representative_title !== '' &&
-    isContactValid(representative) &&
-    (signatoryIsSame || isContactValid(signatory)) &&
+    isContactValid(signatory) &&
     (advIsSame || isContactValid(advContact)) &&
     (billingIsSame || isContactValid(billingContact));
 
@@ -307,20 +304,18 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
         head_office_street: form.head_office_street,
         head_office_postal_code: form.head_office_postal_code,
         head_office_city: form.head_office_city,
-        representative_civility: representative.civility as 'M.' | 'Mme',
-        representative_first_name: representative.first_name,
-        representative_last_name: representative.last_name,
-        representative_email: representative.email,
-        representative_phone: representative.phone,
+        representative_civility: signatory.civility as 'M.' | 'Mme',
+        representative_first_name: signatory.first_name,
+        representative_last_name: signatory.last_name,
+        representative_email: signatory.email,
+        representative_phone: signatory.phone || undefined,
         representative_title: form.representative_title,
-        signatory_same_as_representative: signatoryIsSame,
-        ...(signatoryIsSame ? {} : {
-          signatory_civility: signatory.civility as 'M.' | 'Mme',
-          signatory_first_name: signatory.first_name,
-          signatory_last_name: signatory.last_name,
-          signatory_email: signatory.email,
-          signatory_phone: signatory.phone,
-        }),
+        signatory_same_as_representative: false,
+        signatory_civility: signatory.civility as 'M.' | 'Mme',
+        signatory_first_name: signatory.first_name,
+        signatory_last_name: signatory.last_name,
+        signatory_email: signatory.email,
+        signatory_phone: signatory.phone || undefined,
         adv_contact_same_as_representative: advIsSame,
         ...(advIsSame ? {} : {
           adv_contact_civility: advContact.civility as 'M.' | 'Mme',
@@ -469,27 +464,27 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
           </div>
         </div>
 
-        {/* Représentant légal */}
+        {/* Signataire du contrat (= représentant légal) */}
         <div className="border-t border-gray-100 dark:border-gray-700 pt-5 mt-5">
           <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
-            {entityCategory === 'ei' ? 'Dirigeant' : 'Représentant légal'}
+            Signataire du contrat
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Civilité / Prénom / Nom *</label>
               <div className="flex gap-2">
-                <CivilitySelect value={representative.civility} onChange={(v) => setRepresentative((c) => ({ ...c, civility: v }))} />
+                <CivilitySelect value={signatory.civility} onChange={(v) => setSignatory((c) => ({ ...c, civility: v }))} />
                 <input
                   type="text"
-                  value={representative.first_name}
-                  onChange={(e) => setRepresentative((c) => ({ ...c, first_name: e.target.value }))}
+                  value={signatory.first_name}
+                  onChange={(e) => setSignatory((c) => ({ ...c, first_name: e.target.value }))}
                   placeholder="Prénom"
                   className={INPUT_CLS}
                 />
                 <input
                   type="text"
-                  value={representative.last_name}
-                  onChange={(e) => setRepresentative((c) => ({ ...c, last_name: e.target.value }))}
+                  value={signatory.last_name}
+                  onChange={(e) => setSignatory((c) => ({ ...c, last_name: e.target.value }))}
                   placeholder="Nom"
                   className={INPUT_CLS}
                 />
@@ -499,8 +494,8 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">E-mail *</label>
               <input
                 type="email"
-                value={representative.email}
-                onChange={(e) => setRepresentative((c) => ({ ...c, email: e.target.value }))}
+                value={signatory.email}
+                onChange={(e) => setSignatory((c) => ({ ...c, email: e.target.value }))}
                 className={INPUT_CLS}
               />
             </div>
@@ -508,8 +503,8 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone</label>
               <input
                 type="tel"
-                value={representative.phone}
-                onChange={(e) => setRepresentative((c) => ({ ...c, phone: e.target.value }))}
+                value={signatory.phone}
+                onChange={(e) => setSignatory((c) => ({ ...c, phone: e.target.value }))}
                 className={INPUT_CLS}
               />
             </div>
@@ -527,22 +522,12 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
           </div>
         </div>
 
-        {/* Signataire */}
-        <ContactSection
-          title="Signataire du contrat"
-          contact={signatory}
-          onChange={setSignatory}
-          checkboxLabel="Même personne que le représentant légal"
-          sameAsRep={signatoryIsSame}
-          onToggleSameAsRep={() => setSignatoryIsSame((v) => !v)}
-        />
-
         {/* Contact ADV */}
         <ContactSection
           title="Contact ADV"
           contact={advContact}
           onChange={setAdvContact}
-          checkboxLabel="Même personne que le représentant légal"
+          checkboxLabel="Même personne que le signataire du contrat"
           sameAsRep={advIsSame}
           onToggleSameAsRep={() => setAdvIsSame((v) => !v)}
         />
@@ -552,7 +537,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
           title="Contact facturation"
           contact={billingContact}
           onChange={setBillingContact}
-          checkboxLabel="Même personne que le représentant légal"
+          checkboxLabel="Même personne que le signataire du contrat"
           sameAsRep={billingIsSame}
           onToggleSameAsRep={() => setBillingIsSame((v) => !v)}
         />
