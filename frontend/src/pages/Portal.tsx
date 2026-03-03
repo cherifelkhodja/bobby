@@ -271,6 +271,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
     head_office_street: '',
     head_office_postal_code: '',
     head_office_city: '',
+    rcs_city: '',
     representative_title: '',
   });
   const [siretLoading, setSiretLoading] = useState(false);
@@ -315,6 +316,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
     form.head_office_street !== '' &&
     /^\d{5}$/.test(form.head_office_postal_code) &&
     form.head_office_city !== '' &&
+    (entityCategory === 'ei' || form.rcs_city !== '') &&
     form.representative_title !== '' &&
     isContactValid(signatory) &&
     (advIsSame || isContactValid(advContact)) &&
@@ -333,6 +335,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
         head_office_street: form.head_office_street,
         head_office_postal_code: form.head_office_postal_code,
         head_office_city: form.head_office_city,
+        rcs_city: form.rcs_city || undefined,
         representative_civility: signatory.civility as 'M.' | 'Mme',
         representative_first_name: signatory.first_name,
         representative_last_name: signatory.last_name,
@@ -497,6 +500,19 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
             </label>
             <input type="text" {...field('head_office_city')} className={INPUT_CLS} />
           </div>
+          {entityCategory === 'societe' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Ville du greffe *
+              </label>
+              <input
+                type="text"
+                {...field('rcs_city')}
+                placeholder="Ex : Paris, Lyon…"
+                className={INPUT_CLS}
+              />
+            </div>
+          )}
         </div>
 
         {/* Signataire du contrat (= représentant légal) */}

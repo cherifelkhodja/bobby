@@ -75,11 +75,12 @@ export const portalApi = {
       head_office_street: string;
       head_office_postal_code: string;
       head_office_city: string;
+      rcs_city?: string;
       representative_civility: 'M.' | 'Mme';
       representative_first_name: string;
       representative_last_name: string;
       representative_email: string;
-      representative_phone: string;
+      representative_phone?: string;
       representative_title: string;
       signatory_same_as_representative: boolean;
       signatory_civility?: 'M.' | 'Mme';

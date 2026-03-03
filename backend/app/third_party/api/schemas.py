@@ -191,6 +191,7 @@ class CompanyInfoRequest(BaseModel):
     head_office_street: str = Field(..., max_length=255)
     head_office_postal_code: str = Field(..., min_length=5, max_length=5, pattern=r"^\d{5}$")
     head_office_city: str = Field(..., max_length=100)
+    rcs_city: str | None = Field(None, max_length=100)
     # Représentant légal
     representative_civility: str = Field(..., pattern=r"^(M\.|Mme)$")
     representative_first_name: str = Field(..., max_length=100)

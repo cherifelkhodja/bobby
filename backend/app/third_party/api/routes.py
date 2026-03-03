@@ -399,7 +399,7 @@ async def submit_company_info(
     tp.capital = body.capital
     tp.siren = siren
     tp.siret = body.siret
-    tp.rcs_city = body.head_office_city
+    tp.rcs_city = body.rcs_city or body.head_office_city
     tp.rcs_number = None
     tp.head_office_address = (
         f"{body.head_office_street}, {body.head_office_postal_code} {body.head_office_city}"
