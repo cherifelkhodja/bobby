@@ -454,6 +454,19 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
             </label>
             <input type="text" {...field('company_name')} className={INPUT_CLS} />
           </div>
+          {entityCategory === 'societe' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Ville du greffe *
+              </label>
+              <input
+                type="text"
+                {...field('rcs_city')}
+                placeholder="Ex : Paris, Lyon…"
+                className={INPUT_CLS}
+              />
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Forme juridique *
@@ -500,19 +513,6 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
             </label>
             <input type="text" {...field('head_office_city')} className={INPUT_CLS} />
           </div>
-          {entityCategory === 'societe' && (
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Ville du greffe *
-              </label>
-              <input
-                type="text"
-                {...field('rcs_city')}
-                placeholder="Ex : Paris, Lyon…"
-                className={INPUT_CLS}
-              />
-            </div>
-          )}
         </div>
 
         {/* Signataire du contrat (= représentant légal) */}
