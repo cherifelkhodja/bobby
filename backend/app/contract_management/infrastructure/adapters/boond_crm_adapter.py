@@ -269,15 +269,20 @@ class BoondCrmAdapter:
     async def _resolve_place_label(self, place_id: str) -> str:
         """Resolve a Boond place ID to its display label via the dictionary API.
 
+        The dictionary structure is:
+        data.setting.mobilityArea[].option[] where each option has id and value.
+
         Falls back to the raw ID if the dictionary fetch fails.
         """
         try:
             response = await self._boond._make_request(
                 "GET", "/application/dictionary/setting.place"
             )
-            for item in response.get("data", []):
-                if str(item.get("id")) == place_id:
-                    return item.get("attributes", {}).get("value", place_id)
+            setting = response.get("data", {}).get("setting", {})
+            for area in setting.get("mobilityArea", []):
+                for option in area.get("option", []):
+                    if str(option.get("id")) == place_id:
+                        return option.get("value", place_id)
         except Exception as exc:
             logger.warning("boond_place_dictionary_fetch_failed", error=str(exc))
         return place_id
