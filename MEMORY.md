@@ -161,6 +161,10 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-03 (CI fixes)
+- **fix(models)**: `published_opportunities.skills` column changé de `ARRAY(String(100))` (PostgreSQL-only) vers `JSON` pour compatibilité SQLite dans les tests
+- **fix(domain)**: `CooptationStatus.REJECTED` marqué comme statut final (`is_final=True`) et transitions depuis REJECTED supprimées (était REJECTED→PENDING, maintenant aucune)
+
 ### 2026-02-15 (annulation demande de contrat)
 - **feat(contract-management)**: Possibilité d'annuler une demande de contrat
   - Backend : `DELETE /api/v1/contract-requests/{id}` — annulation (statut → `cancelled`), ADV/admin uniquement
