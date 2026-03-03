@@ -59,8 +59,30 @@ export const portalApi = {
       head_office_street: string;
       head_office_postal_code: string;
       head_office_city: string;
-      representative_name: string;
+      representative_civility: 'M.' | 'Mme';
+      representative_first_name: string;
+      representative_last_name: string;
+      representative_email: string;
+      representative_phone: string;
       representative_title: string;
+      signatory_same_as_representative: boolean;
+      signatory_civility?: 'M.' | 'Mme';
+      signatory_first_name?: string;
+      signatory_last_name?: string;
+      signatory_email?: string;
+      signatory_phone?: string;
+      adv_contact_same_as_representative: boolean;
+      adv_contact_civility?: 'M.' | 'Mme';
+      adv_contact_first_name?: string;
+      adv_contact_last_name?: string;
+      adv_contact_email?: string;
+      adv_contact_phone?: string;
+      billing_contact_same_as_representative: boolean;
+      billing_contact_civility?: 'M.' | 'Mme';
+      billing_contact_first_name?: string;
+      billing_contact_last_name?: string;
+      billing_contact_email?: string;
+      billing_contact_phone?: string;
     },
   ): Promise<{ message: string }> => {
     const response = await portalClient.post(`/${token}/company-info`, data);

@@ -27,6 +27,30 @@ class ThirdParty:
     head_office_address: str | None = None
     representative_name: str | None = None
     representative_title: str | None = None
+    # Structured representative fields
+    representative_civility: str | None = None
+    representative_first_name: str | None = None
+    representative_last_name: str | None = None
+    representative_email: str | None = None
+    representative_phone: str | None = None
+    # Signatory
+    signatory_civility: str | None = None
+    signatory_first_name: str | None = None
+    signatory_last_name: str | None = None
+    signatory_email: str | None = None
+    signatory_phone: str | None = None
+    # ADV contact
+    adv_contact_civility: str | None = None
+    adv_contact_first_name: str | None = None
+    adv_contact_last_name: str | None = None
+    adv_contact_email: str | None = None
+    adv_contact_phone: str | None = None
+    # Billing contact
+    billing_contact_civility: str | None = None
+    billing_contact_first_name: str | None = None
+    billing_contact_last_name: str | None = None
+    billing_contact_email: str | None = None
+    billing_contact_phone: str | None = None
     id: UUID = field(default_factory=uuid4)
     boond_provider_id: int | None = None
     capital: str | None = None

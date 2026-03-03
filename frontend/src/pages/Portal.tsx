@@ -172,6 +172,94 @@ export default function Portal() {
 const INPUT_CLS =
   'w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500';
 
+type Civility = 'M.' | 'Mme';
+
+interface ContactFields {
+  civility: Civility | '';
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+}
+
+const EMPTY_CONTACT: ContactFields = { civility: '', first_name: '', last_name: '', email: '', phone: '' };
+
+function isContactValid(c: ContactFields): boolean {
+  return c.civility !== '' && c.first_name !== '' && c.last_name !== '' && /\S+@\S+\.\S+/.test(c.email) && c.phone !== '';
+}
+
+function CivilitySelect({ value, onChange }: { value: Civility | ''; onChange: (v: Civility) => void }) {
+  return (
+    <div className="w-24 flex-shrink-0">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as Civility)}
+        className={INPUT_CLS}
+      >
+        <option value="">—</option>
+        <option value="M.">M.</option>
+        <option value="Mme">Mme</option>
+      </select>
+    </div>
+  );
+}
+
+function ContactSection({
+  title,
+  contact,
+  onChange,
+  checkboxLabel,
+  sameAsRep,
+  onToggleSameAsRep,
+}: {
+  title: string;
+  contact: ContactFields;
+  onChange: (c: ContactFields) => void;
+  checkboxLabel?: string;
+  sameAsRep?: boolean;
+  onToggleSameAsRep?: () => void;
+}) {
+  const set = (key: keyof ContactFields) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    onChange({ ...contact, [key]: e.target.value });
+
+  return (
+    <div className="border-t border-gray-100 dark:border-gray-700 pt-5 mt-5">
+      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">{title}</p>
+      {checkboxLabel && onToggleSameAsRep !== undefined && (
+        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={sameAsRep}
+            onChange={onToggleSameAsRep}
+            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          />
+          {checkboxLabel}
+        </label>
+      )}
+      {!sameAsRep && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Civilité / Prénom / Nom *</label>
+            <div className="flex gap-2">
+              <CivilitySelect value={contact.civility} onChange={(v) => onChange({ ...contact, civility: v })} />
+              <input type="text" value={contact.first_name} onChange={set('first_name')} placeholder="Prénom" className={INPUT_CLS} />
+              <input type="text" value={contact.last_name} onChange={set('last_name')} placeholder="Nom" className={INPUT_CLS} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">E-mail *</label>
+            <input type="email" value={contact.email} onChange={set('email')} className={INPUT_CLS} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone *</label>
+            <input type="tel" value={contact.phone} onChange={set('phone')} className={INPUT_CLS} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () => void }) {
   const [entityCategory, setEntityCategory] = useState<'ei' | 'societe'>('ei');
   const [form, setForm] = useState({
@@ -182,9 +270,15 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
     head_office_street: '',
     head_office_postal_code: '',
     head_office_city: '',
-    representative_name: '',
     representative_title: '',
   });
+  const [representative, setRepresentative] = useState<ContactFields>(EMPTY_CONTACT);
+  const [signatory, setSignatory] = useState<ContactFields>(EMPTY_CONTACT);
+  const [signatoryIsSame, setSignatoryIsSame] = useState(false);
+  const [advContact, setAdvContact] = useState<ContactFields>(EMPTY_CONTACT);
+  const [advIsSame, setAdvIsSame] = useState(false);
+  const [billingContact, setBillingContact] = useState<ContactFields>(EMPTY_CONTACT);
+  const [billingIsSame, setBillingIsSame] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isValid =
@@ -194,8 +288,11 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
     form.head_office_street !== '' &&
     /^\d{5}$/.test(form.head_office_postal_code) &&
     form.head_office_city !== '' &&
-    form.representative_name !== '' &&
-    form.representative_title !== '';
+    form.representative_title !== '' &&
+    isContactValid(representative) &&
+    (signatoryIsSame || isContactValid(signatory)) &&
+    (advIsSame || isContactValid(advContact)) &&
+    (billingIsSame || isContactValid(billingContact));
 
   const handleSubmit = async () => {
     if (!isValid) return;
@@ -210,8 +307,36 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
         head_office_street: form.head_office_street,
         head_office_postal_code: form.head_office_postal_code,
         head_office_city: form.head_office_city,
-        representative_name: form.representative_name,
+        representative_civility: representative.civility as 'M.' | 'Mme',
+        representative_first_name: representative.first_name,
+        representative_last_name: representative.last_name,
+        representative_email: representative.email,
+        representative_phone: representative.phone,
         representative_title: form.representative_title,
+        signatory_same_as_representative: signatoryIsSame,
+        ...(signatoryIsSame ? {} : {
+          signatory_civility: signatory.civility as 'M.' | 'Mme',
+          signatory_first_name: signatory.first_name,
+          signatory_last_name: signatory.last_name,
+          signatory_email: signatory.email,
+          signatory_phone: signatory.phone,
+        }),
+        adv_contact_same_as_representative: advIsSame,
+        ...(advIsSame ? {} : {
+          adv_contact_civility: advContact.civility as 'M.' | 'Mme',
+          adv_contact_first_name: advContact.first_name,
+          adv_contact_last_name: advContact.last_name,
+          adv_contact_email: advContact.email,
+          adv_contact_phone: advContact.phone,
+        }),
+        billing_contact_same_as_representative: billingIsSame,
+        ...(billingIsSame ? {} : {
+          billing_contact_civility: billingContact.civility as 'M.' | 'Mme',
+          billing_contact_first_name: billingContact.first_name,
+          billing_contact_last_name: billingContact.last_name,
+          billing_contact_email: billingContact.email,
+          billing_contact_phone: billingContact.phone,
+        }),
       });
       toast.success('Informations enregistrées.');
       onSuccess();
@@ -273,6 +398,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
           </div>
         </div>
 
+        {/* Identité */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -341,24 +467,95 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
             </label>
             <input type="text" {...field('head_office_city')} className={INPUT_CLS} />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {entityCategory === 'ei' ? 'Nom du dirigeant *' : 'Représentant légal *'}
-            </label>
-            <input type="text" {...field('representative_name')} className={INPUT_CLS} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Qualité du représentant *
-            </label>
-            <input
-              type="text"
-              {...field('representative_title')}
-              placeholder={entityCategory === 'ei' ? 'Entrepreneur individuel…' : 'Président, Gérant…'}
-              className={INPUT_CLS}
-            />
+        </div>
+
+        {/* Représentant légal */}
+        <div className="border-t border-gray-100 dark:border-gray-700 pt-5 mt-5">
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
+            {entityCategory === 'ei' ? 'Dirigeant' : 'Représentant légal'}
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Civilité / Prénom / Nom *</label>
+              <div className="flex gap-2">
+                <CivilitySelect value={representative.civility} onChange={(v) => setRepresentative((c) => ({ ...c, civility: v }))} />
+                <input
+                  type="text"
+                  value={representative.first_name}
+                  onChange={(e) => setRepresentative((c) => ({ ...c, first_name: e.target.value }))}
+                  placeholder="Prénom"
+                  className={INPUT_CLS}
+                />
+                <input
+                  type="text"
+                  value={representative.last_name}
+                  onChange={(e) => setRepresentative((c) => ({ ...c, last_name: e.target.value }))}
+                  placeholder="Nom"
+                  className={INPUT_CLS}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">E-mail *</label>
+              <input
+                type="email"
+                value={representative.email}
+                onChange={(e) => setRepresentative((c) => ({ ...c, email: e.target.value }))}
+                className={INPUT_CLS}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone *</label>
+              <input
+                type="tel"
+                value={representative.phone}
+                onChange={(e) => setRepresentative((c) => ({ ...c, phone: e.target.value }))}
+                className={INPUT_CLS}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Qualité *
+              </label>
+              <input
+                type="text"
+                {...field('representative_title')}
+                placeholder={entityCategory === 'ei' ? 'Entrepreneur individuel…' : 'Président, Gérant…'}
+                className={INPUT_CLS}
+              />
+            </div>
           </div>
         </div>
+
+        {/* Signataire */}
+        <ContactSection
+          title="Signataire du contrat"
+          contact={signatory}
+          onChange={setSignatory}
+          checkboxLabel="Même personne que le représentant légal"
+          sameAsRep={signatoryIsSame}
+          onToggleSameAsRep={() => setSignatoryIsSame((v) => !v)}
+        />
+
+        {/* Contact ADV */}
+        <ContactSection
+          title="Contact ADV"
+          contact={advContact}
+          onChange={setAdvContact}
+          checkboxLabel="Même personne que le représentant légal"
+          sameAsRep={advIsSame}
+          onToggleSameAsRep={() => setAdvIsSame((v) => !v)}
+        />
+
+        {/* Contact facturation */}
+        <ContactSection
+          title="Contact facturation"
+          contact={billingContact}
+          onChange={setBillingContact}
+          checkboxLabel="Même personne que le représentant légal"
+          sameAsRep={billingIsSame}
+          onToggleSameAsRep={() => setBillingIsSame((v) => !v)}
+        />
 
         <div className="flex justify-end mt-6">
           <Button onClick={handleSubmit} disabled={!isValid || isSubmitting} isLoading={isSubmitting}>

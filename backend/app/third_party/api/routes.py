@@ -399,8 +399,53 @@ async def submit_company_info(
     tp.head_office_address = (
         f"{body.head_office_street}, {body.head_office_postal_code} {body.head_office_city}"
     )
-    tp.representative_name = body.representative_name
+    # Représentant légal
+    tp.representative_civility = body.representative_civility
+    tp.representative_first_name = body.representative_first_name
+    tp.representative_last_name = body.representative_last_name
+    tp.representative_email = body.representative_email
+    tp.representative_phone = body.representative_phone
     tp.representative_title = body.representative_title
+    tp.representative_name = f"{body.representative_first_name} {body.representative_last_name}"
+    # Signataire
+    if body.signatory_same_as_representative:
+        tp.signatory_civility = body.representative_civility
+        tp.signatory_first_name = body.representative_first_name
+        tp.signatory_last_name = body.representative_last_name
+        tp.signatory_email = body.representative_email
+        tp.signatory_phone = body.representative_phone
+    else:
+        tp.signatory_civility = body.signatory_civility
+        tp.signatory_first_name = body.signatory_first_name
+        tp.signatory_last_name = body.signatory_last_name
+        tp.signatory_email = body.signatory_email
+        tp.signatory_phone = body.signatory_phone
+    # Contact ADV
+    if body.adv_contact_same_as_representative:
+        tp.adv_contact_civility = body.representative_civility
+        tp.adv_contact_first_name = body.representative_first_name
+        tp.adv_contact_last_name = body.representative_last_name
+        tp.adv_contact_email = body.representative_email
+        tp.adv_contact_phone = body.representative_phone
+    else:
+        tp.adv_contact_civility = body.adv_contact_civility
+        tp.adv_contact_first_name = body.adv_contact_first_name
+        tp.adv_contact_last_name = body.adv_contact_last_name
+        tp.adv_contact_email = body.adv_contact_email
+        tp.adv_contact_phone = body.adv_contact_phone
+    # Contact facturation
+    if body.billing_contact_same_as_representative:
+        tp.billing_contact_civility = body.representative_civility
+        tp.billing_contact_first_name = body.representative_first_name
+        tp.billing_contact_last_name = body.representative_last_name
+        tp.billing_contact_email = body.representative_email
+        tp.billing_contact_phone = body.representative_phone
+    else:
+        tp.billing_contact_civility = body.billing_contact_civility
+        tp.billing_contact_first_name = body.billing_contact_first_name
+        tp.billing_contact_last_name = body.billing_contact_last_name
+        tp.billing_contact_email = body.billing_contact_email
+        tp.billing_contact_phone = body.billing_contact_phone
 
     try:
         await tp_repo.save(tp)

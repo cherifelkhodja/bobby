@@ -179,5 +179,31 @@ class CompanyInfoRequest(BaseModel):
     head_office_street: str = Field(..., max_length=255)
     head_office_postal_code: str = Field(..., min_length=5, max_length=5, pattern=r"^\d{5}$")
     head_office_city: str = Field(..., max_length=100)
-    representative_name: str = Field(..., max_length=255)
+    # Représentant légal
+    representative_civility: str = Field(..., pattern=r"^(M\.|Mme)$")
+    representative_first_name: str = Field(..., max_length=100)
+    representative_last_name: str = Field(..., max_length=100)
+    representative_email: EmailStr
+    representative_phone: str = Field(..., max_length=50)
     representative_title: str = Field(..., max_length=255)
+    # Signataire du contrat
+    signatory_same_as_representative: bool = False
+    signatory_civility: str | None = Field(None, pattern=r"^(M\.|Mme)$")
+    signatory_first_name: str | None = Field(None, max_length=100)
+    signatory_last_name: str | None = Field(None, max_length=100)
+    signatory_email: EmailStr | None = None
+    signatory_phone: str | None = Field(None, max_length=50)
+    # Contact ADV
+    adv_contact_same_as_representative: bool = False
+    adv_contact_civility: str | None = Field(None, pattern=r"^(M\.|Mme)$")
+    adv_contact_first_name: str | None = Field(None, max_length=100)
+    adv_contact_last_name: str | None = Field(None, max_length=100)
+    adv_contact_email: EmailStr | None = None
+    adv_contact_phone: str | None = Field(None, max_length=50)
+    # Contact facturation
+    billing_contact_same_as_representative: bool = False
+    billing_contact_civility: str | None = Field(None, pattern=r"^(M\.|Mme)$")
+    billing_contact_first_name: str | None = Field(None, max_length=100)
+    billing_contact_last_name: str | None = Field(None, max_length=100)
+    billing_contact_email: EmailStr | None = None
+    billing_contact_phone: str | None = Field(None, max_length=50)
