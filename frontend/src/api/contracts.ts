@@ -114,6 +114,13 @@ export const contractsApi = {
     return response.data;
   },
 
+  syncFromBoond: async (id: string): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      `/contract-requests/${id}/sync-from-boond`,
+    );
+    return response.data;
+  },
+
   cancel: async (id: string): Promise<ContractRequest> => {
     const response = await apiClient.delete<ContractRequest>(
       `/contract-requests/${id}`,

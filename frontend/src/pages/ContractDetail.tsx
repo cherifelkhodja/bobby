@@ -10,6 +10,7 @@ import {
   CheckCircle,
   AlertTriangle,
   Trash2,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -164,6 +165,18 @@ export default function ContractDetail() {
     },
   });
 
+  const syncMutation = useMutation({
+    mutationFn: () => contractsApi.syncFromBoond(id!),
+    onSuccess: () => {
+      toast.success('Données Boond synchronisées.');
+      setFormInitialized(false);
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
   const validateCommercialMutation = useMutation({
     mutationFn: () =>
       contractsApi.validateCommercial(id!, {
@@ -242,6 +255,14 @@ export default function ContractDetail() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => syncMutation.mutate()}
+              disabled={syncMutation.isPending}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+              {syncMutation.isPending ? 'Sync...' : 'Sync Boond'}
+            </Button>
             {actionConfig && (
               <Button
                 onClick={() => actionMutation.mutate(actionConfig.action)}

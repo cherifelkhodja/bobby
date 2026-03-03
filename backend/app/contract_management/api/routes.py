@@ -130,6 +130,107 @@ async def get_contract_request(
 
 
 @router.post(
+    "/{contract_request_id}/sync-from-boond",
+    response_model=ContractRequestResponse,
+    summary="Re-sync contract request data from BoondManager",
+)
+async def sync_from_boond(
+    contract_request_id: UUID,
+    auth: ContractAccessUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Re-fetch positioning and need data from Boond to update the CR.
+
+    Useful for CRs created before fields were added, or when Boond data
+    was incomplete at webhook time.
+    """
+    _user_id, role, email = auth
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+
+    if role == "commercial" and cr.commercial_email != email:
+        raise HTTPException(status_code=403, detail="Accès non autorisé.")
+
+    settings = get_settings()
+
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.infrastructure.boond.client import BoondClient
+
+    boond_client = BoondClient(settings)
+    crm = BoondCrmAdapter(boond_client)
+
+    # Fetch positioning data
+    positioning_data = await crm.get_positioning(cr.boond_positioning_id)
+    if not positioning_data:
+        raise HTTPException(
+            status_code=502,
+            detail="Impossible de récupérer les données du positionnement Boond.",
+        )
+
+    from datetime import date
+    from decimal import Decimal, InvalidOperation
+
+    def _parse_date(raw: object) -> date | None:
+        if raw and isinstance(raw, str):
+            try:
+                return date.fromisoformat(raw[:10])
+            except (ValueError, TypeError):
+                return None
+        if isinstance(raw, date):
+            return raw
+        return None
+
+    raw_daily_rate = positioning_data.get("daily_rate")
+    if raw_daily_rate:
+        try:
+            cr.daily_rate = Decimal(str(raw_daily_rate))
+        except (InvalidOperation, ValueError, TypeError):
+            pass
+
+    raw_start = positioning_data.get("start_date")
+    parsed_start = _parse_date(raw_start)
+    if parsed_start:
+        cr.start_date = parsed_start
+
+    raw_end = positioning_data.get("end_date")
+    parsed_end = _parse_date(raw_end)
+    if parsed_end:
+        cr.end_date = parsed_end
+
+    # Fetch need data
+    need_id = positioning_data.get("need_id") or cr.boond_need_id
+    if need_id:
+        need_data = await crm.get_need(need_id)
+        if need_data:
+            client_name = need_data.get("client_name")
+            if client_name:
+                cr.client_name = client_name
+            title = need_data.get("title")
+            if title:
+                cr.mission_title = title
+            description = need_data.get("description")
+            if description:
+                cr.mission_description = description
+            if not cr.boond_need_id and need_id:
+                cr.boond_need_id = need_id
+
+    saved = await cr_repo.save(cr)
+    await db.commit()
+
+    logger.info(
+        "contract_request_synced_from_boond",
+        cr_id=str(saved.id),
+        positioning_id=cr.boond_positioning_id,
+    )
+
+    return _cr_to_response(saved)
+
+
+@router.post(
     "/{contract_request_id}/validate-commercial",
     response_model=ContractRequestResponse,
     summary="Validate commercial information",
