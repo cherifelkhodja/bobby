@@ -849,62 +849,45 @@ async def test_sirene_connection(
     """
     import time
 
-    import httpx
-
-    configured = bool(settings.SIRENE_API_KEY)
+    configured = bool(settings.INSEE_CONSUMER_KEY and settings.INSEE_CONSUMER_SECRET)
 
     if not configured:
         return SireneTestResponse(
             success=False,
             configured=False,
             response_time_ms=0,
-            message="SIRENE_API_KEY non configurée",
+            message="INSEE_CONSUMER_KEY / INSEE_CONSUMER_SECRET non configurées",
         )
 
-    # Test with a known SIRET (INSEE itself: 12001401900424)
-    test_siret = "12001401900424"
-    url = f"{settings.SIRENE_API_URL}/siret/{test_siret}"
-    headers = {
-        "X-INSEE-Api-Key-Integration": settings.SIRENE_API_KEY,
-        "Accept": "application/json",
-    }
+    from app.third_party.infrastructure.adapters.insee_client import InseeClient
+
+    # Test with INSEE's own SIREN
+    test_siren = "120014019"
+    insee_client = InseeClient(
+        consumer_key=settings.INSEE_CONSUMER_KEY,
+        consumer_secret=settings.INSEE_CONSUMER_SECRET,
+    )
 
     start = time.time()
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url, headers=headers)
+        result = await insee_client.verify_siren(test_siren)
         elapsed = int((time.time() - start) * 1000)
 
-        if resp.status_code == 200:
+        if result is not None:
             return SireneTestResponse(
                 success=True,
                 configured=True,
                 response_time_ms=elapsed,
                 message=f"INSEE Sirene fonctionne ({elapsed}ms)",
             )
-        elif resp.status_code in (401, 403):
-            return SireneTestResponse(
-                success=False,
-                configured=True,
-                response_time_ms=elapsed,
-                message="Clé API INSEE invalide ou accès refusé",
-            )
         else:
             return SireneTestResponse(
                 success=False,
                 configured=True,
                 response_time_ms=elapsed,
-                message=f"Erreur INSEE: HTTP {resp.status_code}",
+                message="Échec: impossible d'obtenir un token ou SIREN introuvable",
             )
 
-    except httpx.TimeoutException:
-        elapsed = int((time.time() - start) * 1000)
-        return SireneTestResponse(
-            success=False,
-            configured=True,
-            response_time_ms=elapsed,
-            message="Timeout: l'API INSEE n'a pas répondu",
-        )
     except Exception as e:
         elapsed = int((time.time() - start) * 1000)
         return SireneTestResponse(
