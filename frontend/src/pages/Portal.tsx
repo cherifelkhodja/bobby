@@ -114,7 +114,6 @@ export default function Portal() {
       {isDocumentUpload && !portalInfo.third_party.siren && (
         <CompanyInfoForm
           token={token!}
-          thirdPartyType={portalInfo.third_party.type}
           onSuccess={() => queryClient.invalidateQueries({ queryKey: ['portal', token] })}
         />
       )}
@@ -173,19 +172,8 @@ export default function Portal() {
 const INPUT_CLS =
   'w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500';
 
-function CompanyInfoForm({
-  token,
-  thirdPartyType,
-  onSuccess,
-}: {
-  token: string;
-  thirdPartyType: string;
-  onSuccess: () => void;
-}) {
-  // sous_traitant is always a société; freelance must choose
-  const [entityCategory, setEntityCategory] = useState<'ei' | 'societe'>(
-    thirdPartyType === 'sous_traitant' ? 'societe' : 'ei',
-  );
+function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () => void }) {
+  const [entityCategory, setEntityCategory] = useState<'ei' | 'societe'>('ei');
   const [form, setForm] = useState({
     company_name: '',
     legal_form: '',
@@ -198,8 +186,6 @@ function CompanyInfoForm({
     representative_title: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const isFreelance = thirdPartyType === 'freelance';
 
   const isValid =
     /^\d{9}$/.test(form.siren) &&
@@ -258,36 +244,34 @@ function CompanyInfoForm({
           </div>
         </div>
 
-        {/* Entity category — only shown for freelance */}
-        {isFreelance && (
-          <div className="mb-5">
-            <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Structure juridique *
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {(
-                [
-                  { value: 'ei', label: 'Entreprise individuelle', sub: 'EI, Micro-entreprise' },
-                  { value: 'societe', label: 'Société', sub: 'SAS, SASU, EURL, SARL…' },
-                ] as const
-              ).map(({ value, label, sub }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setEntityCategory(value)}
-                  className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                    entityCategory === value
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sub}</p>
-                </button>
-              ))}
-            </div>
+        {/* Entity category */}
+        <div className="mb-5">
+          <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Structure juridique *
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {(
+              [
+                { value: 'ei', label: 'Entreprise individuelle', sub: 'EI, Micro-entreprise' },
+                { value: 'societe', label: 'Société', sub: 'SAS, SASU, EURL, SARL…' },
+              ] as const
+            ).map(({ value, label, sub }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setEntityCategory(value)}
+                className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                  entityCategory === value
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sub}</p>
+              </button>
+            ))}
           </div>
-        )}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
