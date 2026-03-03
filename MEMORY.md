@@ -161,6 +161,14 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-03 (fix sync Boond opportunités)
+- **fix(boond)**: Correction du bouton "Sync Boond" qui ne synchronisait aucune opportunité
+  - **Cause racine** : `BoondClient.get_opportunities()` et `get_opportunity()` passaient les items JSON:API bruts au `BoondOpportunityDTO`, mais les champs sont imbriqués dans `item["attributes"]` — `title` (requis) absent au top-level → ValidationError → toutes les opportunités silencieusement ignorées → 0 synchro
+  - **Fix** : Réécriture de `get_opportunities()` avec parsing correct du format JSON:API (attributes/relationships), pagination, extraction de `manager_boond_id` depuis les relationships
+  - **Fix** : Réécriture de `get_opportunity()` avec le même parsing JSON:API correct
+  - **Fix** : Passage de `manager_boond_id` dans `update_from_sync()` dans le use case de sync
+  - **Fichiers** : `backend/app/infrastructure/boond/client.py`, `backend/app/application/use_cases/admin/boond.py`
+
 ### 2026-03-03 (date de fin + intitulé mission + sync Boond sur demande de contrat)
 - **feat(contract-management)**: Ajout de `end_date` et `mission_title` à la demande de contrat
   - **Backend** : Nouveau champs sur entité, modèle SQLAlchemy, schémas Pydantic, ports, repository (save/to_entity/to_model)

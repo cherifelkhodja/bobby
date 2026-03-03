@@ -8,13 +8,9 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import Settings
 from app.domain.entities import Candidate, Opportunity
-from app.infrastructure.boond.dtos import (
-    BoondOpportunityDTO,
-)
 from app.infrastructure.boond.mappers import (
     BoondAdministrativeData,
     BoondCandidateContext,
-    map_boond_opportunity_to_domain,
     map_candidate_administrative_to_boond,
     map_candidate_to_boond,
 )
@@ -56,22 +52,72 @@ class BoondClient:
         wait=wait_exponential(multiplier=1, min=1, max=4),
     )
     async def get_opportunities(self) -> list[Opportunity]:
-        """Fetch opportunities from BoondManager."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        """Fetch all opportunities from BoondManager with pagination.
+
+        Parses JSON:API response format (attributes/relationships).
+        """
+        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
             logger.info("Fetching opportunities from BoondManager")
-            response = await client.get(
-                f"{self.base_url}/opportunities",
-                auth=self._auth,
-            )
-            response.raise_for_status()
 
-            data = response.json()
-            opportunities = []
+            all_items: list[dict] = []
+            managers_map: dict[str, str] = {}
 
-            for item in data.get("data", []):
+            page = 1
+            while True:
+                response = await client.get(
+                    f"{self.base_url}/opportunities",
+                    auth=self._auth,
+                    params={"page": page, "maxResults": 500},
+                )
+                response.raise_for_status()
+                data = response.json()
+
+                all_items.extend(data.get("data", []))
+
+                # Extract manager names from included data
+                for included in data.get("included", []):
+                    if included.get("type") == "resource":
+                        inc_id = str(included.get("id"))
+                        inc_attrs = included.get("attributes", {})
+                        first = inc_attrs.get("firstName", "")
+                        last = inc_attrs.get("lastName", "")
+                        managers_map[inc_id] = f"{first} {last}".strip()
+
+                meta = data.get("meta", {})
+                if page >= meta.get("totalPages", 1):
+                    break
+                page += 1
+
+            opportunities: list[Opportunity] = []
+            for item in all_items:
                 try:
-                    dto = BoondOpportunityDTO(**item)
-                    opportunities.append(map_boond_opportunity_to_domain(dto))
+                    attrs = item.get("attributes", {})
+                    relationships = item.get("relationships", {})
+
+                    # Get manager Boond ID from relationships
+                    main_mgr = relationships.get("mainManager", {}).get("data")
+                    manager_boond_id = str(main_mgr.get("id")) if main_mgr else None
+                    manager_name = (
+                        managers_map.get(manager_boond_id, "") if manager_boond_id else None
+                    )
+
+                    opportunities.append(
+                        Opportunity(
+                            external_id=str(item.get("id")),
+                            title=attrs.get("title", ""),
+                            reference=attrs.get("reference", ""),
+                            start_date=attrs.get("startDate"),
+                            end_date=attrs.get("endDate"),
+                            response_deadline=attrs.get("responseDeadline"),
+                            budget=attrs.get("averageDailyRate"),
+                            manager_name=manager_name,
+                            manager_email=attrs.get("managerEmail"),
+                            manager_boond_id=manager_boond_id,
+                            client_name=attrs.get("clientName"),
+                            description=attrs.get("description"),
+                            location=attrs.get("place"),
+                        )
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to parse opportunity {item.get('id')}: {e}")
 
@@ -83,7 +129,10 @@ class BoondClient:
         wait=wait_exponential(multiplier=1, min=1, max=4),
     )
     async def get_opportunity(self, external_id: str) -> Opportunity | None:
-        """Fetch single opportunity from BoondManager."""
+        """Fetch single opportunity from BoondManager.
+
+        Parses JSON:API response format (attributes/relationships).
+        """
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             logger.info(f"Fetching opportunity {external_id} from BoondManager")
             response = await client.get(
@@ -97,8 +146,39 @@ class BoondClient:
             response.raise_for_status()
             data = response.json()
 
-            dto = BoondOpportunityDTO(**data.get("data", {}))
-            return map_boond_opportunity_to_domain(dto)
+            item = data.get("data", {})
+            attrs = item.get("attributes", {})
+            relationships = item.get("relationships", {})
+
+            # Extract manager info from included data
+            managers_map: dict[str, str] = {}
+            for included in data.get("included", []):
+                if included.get("type") == "resource":
+                    inc_id = str(included.get("id"))
+                    inc_attrs = included.get("attributes", {})
+                    first = inc_attrs.get("firstName", "")
+                    last = inc_attrs.get("lastName", "")
+                    managers_map[inc_id] = f"{first} {last}".strip()
+
+            main_mgr = relationships.get("mainManager", {}).get("data")
+            manager_boond_id = str(main_mgr.get("id")) if main_mgr else None
+            manager_name = managers_map.get(manager_boond_id, "") if manager_boond_id else None
+
+            return Opportunity(
+                external_id=str(item.get("id")),
+                title=attrs.get("title", ""),
+                reference=attrs.get("reference", ""),
+                start_date=attrs.get("startDate"),
+                end_date=attrs.get("endDate"),
+                response_deadline=attrs.get("responseDeadline"),
+                budget=attrs.get("averageDailyRate"),
+                manager_name=manager_name,
+                manager_email=attrs.get("managerEmail"),
+                manager_boond_id=manager_boond_id,
+                client_name=attrs.get("clientName"),
+                description=attrs.get("description"),
+                location=attrs.get("place"),
+            )
 
     @retry(
         stop=stop_after_attempt(3),

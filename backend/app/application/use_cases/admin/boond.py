@@ -170,6 +170,7 @@ class SyncBoondOpportunitiesUseCase:
                         end_date=boond_opp.end_date,
                         budget=boond_opp.budget,
                         manager_name=boond_opp.manager_name,
+                        manager_boond_id=boond_opp.manager_boond_id,
                     )
                     await self._opportunity_repository.save(existing)
                 else:
