@@ -394,9 +394,11 @@ async def submit_company_info(
     tp.legal_form = body.legal_form
     tp.capital = body.capital
     tp.siren = body.siren
-    tp.rcs_city = body.rcs_city
-    tp.rcs_number = body.rcs_number
-    tp.head_office_address = body.head_office_address
+    tp.rcs_city = body.head_office_city
+    tp.rcs_number = None
+    tp.head_office_address = (
+        f"{body.head_office_street}, {body.head_office_postal_code} {body.head_office_city}"
+    )
     tp.representative_name = body.representative_name
     tp.representative_title = body.representative_title
 

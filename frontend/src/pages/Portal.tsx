@@ -179,9 +179,9 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
     legal_form: '',
     capital: '',
     siren: '',
-    rcs_city: '',
-    rcs_number: '',
-    head_office_address: '',
+    head_office_street: '',
+    head_office_postal_code: '',
+    head_office_city: '',
     representative_name: '',
     representative_title: '',
   });
@@ -191,9 +191,9 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
     /^\d{9}$/.test(form.siren) &&
     form.company_name !== '' &&
     form.legal_form !== '' &&
-    form.rcs_city !== '' &&
-    form.rcs_number !== '' &&
-    form.head_office_address !== '' &&
+    form.head_office_street !== '' &&
+    /^\d{5}$/.test(form.head_office_postal_code) &&
+    form.head_office_city !== '' &&
     form.representative_name !== '' &&
     form.representative_title !== '';
 
@@ -207,9 +207,9 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
         legal_form: form.legal_form,
         capital: form.capital || undefined,
         siren: form.siren,
-        rcs_city: form.rcs_city,
-        rcs_number: form.rcs_number,
-        head_office_address: form.head_office_address,
+        head_office_street: form.head_office_street,
+        head_office_postal_code: form.head_office_postal_code,
+        head_office_city: form.head_office_city,
         representative_name: form.representative_name,
         representative_title: form.representative_title,
       });
@@ -314,23 +314,32 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
               <input type="text" {...field('capital')} placeholder="Ex : 10 000 €" className={INPUT_CLS} />
             </div>
           )}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Ville RCS *
-            </label>
-            <input type="text" {...field('rcs_city')} className={INPUT_CLS} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Numéro RCS *
-            </label>
-            <input type="text" {...field('rcs_number')} className={INPUT_CLS} />
-          </div>
           <div className="md:col-span-2">
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Adresse du siège social *
+              Numéro et voie *
             </label>
-            <input type="text" {...field('head_office_address')} className={INPUT_CLS} />
+            <input type="text" {...field('head_office_street')} placeholder="Ex : 12 rue de la Paix" className={INPUT_CLS} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Code postal *
+            </label>
+            <input
+              type="text"
+              maxLength={5}
+              {...field('head_office_postal_code')}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, head_office_postal_code: e.target.value.replace(/\D/g, '') }))
+              }
+              placeholder="75001"
+              className={INPUT_CLS}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Ville *
+            </label>
+            <input type="text" {...field('head_office_city')} className={INPUT_CLS} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">

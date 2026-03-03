@@ -56,9 +56,9 @@ export const portalApi = {
       legal_form: string;
       capital?: string;
       siren: string;
-      rcs_city: string;
-      rcs_number: string;
-      head_office_address: string;
+      head_office_street: string;
+      head_office_postal_code: string;
+      head_office_city: string;
       representative_name: string;
       representative_title: string;
     },

@@ -176,8 +176,8 @@ class CompanyInfoRequest(BaseModel):
     legal_form: str = Field(..., max_length=100)
     capital: str | None = Field(None, max_length=50)
     siren: str = Field(..., min_length=9, max_length=9, pattern=r"^\d{9}$")
-    rcs_city: str = Field(..., max_length=100)
-    rcs_number: str = Field(..., max_length=50)
-    head_office_address: str
+    head_office_street: str = Field(..., max_length=255)
+    head_office_postal_code: str = Field(..., min_length=5, max_length=5, pattern=r"^\d{5}$")
+    head_office_city: str = Field(..., max_length=100)
     representative_name: str = Field(..., max_length=255)
     representative_title: str = Field(..., max_length=255)
