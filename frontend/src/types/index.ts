@@ -762,6 +762,7 @@ export interface ContractRequest {
   mission_city: string | null;
   commercial_email: string;
   commercial_name: string | null;
+  contractualization_contact_email: string | null;
   third_party_id: string | null;
   compliance_override: boolean;
   created_at: string;

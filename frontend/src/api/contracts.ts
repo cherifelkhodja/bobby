@@ -133,6 +133,29 @@ export const contractsApi = {
     return response.data;
   },
 
+  initiateDocumentCollection: async (
+    id: string,
+    data: {
+      siren: string;
+      company_name: string;
+      legal_form: string;
+      siret: string;
+      rcs_city: string;
+      rcs_number: string;
+      head_office_address: string;
+      representative_name: string;
+      representative_title: string;
+      capital?: string;
+      boond_provider_id?: number;
+    },
+  ): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      `/contract-requests/${id}/initiate-document-collection`,
+      data,
+    );
+    return response.data;
+  },
+
   listContracts: async (id: string): Promise<Contract[]> => {
     const response = await apiClient.get<Contract[]>(
       `/contract-requests/${id}/contracts`,

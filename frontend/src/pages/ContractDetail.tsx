@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   FileSignature,
+  FileText,
+  Mail,
   Send,
   PenTool,
   Upload,
@@ -65,6 +67,20 @@ export default function ContractDetail() {
   const [overrideReason, setOverrideReason] = useState('');
   const [showOverride, setShowOverride] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+
+  const [docCollectionForm, setDocCollectionForm] = useState({
+    siren: '',
+    company_name: '',
+    legal_form: '',
+    siret: '',
+    rcs_city: '',
+    rcs_number: '',
+    head_office_address: '',
+    representative_name: '',
+    representative_title: '',
+    capital: '',
+  });
+  const [showResendForm, setShowResendForm] = useState(false);
 
   // Commercial validation form state — pre-filled from Boond data
   const [validationForm, setValidationForm] = useState({
@@ -213,12 +229,48 @@ export default function ContractDetail() {
     },
   });
 
+  const initiateDocCollectionMutation = useMutation({
+    mutationFn: () =>
+      contractsApi.initiateDocumentCollection(id!, {
+        siren: docCollectionForm.siren,
+        company_name: docCollectionForm.company_name,
+        legal_form: docCollectionForm.legal_form,
+        siret: docCollectionForm.siret,
+        rcs_city: docCollectionForm.rcs_city,
+        rcs_number: docCollectionForm.rcs_number,
+        head_office_address: docCollectionForm.head_office_address,
+        representative_name: docCollectionForm.representative_name,
+        representative_title: docCollectionForm.representative_title,
+        capital: docCollectionForm.capital || undefined,
+      }),
+    onSuccess: () => {
+      toast.success('Email de collecte envoyé au tiers.');
+      setShowResendForm(false);
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
   const isValidationFormValid =
     validationForm.third_party_type !== '' &&
     validationForm.daily_rate !== '' &&
     parseFloat(validationForm.daily_rate) > 0 &&
     validationForm.start_date !== '' &&
     validationForm.contact_email !== '';
+
+  const isDocCollectionFormValid =
+    /^\d{9}$/.test(docCollectionForm.siren) &&
+    /^\d{14}$/.test(docCollectionForm.siret) &&
+    docCollectionForm.company_name !== '' &&
+    docCollectionForm.legal_form !== '' &&
+    docCollectionForm.rcs_city !== '' &&
+    docCollectionForm.rcs_number !== '' &&
+    docCollectionForm.head_office_address !== '' &&
+    docCollectionForm.representative_name !== '' &&
+    docCollectionForm.representative_title !== '';
 
   const canCancel = cr && isAdv && cr.status !== 'cancelled' && cr.status !== 'signed' && cr.status !== 'archived' && cr.status !== 'redirected_payfit';
 
@@ -522,6 +574,269 @@ export default function ContractDetail() {
               <CheckCircle className="h-4 w-4 mr-2" />
               Valider
             </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Document collection form (ADV) — initiation depuis commercial_validated */}
+      {isAdv && cr.status === 'commercial_validated' && (
+        <Card className="mb-6 border-blue-200 dark:border-blue-800">
+          <div className="flex items-center gap-2 mb-4">
+            <FileText className="h-4 w-4 text-blue-500" />
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+              Collecte des documents du tiers
+            </h3>
+          </div>
+          {cr.contractualization_contact_email && (
+            <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <Mail className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                Le lien portail sera envoyé à{' '}
+                <span className="font-medium">{cr.contractualization_contact_email}</span>
+              </p>
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                SIREN *
+              </label>
+              <input
+                type="text"
+                maxLength={9}
+                value={docCollectionForm.siren}
+                onChange={(e) =>
+                  setDocCollectionForm((f) => ({ ...f, siren: e.target.value.replace(/\D/g, '') }))
+                }
+                placeholder="9 chiffres"
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                SIRET *
+              </label>
+              <input
+                type="text"
+                maxLength={14}
+                value={docCollectionForm.siret}
+                onChange={(e) =>
+                  setDocCollectionForm((f) => ({ ...f, siret: e.target.value.replace(/\D/g, '') }))
+                }
+                placeholder="14 chiffres"
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Raison sociale *
+              </label>
+              <input
+                type="text"
+                value={docCollectionForm.company_name}
+                onChange={(e) =>
+                  setDocCollectionForm((f) => ({ ...f, company_name: e.target.value }))
+                }
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Forme juridique *
+              </label>
+              <input
+                type="text"
+                value={docCollectionForm.legal_form}
+                onChange={(e) =>
+                  setDocCollectionForm((f) => ({ ...f, legal_form: e.target.value }))
+                }
+                placeholder="SAS, SASU, EURL..."
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Ville RCS *
+              </label>
+              <input
+                type="text"
+                value={docCollectionForm.rcs_city}
+                onChange={(e) =>
+                  setDocCollectionForm((f) => ({ ...f, rcs_city: e.target.value }))
+                }
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Numéro RCS *
+              </label>
+              <input
+                type="text"
+                value={docCollectionForm.rcs_number}
+                onChange={(e) =>
+                  setDocCollectionForm((f) => ({ ...f, rcs_number: e.target.value }))
+                }
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Adresse du siège social *
+              </label>
+              <input
+                type="text"
+                value={docCollectionForm.head_office_address}
+                onChange={(e) =>
+                  setDocCollectionForm((f) => ({ ...f, head_office_address: e.target.value }))
+                }
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Représentant légal *
+              </label>
+              <input
+                type="text"
+                value={docCollectionForm.representative_name}
+                onChange={(e) =>
+                  setDocCollectionForm((f) => ({ ...f, representative_name: e.target.value }))
+                }
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Qualité du représentant *
+              </label>
+              <input
+                type="text"
+                value={docCollectionForm.representative_title}
+                onChange={(e) =>
+                  setDocCollectionForm((f) => ({ ...f, representative_title: e.target.value }))
+                }
+                placeholder="Président, Gérant..."
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Capital social
+              </label>
+              <input
+                type="text"
+                value={docCollectionForm.capital}
+                onChange={(e) =>
+                  setDocCollectionForm((f) => ({ ...f, capital: e.target.value }))
+                }
+                placeholder="Ex : 10 000 €"
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button
+              onClick={() => initiateDocCollectionMutation.mutate()}
+              disabled={!isDocCollectionFormValid || initiateDocCollectionMutation.isPending}
+              isLoading={initiateDocCollectionMutation.isPending}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Lancer la collecte de documents
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Re-envoi lien collecte (ADV) — depuis collecting_documents */}
+      {isAdv && cr.status === 'collecting_documents' && (
+        <Card className="mb-6 border-indigo-200 dark:border-indigo-800">
+          <div className="flex items-start gap-3">
+            <FileText className="h-5 w-5 text-indigo-500 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">
+                Collecte de documents en cours
+              </h3>
+              {cr.contractualization_contact_email && (
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 flex items-center gap-1">
+                  <Mail className="h-3 w-3 flex-shrink-0" />
+                  Lien envoyé à{' '}
+                  <span className="font-medium">{cr.contractualization_contact_email}</span>
+                </p>
+              )}
+              {!showResendForm ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => setShowResendForm(true)}
+                >
+                  Renvoyer le lien de collecte
+                </Button>
+              ) : (
+                <div className="mt-4 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">SIREN *</label>
+                      <input type="text" maxLength={9} value={docCollectionForm.siren} onChange={(e) => setDocCollectionForm((f) => ({ ...f, siren: e.target.value.replace(/\D/g, '') }))} placeholder="9 chiffres" className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">SIRET *</label>
+                      <input type="text" maxLength={14} value={docCollectionForm.siret} onChange={(e) => setDocCollectionForm((f) => ({ ...f, siret: e.target.value.replace(/\D/g, '') }))} placeholder="14 chiffres" className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Raison sociale *</label>
+                      <input type="text" value={docCollectionForm.company_name} onChange={(e) => setDocCollectionForm((f) => ({ ...f, company_name: e.target.value }))} className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Forme juridique *</label>
+                      <input type="text" value={docCollectionForm.legal_form} onChange={(e) => setDocCollectionForm((f) => ({ ...f, legal_form: e.target.value }))} placeholder="SAS, SASU, EURL..." className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Ville RCS *</label>
+                      <input type="text" value={docCollectionForm.rcs_city} onChange={(e) => setDocCollectionForm((f) => ({ ...f, rcs_city: e.target.value }))} className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Numéro RCS *</label>
+                      <input type="text" value={docCollectionForm.rcs_number} onChange={(e) => setDocCollectionForm((f) => ({ ...f, rcs_number: e.target.value }))} className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Adresse du siège social *</label>
+                      <input type="text" value={docCollectionForm.head_office_address} onChange={(e) => setDocCollectionForm((f) => ({ ...f, head_office_address: e.target.value }))} className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Représentant légal *</label>
+                      <input type="text" value={docCollectionForm.representative_name} onChange={(e) => setDocCollectionForm((f) => ({ ...f, representative_name: e.target.value }))} className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Qualité du représentant *</label>
+                      <input type="text" value={docCollectionForm.representative_title} onChange={(e) => setDocCollectionForm((f) => ({ ...f, representative_title: e.target.value }))} placeholder="Président, Gérant..." className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Capital social</label>
+                      <input type="text" value={docCollectionForm.capital} onChange={(e) => setDocCollectionForm((f) => ({ ...f, capital: e.target.value }))} placeholder="Ex : 10 000 €" className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => initiateDocCollectionMutation.mutate()}
+                      disabled={!isDocCollectionFormValid || initiateDocCollectionMutation.isPending}
+                      isLoading={initiateDocCollectionMutation.isPending}
+                    >
+                      Renvoyer
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowResendForm(false)}
+                    >
+                      Annuler
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </Card>
       )}
