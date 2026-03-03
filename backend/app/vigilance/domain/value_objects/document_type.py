@@ -21,12 +21,12 @@ class DocumentType(str, Enum):
     def display_name(self) -> str:
         """Return a human-readable label for this document type."""
         labels = {
-            "kbis": "Extrait Kbis",
-            "extrait_insee": "Extrait INSEE",
+            "kbis": "Extrait Kbis (≤ 3 mois)",
+            "extrait_insee": "Avis de situation SIRENE (≤ 3 mois)",
             "attestation_urssaf": "Attestation URSSAF",
-            "attestation_fiscale": "Attestation fiscale",
-            "attestation_assurance_rc_pro": "Attestation RC Pro",
-            "attestation_vigilance": "Attestation de vigilance",
+            "attestation_fiscale": "Attestation de régularité fiscale (≤ 6 mois)",
+            "attestation_assurance_rc_pro": "Attestation RC Pro (en cours de validité)",
+            "attestation_vigilance": "Attestation de vigilance URSSAF (≤ 6 mois)",
             "certificat_regularite_fiscale": "Certificat de régularité fiscale",
             "rib": "RIB",
             "cni_representant": "CNI du représentant",

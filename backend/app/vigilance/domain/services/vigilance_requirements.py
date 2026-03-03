@@ -7,38 +7,23 @@ from app.vigilance.domain.value_objects.document_type import DocumentType
 # Each entry defines: document_type, validity_months (None = no expiry),
 # and whether it is mandatory.
 VIGILANCE_REQUIREMENTS: dict[ThirdPartyType, list[dict]] = {
+    # Entreprise Individuelle / Micro-entreprise
     ThirdPartyType.FREELANCE: [
-        {"type": DocumentType.KBIS, "validity_months": 3, "mandatory": True},
-        {"type": DocumentType.ATTESTATION_URSSAF, "validity_months": 6, "mandatory": True},
-        {"type": DocumentType.ATTESTATION_FISCALE, "validity_months": 12, "mandatory": True},
-        {
-            "type": DocumentType.ATTESTATION_ASSURANCE_RC_PRO,
-            "validity_months": 12,
-            "mandatory": True,
-        },
+        {"type": DocumentType.EXTRAIT_INSEE, "validity_months": 3, "mandatory": True},
         {"type": DocumentType.ATTESTATION_VIGILANCE, "validity_months": 6, "mandatory": True},
+        {"type": DocumentType.ATTESTATION_FISCALE, "validity_months": 6, "mandatory": True},
+        {"type": DocumentType.ATTESTATION_ASSURANCE_RC_PRO, "validity_months": None, "mandatory": True},
         {"type": DocumentType.RIB, "validity_months": None, "mandatory": True},
-        {"type": DocumentType.CNI_REPRESENTANT, "validity_months": None, "mandatory": True},
     ],
+    # Société (SAS, SASU, SARL, EURL, SA, etc.)
     ThirdPartyType.SOUS_TRAITANT: [
         {"type": DocumentType.KBIS, "validity_months": 3, "mandatory": True},
-        {"type": DocumentType.ATTESTATION_URSSAF, "validity_months": 6, "mandatory": True},
-        {"type": DocumentType.ATTESTATION_FISCALE, "validity_months": 12, "mandatory": True},
-        {
-            "type": DocumentType.ATTESTATION_ASSURANCE_RC_PRO,
-            "validity_months": 12,
-            "mandatory": True,
-        },
         {"type": DocumentType.ATTESTATION_VIGILANCE, "validity_months": 6, "mandatory": True},
-        {
-            "type": DocumentType.CERTIFICAT_REGULARITE_FISCALE,
-            "validity_months": 12,
-            "mandatory": False,
-        },
+        {"type": DocumentType.ATTESTATION_FISCALE, "validity_months": 6, "mandatory": True},
+        {"type": DocumentType.ATTESTATION_ASSURANCE_RC_PRO, "validity_months": None, "mandatory": True},
         {"type": DocumentType.RIB, "validity_months": None, "mandatory": True},
-        {"type": DocumentType.CNI_REPRESENTANT, "validity_months": None, "mandatory": True},
-        {"type": DocumentType.LISTE_SALARIES_ETRANGERS, "validity_months": 6, "mandatory": False},
     ],
+    # Salarié porté — pas de collecte documentaire requise
     ThirdPartyType.SALARIE: [],
 }
 
