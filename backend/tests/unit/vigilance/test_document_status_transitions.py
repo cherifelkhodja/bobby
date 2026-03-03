@@ -1,6 +1,5 @@
 """Tests for DocumentStatus state machine transitions."""
 
-import pytest
 
 from app.vigilance.domain.value_objects.document_status import DocumentStatus
 

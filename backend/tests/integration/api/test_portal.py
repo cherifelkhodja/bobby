@@ -11,31 +11,29 @@ from app.contract_management.infrastructure.models import (
     ContractModel,
     ContractRequestModel,
 )
-from app.infrastructure.database.models import UserModel
 from app.third_party.infrastructure.models import MagicLinkModel, ThirdPartyModel
 from app.vigilance.infrastructure.models import VigilanceDocumentModel
-
 
 # ── Helpers ──────────────────────────────────────────────────────
 
 
 async def _create_third_party(db: AsyncSession, **overrides) -> ThirdPartyModel:
     """Insert a third party into the test DB."""
-    defaults = dict(
-        id=uuid4(),
-        type="freelance",
-        company_name="Portal Test SARL",
-        legal_form="SARL",
-        siren=f"{uuid4().int % 999999999:09d}",
-        siret=f"{uuid4().int % 99999999999999:014d}",
-        rcs_city="Lyon",
-        rcs_number="987 654 321",
-        head_office_address="10 rue du Test, 69001 Lyon",
-        representative_name="Marie Martin",
-        representative_title="Gérante",
-        contact_email="portal@test.fr",
-        compliance_status="pending",
-    )
+    defaults = {
+        "id": uuid4(),
+        "type": "freelance",
+        "company_name": "Portal Test SARL",
+        "legal_form": "SARL",
+        "siren": f"{uuid4().int % 999999999:09d}",
+        "siret": f"{uuid4().int % 99999999999999:014d}",
+        "rcs_city": "Lyon",
+        "rcs_number": "987 654 321",
+        "head_office_address": "10 rue du Test, 69001 Lyon",
+        "representative_name": "Marie Martin",
+        "representative_title": "Gérante",
+        "contact_email": "portal@test.fr",
+        "compliance_status": "pending",
+    }
     defaults.update(overrides)
     tp = ThirdPartyModel(**defaults)
     db.add(tp)
@@ -51,15 +49,15 @@ async def _create_magic_link(
     **overrides,
 ) -> MagicLinkModel:
     """Insert a magic link into the test DB."""
-    defaults = dict(
-        id=uuid4(),
-        token=f"test-token-{uuid4().hex[:16]}",
-        third_party_id=third_party_id,
-        purpose=purpose,
-        email_sent_to="portal@test.fr",
-        expires_at=datetime.utcnow() + timedelta(days=7),
-        is_revoked=False,
-    )
+    defaults = {
+        "id": uuid4(),
+        "token": f"test-token-{uuid4().hex[:16]}",
+        "third_party_id": third_party_id,
+        "purpose": purpose,
+        "email_sent_to": "portal@test.fr",
+        "expires_at": datetime.utcnow() + timedelta(days=7),
+        "is_revoked": False,
+    }
     defaults.update(overrides)
     ml = MagicLinkModel(**defaults)
     db.add(ml)
@@ -72,13 +70,13 @@ async def _create_contract_request(
     db: AsyncSession, **overrides
 ) -> ContractRequestModel:
     """Insert a contract request into the test DB."""
-    defaults = dict(
-        id=uuid4(),
-        reference=f"CR-{uuid4().hex[:6].upper()}",
-        boond_positioning_id=2000 + int(uuid4().int % 9999),
-        status="draft_sent_to_partner",
-        commercial_email="commercial@example.com",
-    )
+    defaults = {
+        "id": uuid4(),
+        "reference": f"CR-{uuid4().hex[:6].upper()}",
+        "boond_positioning_id": 2000 + int(uuid4().int % 9999),
+        "status": "draft_sent_to_partner",
+        "commercial_email": "commercial@example.com",
+    }
     defaults.update(overrides)
     cr = ContractRequestModel(**defaults)
     db.add(cr)
@@ -91,11 +89,11 @@ async def _create_document(
     db: AsyncSession, **overrides
 ) -> VigilanceDocumentModel:
     """Insert a vigilance document into the test DB."""
-    defaults = dict(
-        id=uuid4(),
-        document_type="kbis",
-        status="requested",
-    )
+    defaults = {
+        "id": uuid4(),
+        "document_type": "kbis",
+        "status": "requested",
+    }
     defaults.update(overrides)
     doc = VigilanceDocumentModel(**defaults)
     db.add(doc)
@@ -106,12 +104,12 @@ async def _create_document(
 
 async def _create_contract(db: AsyncSession, **overrides) -> ContractModel:
     """Insert a contract into the test DB."""
-    defaults = dict(
-        id=uuid4(),
-        reference=f"C-{uuid4().hex[:6].upper()}",
-        version=1,
-        s3_key_draft="contracts/draft/test.docx",
-    )
+    defaults = {
+        "id": uuid4(),
+        "reference": f"C-{uuid4().hex[:6].upper()}",
+        "version": 1,
+        "s3_key_draft": "contracts/draft/test.docx",
+    }
     defaults.update(overrides)
     c = ContractModel(**defaults)
     db.add(c)

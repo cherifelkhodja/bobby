@@ -2,8 +2,6 @@
 
 from uuid import uuid4
 
-import pytest
-
 from app.third_party.domain.value_objects.compliance_status import ComplianceStatus
 from app.third_party.domain.value_objects.third_party_type import ThirdPartyType
 from app.vigilance.domain.entities.vigilance_document import VigilanceDocument

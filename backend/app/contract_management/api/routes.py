@@ -410,16 +410,15 @@ async def send_draft_to_partner(
     db: AsyncSession = Depends(get_db),
 ):
     """Send the contract draft to the partner via magic link. ADV/admin only."""
+    from app.contract_management.application.use_cases.send_draft_to_partner import (
+        SendDraftToPartnerUseCase,
+    )
     from app.infrastructure.email.sender import EmailService
     from app.third_party.application.use_cases.generate_magic_link import (
         GenerateMagicLinkUseCase,
     )
     from app.third_party.infrastructure.adapters.postgres_magic_link_repo import (
         MagicLinkRepository,
-    )
-
-    from app.contract_management.application.use_cases.send_draft_to_partner import (
-        SendDraftToPartnerUseCase,
     )
 
     settings = get_settings()

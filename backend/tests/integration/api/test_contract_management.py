@@ -1,7 +1,5 @@
 """Contract management API integration tests."""
 
-from datetime import datetime
-from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -11,32 +9,30 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.contract_management.infrastructure.models import (
     ContractModel,
     ContractRequestModel,
-    WebhookEventModel,
 )
 from app.infrastructure.database.models import UserModel
 from app.third_party.infrastructure.models import ThirdPartyModel
-
 
 # ── Helpers ──────────────────────────────────────────────────────
 
 
 async def _create_third_party(db: AsyncSession, **overrides) -> ThirdPartyModel:
     """Insert a third party into the test DB."""
-    defaults = dict(
-        id=uuid4(),
-        type="freelance",
-        company_name="Acme SARL",
-        legal_form="SARL",
-        siren="123456789",
-        siret="12345678900010",
-        rcs_city="Paris",
-        rcs_number="123 456 789",
-        head_office_address="1 rue de la Paix, 75001 Paris",
-        representative_name="Jean Dupont",
-        representative_title="Gérant",
-        contact_email="contact@acme.fr",
-        compliance_status="pending",
-    )
+    defaults = {
+        "id": uuid4(),
+        "type": "freelance",
+        "company_name": "Acme SARL",
+        "legal_form": "SARL",
+        "siren": "123456789",
+        "siret": "12345678900010",
+        "rcs_city": "Paris",
+        "rcs_number": "123 456 789",
+        "head_office_address": "1 rue de la Paix, 75001 Paris",
+        "representative_name": "Jean Dupont",
+        "representative_title": "Gérant",
+        "contact_email": "contact@acme.fr",
+        "compliance_status": "pending",
+    }
     defaults.update(overrides)
     tp = ThirdPartyModel(**defaults)
     db.add(tp)
@@ -49,13 +45,13 @@ async def _create_contract_request(
     db: AsyncSession, **overrides
 ) -> ContractRequestModel:
     """Insert a contract request into the test DB."""
-    defaults = dict(
-        id=uuid4(),
-        reference=f"CR-{uuid4().hex[:6].upper()}",
-        boond_positioning_id=1000 + int(uuid4().int % 9999),
-        status="pending_commercial_validation",
-        commercial_email="commercial@example.com",
-    )
+    defaults = {
+        "id": uuid4(),
+        "reference": f"CR-{uuid4().hex[:6].upper()}",
+        "boond_positioning_id": 1000 + int(uuid4().int % 9999),
+        "status": "pending_commercial_validation",
+        "commercial_email": "commercial@example.com",
+    }
     defaults.update(overrides)
     cr = ContractRequestModel(**defaults)
     db.add(cr)
@@ -66,12 +62,12 @@ async def _create_contract_request(
 
 async def _create_contract(db: AsyncSession, **overrides) -> ContractModel:
     """Insert a contract into the test DB."""
-    defaults = dict(
-        id=uuid4(),
-        reference=f"C-{uuid4().hex[:6].upper()}",
-        version=1,
-        s3_key_draft="contracts/draft/test.docx",
-    )
+    defaults = {
+        "id": uuid4(),
+        "reference": f"C-{uuid4().hex[:6].upper()}",
+        "version": 1,
+        "s3_key_draft": "contracts/draft/test.docx",
+    }
     defaults.update(overrides)
     c = ContractModel(**defaults)
     db.add(c)

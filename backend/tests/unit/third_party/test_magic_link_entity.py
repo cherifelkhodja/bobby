@@ -2,8 +2,6 @@
 
 from datetime import datetime, timedelta
 
-import pytest
-
 from app.third_party.domain.entities.magic_link import MagicLink
 from app.third_party.domain.value_objects.magic_link_purpose import MagicLinkPurpose
 

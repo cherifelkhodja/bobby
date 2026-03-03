@@ -15,9 +15,10 @@ Creates 6 tables for the 3 new bounded contexts:
 Also adds RLS policies on vig_documents and cm_contract_requests.
 """
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy.dialects.postgresql import JSON, UUID
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "025_contract_vigil"

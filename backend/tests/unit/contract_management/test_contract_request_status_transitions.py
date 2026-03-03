@@ -1,6 +1,5 @@
 """Tests for ContractRequestStatus state machine."""
 
-import pytest
 
 from app.contract_management.domain.value_objects.contract_request_status import (
     ContractRequestStatus,

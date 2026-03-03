@@ -11,7 +11,6 @@ from app.infrastructure.database.models import UserModel
 from app.third_party.infrastructure.models import ThirdPartyModel
 from app.vigilance.infrastructure.models import VigilanceDocumentModel
 
-
 # ── Helpers ──────────────────────────────────────────────────────
 
 
@@ -19,21 +18,21 @@ async def _create_third_party(
     db: AsyncSession, **overrides
 ) -> ThirdPartyModel:
     """Insert a third party into the test DB."""
-    defaults = dict(
-        id=uuid4(),
-        type="freelance",
-        company_name="Acme SARL",
-        legal_form="SARL",
-        siren=f"{uuid4().int % 999999999:09d}",
-        siret=f"{uuid4().int % 99999999999999:014d}",
-        rcs_city="Paris",
-        rcs_number="123 456 789",
-        head_office_address="1 rue de la Paix, 75001 Paris",
-        representative_name="Jean Dupont",
-        representative_title="Gérant",
-        contact_email="contact@acme.fr",
-        compliance_status="pending",
-    )
+    defaults = {
+        "id": uuid4(),
+        "type": "freelance",
+        "company_name": "Acme SARL",
+        "legal_form": "SARL",
+        "siren": f"{uuid4().int % 999999999:09d}",
+        "siret": f"{uuid4().int % 99999999999999:014d}",
+        "rcs_city": "Paris",
+        "rcs_number": "123 456 789",
+        "head_office_address": "1 rue de la Paix, 75001 Paris",
+        "representative_name": "Jean Dupont",
+        "representative_title": "Gérant",
+        "contact_email": "contact@acme.fr",
+        "compliance_status": "pending",
+    }
     defaults.update(overrides)
     tp = ThirdPartyModel(**defaults)
     db.add(tp)
@@ -46,11 +45,11 @@ async def _create_document(
     db: AsyncSession, **overrides
 ) -> VigilanceDocumentModel:
     """Insert a vigilance document into the test DB."""
-    defaults = dict(
-        id=uuid4(),
-        document_type="kbis",
-        status="requested",
-    )
+    defaults = {
+        "id": uuid4(),
+        "document_type": "kbis",
+        "status": "requested",
+    }
     defaults.update(overrides)
     doc = VigilanceDocumentModel(**defaults)
     db.add(doc)

@@ -1,6 +1,6 @@
 """Unit tests for ServiceFactory wiring of new bounded contexts."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -283,7 +283,7 @@ class TestRepositoryIndependence:
             factory.contract_repository,
             factory.webhook_event_repository,
         ]
-        assert len(set(id(r) for r in repos)) == len(repos)
+        assert len({id(r) for r in repos}) == len(repos)
 
     def test_new_repos_independent_from_existing(self, factory):
         """Given a factory, new repos don't interfere with existing ones."""
