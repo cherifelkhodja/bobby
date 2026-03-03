@@ -249,11 +249,11 @@ function ContactSection({
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">E-mail *</label>
-            <input type="email" value={contact.email} onChange={set('email')} className={INPUT_CLS} />
+            <input type="email" value={contact.email} onChange={set('email')} placeholder="Ex : jean.dupont@entreprise.fr" className={INPUT_CLS} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone</label>
-            <input type="tel" value={contact.phone} onChange={set('phone')} className={INPUT_CLS} />
+            <input type="tel" value={contact.phone} onChange={set('phone')} placeholder="Ex : +33 6 12 34 56 78" className={INPUT_CLS} />
           </div>
         </div>
       )}
@@ -437,7 +437,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
                 maxLength={14}
                 value={form.siret}
                 onChange={(e) => handleSiretChange(e.target.value)}
-                placeholder="14 chiffres"
+                placeholder="Ex : 44035388200012"
                 className={INPUT_CLS}
               />
               {siretLoading && (
@@ -452,7 +452,12 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               {entityCategory === 'ei' ? 'Nom commercial / Enseigne *' : 'Raison sociale *'}
             </label>
-            <input type="text" {...field('company_name')} className={INPUT_CLS} />
+            <input
+              type="text"
+              {...field('company_name')}
+              placeholder={entityCategory === 'ei' ? 'Ex : Jean Dupont Consulting' : 'Ex : Acme SAS'}
+              className={INPUT_CLS}
+            />
           </div>
           {entityCategory === 'societe' && (
             <div>
@@ -462,7 +467,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
               <input
                 type="text"
                 {...field('rcs_city')}
-                placeholder="Ex : Paris, Lyon…"
+                placeholder="Ex : Paris"
                 className={INPUT_CLS}
               />
             </div>
@@ -474,7 +479,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
             <input
               type="text"
               {...field('legal_form')}
-              placeholder={entityCategory === 'ei' ? 'EI, Micro-entreprise…' : 'SAS, SASU, EURL…'}
+              placeholder={entityCategory === 'ei' ? 'Ex : EI' : 'Ex : SAS'}
               className={INPUT_CLS}
             />
           </div>
@@ -483,7 +488,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Capital social
               </label>
-              <input type="text" {...field('capital')} placeholder="Ex : 10 000 €" className={INPUT_CLS} />
+              <input type="text" {...field('capital')} placeholder="Ex : 10 000" className={INPUT_CLS} />
             </div>
           )}
           <div className="md:col-span-2">
@@ -503,7 +508,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
               onChange={(e) =>
                 setForm((f) => ({ ...f, head_office_postal_code: e.target.value.replace(/\D/g, '') }))
               }
-              placeholder="75001"
+              placeholder="Ex : 75001"
               className={INPUT_CLS}
             />
           </div>
@@ -511,7 +516,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Ville *
             </label>
-            <input type="text" {...field('head_office_city')} className={INPUT_CLS} />
+            <input type="text" {...field('head_office_city')} placeholder="Ex : Paris" className={INPUT_CLS} />
           </div>
         </div>
 
@@ -547,6 +552,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
                 type="email"
                 value={signatory.email}
                 onChange={(e) => setSignatory((c) => ({ ...c, email: e.target.value }))}
+                placeholder="Ex : jean.dupont@entreprise.fr"
                 className={INPUT_CLS}
               />
             </div>
@@ -556,6 +562,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
                 type="tel"
                 value={signatory.phone}
                 onChange={(e) => setSignatory((c) => ({ ...c, phone: e.target.value }))}
+                placeholder="Ex : +33 6 12 34 56 78"
                 className={INPUT_CLS}
               />
             </div>
@@ -566,7 +573,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
               <input
                 type="text"
                 {...field('representative_title')}
-                placeholder={entityCategory === 'ei' ? 'Entrepreneur individuel…' : 'Président, Gérant…'}
+                placeholder={entityCategory === 'ei' ? 'Ex : Entrepreneur individuel' : 'Ex : Président'}
                 className={INPUT_CLS}
               />
             </div>
