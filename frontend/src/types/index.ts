@@ -764,6 +764,7 @@ export interface ContractRequest {
   commercial_name: string | null;
   contractualization_contact_email: string | null;
   third_party_id: string | null;
+  portal_url: string | null;
   compliance_override: boolean;
   created_at: string;
   updated_at: string;

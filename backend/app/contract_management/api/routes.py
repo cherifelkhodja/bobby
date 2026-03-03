@@ -73,7 +73,12 @@ async def _resolve_commercial_names(db: AsyncSession, emails: list[str]) -> dict
     return {row.email: f"{row.first_name} {row.last_name}".strip() for row in result.all()}
 
 
-def _cr_to_response(cr, *, commercial_name: str | None = None) -> ContractRequestResponse:
+def _cr_to_response(
+    cr,
+    *,
+    commercial_name: str | None = None,
+    portal_url: str | None = None,
+) -> ContractRequestResponse:
     """Convert a ContractRequest entity to response."""
     return ContractRequestResponse(
         id=cr.id,
@@ -99,6 +104,7 @@ def _cr_to_response(cr, *, commercial_name: str | None = None) -> ContractReques
         commercial_name=commercial_name,
         contractualization_contact_email=cr.contractualization_contact_email,
         third_party_id=cr.third_party_id,
+        portal_url=portal_url,
         compliance_override=cr.compliance_override,
         created_at=cr.created_at,
         updated_at=cr.updated_at,
@@ -164,6 +170,8 @@ async def get_contract_request(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a contract request by ID. Commercial sees own, ADV/admin see all."""
+    from app.third_party.domain.value_objects.magic_link_purpose import MagicLinkPurpose
+
     _user_id, role, email = auth
     cr_repo = ContractRequestRepository(db)
     cr = await cr_repo.get_by_id(contract_request_id)
@@ -173,8 +181,19 @@ async def get_contract_request(
     if role == "commercial" and cr.commercial_email != email:
         raise HTTPException(status_code=403, detail="Accès non autorisé.")
 
+    # Resolve active portal URL if a third party is linked
+    portal_url: str | None = None
+    if cr.third_party_id:
+        ml_repo = MagicLinkRepository(db)
+        active_link = await ml_repo.get_active_by_third_party_and_purpose(
+            cr.third_party_id, MagicLinkPurpose.DOCUMENT_UPLOAD
+        )
+        if active_link:
+            settings = get_settings()
+            portal_url = f"{settings.BOBBY_PORTAL_BASE_URL}/{active_link.token}"
+
     name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return _cr_to_response(cr, commercial_name=name, portal_url=portal_url)
 
 
 @router.post(

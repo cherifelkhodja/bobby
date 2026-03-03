@@ -11,6 +11,8 @@ import {
   AlertTriangle,
   Trash2,
   Mail,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -65,6 +67,7 @@ export default function ContractDetail() {
   const [overrideReason, setOverrideReason] = useState('');
   const [showOverride, setShowOverride] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // Commercial validation form state — pre-filled from Boond data
   const [validationForm, setValidationForm] = useState({
@@ -612,16 +615,36 @@ export default function ContractDetail() {
                 )}
               </div>
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => resendCollectionEmailMutation.mutate()}
-              disabled={resendCollectionEmailMutation.isPending}
-              isLoading={resendCollectionEmailMutation.isPending}
-            >
-              <Mail className="h-4 w-4 mr-2" />
-              Renvoyer le lien
-            </Button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {cr.portal_url && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(cr.portal_url!);
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
+                  }}
+                >
+                  {linkCopied ? (
+                    <Check className="h-4 w-4 mr-2 text-green-500" />
+                  ) : (
+                    <Copy className="h-4 w-4 mr-2" />
+                  )}
+                  {linkCopied ? 'Copié !' : 'Copier le lien'}
+                </Button>
+              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => resendCollectionEmailMutation.mutate()}
+                disabled={resendCollectionEmailMutation.isPending}
+                isLoading={resendCollectionEmailMutation.isPending}
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Renvoyer le lien
+              </Button>
+            </div>
           </div>
         </Card>
       )}
