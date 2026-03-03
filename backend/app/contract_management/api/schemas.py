@@ -22,13 +22,13 @@ class ContractRequestResponse(BaseModel):
     client_name: str | None = None
     mission_title: str | None = None
     mission_description: str | None = None
+    consultant_civility: str | None = None
+    consultant_first_name: str | None = None
+    consultant_last_name: str | None = None
     mission_site_name: str | None = None
     mission_address: str | None = None
     mission_postal_code: str | None = None
     mission_city: str | None = None
-    consultant_civility: str | None = None
-    consultant_first_name: str | None = None
-    consultant_last_name: str | None = None
     commercial_email: str
     commercial_name: str | None = None
     third_party_id: UUID | None = None

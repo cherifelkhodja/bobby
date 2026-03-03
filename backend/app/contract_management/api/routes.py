@@ -80,13 +80,13 @@ def _cr_to_response(cr, *, commercial_name: str | None = None) -> ContractReques
         client_name=cr.client_name,
         mission_title=cr.mission_title,
         mission_description=cr.mission_description,
+        consultant_civility=cr.consultant_civility,
+        consultant_first_name=cr.consultant_first_name,
+        consultant_last_name=cr.consultant_last_name,
         mission_site_name=cr.mission_site_name,
         mission_address=cr.mission_address,
         mission_postal_code=cr.mission_postal_code,
         mission_city=cr.mission_city,
-        consultant_civility=cr.consultant_civility,
-        consultant_first_name=cr.consultant_first_name,
-        consultant_last_name=cr.consultant_last_name,
         commercial_email=cr.commercial_email,
         commercial_name=commercial_name,
         third_party_id=cr.third_party_id,
@@ -239,6 +239,14 @@ async def sync_from_boond(
     parsed_end = _parse_date(raw_end)
     if parsed_end:
         cr.end_date = parsed_end
+
+    # Update consultant info from positioning included data
+    consultant_fn = positioning_data.get("consultant_first_name")
+    consultant_ln = positioning_data.get("consultant_last_name")
+    if consultant_fn:
+        cr.consultant_first_name = consultant_fn
+    if consultant_ln:
+        cr.consultant_last_name = consultant_ln
 
     # Fetch need data
     need_id = positioning_data.get("need_id") or cr.boond_need_id

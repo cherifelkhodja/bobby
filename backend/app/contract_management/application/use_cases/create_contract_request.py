@@ -229,14 +229,14 @@ class CreateContractRequestUseCase:
 
             # Fetch consultant info from Boond positioning candidate
             consultant_civility = None
-            consultant_first_name = None
-            consultant_last_name = None
+            consultant_first_name = positioning_data.get("consultant_first_name") or None
+            consultant_last_name = positioning_data.get("consultant_last_name") or None
             if candidate_id:
                 candidate_info = await self._crm.get_candidate_info(candidate_id)
                 if candidate_info:
                     consultant_civility = candidate_info.get("civility") or None
-                    consultant_first_name = candidate_info.get("first_name") or None
-                    consultant_last_name = candidate_info.get("last_name") or None
+                    consultant_first_name = candidate_info.get("first_name") or consultant_first_name
+                    consultant_last_name = candidate_info.get("last_name") or consultant_last_name
 
             # Create contract request
             cr = ContractRequest(

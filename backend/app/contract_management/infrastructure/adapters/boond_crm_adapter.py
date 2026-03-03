@@ -20,6 +20,10 @@ class BoondCrmAdapter:
     async def get_positioning(self, positioning_id: int) -> dict[str, Any] | None:
         """Fetch a positioning from BoondManager.
 
+        Extracts consultant info (name) from the ``included`` array
+        using the ``dependsOn`` relationship, which points to the
+        resource assigned to the positioning.
+
         Args:
             positioning_id: Boond positioning ID.
 
@@ -45,11 +49,26 @@ class BoondCrmAdapter:
                 relationships, "opportunity"
             ) or self._extract_relationship_id(relationships, "delivery")
 
+            # Extract consultant name from included data
+            consultant_first_name = ""
+            consultant_last_name = ""
+            candidate_id_str = str(candidate_id) if candidate_id else ""
+            for included in response.get("included", []):
+                if (
+                    included.get("type") == "resource"
+                    and str(included.get("id", "")) == candidate_id_str
+                ):
+                    inc_attrs = included.get("attributes", {})
+                    consultant_first_name = inc_attrs.get("firstName", "")
+                    consultant_last_name = inc_attrs.get("lastName", "")
+                    break
+
             logger.info(
                 "boond_positioning_parsed",
                 positioning_id=positioning_id,
                 candidate_id=candidate_id,
                 need_id=need_id,
+                consultant_name=f"{consultant_first_name} {consultant_last_name}".strip(),
                 relationship_keys=list(relationships.keys()),
             )
 
@@ -61,6 +80,8 @@ class BoondCrmAdapter:
                 "daily_rate": attributes.get("averageDailyPriceExcludingTax"),
                 "start_date": attributes.get("startDate"),
                 "end_date": attributes.get("endDate"),
+                "consultant_first_name": consultant_first_name,
+                "consultant_last_name": consultant_last_name,
             }
         except Exception as exc:
             logger.error(

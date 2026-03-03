@@ -198,6 +198,16 @@ docker-compose up # Start all services
   - Bouton "Sync Boond" dans le header de la page détail avec icône de rotation
   - Résout le problème des CR créées avant l'ajout des nouveaux champs (le webhook ne re-crée pas si CR active)
 
+### 2026-03-03 (consultant + adresse mission sur demande de contrat)
+- **feat(contract-management)**: Ajout champs consultant et adresse de mission
+  - **7 nouveaux champs** : `consultant_civility`, `consultant_first_name`, `consultant_last_name`, `mission_site_name`, `mission_address`, `mission_postal_code`, `mission_city`
+  - **Migration** : `028_add_consultant_address_to_contract_requests.py`
+  - **Toutes couches** : entité domaine, modèle SQLAlchemy, repo (save/to_entity/to_model), schema réponse, schema validation, command, use case, routes
+  - **Boond adapter** : `get_positioning()` extrait désormais `consultant_first_name`/`consultant_last_name` depuis le `included` du positionnement (relation `dependsOn`)
+  - **Création CR** : pré-rempli automatiquement depuis les données Boond du positionnement
+  - **Sync-from-boond** : met aussi à jour `consultant_first_name`/`consultant_last_name`
+  - **Frontend** : suppression de tous les encarts info (lecture seule), champs consultant (civilité select + prénom + nom) et adresse (nom du site, adresse, CP, ville) ajoutés au formulaire de validation commerciale avec pré-remplissage Boond
+
 ### 2026-03-03 (CI fixes)
 - **fix(models)**: `published_opportunities.skills` column changé de `ARRAY(String(100))` (PostgreSQL-only) vers `JSON` pour compatibilité SQLite dans les tests
 - **fix(domain)**: `CooptationStatus.REJECTED` marqué comme statut final (`is_final=True`) et transitions depuis REJECTED supprimées (était REJECTED→PENDING, maintenant aucune)
