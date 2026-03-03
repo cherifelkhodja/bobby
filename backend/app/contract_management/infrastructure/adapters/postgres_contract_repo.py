@@ -110,7 +110,7 @@ class ContractRequestRepository:
     ) -> list[ContractRequest]:
         """List contract requests for a specific commercial."""
         query = select(ContractRequestModel).where(
-            func.lower(ContractRequestModel.commercial_email) == email.lower()
+            func.lower(ContractRequestModel.commercial_email) == str(email).lower()
         )
         if status:
             query = query.where(ContractRequestModel.status == status.value)
@@ -125,7 +125,7 @@ class ContractRequestRepository:
     ) -> int:
         """Count contract requests for a specific commercial."""
         query = select(func.count(ContractRequestModel.id)).where(
-            func.lower(ContractRequestModel.commercial_email) == email.lower()
+            func.lower(ContractRequestModel.commercial_email) == str(email).lower()
         )
         if status:
             query = query.where(ContractRequestModel.status == status.value)
