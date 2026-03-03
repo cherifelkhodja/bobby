@@ -110,12 +110,13 @@ class DocumentRepository:
         """List all validated/expiring documents that have expired."""
         now = datetime.utcnow()
         result = await self.session.execute(
-            select(VigilanceDocumentModel)
-            .where(
-                VigilanceDocumentModel.status.in_([
-                    DocumentStatus.VALIDATED.value,
-                    DocumentStatus.EXPIRING_SOON.value,
-                ]),
+            select(VigilanceDocumentModel).where(
+                VigilanceDocumentModel.status.in_(
+                    [
+                        DocumentStatus.VALIDATED.value,
+                        DocumentStatus.EXPIRING_SOON.value,
+                    ]
+                ),
                 VigilanceDocumentModel.expires_at.isnot(None),
                 VigilanceDocumentModel.expires_at <= now,
             )

@@ -14,18 +14,14 @@ class InvalidContractStatusError(DomainError):
     """Raised when a contract request status transition is invalid."""
 
     def __init__(self, current: str, target: str) -> None:
-        super().__init__(
-            f"Transition de statut invalide : {current} → {target}"
-        )
+        super().__init__(f"Transition de statut invalide : {current} → {target}")
 
 
 class ComplianceBlockError(DomainError):
     """Raised when compliance check blocks contract generation."""
 
     def __init__(self, third_party_id: str, reason: str) -> None:
-        super().__init__(
-            f"Blocage conformité pour le tiers {third_party_id} : {reason}"
-        )
+        super().__init__(f"Blocage conformité pour le tiers {third_party_id} : {reason}")
 
 
 class WebhookDuplicateError(DomainError):

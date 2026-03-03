@@ -36,9 +36,7 @@ class BoondClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=4),
     )
-    async def _make_request(
-        self, method: str, endpoint: str, **kwargs
-    ) -> dict:
+    async def _make_request(self, method: str, endpoint: str, **kwargs) -> dict:
         """Generic request method for Boond API.
 
         Used by BoondCrmAdapter and other internal callers.

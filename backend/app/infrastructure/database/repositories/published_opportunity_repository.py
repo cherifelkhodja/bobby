@@ -183,8 +183,7 @@ class PublishedOpportunityRepository:
             )
             .outerjoin(
                 OpportunityModel,
-                OpportunityModel.external_id
-                == PublishedOpportunityModel.boond_opportunity_id,
+                OpportunityModel.external_id == PublishedOpportunityModel.boond_opportunity_id,
             )
             .outerjoin(
                 CooptationModel,
@@ -225,7 +224,6 @@ class PublishedOpportunityRepository:
         )
         await self.session.flush()
         return result.rowcount
-
 
     def _to_entity(self, model: PublishedOpportunityModel) -> PublishedOpportunity:
         """Convert model to entity."""

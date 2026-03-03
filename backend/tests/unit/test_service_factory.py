@@ -46,6 +46,7 @@ class TestThirdPartyRepositories:
         from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
             ThirdPartyRepository,
         )
+
         assert isinstance(repo, ThirdPartyRepository)
 
     def test_third_party_repository_cached(self, factory):
@@ -61,6 +62,7 @@ class TestThirdPartyRepositories:
         from app.third_party.infrastructure.adapters.postgres_magic_link_repo import (
             MagicLinkRepository,
         )
+
         assert isinstance(repo, MagicLinkRepository)
 
     def test_magic_link_repository_cached(self, factory):
@@ -80,6 +82,7 @@ class TestVigilanceRepositories:
         from app.vigilance.infrastructure.adapters.postgres_document_repo import (
             DocumentRepository,
         )
+
         assert isinstance(repo, DocumentRepository)
 
     def test_document_repository_cached(self, factory):
@@ -99,6 +102,7 @@ class TestContractManagementRepositories:
         from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
             ContractRequestRepository,
         )
+
         assert isinstance(repo, ContractRequestRepository)
 
     def test_contract_request_repository_cached(self, factory):
@@ -114,6 +118,7 @@ class TestContractManagementRepositories:
         from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
             ContractRepository,
         )
+
         assert isinstance(repo, ContractRepository)
 
     def test_contract_repository_cached(self, factory):
@@ -129,6 +134,7 @@ class TestContractManagementRepositories:
         from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
             WebhookEventRepository,
         )
+
         assert isinstance(repo, WebhookEventRepository)
 
     def test_webhook_event_repository_cached(self, factory):
@@ -151,6 +157,7 @@ class TestExternalServices:
         client = factory.insee_client
         assert client is not None
         from app.third_party.infrastructure.adapters.insee_client import InseeClient
+
         assert isinstance(client, InseeClient)
 
     def test_insee_client_cached(self, factory):
@@ -166,6 +173,7 @@ class TestExternalServices:
         from app.contract_management.infrastructure.adapters.yousign_client import (
             YouSignClient,
         )
+
         assert isinstance(client, YouSignClient)
 
     def test_yousign_client_cached(self, factory):
@@ -181,6 +189,7 @@ class TestExternalServices:
         from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
             BoondCrmAdapter,
         )
+
         assert isinstance(adapter, BoondCrmAdapter)
 
 
@@ -199,6 +208,7 @@ class TestThirdPartyUseCases:
         from app.third_party.application.use_cases.find_or_create_third_party import (
             FindOrCreateThirdPartyUseCase,
         )
+
         assert isinstance(use_case, FindOrCreateThirdPartyUseCase)
 
     def test_generate_magic_link_use_case(self, factory):
@@ -208,6 +218,7 @@ class TestThirdPartyUseCases:
         from app.third_party.application.use_cases.generate_magic_link import (
             GenerateMagicLinkUseCase,
         )
+
         assert isinstance(use_case, GenerateMagicLinkUseCase)
 
 
@@ -226,6 +237,7 @@ class TestContractManagementUseCases:
         from app.contract_management.application.use_cases.generate_draft import (
             GenerateDraftUseCase,
         )
+
         assert isinstance(use_case, GenerateDraftUseCase)
 
     def test_send_draft_to_partner_use_case(self, factory):
@@ -235,6 +247,7 @@ class TestContractManagementUseCases:
         from app.contract_management.application.use_cases.send_draft_to_partner import (
             SendDraftToPartnerUseCase,
         )
+
         assert isinstance(use_case, SendDraftToPartnerUseCase)
 
     def test_send_for_signature_use_case(self, factory):
@@ -244,6 +257,7 @@ class TestContractManagementUseCases:
         from app.contract_management.application.use_cases.send_for_signature import (
             SendForSignatureUseCase,
         )
+
         assert isinstance(use_case, SendForSignatureUseCase)
 
     def test_handle_signature_completed_use_case(self, factory):
@@ -253,6 +267,7 @@ class TestContractManagementUseCases:
         from app.contract_management.application.use_cases.handle_signature_completed import (
             HandleSignatureCompletedUseCase,
         )
+
         assert isinstance(use_case, HandleSignatureCompletedUseCase)
 
     def test_push_to_crm_use_case(self, factory):
@@ -262,6 +277,7 @@ class TestContractManagementUseCases:
         from app.contract_management.application.use_cases.push_to_crm import (
             PushToCrmUseCase,
         )
+
         assert isinstance(use_case, PushToCrmUseCase)
 
 

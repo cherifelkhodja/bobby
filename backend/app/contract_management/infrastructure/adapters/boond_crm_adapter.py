@@ -27,9 +27,7 @@ class BoondCrmAdapter:
             Positioning data or None.
         """
         try:
-            response = await self._boond._make_request(
-                "GET", f"/positionings/{positioning_id}"
-            )
+            response = await self._boond._make_request("GET", f"/positionings/{positioning_id}")
             data = response.get("data", {})
             attributes = data.get("attributes", {})
             relationships = data.get("relationships", {})
@@ -43,10 +41,9 @@ class BoondCrmAdapter:
                 or self._extract_relationship_id(relationships, "resource")
                 or self._extract_relationship_id(relationships, "candidate")
             )
-            need_id = (
-                self._extract_relationship_id(relationships, "opportunity")
-                or self._extract_relationship_id(relationships, "delivery")
-            )
+            need_id = self._extract_relationship_id(
+                relationships, "opportunity"
+            ) or self._extract_relationship_id(relationships, "delivery")
 
             logger.info(
                 "boond_positioning_parsed",
@@ -84,9 +81,7 @@ class BoondCrmAdapter:
             Need data with commercial_email and commercial_name, or None.
         """
         try:
-            response = await self._boond._make_request(
-                "GET", f"/opportunities/{need_id}"
-            )
+            response = await self._boond._make_request("GET", f"/opportunities/{need_id}")
             data = response.get("data", {})
             attributes = data.get("attributes", {})
             relationships = data.get("relationships", {})
@@ -165,9 +160,7 @@ class BoondCrmAdapter:
             Candidate data or None.
         """
         try:
-            response = await self._boond._make_request(
-                "GET", f"/resources/{candidate_id}"
-            )
+            response = await self._boond._make_request("GET", f"/resources/{candidate_id}")
             data = response.get("data", {})
             attributes = data.get("attributes", {})
 

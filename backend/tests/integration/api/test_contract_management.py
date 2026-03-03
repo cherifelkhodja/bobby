@@ -41,9 +41,7 @@ async def _create_third_party(db: AsyncSession, **overrides) -> ThirdPartyModel:
     return tp
 
 
-async def _create_contract_request(
-    db: AsyncSession, **overrides
-) -> ContractRequestModel:
+async def _create_contract_request(db: AsyncSession, **overrides) -> ContractRequestModel:
     """Insert a contract request into the test DB."""
     defaults = {
         "id": uuid4(),
@@ -136,12 +134,8 @@ class TestListContractRequests:
         commercial_headers: dict,
     ):
         """Commercial sees only their contract requests."""
-        await _create_contract_request(
-            db_session, commercial_email=commercial_user.email
-        )
-        await _create_contract_request(
-            db_session, commercial_email="other@example.com"
-        )
+        await _create_contract_request(db_session, commercial_email=commercial_user.email)
+        await _create_contract_request(db_session, commercial_email="other@example.com")
 
         response = await client.get(
             "/api/v1/contract-requests",
@@ -183,9 +177,7 @@ class TestListContractRequests:
         adv_headers: dict,
     ):
         """Can filter contract requests by status."""
-        await _create_contract_request(
-            db_session, status="pending_commercial_validation"
-        )
+        await _create_contract_request(db_session, status="pending_commercial_validation")
         await _create_contract_request(db_session, status="configuring_contract")
 
         response = await client.get(
@@ -254,9 +246,7 @@ class TestGetContractRequest:
         commercial_headers: dict,
     ):
         """Commercial can get their own contract request."""
-        cr = await _create_contract_request(
-            db_session, commercial_email=commercial_user.email
-        )
+        cr = await _create_contract_request(db_session, commercial_email=commercial_user.email)
 
         response = await client.get(
             f"/api/v1/contract-requests/{cr.id}",
@@ -274,9 +264,7 @@ class TestGetContractRequest:
         commercial_headers: dict,
     ):
         """Commercial cannot get other's contract request."""
-        cr = await _create_contract_request(
-            db_session, commercial_email="other@example.com"
-        )
+        cr = await _create_contract_request(db_session, commercial_email="other@example.com")
 
         response = await client.get(
             f"/api/v1/contract-requests/{cr.id}",
@@ -318,9 +306,7 @@ class TestComplianceOverride:
         adv_headers: dict,
     ):
         """ADV can override compliance."""
-        cr = await _create_contract_request(
-            db_session, status="compliance_blocked"
-        )
+        cr = await _create_contract_request(db_session, status="compliance_blocked")
 
         response = await client.post(
             f"/api/v1/contract-requests/{cr.id}/compliance-override",
@@ -424,9 +410,7 @@ class TestListContracts:
     ):
         """Returns contracts when they exist."""
         tp = await _create_third_party(db_session)
-        cr = await _create_contract_request(
-            db_session, third_party_id=tp.id
-        )
+        cr = await _create_contract_request(db_session, third_party_id=tp.id)
         await _create_contract(
             db_session,
             contract_request_id=cr.id,
@@ -639,9 +623,7 @@ class TestConfigureContract:
         adv_headers: dict,
     ):
         """ADV can configure a contract request."""
-        cr = await _create_contract_request(
-            db_session, status="collecting_documents"
-        )
+        cr = await _create_contract_request(db_session, status="collecting_documents")
 
         response = await client.post(
             f"/api/v1/contract-requests/{cr.id}/configure",

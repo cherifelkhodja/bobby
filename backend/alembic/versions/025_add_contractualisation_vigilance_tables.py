@@ -301,9 +301,7 @@ def upgrade() -> None:
 
     # RLS on cm_contract_requests: ADV and admin see all, commercial sees own
     op.execute("ALTER TABLE cm_contract_requests ENABLE ROW LEVEL SECURITY;")
-    op.execute(
-        "DROP POLICY IF EXISTS cm_contract_requests_select_policy ON cm_contract_requests;"
-    )
+    op.execute("DROP POLICY IF EXISTS cm_contract_requests_select_policy ON cm_contract_requests;")
     op.execute("""
         CREATE POLICY cm_contract_requests_select_policy ON cm_contract_requests
             FOR SELECT
@@ -312,9 +310,7 @@ def upgrade() -> None:
                 OR commercial_email = current_setting('app.user_email', true)
             );
     """)
-    op.execute(
-        "DROP POLICY IF EXISTS cm_contract_requests_all_policy ON cm_contract_requests;"
-    )
+    op.execute("DROP POLICY IF EXISTS cm_contract_requests_all_policy ON cm_contract_requests;")
     op.execute("""
         CREATE POLICY cm_contract_requests_all_policy ON cm_contract_requests
             FOR ALL
@@ -327,9 +323,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Drop RLS policies
     op.execute("DROP POLICY IF EXISTS cm_contract_requests_all_policy ON cm_contract_requests;")
-    op.execute(
-        "DROP POLICY IF EXISTS cm_contract_requests_select_policy ON cm_contract_requests;"
-    )
+    op.execute("DROP POLICY IF EXISTS cm_contract_requests_select_policy ON cm_contract_requests;")
     op.execute("ALTER TABLE cm_contract_requests DISABLE ROW LEVEL SECURITY;")
 
     op.execute("DROP POLICY IF EXISTS vig_documents_insert_policy ON vig_documents;")

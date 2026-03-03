@@ -1,6 +1,5 @@
 """Tests for ContractRequestStatus state machine."""
 
-
 from app.contract_management.domain.value_objects.contract_request_status import (
     ContractRequestStatus,
 )
@@ -41,18 +40,12 @@ class TestContractRequestStatusTransitions:
 
     def test_signed_can_be_archived(self):
         """Given SIGNED, can be archived."""
-        assert ContractRequestStatus.SIGNED.can_transition_to(
-            ContractRequestStatus.ARCHIVED
-        )
+        assert ContractRequestStatus.SIGNED.can_transition_to(ContractRequestStatus.ARCHIVED)
 
     def test_archived_is_terminal(self):
         """Given ARCHIVED, no transitions are allowed."""
-        assert not ContractRequestStatus.ARCHIVED.can_transition_to(
-            ContractRequestStatus.SIGNED
-        )
-        assert not ContractRequestStatus.ARCHIVED.can_transition_to(
-            ContractRequestStatus.CANCELLED
-        )
+        assert not ContractRequestStatus.ARCHIVED.can_transition_to(ContractRequestStatus.SIGNED)
+        assert not ContractRequestStatus.ARCHIVED.can_transition_to(ContractRequestStatus.CANCELLED)
 
     def test_cancelled_is_terminal(self):
         """Given CANCELLED, no transitions are allowed."""

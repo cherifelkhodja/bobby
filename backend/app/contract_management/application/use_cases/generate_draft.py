@@ -127,18 +127,20 @@ class GenerateDraftUseCase:
 
         # Partner info
         if tp:
-            context.update({
-                "partner_company_name": tp.company_name,
-                "partner_legal_form": tp.legal_form,
-                "partner_capital": tp.capital or "",
-                "partner_head_office": tp.head_office_address,
-                "partner_rcs_city": tp.rcs_city,
-                "partner_rcs_number": tp.rcs_number,
-                "partner_representative_name": tp.representative_name,
-                "partner_representative_title": tp.representative_title,
-                "partner_siren": tp.siren,
-                "partner_siret": tp.siret,
-            })
+            context.update(
+                {
+                    "partner_company_name": tp.company_name,
+                    "partner_legal_form": tp.legal_form,
+                    "partner_capital": tp.capital or "",
+                    "partner_head_office": tp.head_office_address,
+                    "partner_rcs_city": tp.rcs_city,
+                    "partner_rcs_number": tp.rcs_number,
+                    "partner_representative_name": tp.representative_name,
+                    "partner_representative_title": tp.representative_title,
+                    "partner_siren": tp.siren,
+                    "partner_siret": tp.siret,
+                }
+            )
 
         # Contract config (clauses)
         if cr.contract_config:

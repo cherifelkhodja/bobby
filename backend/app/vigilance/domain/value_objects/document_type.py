@@ -36,9 +36,11 @@ class DocumentType(str, Enum):
 
 
 # Documents interdits par le RGPD
-FORBIDDEN_DOCUMENT_TYPES = frozenset({
-    "casier_judiciaire",
-    "releve_bancaire",
-    "avis_imposition_personnel",
-    "certificat_medical",
-})
+FORBIDDEN_DOCUMENT_TYPES = frozenset(
+    {
+        "casier_judiciaire",
+        "releve_bancaire",
+        "avis_imposition_personnel",
+        "certificat_medical",
+    }
+)

@@ -324,9 +324,7 @@ class WebhookEventRepository:
         from sqlalchemy import delete
 
         result = await self.session.execute(
-            delete(WebhookEventModel).where(
-                WebhookEventModel.event_id.like(f"{prefix}%")
-            )
+            delete(WebhookEventModel).where(WebhookEventModel.event_id.like(f"{prefix}%"))
         )
         await self.session.flush()
         return result.rowcount

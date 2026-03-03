@@ -25,55 +25,77 @@ class ContractRequestStatus(str, Enum):
     def allowed_transitions(self) -> frozenset["ContractRequestStatus"]:
         """Return valid transitions from this status."""
         t = {
-            ContractRequestStatus.PENDING_COMMERCIAL_VALIDATION: frozenset({
-                ContractRequestStatus.COMMERCIAL_VALIDATED,
-                ContractRequestStatus.REDIRECTED_PAYFIT,
-                ContractRequestStatus.CANCELLED,
-            }),
-            ContractRequestStatus.COMMERCIAL_VALIDATED: frozenset({
-                ContractRequestStatus.COLLECTING_DOCUMENTS,
-                ContractRequestStatus.CONFIGURING_CONTRACT,
-                ContractRequestStatus.CANCELLED,
-            }),
-            ContractRequestStatus.COLLECTING_DOCUMENTS: frozenset({
-                ContractRequestStatus.CONFIGURING_CONTRACT,
-                ContractRequestStatus.COMPLIANCE_BLOCKED,
-                ContractRequestStatus.CANCELLED,
-            }),
-            ContractRequestStatus.COMPLIANCE_BLOCKED: frozenset({
-                ContractRequestStatus.CONFIGURING_CONTRACT,
-                ContractRequestStatus.COLLECTING_DOCUMENTS,
-                ContractRequestStatus.CANCELLED,
-            }),
-            ContractRequestStatus.CONFIGURING_CONTRACT: frozenset({
-                ContractRequestStatus.DRAFT_GENERATED,
-                ContractRequestStatus.CANCELLED,
-            }),
-            ContractRequestStatus.DRAFT_GENERATED: frozenset({
-                ContractRequestStatus.DRAFT_SENT_TO_PARTNER,
-                ContractRequestStatus.CONFIGURING_CONTRACT,
-                ContractRequestStatus.CANCELLED,
-            }),
-            ContractRequestStatus.DRAFT_SENT_TO_PARTNER: frozenset({
-                ContractRequestStatus.PARTNER_APPROVED,
-                ContractRequestStatus.PARTNER_REQUESTED_CHANGES,
-                ContractRequestStatus.CANCELLED,
-            }),
-            ContractRequestStatus.PARTNER_APPROVED: frozenset({
-                ContractRequestStatus.SENT_FOR_SIGNATURE,
-                ContractRequestStatus.CANCELLED,
-            }),
-            ContractRequestStatus.PARTNER_REQUESTED_CHANGES: frozenset({
-                ContractRequestStatus.CONFIGURING_CONTRACT,
-                ContractRequestStatus.CANCELLED,
-            }),
-            ContractRequestStatus.SENT_FOR_SIGNATURE: frozenset({
-                ContractRequestStatus.SIGNED,
-                ContractRequestStatus.CANCELLED,
-            }),
-            ContractRequestStatus.SIGNED: frozenset({
-                ContractRequestStatus.ARCHIVED,
-            }),
+            ContractRequestStatus.PENDING_COMMERCIAL_VALIDATION: frozenset(
+                {
+                    ContractRequestStatus.COMMERCIAL_VALIDATED,
+                    ContractRequestStatus.REDIRECTED_PAYFIT,
+                    ContractRequestStatus.CANCELLED,
+                }
+            ),
+            ContractRequestStatus.COMMERCIAL_VALIDATED: frozenset(
+                {
+                    ContractRequestStatus.COLLECTING_DOCUMENTS,
+                    ContractRequestStatus.CONFIGURING_CONTRACT,
+                    ContractRequestStatus.CANCELLED,
+                }
+            ),
+            ContractRequestStatus.COLLECTING_DOCUMENTS: frozenset(
+                {
+                    ContractRequestStatus.CONFIGURING_CONTRACT,
+                    ContractRequestStatus.COMPLIANCE_BLOCKED,
+                    ContractRequestStatus.CANCELLED,
+                }
+            ),
+            ContractRequestStatus.COMPLIANCE_BLOCKED: frozenset(
+                {
+                    ContractRequestStatus.CONFIGURING_CONTRACT,
+                    ContractRequestStatus.COLLECTING_DOCUMENTS,
+                    ContractRequestStatus.CANCELLED,
+                }
+            ),
+            ContractRequestStatus.CONFIGURING_CONTRACT: frozenset(
+                {
+                    ContractRequestStatus.DRAFT_GENERATED,
+                    ContractRequestStatus.CANCELLED,
+                }
+            ),
+            ContractRequestStatus.DRAFT_GENERATED: frozenset(
+                {
+                    ContractRequestStatus.DRAFT_SENT_TO_PARTNER,
+                    ContractRequestStatus.CONFIGURING_CONTRACT,
+                    ContractRequestStatus.CANCELLED,
+                }
+            ),
+            ContractRequestStatus.DRAFT_SENT_TO_PARTNER: frozenset(
+                {
+                    ContractRequestStatus.PARTNER_APPROVED,
+                    ContractRequestStatus.PARTNER_REQUESTED_CHANGES,
+                    ContractRequestStatus.CANCELLED,
+                }
+            ),
+            ContractRequestStatus.PARTNER_APPROVED: frozenset(
+                {
+                    ContractRequestStatus.SENT_FOR_SIGNATURE,
+                    ContractRequestStatus.CANCELLED,
+                }
+            ),
+            ContractRequestStatus.PARTNER_REQUESTED_CHANGES: frozenset(
+                {
+                    ContractRequestStatus.CONFIGURING_CONTRACT,
+                    ContractRequestStatus.CANCELLED,
+                }
+            ),
+            ContractRequestStatus.SENT_FOR_SIGNATURE: frozenset(
+                {
+                    ContractRequestStatus.SIGNED,
+                    ContractRequestStatus.CANCELLED,
+                }
+            ),
+            ContractRequestStatus.SIGNED: frozenset(
+                {
+                    ContractRequestStatus.ARCHIVED,
+                }
+            ),
             ContractRequestStatus.ARCHIVED: frozenset(),
             ContractRequestStatus.REDIRECTED_PAYFIT: frozenset(),
             ContractRequestStatus.CANCELLED: frozenset(),

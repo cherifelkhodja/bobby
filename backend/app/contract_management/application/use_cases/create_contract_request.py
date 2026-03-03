@@ -170,9 +170,7 @@ class CreateContractRequestUseCase:
 
                     # Try Bobby DB first (commercial is a registered user)
                     if manager_id and self._user_repo:
-                        bobby_user = await self._user_repo.get_by_boond_resource_id(
-                            str(manager_id)
-                        )
+                        bobby_user = await self._user_repo.get_by_boond_resource_id(str(manager_id))
                         if bobby_user:
                             commercial_email = str(bobby_user.email)
                             commercial_name = (

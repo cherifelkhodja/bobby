@@ -128,9 +128,7 @@ class EmailServicePort(Protocol):
         """Notify that a document is expiring soon."""
         ...
 
-    async def send_document_expired(
-        self, to: str, third_party_name: str, doc_type: str
-    ) -> bool:
+    async def send_document_expired(self, to: str, third_party_name: str, doc_type: str) -> bool:
         """Notify that a document has expired."""
         ...
 

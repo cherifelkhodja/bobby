@@ -57,9 +57,7 @@ class VigilanceDocument:
             InvalidDocumentTransitionError: If the transition is not allowed.
         """
         if not self.can_transition_to(target):
-            raise InvalidDocumentTransitionError(
-                self.status.value, target.value
-            )
+            raise InvalidDocumentTransitionError(self.status.value, target.value)
         self.status = target
         self.updated_at = datetime.utcnow()
 

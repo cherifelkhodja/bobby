@@ -96,7 +96,9 @@ class SendForSignatureUseCase:
                 },
                 {
                     "name": gemini_signatory,
-                    "email": self._settings.SMTP_FROM if hasattr(self._settings, "SMTP_FROM") else "",
+                    "email": self._settings.SMTP_FROM
+                    if hasattr(self._settings, "SMTP_FROM")
+                    else "",
                     "role": "gemini",
                 },
             ],
@@ -157,9 +159,7 @@ class SendForSignatureUseCase:
                     returncode=process.returncode,
                     stderr=stderr.decode(),
                 )
-                raise RuntimeError(
-                    f"LibreOffice conversion failed: {stderr.decode()}"
-                )
+                raise RuntimeError(f"LibreOffice conversion failed: {stderr.decode()}")
 
             pdf_path = os.path.join(tmpdir, f"{reference}.pdf")
             with open(pdf_path, "rb") as f:

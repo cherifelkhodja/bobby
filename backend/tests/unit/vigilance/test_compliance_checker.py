@@ -69,9 +69,6 @@ class TestComplianceChecker:
         mandatory = [r for r in requirements if r["mandatory"]]
 
         # Skip the first mandatory doc
-        docs = [
-            self._make_doc(req["type"], DocumentStatus.VALIDATED)
-            for req in mandatory[1:]
-        ]
+        docs = [self._make_doc(req["type"], DocumentStatus.VALIDATED) for req in mandatory[1:]]
         result = compute_compliance_status(ThirdPartyType.FREELANCE, docs)
         assert result == ComplianceStatus.NON_COMPLIANT

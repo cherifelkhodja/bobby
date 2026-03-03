@@ -29,9 +29,7 @@ class ThirdPartyModel(Base):
     representative_name: Mapped[str] = mapped_column(String(255), nullable=False)
     representative_title: Mapped[str] = mapped_column(String(255), nullable=False)
     contact_email: Mapped[str] = mapped_column(String(255), nullable=False)
-    compliance_status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="pending"
-    )
+    compliance_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

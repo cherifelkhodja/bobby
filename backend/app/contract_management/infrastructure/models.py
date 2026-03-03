@@ -33,9 +33,7 @@ class ContractRequestModel(Base):
     client_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mission_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     mission_location: Mapped[str | None] = mapped_column(Text, nullable=True)
-    contractualization_contact_email: Mapped[str | None] = mapped_column(
-        String(255), nullable=True
-    )
+    contractualization_contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     contract_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     commercial_email: Mapped[str] = mapped_column(String(255), nullable=False)
     commercial_validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

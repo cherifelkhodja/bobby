@@ -1,6 +1,5 @@
 """Tests for dynamic article numbering."""
 
-
 from app.contract_management.domain.services.article_numbering import compute_article_numbers
 
 

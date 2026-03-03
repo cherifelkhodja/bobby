@@ -14,9 +14,7 @@ from app.vigilance.infrastructure.models import VigilanceDocumentModel
 # ── Helpers ──────────────────────────────────────────────────────
 
 
-async def _create_third_party(
-    db: AsyncSession, **overrides
-) -> ThirdPartyModel:
+async def _create_third_party(db: AsyncSession, **overrides) -> ThirdPartyModel:
     """Insert a third party into the test DB."""
     defaults = {
         "id": uuid4(),
@@ -41,9 +39,7 @@ async def _create_third_party(
     return tp
 
 
-async def _create_document(
-    db: AsyncSession, **overrides
-) -> VigilanceDocumentModel:
+async def _create_document(db: AsyncSession, **overrides) -> VigilanceDocumentModel:
     """Insert a vigilance document into the test DB."""
     defaults = {
         "id": uuid4(),

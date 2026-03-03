@@ -18,19 +18,25 @@ class DocumentStatus(str, Enum):
         """Return the set of statuses this status can transition to."""
         transitions: dict[DocumentStatus, frozenset[DocumentStatus]] = {
             DocumentStatus.REQUESTED: frozenset({DocumentStatus.RECEIVED}),
-            DocumentStatus.RECEIVED: frozenset({
-                DocumentStatus.VALIDATED,
-                DocumentStatus.REJECTED,
-            }),
-            DocumentStatus.VALIDATED: frozenset({
-                DocumentStatus.EXPIRING_SOON,
-                DocumentStatus.EXPIRED,
-            }),
+            DocumentStatus.RECEIVED: frozenset(
+                {
+                    DocumentStatus.VALIDATED,
+                    DocumentStatus.REJECTED,
+                }
+            ),
+            DocumentStatus.VALIDATED: frozenset(
+                {
+                    DocumentStatus.EXPIRING_SOON,
+                    DocumentStatus.EXPIRED,
+                }
+            ),
             DocumentStatus.REJECTED: frozenset({DocumentStatus.REQUESTED}),
-            DocumentStatus.EXPIRING_SOON: frozenset({
-                DocumentStatus.EXPIRED,
-                DocumentStatus.VALIDATED,
-            }),
+            DocumentStatus.EXPIRING_SOON: frozenset(
+                {
+                    DocumentStatus.EXPIRED,
+                    DocumentStatus.VALIDATED,
+                }
+            ),
             DocumentStatus.EXPIRED: frozenset({DocumentStatus.REQUESTED}),
         }
         return transitions.get(self, frozenset())

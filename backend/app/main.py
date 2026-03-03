@@ -116,9 +116,7 @@ app.include_router(quotation_generator_router, prefix="/api/v1", tags=["Quotatio
 # Contractualisation & Vigilance routes
 app.include_router(portal_router, prefix="/api/v1", tags=["Portal"])
 app.include_router(vigilance_router, prefix="/api/v1/vigilance", tags=["Vigilance"])
-app.include_router(
-    compliance_dashboard_router, prefix="/api/v1/compliance", tags=["Compliance"]
-)
+app.include_router(compliance_dashboard_router, prefix="/api/v1/compliance", tags=["Compliance"])
 app.include_router(
     contract_routes_router, prefix="/api/v1/contract-requests", tags=["Contract Management"]
 )

@@ -49,7 +49,6 @@ class HandleSignatureCompletedUseCase:
         # This requires a custom query — for now iterate
         # In production, add an index on yousign_procedure_id
 
-
         # Download signed PDF
         signed_pdf = await self._signature_service.get_signed_document(procedure_id)
 

@@ -149,7 +149,8 @@ async def test_boond_webhook(request: Request):
         "status": "ok",
         "message": "Test webhook received",
         "headers": {
-            k: v for k, v in request.headers.items()
+            k: v
+            for k, v in request.headers.items()
             if k.lower() in ("content-type", "user-agent", "x-forwarded-for", "host")
         },
         "body_length": len(raw_body),

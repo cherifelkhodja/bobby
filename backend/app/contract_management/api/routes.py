@@ -192,9 +192,7 @@ async def configure_contract(
     use_case = ConfigureContractUseCase(contract_request_repository=cr_repo)
 
     try:
-        cr = await use_case.execute(
-            contract_request_id, body.model_dump()
-        )
+        cr = await use_case.execute(contract_request_id, body.model_dump())
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -295,9 +293,7 @@ async def cancel_contract_request(
     )
 
     webhook_repo = WebhookEventRepository(db)
-    deleted = await webhook_repo.delete_by_prefix(
-        f"positioning_update_{cr.boond_positioning_id}_"
-    )
+    deleted = await webhook_repo.delete_by_prefix(f"positioning_update_{cr.boond_positioning_id}_")
 
     audit_logger.log(
         AuditAction.CONTRACT_REQUEST_CANCELLED,

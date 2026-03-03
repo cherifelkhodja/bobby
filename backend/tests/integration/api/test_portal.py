@@ -66,9 +66,7 @@ async def _create_magic_link(
     return ml
 
 
-async def _create_contract_request(
-    db: AsyncSession, **overrides
-) -> ContractRequestModel:
+async def _create_contract_request(db: AsyncSession, **overrides) -> ContractRequestModel:
     """Insert a contract request into the test DB."""
     defaults = {
         "id": uuid4(),
@@ -85,9 +83,7 @@ async def _create_contract_request(
     return cr
 
 
-async def _create_document(
-    db: AsyncSession, **overrides
-) -> VigilanceDocumentModel:
+async def _create_document(db: AsyncSession, **overrides) -> VigilanceDocumentModel:
     """Insert a vigilance document into the test DB."""
     defaults = {
         "id": uuid4(),
@@ -315,9 +311,7 @@ class TestUploadPortalDocument:
         tp1 = await _create_third_party(db_session)
         tp2 = await _create_third_party(db_session)
         ml = await _create_magic_link(db_session, tp1.id, purpose="document_upload")
-        doc = await _create_document(
-            db_session, third_party_id=tp2.id
-        )
+        doc = await _create_document(db_session, third_party_id=tp2.id)
 
         response = await client.post(
             f"/api/v1/portal/{ml.token}/documents/{doc.id}/upload",

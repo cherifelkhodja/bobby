@@ -342,9 +342,7 @@ async def submit_contract_review(
     )
 
     decision_msg = (
-        "Contrat approuvé."
-        if body.decision == "approved"
-        else "Demande de modifications envoyée."
+        "Contrat approuvé." if body.decision == "approved" else "Demande de modifications envoyée."
     )
 
     return ContractReviewResponse(

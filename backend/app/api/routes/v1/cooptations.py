@@ -212,9 +212,7 @@ async def list_cooptations(
         published = await published_repo.get_by_id(opp_id)
         if published:
             opportunity_repo = OpportunityRepository(db)
-            opp = await opportunity_repo.get_by_external_id(
-                published.boond_opportunity_id
-            )
+            opp = await opportunity_repo.get_by_external_id(published.boond_opportunity_id)
             if opp:
                 opp_id = opp.id
 

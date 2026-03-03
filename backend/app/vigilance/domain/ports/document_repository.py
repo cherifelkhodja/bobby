@@ -43,9 +43,7 @@ class DocumentRepositoryPort(Protocol):
         """List all validated documents that have expired."""
         ...
 
-    async def count_by_status(
-        self, third_party_id: UUID
-    ) -> dict[str, int]:
+    async def count_by_status(self, third_party_id: UUID) -> dict[str, int]:
         """Count documents grouped by status for a third party."""
         ...
 

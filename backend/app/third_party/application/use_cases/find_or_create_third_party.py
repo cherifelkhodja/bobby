@@ -1,6 +1,5 @@
 """Use case: Find or create a third party by SIREN."""
 
-
 import structlog
 
 from app.third_party.domain.entities.third_party import ThirdParty
