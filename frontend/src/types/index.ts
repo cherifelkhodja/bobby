@@ -883,10 +883,11 @@ export const DOCUMENT_STATUS_CONFIG: Record<DocumentStatus, { label: string; col
 export interface PortalInfo {
   third_party: {
     id: string;
-    company_name: string;
+    company_name: string | null;
     contact_email: string;
     compliance_status: string;
     type: string;
+    siren: string | null;
   };
   purpose: string;
   contract_request_id: string | null;

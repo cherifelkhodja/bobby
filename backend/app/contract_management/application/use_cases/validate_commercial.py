@@ -7,6 +7,12 @@ from uuid import UUID
 import structlog
 
 from app.contract_management.domain.exceptions import ContractRequestNotFoundError
+from app.contract_management.domain.value_objects.contract_request_status import (
+    ContractRequestStatus,
+)
+from app.third_party.domain.entities.third_party import ThirdParty
+from app.third_party.domain.value_objects.magic_link_purpose import MagicLinkPurpose
+from app.third_party.domain.value_objects.third_party_type import ThirdPartyType
 
 logger = structlog.get_logger()
 
@@ -56,7 +62,9 @@ class ValidateCommercialUseCase:
     """Apply commercial validation to a contract request.
 
     If the type is 'salarie', redirects to PayFit.
-    Otherwise, finds or creates the third party and checks compliance.
+    Otherwise, creates a stub ThirdParty, requests documents and sends
+    a magic link to the contact so they can fill in company info and
+    upload compliance documents via the portal.
     """
 
     def __init__(
@@ -64,10 +72,14 @@ class ValidateCommercialUseCase:
         contract_request_repository,
         third_party_repository,
         find_or_create_third_party_use_case,
+        generate_magic_link_use_case=None,
+        request_documents_use_case=None,
     ) -> None:
         self._cr_repo = contract_request_repository
         self._tp_repo = third_party_repository
         self._find_or_create_tp = find_or_create_third_party_use_case
+        self._generate_magic_link_uc = generate_magic_link_use_case
+        self._request_documents_uc = request_documents_use_case
 
     async def execute(self, command: ValidateCommercialCommand):
         """Execute the use case.
@@ -124,6 +136,11 @@ class ValidateCommercialUseCase:
         if command.mission_city is not None:
             cr.mission_city = command.mission_city
 
+        # Initiate document collection: create stub ThirdParty, request
+        # documents and send magic link to the contact.
+        if self._generate_magic_link_uc and self._request_documents_uc:
+            cr = await self._initiate_document_collection(cr, command)
+
         saved = await self._cr_repo.save(cr)
 
         logger.info(
@@ -132,3 +149,44 @@ class ValidateCommercialUseCase:
             third_party_type=command.third_party_type,
         )
         return saved
+
+    async def _initiate_document_collection(self, cr, command: ValidateCommercialCommand):
+        """Create a stub ThirdParty, create document slots and send magic link."""
+        from app.third_party.application.use_cases.generate_magic_link import (
+            GenerateMagicLinkCommand,
+        )
+
+        # Reuse existing ThirdParty if already linked (re-validation case)
+        if cr.third_party_id:
+            stub_tp = await self._tp_repo.get_by_id(cr.third_party_id)
+        else:
+            stub_tp = None
+
+        if not stub_tp:
+            tp_type = ThirdPartyType(command.third_party_type)
+            stub_tp = ThirdParty(
+                contact_email=command.contact_email,
+                type=tp_type,
+            )
+            stub_tp = await self._tp_repo.save(stub_tp)
+            logger.info("stub_third_party_created", tp_id=str(stub_tp.id))
+
+        cr.third_party_id = stub_tp.id
+
+        # Create document request slots for the third party type
+        await self._request_documents_uc.execute(stub_tp.id)
+
+        # Send portal magic link to the contact email
+        await self._generate_magic_link_uc.execute(
+            GenerateMagicLinkCommand(
+                third_party_id=stub_tp.id,
+                purpose=MagicLinkPurpose.DOCUMENT_UPLOAD,
+                email=command.contact_email,
+                contract_request_id=cr.id,
+            )
+        )
+
+        # Transition directly to collecting_documents
+        cr.transition_to(ContractRequestStatus.COLLECTING_DOCUMENTS)
+
+        return cr

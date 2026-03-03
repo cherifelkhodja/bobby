@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_db
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
 from app.third_party.api.schemas import (
+    CompanyInfoRequest,
     ContractReviewRequest,
     ContractReviewResponse,
     DocumentUploadResponse,
@@ -101,6 +102,7 @@ async def get_portal_info(
             contact_email=result.third_party.contact_email,
             compliance_status=result.third_party.compliance_status.value,
             type=result.third_party.type.value,
+            siren=result.third_party.siren,
         ),
         purpose=result.purpose.value,
         contract_request_id=result.contract_request_id,
@@ -147,6 +149,58 @@ async def _verify_portal_token(
             detail="Ce lien ne permet pas cette action.",
         )
     return result
+
+
+@router.post(
+    "/portal/{token}/company-info",
+    summary="Submit company information via portal",
+)
+async def submit_company_info(
+    token: str,
+    body: CompanyInfoRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Tiers fills in their company details (SIREN, SIRET, etc.) via the portal.
+
+    Updates the stub ThirdParty created at commercial validation time.
+    This is a public endpoint — the magic link token acts as authentication.
+    """
+    from datetime import datetime
+
+    from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
+        ThirdPartyRepository,
+    )
+
+    result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
+
+    tp = result.third_party
+    tp.company_name = body.company_name
+    tp.legal_form = body.legal_form
+    tp.siren = body.siren
+    tp.siret = body.siret
+    tp.rcs_city = body.rcs_city
+    tp.rcs_number = body.rcs_number
+    tp.head_office_address = body.head_office_address
+    tp.representative_name = body.representative_name
+    tp.representative_title = body.representative_title
+    tp.capital = body.capital
+    tp.updated_at = datetime.utcnow()
+
+    tp_repo = ThirdPartyRepository(db)
+    await tp_repo.save(tp)
+
+    audit_logger.log(
+        AuditAction.PORTAL_ACCESSED,
+        AuditResource.MAGIC_LINK,
+        resource_id=str(result.magic_link.id),
+        details={
+            "action": "company_info_submitted",
+            "third_party_id": str(tp.id),
+            "siren": body.siren,
+        },
+    )
+
+    return {"message": "Informations enregistrées avec succès."}
 
 
 @router.get(

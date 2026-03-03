@@ -16,17 +16,17 @@ class ThirdParty:
     legal identity, compliance status, contractualization contact.
     """
 
-    company_name: str
-    legal_form: str
-    siren: str
-    siret: str
-    rcs_city: str
-    rcs_number: str
-    head_office_address: str
-    representative_name: str
-    representative_title: str
     contact_email: str
     type: ThirdPartyType
+    company_name: str | None = None
+    legal_form: str | None = None
+    siren: str | None = None
+    siret: str | None = None
+    rcs_city: str | None = None
+    rcs_number: str | None = None
+    head_office_address: str | None = None
+    representative_name: str | None = None
+    representative_title: str | None = None
     id: UUID = field(default_factory=uuid4)
     boond_provider_id: int | None = None
     capital: str | None = None
@@ -52,9 +52,9 @@ class ThirdParty:
     def full_legal_identity(self) -> str:
         """Return formatted legal identity string."""
         parts = [
-            f"{self.legal_form} {self.company_name}",
+            f"{self.legal_form} {self.company_name}" if self.legal_form and self.company_name else None,
             f"au capital de {self.capital} euros" if self.capital else None,
-            f"Siège social : {self.head_office_address}",
-            f"RCS {self.rcs_city} {self.rcs_number}",
+            f"Siège social : {self.head_office_address}" if self.head_office_address else None,
+            f"RCS {self.rcs_city} {self.rcs_number}" if self.rcs_city and self.rcs_number else None,
         ]
         return ", ".join(p for p in parts if p)

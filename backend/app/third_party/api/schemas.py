@@ -12,10 +12,26 @@ class ThirdPartyPortalResponse(BaseModel):
     """Third party info returned via portal (magic link)."""
 
     id: UUID
-    company_name: str
+    company_name: str | None = None
     contact_email: str
     compliance_status: str
     type: str
+    siren: str | None = None
+
+
+class CompanyInfoRequest(BaseModel):
+    """Company info submitted by the tiers via the portal."""
+
+    company_name: str = Field(..., max_length=255)
+    legal_form: str = Field(..., max_length=100)
+    siren: str = Field(..., min_length=9, max_length=9, pattern=r"^\d{9}$")
+    siret: str = Field(..., min_length=14, max_length=14, pattern=r"^\d{14}$")
+    rcs_city: str = Field(..., max_length=100)
+    rcs_number: str = Field(..., max_length=50)
+    head_office_address: str
+    representative_name: str = Field(..., max_length=255)
+    representative_title: str = Field(..., max_length=255)
+    capital: str | None = Field(None, max_length=50)
 
 
 class MagicLinkPortalResponse(BaseModel):

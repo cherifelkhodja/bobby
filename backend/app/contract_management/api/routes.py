@@ -33,9 +33,17 @@ from app.contract_management.infrastructure.adapters.postgres_contract_repo impo
 from app.dependencies import get_db
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
 from app.infrastructure.database.models import UserModel
+from app.third_party.application.use_cases.generate_magic_link import (
+    GenerateMagicLinkUseCase,
+)
+from app.third_party.infrastructure.adapters.postgres_magic_link_repo import (
+    MagicLinkRepository,
+)
 from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
     ThirdPartyRepository,
 )
+from app.vigilance.application.use_cases.request_documents import RequestDocumentsUseCase
+from app.vigilance.infrastructure.adapters.postgres_document_repo import DocumentRepository
 
 logger = structlog.get_logger()
 
@@ -301,14 +309,33 @@ async def validate_commercial(
     db: AsyncSession = Depends(get_db),
 ):
     """Apply commercial validation to a contract request. Commercial/ADV/admin."""
+    from app.infrastructure.email.sender import EmailService
+
     user_id, _role, _email = access
+    settings = get_settings()
     cr_repo = ContractRequestRepository(db)
     tp_repo = ThirdPartyRepository(db)
+    ml_repo = MagicLinkRepository(db)
+    doc_repo = DocumentRepository(db)
+
+    email_service = EmailService(settings)
+    generate_magic_link_uc = GenerateMagicLinkUseCase(
+        third_party_repository=tp_repo,
+        magic_link_repository=ml_repo,
+        email_service=email_service,
+        portal_base_url=settings.BOBBY_PORTAL_BASE_URL,
+    )
+    request_documents_uc = RequestDocumentsUseCase(
+        third_party_repository=tp_repo,
+        document_repository=doc_repo,
+    )
 
     use_case = ValidateCommercialUseCase(
         contract_request_repository=cr_repo,
         third_party_repository=tp_repo,
         find_or_create_third_party_use_case=None,
+        generate_magic_link_use_case=generate_magic_link_uc,
+        request_documents_use_case=request_documents_uc,
     )
 
     try:

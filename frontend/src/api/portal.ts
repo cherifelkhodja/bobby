@@ -48,6 +48,25 @@ export const portalApi = {
     return response.data;
   },
 
+  submitCompanyInfo: async (
+    token: string,
+    data: {
+      company_name: string;
+      legal_form: string;
+      siren: string;
+      siret: string;
+      rcs_city: string;
+      rcs_number: string;
+      head_office_address: string;
+      representative_name: string;
+      representative_title: string;
+      capital?: string;
+    },
+  ): Promise<{ message: string }> => {
+    const response = await portalClient.post(`/${token}/company-info`, data);
+    return response.data;
+  },
+
   submitContractReview: async (
     token: string,
     decision: 'approved' | 'changes_requested',

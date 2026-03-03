@@ -90,7 +90,7 @@ class GenerateMagicLinkUseCase:
         if command.purpose == MagicLinkPurpose.DOCUMENT_UPLOAD:
             await self._email_service.send_document_collection_request(
                 to=command.email,
-                third_party_name=third_party.company_name,
+                third_party_name=third_party.company_name or third_party.contact_email,
                 portal_link=portal_url,
             )
         elif command.purpose == MagicLinkPurpose.CONTRACT_REVIEW:

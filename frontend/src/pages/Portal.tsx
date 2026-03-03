@@ -104,14 +104,24 @@ export default function Portal() {
               Portail partenaire
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {portalInfo.third_party.company_name}
+              {portalInfo.third_party.company_name || portalInfo.third_party.contact_email}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Document upload section */}
-      {isDocumentUpload && docsData && (
+      {/* Company info form — shown when tiers hasn't filled in their details yet */}
+      {isDocumentUpload && !portalInfo.third_party.siren && (
+        <div className="max-w-3xl mx-auto">
+          <CompanyInfoForm
+            token={token!}
+            onSuccess={() => queryClient.invalidateQueries({ queryKey: ['portal', token] })}
+          />
+        </div>
+      )}
+
+      {/* Document upload section — shown after company info is filled */}
+      {isDocumentUpload && portalInfo.third_party.siren && docsData && (
         <div className="max-w-3xl mx-auto">
           <Card className="mb-6">
             <div className="flex items-center gap-3 mb-4">
@@ -294,6 +304,159 @@ function DocumentUploadCard({
           )}
         </div>
       )}
+    </Card>
+  );
+}
+
+const INPUT_CLASS =
+  'w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300';
+
+function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () => void }) {
+  const [form, setForm] = useState({
+    company_name: '',
+    legal_form: '',
+    siren: '',
+    siret: '',
+    rcs_city: '',
+    rcs_number: '',
+    head_office_address: '',
+    representative_name: '',
+    representative_title: '',
+    capital: '',
+  });
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      portalApi.submitCompanyInfo(token, {
+        ...form,
+        capital: form.capital || undefined,
+      }),
+    onSuccess: () => {
+      toast.success('Informations enregistrées.');
+      onSuccess();
+    },
+    onError: () => {
+      toast.error('Erreur lors de l\'enregistrement.');
+    },
+  });
+
+  const isValid =
+    /^\d{9}$/.test(form.siren) &&
+    /^\d{14}$/.test(form.siret) &&
+    form.company_name !== '' &&
+    form.legal_form !== '' &&
+    form.rcs_city !== '' &&
+    form.rcs_number !== '' &&
+    form.head_office_address !== '' &&
+    form.representative_name !== '' &&
+    form.representative_title !== '';
+
+  const field = (key: keyof typeof form) => (
+    <input
+      type="text"
+      value={form[key]}
+      onChange={(e) => {
+        const val =
+          (key === 'siren' || key === 'siret')
+            ? e.target.value.replace(/\D/g, '')
+            : e.target.value;
+        setForm((f) => ({ ...f, [key]: val }));
+      }}
+      maxLength={key === 'siren' ? 9 : key === 'siret' ? 14 : undefined}
+      className={INPUT_CLASS}
+    />
+  );
+
+  return (
+    <Card>
+      <div className="flex items-center gap-3 mb-6">
+        <Building2 className="h-6 w-6 text-primary-600" />
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Informations de votre société
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Renseignez vos coordonnées légales pour démarrer la collecte de documents.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">SIREN *</label>
+          {field('siren')}
+          {form.siren && !/^\d{9}$/.test(form.siren) && (
+            <p className="text-xs text-red-500 mt-1">9 chiffres requis</p>
+          )}
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">SIRET *</label>
+          {field('siret')}
+          {form.siret && !/^\d{14}$/.test(form.siret) && (
+            <p className="text-xs text-red-500 mt-1">14 chiffres requis</p>
+          )}
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Raison sociale *</label>
+          {field('company_name')}
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Forme juridique *</label>
+          <input
+            type="text"
+            value={form.legal_form}
+            onChange={(e) => setForm((f) => ({ ...f, legal_form: e.target.value }))}
+            placeholder="SAS, SASU, EURL…"
+            className={INPUT_CLASS}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Ville RCS *</label>
+          {field('rcs_city')}
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Numéro RCS *</label>
+          {field('rcs_number')}
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Adresse du siège social *</label>
+          {field('head_office_address')}
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Représentant légal *</label>
+          {field('representative_name')}
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Qualité du représentant *</label>
+          <input
+            type="text"
+            value={form.representative_title}
+            onChange={(e) => setForm((f) => ({ ...f, representative_title: e.target.value }))}
+            placeholder="Président, Gérant…"
+            className={INPUT_CLASS}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Capital social</label>
+          <input
+            type="text"
+            value={form.capital}
+            onChange={(e) => setForm((f) => ({ ...f, capital: e.target.value }))}
+            placeholder="Ex : 10 000 €"
+            className={INPUT_CLASS}
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-end mt-6">
+        <Button
+          onClick={() => mutation.mutate()}
+          disabled={!isValid || mutation.isPending}
+          isLoading={mutation.isPending}
+        >
+          Valider et continuer
+        </Button>
+      </div>
     </Card>
   );
 }
