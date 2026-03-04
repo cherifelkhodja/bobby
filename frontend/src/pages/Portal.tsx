@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Building2,
   Loader2,
+  PenLine,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -47,6 +48,77 @@ const DOCUMENT_STATUS_LABELS: Record<string, string> = {
   expiring_soon: 'Expire bientôt',
   expired: 'Expiré',
 };
+
+// ─── Progress Stepper ───────────────────────────────────────────────────────
+
+type StepStatus = 'done' | 'current' | 'upcoming';
+
+interface Step {
+  label: string;
+  icon: React.ElementType;
+  status: StepStatus;
+}
+
+function PortalStepper({ steps }: { steps: Step[] }) {
+  return (
+    <div className="max-w-3xl mx-auto mb-8">
+      <div className="flex items-center">
+        {steps.map((step, i) => {
+          const Icon = step.icon;
+          const isLast = i === steps.length - 1;
+          return (
+            <div key={i} className="flex items-center flex-1 min-w-0">
+              {/* Step bubble + label */}
+              <div className="flex flex-col items-center flex-shrink-0">
+                <div
+                  className={[
+                    'flex items-center justify-center w-9 h-9 rounded-full border-2 transition-colors',
+                    step.status === 'done'
+                      ? 'bg-green-500 border-green-500 text-white'
+                      : step.status === 'current'
+                      ? 'bg-primary-600 border-primary-600 text-white'
+                      : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400',
+                  ].join(' ')}
+                >
+                  {step.status === 'done' ? (
+                    <CheckCircle className="h-5 w-5" />
+                  ) : (
+                    <Icon className="h-4 w-4" />
+                  )}
+                </div>
+                <span
+                  className={[
+                    'mt-1.5 text-xs font-medium text-center leading-tight max-w-[80px]',
+                    step.status === 'done'
+                      ? 'text-green-600 dark:text-green-400'
+                      : step.status === 'current'
+                      ? 'text-primary-600 dark:text-primary-400'
+                      : 'text-gray-400 dark:text-gray-500',
+                  ].join(' ')}
+                >
+                  {step.label}
+                </span>
+              </div>
+              {/* Connector */}
+              {!isLast && (
+                <div
+                  className={[
+                    'flex-1 h-0.5 mx-2 mb-5',
+                    step.status === 'done'
+                      ? 'bg-green-400'
+                      : 'bg-gray-200 dark:bg-gray-700',
+                  ].join(' ')}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Portal ─────────────────────────────────────────────────────────────────
 
 export default function Portal() {
   const { token } = useParams<{ token: string }>();
@@ -96,11 +168,53 @@ export default function Portal() {
   const isDocumentUpload = portalInfo.purpose === 'document_upload';
   const isContractReview = portalInfo.purpose === 'contract_review';
 
+  const hasSiren = !!portalInfo.third_party.siren;
+  const allDocsUploaded =
+    !!docsData &&
+    docsData.documents.length > 0 &&
+    docsData.documents.every((d) => ['received', 'validated', 'expiring_soon'].includes(d.status));
+  const allDocsEmpty = !!docsData && docsData.documents.length === 0;
+
+  const steps: Step[] = isDocumentUpload
+    ? [
+        {
+          label: 'Infos société',
+          icon: Building2,
+          status: hasSiren ? 'done' : 'current',
+        },
+        {
+          label: 'Documents',
+          icon: Upload,
+          status: !hasSiren
+            ? 'upcoming'
+            : allDocsUploaded || allDocsEmpty
+            ? 'done'
+            : 'current',
+        },
+        {
+          label: 'Vérification',
+          icon: ShieldCheck,
+          status: allDocsUploaded || allDocsEmpty ? 'current' : 'upcoming',
+        },
+      ]
+    : [
+        {
+          label: 'Relecture',
+          icon: FileText,
+          status: 'current',
+        },
+        {
+          label: 'Signature',
+          icon: PenLine,
+          status: 'upcoming',
+        },
+      ];
+
   return (
     <PortalLayout>
       {/* Header */}
-      <div className="max-w-3xl mx-auto mb-8">
-        <div className="flex items-center gap-3 mb-4">
+      <div className="max-w-3xl mx-auto mb-6">
+        <div className="flex items-center gap-3 mb-6">
           <Building2 className="h-8 w-8 text-primary-600" />
           <div>
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -112,6 +226,9 @@ export default function Portal() {
           </div>
         </div>
       </div>
+
+      {/* Progress stepper */}
+      <PortalStepper steps={steps} />
 
       {/* Company info form — shown when SIRET not yet filled */}
       {isDocumentUpload && !portalInfo.third_party.siren && (
