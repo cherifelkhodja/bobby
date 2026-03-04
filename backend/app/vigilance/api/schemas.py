@@ -27,6 +27,8 @@ class DocumentResponse(BaseModel):
     document_date: date | None = None
     is_valid_at_upload: bool | None = None
     auto_check_results: dict[str, Any] | None = None
+    is_unavailable: bool = False
+    unavailability_reason: str | None = None
     created_at: datetime
     updated_at: datetime
 

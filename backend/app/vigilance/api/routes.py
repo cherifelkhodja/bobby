@@ -55,6 +55,8 @@ def _document_to_response(doc) -> DocumentResponse:
         document_date=doc.document_date,
         is_valid_at_upload=doc.is_valid_at_upload,
         auto_check_results=doc.auto_check_results,
+        is_unavailable=doc.is_unavailable,
+        unavailability_reason=doc.unavailability_reason,
         created_at=doc.created_at,
         updated_at=doc.updated_at,
     )
