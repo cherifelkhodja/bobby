@@ -812,6 +812,8 @@ export interface VigilanceDocument {
   expires_at: string | null;
   document_date: string | null;
   is_valid_at_upload: boolean | null;
+  is_unavailable: boolean;
+  unavailability_reason: string | null;
   auto_check_results: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
@@ -868,7 +870,7 @@ export interface ComplianceDashboard {
 }
 
 export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, { label: string; color: string }> = {
-  pending: { label: 'En attente', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
+  pending: { label: 'Dossier en constitution', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700/50 dark:text-gray-400' },
   under_review: { label: 'En cours de vérification', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
   compliant: { label: 'Conforme', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
   expiring_soon: { label: 'Expire bientôt', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' },
