@@ -171,16 +171,16 @@ export default function Portal() {
   const isContractReview = portalInfo.purpose === 'contract_review';
 
   const hasSiren = !!portalInfo.third_party.siren;
-  const allDocsUploaded =
-    !!docsData &&
-    docsData.documents.length > 0 &&
-    docsData.documents.every((d) => ['received', 'validated', 'expiring_soon'].includes(d.status));
   const allDocsEmpty = !!docsData && docsData.documents.length === 0;
+  const hasAnyReceived =
+    !!docsData && docsData.documents.some((d) => d.status === 'received');
 
-  // Natural step based on server state (document_upload: 0=infos, 1=docs, 2=verif)
-  // Only advance to step 2 when documents were actually uploaded — not when none were requested.
+  // step 2 is reached only after explicit "Valider le dépôt" — never automatically
+  const [submitted, setSubmitted] = useState(false);
+
+  // Natural step: 0=infos société, 1=documents, 2=confirmation (post-submit)
   const naturalStep = isDocumentUpload
-    ? !hasSiren ? 0 : allDocsUploaded ? 2 : 1
+    ? !hasSiren ? 0 : submitted ? 2 : 1
     : 0;
 
   // displayStep: forceStep allows going back; clamp to [0, naturalStep]
@@ -191,8 +191,8 @@ export default function Portal() {
     if (stepIndex === displayStep) return 'current';
     // Steps beyond displayStep: show natural server status
     if (isDocumentUpload) {
-      if (stepIndex === 1) return hasSiren ? (allDocsUploaded || allDocsEmpty ? 'done' : 'upcoming') : 'upcoming';
-      if (stepIndex === 2) return allDocsUploaded || allDocsEmpty ? 'upcoming' : 'upcoming';
+      if (stepIndex === 1) return hasSiren ? (submitted || allDocsEmpty ? 'done' : 'upcoming') : 'upcoming';
+      if (stepIndex === 2) return 'upcoming';
     }
     return 'upcoming';
   };
@@ -296,6 +296,17 @@ export default function Portal() {
               </Card>
             )}
           </div>
+
+          {docsData.documents.length > 0 && (
+            <SubmitDocumentsButton
+              token={token!}
+              enabled={hasAnyReceived}
+              onSubmitted={() => {
+                setSubmitted(true);
+                setForceStep(null);
+              }}
+            />
+          )}
         </div>
       )}
 
@@ -1011,6 +1022,59 @@ function PortalSpinner() {
   );
 }
 
+function SubmitDocumentsButton({
+  token,
+  enabled,
+  onSubmitted,
+}: {
+  token: string;
+  enabled: boolean;
+  onSubmitted: () => void;
+}) {
+  const submitMutation = useMutation({
+    mutationFn: () => portalApi.submitDocuments(token),
+    onSuccess: () => {
+      toast.success('Dépôt validé. Notre équipe va examiner vos documents.');
+      onSubmitted();
+    },
+    onError: () => {
+      toast.error('Une erreur est survenue. Veuillez réessayer.');
+    },
+  });
+
+  return (
+    <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Une fois tous vos documents déposés, validez votre dépôt pour notifier notre équipe.
+        </p>
+        <Button
+          onClick={() => submitMutation.mutate()}
+          disabled={!enabled || submitMutation.isPending}
+          className="min-w-48"
+        >
+          {submitMutation.isPending ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Envoi en cours…
+            </>
+          ) : (
+            <>
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Valider le dépôt des documents
+            </>
+          )}
+        </Button>
+        {!enabled && (
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            Téléversez au moins un document pour valider.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DocumentUploadCard({
   doc,
   token,
@@ -1021,15 +1085,17 @@ function DocumentUploadCard({
   onSuccess: () => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
+  const [showReplace, setShowReplace] = useState(false);
   const Icon = DOCUMENT_STATUS_ICONS[doc.status] ?? FileText;
   const iconColor = DOCUMENT_STATUS_COLORS[doc.status] ?? 'text-gray-400';
   const statusLabel = DOCUMENT_STATUS_LABELS[doc.status] ?? doc.status;
-  const needsUpload = doc.status === 'requested' || doc.status === 'rejected';
+  const needsUpload = doc.status === 'requested' || doc.status === 'rejected' || showReplace;
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => portalApi.uploadDocument(token, doc.id, file),
     onSuccess: () => {
       toast.success('Document téléversé avec succès.');
+      setShowReplace(false);
       onSuccess();
     },
     onError: () => {
@@ -1061,8 +1127,8 @@ function DocumentUploadCard({
   return (
     <Card>
       <div className="flex items-start justify-between">
-        <div className="flex items-start gap-3">
-          <Icon className={`h-5 w-5 mt-0.5 ${iconColor}`} />
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <Icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${iconColor}`} />
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-sm font-medium text-gray-900 dark:text-white">
@@ -1089,38 +1155,31 @@ function DocumentUploadCard({
             )}
 
             {/* AI-extracted data */}
-            {doc.document_date && (
-              <div className="mt-2 flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  Date du document :&nbsp;
-                  {new Date(doc.document_date).toLocaleDateString('fr-FR')}
-                </span>
+            {doc.document_type !== 'rib' && (doc.document_date || doc.extracted_info?.expiry_date) && (
+              <div className="mt-2 space-y-1">
+                {/* Date d'émission */}
+                {doc.document_date && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="font-medium text-gray-600 dark:text-gray-300">Date du document :</span>{' '}
+                    {new Date(doc.document_date).toLocaleDateString('fr-FR')}
+                  </p>
+                )}
+                {/* Date de fin de validité (calculée ou extraite) */}
+                {doc.extracted_info?.expiry_date && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="font-medium text-gray-600 dark:text-gray-300">Valide jusqu'au :</span>{' '}
+                    {new Date(doc.extracted_info.expiry_date).toLocaleDateString('fr-FR')}
+                  </p>
+                )}
+                {/* Badge validité */}
                 {doc.is_valid_at_upload === true && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-700">
-                    Valide à la date de dépôt
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-700">
+                    <CheckCircle className="h-3 w-3" /> Valide
                   </span>
                 )}
                 {doc.is_valid_at_upload === false && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-700">
-                    Document périmé
-                  </span>
-                )}
-              </div>
-            )}
-            {doc.document_type === 'attestation_assurance_rc_pro' && doc.extracted_info?.expiry_date && (
-              <div className="mt-2 flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  Valide jusqu'au :&nbsp;
-                  {new Date(doc.extracted_info.expiry_date).toLocaleDateString('fr-FR')}
-                </span>
-                {doc.is_valid_at_upload === true && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-700">
-                    En cours de validité
-                  </span>
-                )}
-                {doc.is_valid_at_upload === false && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-700">
-                    RC Pro expirée
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-700">
+                    <XCircle className="h-3 w-3" /> Document périmé
                   </span>
                 )}
               </div>
@@ -1146,6 +1205,24 @@ function DocumentUploadCard({
             )}
           </div>
         </div>
+
+        {/* "Changer" button for already-received documents */}
+        {doc.status === 'received' && !showReplace && (
+          <button
+            onClick={() => setShowReplace(true)}
+            className="ml-3 flex-shrink-0 text-xs text-primary-600 dark:text-primary-400 hover:underline"
+          >
+            Changer
+          </button>
+        )}
+        {showReplace && (
+          <button
+            onClick={() => setShowReplace(false)}
+            className="ml-3 flex-shrink-0 text-xs text-gray-400 hover:underline"
+          >
+            Annuler
+          </button>
+        )}
       </div>
 
       {needsUpload && (

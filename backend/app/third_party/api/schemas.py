@@ -153,6 +153,15 @@ class PortalDocumentsListResponse(BaseModel):
     documents: list[PortalDocumentResponse]
 
 
+# ── Portal Document Submission ─────────────────────────────────
+
+
+class DocumentsSubmittedResponse(BaseModel):
+    """Response after the third party confirms their document submission."""
+
+    message: str = "Dépôt validé. Notre équipe va examiner vos documents."
+
+
 # ── Portal Contract Review ──────────────────────────────────────
 
 

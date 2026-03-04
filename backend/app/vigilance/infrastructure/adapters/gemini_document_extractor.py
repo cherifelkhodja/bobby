@@ -237,14 +237,16 @@ class GeminiDocumentExtractor:
         emission = _pick_emission_date(dates)
         today = datetime.now(tz=timezone.utc).date()
         is_valid: bool | None = None
+        expiry_date: date | None = None
 
         if emission:
             validity_months = _DATED_TYPES[document_type]
-            expiry = _add_months(emission, validity_months)
-            is_valid = expiry >= today
+            expiry_date = _add_months(emission, validity_months)
+            is_valid = expiry_date >= today
 
         return {
             "document_date": emission.isoformat() if emission else None,
+            "expiry_date": expiry_date.isoformat() if expiry_date else None,
             "is_valid": is_valid,
         }
 
@@ -353,17 +355,19 @@ class GeminiDocumentExtractor:
         document_date: date | None = None
         is_valid: bool | None = None
 
+        expiry_date: date | None = None
         if document_date_str:
             try:
                 document_date = date.fromisoformat(document_date_str)
                 today = datetime.now(tz=timezone.utc).date()
-                expiry = _add_months(document_date, _DATED_TYPES[document_type])
-                is_valid = expiry >= today
+                expiry_date = _add_months(document_date, _DATED_TYPES[document_type])
+                is_valid = expiry_date >= today
             except ValueError:
                 logger.warning("invalid_document_date_format", raw=document_date_str)
 
         return {
             "document_date": document_date.isoformat() if document_date else None,
+            "expiry_date": expiry_date.isoformat() if expiry_date else None,
             "is_valid": is_valid,
         }
 

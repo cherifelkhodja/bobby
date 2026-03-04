@@ -609,6 +609,36 @@ class EmailService:
         """
         return await self._send_email(to, subject, html_body)
 
+    async def send_documents_submitted_notification(
+        self,
+        to: str,
+        third_party_name: str,
+        uploaded_count: int,
+        total_count: int,
+        compliance_url: str,
+    ) -> bool:
+        """Notify ADV that a third party has confirmed their document submission."""
+        subject = f"Documents déposés — {third_party_name}"
+        html_body = f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #0ea5e9;">Dépôt de documents confirmé</h1>
+                <p>Le tiers <strong>{third_party_name}</strong> vient de valider son dépôt de documents.</p>
+                <p><strong>{uploaded_count} document(s) sur {total_count}</strong> ont été téléversés et sont en attente de vérification.</p>
+                <p style="text-align: center; margin: 30px 0;">
+                    <a href="{compliance_url}" style="background-color: #0ea5e9; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                        Accéder au tableau de conformité
+                    </a>
+                </p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby.</p>
+            </div>
+        </body></html>
+        """
+        return await self._send_email(to, subject, html_body)
+
     async def send_document_expired(
         self,
         to: str,

@@ -10,6 +10,7 @@ from app.vigilance.domain.exceptions import (
     DocumentNotAllowedError,
     DocumentNotFoundError,
 )
+from app.vigilance.domain.value_objects.document_status import DocumentStatus
 from app.vigilance.domain.services.vigilance_requirements import (
     ALLOWED_EXTENSIONS,
     ALLOWED_MIME_TYPES,
@@ -92,12 +93,19 @@ class UploadDocumentUseCase:
             extension=extension,
         )
 
-        # Transition to RECEIVED
-        document.mark_received(
-            s3_key=s3_key,
-            file_name=command.file_name,
-            file_size=len(command.file_content),
-        )
+        # Transition to RECEIVED (or replace existing file)
+        if document.status == DocumentStatus.RECEIVED:
+            document.replace_file(
+                s3_key=s3_key,
+                file_name=command.file_name,
+                file_size=len(command.file_content),
+            )
+        else:
+            document.mark_received(
+                s3_key=s3_key,
+                file_name=command.file_name,
+                file_size=len(command.file_content),
+            )
 
         # AI extraction (best-effort — never blocks the upload on failure)
         if self._extractor is not None:

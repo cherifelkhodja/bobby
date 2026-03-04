@@ -130,6 +130,35 @@ class VigilanceDocument:
         self.document_date = None
         self.is_valid_at_upload = None
 
+    def replace_file(
+        self,
+        s3_key: str,
+        file_name: str,
+        file_size: int,
+    ) -> None:
+        """Replace the file of a previously received document.
+
+        Stays in RECEIVED status — resets extraction fields.
+
+        Args:
+            s3_key: New S3 storage key.
+            file_name: New file name.
+            file_size: New file size in bytes.
+
+        Raises:
+            InvalidDocumentTransitionError: If the document is not in RECEIVED status.
+        """
+        if self.status != DocumentStatus.RECEIVED:
+            raise InvalidDocumentTransitionError(self.status.value, "received (replace)")
+        self.s3_key = s3_key
+        self.file_name = file_name
+        self.file_size = file_size
+        self.uploaded_at = datetime.utcnow()
+        self.auto_check_results = None
+        self.document_date = None
+        self.is_valid_at_upload = None
+        self.updated_at = datetime.utcnow()
+
     @property
     def is_valid(self) -> bool:
         """Check if the document is currently valid."""

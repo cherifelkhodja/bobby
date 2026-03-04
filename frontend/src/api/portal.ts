@@ -108,6 +108,11 @@ export const portalApi = {
     return response.data;
   },
 
+  submitDocuments: async (token: string): Promise<{ message: string }> => {
+    const response = await portalClient.post(`/${token}/submit-documents`);
+    return response.data;
+  },
+
   submitContractReview: async (
     token: string,
     decision: 'approved' | 'changes_requested',

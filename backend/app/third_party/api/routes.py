@@ -13,6 +13,7 @@ from app.third_party.api.schemas import (
     ContractReviewRequest,
     ContractReviewResponse,
     DocumentUploadResponse,
+    DocumentsSubmittedResponse,
     MagicLinkPortalResponse,
     PortalDocumentResponse,
     PortalDocumentsListResponse,
@@ -264,6 +265,74 @@ async def upload_portal_document(
         status=updated.status.value,
         file_name=updated.file_name or "",
     )
+
+
+# ── Portal Submit Documents ─────────────────────────────────────
+
+
+@router.post(
+    "/portal/{token}/submit-documents",
+    response_model=DocumentsSubmittedResponse,
+    summary="Third party confirms document submission",
+)
+async def submit_portal_documents(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Called when the third party clicks 'Valider le dépôt'.
+
+    Sends a notification email to the ADV contact of the third party.
+    Never blocks on email failure.
+    """
+    result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
+
+    doc_repo = DocumentRepository(db)
+    documents = await doc_repo.list_by_third_party(result.third_party.id)
+
+    uploaded_count = sum(
+        1 for d in documents
+        if d.status.value in ("received", "validated", "expiring_soon")
+    )
+    total_count = len(documents)
+
+    # Send notification to ADV contact (best-effort)
+    adv_email = result.third_party.adv_contact_email
+    if adv_email:
+        try:
+            from app.config import get_settings
+            from app.infrastructure.email.sender import EmailSender
+            settings = get_settings()
+            email_sender = EmailSender(settings)
+            frontend_url = settings.FRONTEND_URL.rstrip("/")
+            compliance_url = f"{frontend_url}/compliance"
+            await email_sender.send_documents_submitted_notification(
+                to=adv_email,
+                third_party_name=result.third_party.company_name or result.third_party.contact_email,
+                uploaded_count=uploaded_count,
+                total_count=total_count,
+                compliance_url=compliance_url,
+            )
+        except Exception as exc:
+            logger.warning(
+                "submit_notification_email_failed",
+                third_party_id=str(result.third_party.id),
+                adv_email=adv_email,
+                error=str(exc),
+            )
+
+    audit_logger.log(
+        AuditAction.PORTAL_ACCESSED,
+        AuditResource.MAGIC_LINK,
+        resource_id=str(result.magic_link.id),
+        details={
+            "action": "documents_submitted",
+            "third_party_id": str(result.third_party.id),
+            "uploaded_count": uploaded_count,
+            "total_count": total_count,
+        },
+    )
+
+    return DocumentsSubmittedResponse()
 
 
 # ── Portal Contract Review Routes ───────────────────────────────
