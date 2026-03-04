@@ -180,11 +180,14 @@ export default function Portal() {
   const allDocsHandled =
     !!docsData &&
     docsData.documents.length > 0 &&
-    docsData.documents.every(
-      (d) =>
+    docsData.documents.every((d) => {
+      // Temporarily validated (no real file) still requires a real upload
+      if (d.status === 'validated' && !d.file_name) return false;
+      return (
         ['received', 'validated', 'expiring_soon'].includes(d.status) ||
-        (d.is_unavailable && !!d.unavailability_reason),
-    );
+        (d.is_unavailable && !!d.unavailability_reason)
+      );
+    });
 
   const hasExpiredDoc =
     !!docsData && docsData.documents.some((d) => d.status === 'expired');
@@ -1127,8 +1130,10 @@ function DocumentUploadCard({
     ? 'Document indisponible'
     : DOCUMENT_STATUS_LABELS[doc.status] ?? doc.status;
 
-  // Upload zone shown for requested/rejected, or when user clicks "Changer"
-  const needsUpload = !unavailChecked && (doc.status === 'requested' || doc.status === 'rejected' || showReplace);
+  // Temporarily validated by ADV (no real file yet) — third party can still submit
+  const isTempValidated = doc.status === 'validated' && !doc.file_name;
+  // Upload zone shown for requested/rejected, temporarily validated, or when user clicks "Changer"
+  const needsUpload = isTempValidated || (!unavailChecked && (doc.status === 'requested' || doc.status === 'rejected' || showReplace));
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => portalApi.uploadDocument(token, doc.id, file),
@@ -1306,6 +1311,13 @@ function DocumentUploadCard({
         )}
       </div>
 
+      {/* ── Banner for temporarily validated docs ── */}
+      {isTempValidated && (
+        <p className="mt-3 text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 py-2">
+          Votre interlocuteur a pris acte de l'indisponibilité de ce document. Si vous l'avez obtenu depuis, vous pouvez le déposer ici.
+        </p>
+      )}
+
       {/* ── Upload zone ── */}
       {needsUpload && (
         <div
@@ -1336,7 +1348,7 @@ function DocumentUploadCard({
       )}
 
       {/* ── "Je ne dispose pas de ce document" checkbox ── */}
-      {(doc.status === 'requested' || doc.status === 'rejected' || doc.is_unavailable) && !showReplace && (
+      {!isTempValidated && (doc.status === 'requested' || doc.status === 'rejected' || doc.is_unavailable) && !showReplace && (
         <div className="mt-3 border-t border-gray-100 dark:border-gray-700 pt-3">
           <label className="flex items-start gap-2 cursor-pointer select-none">
             <input
