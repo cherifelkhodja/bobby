@@ -390,6 +390,7 @@ function DocumentCard({
   onRejectConfirm,
   onRejectCancel,
   isValidating,
+  isTempValidating,
   isRejecting,
 }: {
   doc: VigilanceDocument;
