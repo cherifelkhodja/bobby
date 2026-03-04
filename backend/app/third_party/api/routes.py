@@ -401,7 +401,7 @@ async def submit_portal_documents(
     from app.infrastructure.database.repositories.user_repository import UserRepository
     from app.infrastructure.email.sender import EmailSender
     from app.domain.value_objects import UserRole
-    from app.third_party.domain.value_objects.compliance_status import ComplianceStatus
+    from app.third_party.infrastructure.models import ThirdPartyModel
 
     result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
 
@@ -414,10 +414,18 @@ async def submit_portal_documents(
     )
     total_count = len(documents)
 
-    # Update compliance status to "En cours de vérification"
-    tp_repo = ThirdPartyRepository(db)
-    result.third_party.update_compliance_status(ComplianceStatus.UNDER_REVIEW)
-    await tp_repo.save(result.third_party)
+    # Update compliance status to "En cours de vérification" (best-effort)
+    try:
+        tp_model = await db.get(ThirdPartyModel, result.third_party.id)
+        if tp_model:
+            tp_model.compliance_status = "under_review"
+            await db.flush()
+    except Exception as exc:
+        logger.warning(
+            "compliance_status_update_failed",
+            third_party_id=str(result.third_party.id),
+            error=str(exc),
+        )
 
     # Collect recipients: ADV contact + all active admin users
     settings = get_settings()
