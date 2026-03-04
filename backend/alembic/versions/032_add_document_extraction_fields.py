@@ -1,7 +1,7 @@
 """Add document_date and is_valid_at_upload to vig_documents.
 
-Revision ID: 029_add_doc_extraction_fields
-Revises: 028_cr_consultant_address
+Revision ID: 032_add_doc_extraction_fields
+Revises: 031_remove_siren_unique
 Create Date: 2026-03-04
 """
 
@@ -9,8 +9,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "029_add_doc_extraction_fields"
-down_revision = "028_cr_consultant_address"
+revision = "032_add_doc_extraction_fields"
+down_revision = "031_remove_siren_unique"
 branch_labels = None
 depends_on = None
 
