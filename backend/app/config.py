@@ -97,7 +97,10 @@ class Settings(BaseSettings):
     INSEE_CONSUMER_KEY: str = ""
     INSEE_CONSUMER_SECRET: str = ""
 
-    # INPI RNE API (Bearer token stocké dans AWS Secrets Manager)
+    # INPI RNE API — credentials pour auto-login (JWT expires régulièrement)
+    INPI_USERNAME: str = ""
+    INPI_PASSWORD: str = ""
+    # Token statique optionnel (fallback si pas de credentials)
     INPI_TOKEN: str = ""
 
     # Bobby Portal
@@ -261,6 +264,8 @@ def get_settings() -> Settings:
             "ANTHROPIC_API_KEY": "ANTHROPIC_API_KEY",
             "SIRENE_API_KEY": "SIRENE_API_KEY",
             "INPI_TOKEN": "INPI_TOKEN",
+            "INPI_USERNAME": "INPI_USERNAME",
+            "INPI_PASSWORD": "INPI_PASSWORD",
             "SMTP_USER": "SMTP_USER",
             "SMTP_PASSWORD": "SMTP_PASSWORD",
             "FRONTEND_URL": "FRONTEND_URL",

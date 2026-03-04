@@ -605,7 +605,11 @@ async def lookup_siret(
     if siren and settings.INPI_TOKEN:
         from app.third_party.infrastructure.adapters.inpi_client import InpiClient
         try:
-            inpi = InpiClient(token=settings.INPI_TOKEN)
+            inpi = InpiClient(
+                username=settings.INPI_USERNAME,
+                password=settings.INPI_PASSWORD,
+                token=settings.INPI_TOKEN,
+            )
             inpi_info = await inpi.get_company(siren)
             if not inpi_info:
                 logger.warning("inpi_no_data_returned", siren=siren)
