@@ -121,6 +121,11 @@ export const portalApi = {
     return response.data;
   },
 
+  deleteDocument: async (token: string, documentId: string): Promise<{ message: string }> => {
+    const response = await portalClient.delete(`/${token}/documents/${documentId}`);
+    return response.data;
+  },
+
   submitDocuments: async (token: string): Promise<{ message: string }> => {
     const response = await portalClient.post(`/${token}/submit-documents`);
     return response.data;

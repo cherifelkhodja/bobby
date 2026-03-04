@@ -322,6 +322,63 @@ async def update_document_availability(
     )
 
 
+# ── Portal Document Delete (reset to requested) ─────────────────
+
+
+@router.delete(
+    "/portal/{token}/documents/{document_id}",
+    summary="Delete a transmitted document (reset to requested)",
+    status_code=status.HTTP_200_OK,
+)
+async def delete_portal_document(
+    token: str,
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Third party resets a received document back to 'requested', deleting the uploaded file."""
+    result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
+
+    from app.config import get_settings
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    doc_repo = DocumentRepository(db)
+    doc = await doc_repo.get_by_id(document_id)
+    if not doc or doc.third_party_id != result.third_party.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document introuvable.")
+
+    if doc.status.value not in ("received",):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Seuls les documents transmis peuvent être supprimés.",
+        )
+
+    old_s3_key = doc.s3_key
+    doc.re_request()
+    await doc_repo.save(doc)
+
+    # Best-effort S3 deletion
+    if old_s3_key:
+        try:
+            s3_client = S3StorageClient(get_settings())
+            storage = VigilanceDocumentStorage(s3_client)
+            await storage.delete(old_s3_key)
+        except Exception:
+            logger.warning("portal_document_s3_delete_failed", s3_key=old_s3_key)
+
+    audit_logger.log(
+        AuditAction.DOCUMENT_UPLOADED,
+        AuditResource.VIGILANCE_DOCUMENT,
+        resource_id=str(doc.id),
+        details={
+            "third_party_id": str(result.third_party.id),
+            "document_type": doc.document_type.value,
+            "action": "deleted_by_portal",
+        },
+    )
+
+    return {"message": "Document supprimé. Vous pouvez en déposer un nouveau."}
+
+
 # ── Portal Submit Documents ─────────────────────────────────────
 
 

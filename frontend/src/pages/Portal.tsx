@@ -1156,6 +1156,18 @@ function DocumentUploadCard({
     availabilityMutation.mutate({ isUnavail: true, reason: unavailReason });
   };
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: () => portalApi.deleteDocument(token, doc.id),
+    onSuccess: () => {
+      toast.success('Document supprimé. Vous pouvez en déposer un nouveau.');
+      setConfirmDelete(false);
+      onSuccess();
+    },
+    onError: () => { toast.error('Erreur lors de la suppression.'); },
+  });
+
   return (
     <Card>
       {/* ── Header ── */}
@@ -1230,18 +1242,42 @@ function DocumentUploadCard({
           </div>
         </div>
 
-        {/* "Changer" button for received documents */}
-        {doc.status === 'received' && !showReplace && !unavailChecked && (
-          <button onClick={() => setShowReplace(true)}
-            className="ml-3 flex-shrink-0 text-xs text-primary-600 dark:text-primary-400 hover:underline">
-            Changer
-          </button>
+        {/* Actions for received documents */}
+        {doc.status === 'received' && !showReplace && !unavailChecked && !confirmDelete && (
+          <div className="ml-3 flex-shrink-0 flex flex-col items-end gap-1">
+            <button onClick={() => setShowReplace(true)}
+              className="text-xs text-primary-600 dark:text-primary-400 hover:underline">
+              Changer
+            </button>
+            <button onClick={() => setConfirmDelete(true)}
+              className="text-xs text-red-500 dark:text-red-400 hover:underline">
+              Supprimer
+            </button>
+          </div>
         )}
         {showReplace && (
           <button onClick={() => setShowReplace(false)}
             className="ml-3 flex-shrink-0 text-xs text-gray-400 hover:underline">
             Annuler
           </button>
+        )}
+        {confirmDelete && (
+          <div className="ml-3 flex-shrink-0 flex flex-col items-end gap-1">
+            <p className="text-xs text-gray-600 dark:text-gray-400 text-right">Confirmer ?</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+                className="text-xs text-red-500 dark:text-red-400 hover:underline disabled:opacity-50"
+              >
+                {deleteMutation.isPending ? 'Suppression…' : 'Oui, supprimer'}
+              </button>
+              <button onClick={() => setConfirmDelete(false)}
+                className="text-xs text-gray-400 hover:underline">
+                Annuler
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
