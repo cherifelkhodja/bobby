@@ -154,128 +154,142 @@ FORME_JURIDIQUE_LABELS: dict[str, str] = {
 
 # =============================================================================
 # Mapping département → ville principale du greffe (Tribunal de Commerce)
-# Source: liste des greffes des tribunaux de commerce de France
-# Pour les départements sans TC propre (agriculture), tribunal judiciaire compétent
+# Source: Infogreffe / Legalin.fr - Open Licence v2.0 (2025-04-09), 134 greffes
+# Notes:
+#   - Pour les depts avec plusieurs TC, on retourne le greffe principal (préfecture/le plus grand).
+#     Une commune précise permettrait de raffiner (non implémenté ici).
+#   - Alsace-Moselle (57, 67, 68) : pas de TC, compétence du Tribunal Judiciaire (TJ).
+#   - Corse (2A, 2B) : codes postaux 20xxx — dérivation via derive_greffe_city().
 # =============================================================================
 DEPT_TO_GREFFE: dict[str, str] = {
     "01": "Bourg-en-Bresse",
-    "02": "Soissons",
-    "03": "Cusset",
-    "04": "Digne-les-Bains",
+    "02": "Saint-Quentin",          # Aussi: Soissons
+    "03": "Cusset",                 # Aussi: Montluçon
+    "04": "Manosque",
     "05": "Gap",
-    "06": "Nice",
-    "07": "Privas",
-    "08": "Charleville-Mézières",
+    "06": "Nice",                   # Aussi: Antibes, Cannes, Grasse
+    "07": "Aubenas",
+    "08": "Sedan",
     "09": "Foix",
     "10": "Troyes",
-    "11": "Carcassonne",
+    "11": "Carcassonne",            # Aussi: Narbonne
     "12": "Rodez",
-    "13": "Marseille",
-    "14": "Caen",
+    "13": "Marseille",              # Aussi: Aix-en-Provence, Salon-de-Provence, Tarascon
+    "14": "Caen",                   # Aussi: Lisieux
     "15": "Aurillac",
     "16": "Angoulême",
-    "17": "La Rochelle",
+    "17": "La Rochelle",            # Aussi: Saintes
     "18": "Bourges",
     "19": "Brive-la-Gaillarde",
+    # 2A et 2B (Corse) gérés dans derive_greffe_city() via le code postal 20xxx
+    "2A": "Ajaccio",
+    "2B": "Bastia",
     "21": "Dijon",
     "22": "Saint-Brieuc",
     "23": "Guéret",
-    "24": "Périgueux",
+    "24": "Périgueux",              # Aussi: Bergerac
     "25": "Besançon",
     "26": "Romans-sur-Isère",
-    "27": "Évreux",
+    "27": "Evreux",                 # Aussi: Bernay
     "28": "Chartres",
-    "29": "Brest",
+    "29": "Brest",                  # Aussi: Quimper
     "30": "Nîmes",
     "31": "Toulouse",
     "32": "Auch",
-    "33": "Bordeaux",
-    "34": "Montpellier",
-    "35": "Rennes",
+    "33": "Bordeaux",               # Aussi: Libourne
+    "34": "Montpellier",            # Aussi: Béziers
+    "35": "Rennes",                 # Aussi: Saint-Malo
     "36": "Châteauroux",
     "37": "Tours",
-    "38": "Grenoble",
+    "38": "Grenoble",               # Aussi: Vienne
     "39": "Lons-le-Saunier",
-    "40": "Mont-de-Marsan",
+    "40": "Mont-de-Marsan",         # Aussi: Dax
     "41": "Blois",
-    "42": "Saint-Étienne",
+    "42": "Saint-Etienne",          # Aussi: Roanne
     "43": "Le Puy-en-Velay",
-    "44": "Nantes",
+    "44": "Nantes",                 # Aussi: Saint-Nazaire
     "45": "Orléans",
     "46": "Cahors",
     "47": "Agen",
     "48": "Mende",
     "49": "Angers",
-    "50": "Cherbourg-en-Cotentin",
-    "51": "Reims",
+    "50": "Cherbourg-Octeville",    # Aussi: Coutances
+    "51": "Reims",                  # Aussi: Châlons-en-Champagne
     "52": "Chaumont",
     "53": "Laval",
-    "54": "Nancy",
+    "54": "Nancy",                  # Aussi: Briey
     "55": "Bar-le-Duc",
-    "56": "Vannes",
-    "57": "Metz",
+    "56": "Vannes",                 # Aussi: Lorient
+    "57": "Metz",                   # TJ Alsace-Moselle (pas de TC) — Aussi: Sarreguemines, Thionville
     "58": "Nevers",
-    "59": "Lille",
-    "60": "Beauvais",
+    "59": "Lille Métropole",        # Aussi: Douai, Dunkerque, Valenciennes
+    "60": "Beauvais",               # Aussi: Compiègne
     "61": "Alençon",
-    "62": "Arras",
+    "62": "Arras",                  # Aussi: Boulogne-sur-Mer
     "63": "Clermont-Ferrand",
-    "64": "Pau",
+    "64": "Pau",                    # Aussi: Bayonne
     "65": "Tarbes",
     "66": "Perpignan",
-    "67": "Strasbourg",
-    "68": "Colmar",
-    "69": "Lyon",
+    "67": "Strasbourg",             # TJ Alsace-Moselle (pas de TC) — Aussi: Saverne
+    "68": "Colmar",                 # TJ Alsace-Moselle (pas de TC) — Aussi: Mulhouse
+    "69": "Lyon",                   # Aussi: Villefranche-Tarare
     "70": "Vesoul",
-    "71": "Mâcon",
+    "71": "Chalon-sur-Saône",       # Aussi: Mâcon
     "72": "Le Mans",
     "73": "Chambéry",
-    "74": "Annecy",
+    "74": "Annecy",                 # Aussi: Thonon-les-Bains
     "75": "Paris",
-    "76": "Rouen",
-    "77": "Meaux",
+    "76": "Rouen",                  # Aussi: Le Havre, Dieppe
+    "77": "Meaux",                  # Aussi: Melun
     "78": "Versailles",
     "79": "Niort",
     "80": "Amiens",
-    "81": "Albi",
+    "81": "Albi",                   # Aussi: Castres
     "82": "Montauban",
-    "83": "Toulon",
+    "83": "Toulon",                 # Aussi: Draguignan, Fréjus
     "84": "Avignon",
     "85": "La Roche-sur-Yon",
     "86": "Poitiers",
     "87": "Limoges",
-    "88": "Épinal",
-    "89": "Auxerre",
+    "88": "Epinal",
+    "89": "Auxerre",                # Aussi: Sens
     "90": "Belfort",
-    "91": "Évry-Courcouronnes",
+    "91": "Evry",
     "92": "Nanterre",
     "93": "Bobigny",
     "94": "Créteil",
     "95": "Pontoise",
     # DOM-TOM
-    "971": "Pointe-à-Pitre",
+    "971": "Pointe-à-Pitre",        # Aussi: Basse-Terre
     "972": "Fort-de-France",
     "973": "Cayenne",
     "974": "Saint-Denis",
-    "976": "Mamoudzou",
 }
 
 
 def derive_greffe_city(postal_code: str, commune: str | None = None) -> str | None:
-    """Derive the greffe (Tribunal de Commerce) city from a French postal code.
+    """Derive the greffe (Tribunal de Commerce / Judiciaire) city from a French postal code.
 
-    Uses the department code extracted from the postal code to map to the
-    principal tribunal de commerce for that department.
+    Uses the department code extracted from the postal code. For departments with
+    multiple greffes, returns the principal one (préfecture / largest city).
 
-    Args:
-        postal_code: French postal code (5 digits).
-        commune: Commune name (unused currently, reserved for future refinement).
-
-    Returns:
-        City name of the tribunal de commerce, or None if not determinable.
+    Special cases:
+    - Corse: postal codes start with "20" but map to 2A or 2B depending on range.
+      20000–20199 → Corse-du-Sud (2A) → Ajaccio
+      20200–20999 → Haute-Corse (2B) → Bastia
+    - DOM-TOM: 97x → 3-digit department code.
+    - Alsace-Moselle (57, 67, 68): Tribunal Judiciaire, not TC (same city returned).
     """
     if not postal_code or len(postal_code) < 2:
         return None
+
+    # Corse: postal codes 20xxx map to 2A or 2B (not "20")
+    if postal_code.startswith("20") and len(postal_code) == 5:
+        try:
+            num = int(postal_code)
+            return "Ajaccio" if num < 20200 else "Bastia"
+        except ValueError:
+            pass
 
     # DOM-TOM: 97x codes use 3 digits for department
     if postal_code.startswith("97") and len(postal_code) >= 3:
