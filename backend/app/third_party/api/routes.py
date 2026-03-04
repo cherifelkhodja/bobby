@@ -449,19 +449,17 @@ async def submit_portal_documents(
                 error=str(exc),
             )
 
-    # Collect recipients: ADV contact + all active admin users
+    # Collect recipients: ADV and admin users in Bobby
     settings = get_settings()
     email_sender = EmailSender(settings)
     frontend_url = settings.FRONTEND_URL.rstrip("/")
     compliance_url = f"{frontend_url}/compliance"
     third_party_name = result.third_party.company_name or result.third_party.contact_email
 
-    recipients: list[str] = []
-    if result.third_party.adv_contact_email:
-        recipients.append(result.third_party.adv_contact_email)
     user_repo = UserRepository(db)
-    admin_users = await user_repo.list_by_roles([UserRole.ADMIN])
-    for u in admin_users:
+    internal_users = await user_repo.list_by_roles([UserRole.ADV, UserRole.ADMIN])
+    recipients: list[str] = []
+    for u in internal_users:
         email = str(u.email)
         if email and email not in recipients:
             recipients.append(email)
