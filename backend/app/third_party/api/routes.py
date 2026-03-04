@@ -399,7 +399,7 @@ async def submit_portal_documents(
     """
     from app.config import get_settings
     from app.infrastructure.database.repositories.user_repository import UserRepository
-    from app.infrastructure.email.sender import EmailSender
+    from app.infrastructure.email.sender import EmailService as EmailSender
     from app.domain.value_objects import UserRole
     from app.third_party.infrastructure.models import ThirdPartyModel
 
