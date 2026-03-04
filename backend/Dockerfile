@@ -52,7 +52,7 @@ RUN pip install --no-cache-dir \
     "pymupdf>=1.24.0"
 
 # Force fresh copy - change this value to bust Docker cache
-RUN echo "build-20260215-v1"
+RUN echo "build-20260304-pymupdf"
 
 # Copy application code
 COPY . .
