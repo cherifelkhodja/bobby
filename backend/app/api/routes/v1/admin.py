@@ -929,30 +929,26 @@ async def test_inpi_connection(
 ):
     """Test INPI RNE API connection (admin only).
 
-    Authenticates with INPI credentials and queries a known SIREN.
-    Credentials (INPI_USERNAME / INPI_PASSWORD) should be stored in AWS Secrets Manager.
+    Uses the static Bearer token (INPI_TOKEN) stored in AWS Secrets Manager.
     """
     import time
 
     from app.third_party.infrastructure.adapters.inpi_client import InpiClient
 
-    configured = bool(settings.INPI_USERNAME and settings.INPI_PASSWORD)
+    configured = bool(settings.INPI_TOKEN)
 
     if not configured:
         return InpiTestResponse(
             success=False,
             configured=False,
             response_time_ms=0,
-            message="INPI_USERNAME / INPI_PASSWORD non configurés",
+            message="INPI_TOKEN non configuré (AWS Secrets Manager)",
         )
 
-    inpi_client = InpiClient(
-        username=settings.INPI_USERNAME,
-        password=settings.INPI_PASSWORD,
-    )
+    inpi_client = InpiClient(token=settings.INPI_TOKEN)
 
-    # Test with INSEE's own SIREN (known stable public entity)
-    test_siren = "120014019"
+    # Test with GEMINI's own SIREN (real payload verified)
+    test_siren = "842799959"
     start = time.time()
     try:
         result = await inpi_client.get_company(test_siren)
@@ -974,12 +970,12 @@ async def test_inpi_connection(
                 message=f"INPI RNE fonctionne ({elapsed}ms) — {result.company_name} — {detail_str}",
             )
         else:
-            # 404 = SIREN introuvable, but auth worked (token was obtained)
+            # 404 = SIREN introuvable mais token valide (pas d'erreur 401/403)
             return InpiTestResponse(
                 success=True,
                 configured=True,
                 response_time_ms=elapsed,
-                message=f"INPI RNE accessible ({elapsed}ms) — authentification OK",
+                message=f"INPI RNE accessible ({elapsed}ms) — token valide",
             )
 
     except Exception as e:

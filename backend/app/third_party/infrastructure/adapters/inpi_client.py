@@ -1,6 +1,6 @@
 """INPI RNE API client for company information lookup.
 
-Uses username/password → Bearer token flow (token cached until expiry).
+Uses a static Bearer token stored in AWS Secrets Manager (INPI_TOKEN).
 Fetches forme juridique, capital social, and ville du greffe for a given SIREN.
 
 Response structure (verified on real payload):
@@ -13,7 +13,6 @@ Response structure (verified on real payload):
   → Greffe is derived from postal code (no direct field for the company itself)
 """
 
-import time
 from dataclasses import dataclass
 
 import httpx
@@ -22,8 +21,6 @@ import structlog
 logger = structlog.get_logger()
 
 INPI_BASE_URL = "https://registre-national-entreprises.inpi.fr/api"
-INPI_LOGIN_URL = f"{INPI_BASE_URL}/sso/login"
-INPI_TOKEN_TTL_SECONDS = 3600  # Refresh every hour
 
 
 # =============================================================================
@@ -333,55 +330,11 @@ class InpiCompanyInfo:
 class InpiClient:
     """Client for the INPI Registre National des Entreprises (RNE) API.
 
-    Authentication: POST /api/sso/login with username/password → Bearer token.
-    Token is cached and refreshed before expiry.
+    Authentication: static Bearer token stored in AWS Secrets Manager (INPI_TOKEN).
     """
 
-    def __init__(self, username: str, password: str) -> None:
-        self._username = username
-        self._password = password
-        self._access_token: str | None = None
-        self._token_expires_at: float = 0
-
-    async def _get_access_token(self) -> str | None:
-        """Obtain or return cached Bearer token."""
-        if self._access_token and time.monotonic() < self._token_expires_at - 60:
-            return self._access_token
-
-        if not self._username or not self._password:
-            logger.warning("inpi_credentials_not_configured")
-            return None
-
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post(
-                    INPI_LOGIN_URL,
-                    json={"username": self._username, "password": self._password},
-                    headers={"Content-Type": "application/json"},
-                )
-                response.raise_for_status()
-                data = response.json()
-
-            token = data.get("token")
-            if not token:
-                logger.error("inpi_login_no_token", response=str(data)[:200])
-                return None
-
-            self._access_token = token
-            self._token_expires_at = time.monotonic() + INPI_TOKEN_TTL_SECONDS
-            logger.info("inpi_token_obtained")
-            return self._access_token
-
-        except httpx.HTTPStatusError as exc:
-            logger.error(
-                "inpi_login_failed",
-                status_code=exc.response.status_code,
-                body=exc.response.text[:200],
-            )
-            return None
-        except httpx.RequestError as exc:
-            logger.error("inpi_login_request_error", error=str(exc))
-            return None
+    def __init__(self, token: str) -> None:
+        self._token = token
 
     async def get_company(self, siren: str) -> InpiCompanyInfo | None:
         """Fetch company info from INPI RNE by SIREN.
@@ -389,12 +342,12 @@ class InpiClient:
         Returns InpiCompanyInfo with legal form, capital, and greffe city,
         or None if not found or on error.
         """
-        token = await self._get_access_token()
-        if not token:
+        if not self._token:
+            logger.warning("inpi_token_not_configured")
             return None
 
         url = f"{INPI_BASE_URL}/companies/{siren}"
-        headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+        headers = {"Authorization": f"Bearer {self._token}", "Accept": "application/json"}
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
@@ -404,19 +357,9 @@ class InpiClient:
                 logger.info("inpi_company_not_found", siren=siren)
                 return None
 
-            if response.status_code == 401:
-                # Token rejected — clear and retry once
-                self._access_token = None
-                self._token_expires_at = 0
-                token = await self._get_access_token()
-                if not token:
-                    return None
-                headers["Authorization"] = f"Bearer {token}"
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    response = await client.get(url, headers=headers)
-                if response.status_code != 200:
-                    logger.error("inpi_auth_failed_after_retry", siren=siren)
-                    return None
+            if response.status_code in (401, 403):
+                logger.error("inpi_token_rejected", status_code=response.status_code, siren=siren)
+                return None
 
             response.raise_for_status()
             return self._parse_company(siren, response.json())

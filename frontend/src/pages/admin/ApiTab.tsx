@@ -569,7 +569,7 @@ export function ApiTab() {
         </div>
 
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Identifiants configurés via les variables <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">INPI_USERNAME</code> et <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">INPI_PASSWORD</code> (ou AWS Secrets Manager).
+          Token Bearer configuré via la variable <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">INPI_TOKEN</code> (AWS Secrets Manager).
         </p>
 
         {/* Test Result */}
