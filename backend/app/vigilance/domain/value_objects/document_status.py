@@ -22,6 +22,7 @@ class DocumentStatus(str, Enum):
                 {
                     DocumentStatus.VALIDATED,
                     DocumentStatus.REJECTED,
+                    DocumentStatus.REQUESTED,  # Portal user can reset/delete their upload
                 }
             ),
             DocumentStatus.VALIDATED: frozenset(

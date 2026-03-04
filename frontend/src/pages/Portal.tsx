@@ -9,6 +9,7 @@ import {
   FileText,
   CheckCircle,
   XCircle,
+  X,
   Clock,
   AlertTriangle,
   Building2,
@@ -1169,7 +1170,34 @@ function DocumentUploadCard({
   });
 
   return (
-    <Card>
+    <Card className="relative">
+      {/* ── X delete button (top-right) ── */}
+      {doc.status === 'received' && !unavailChecked && (
+        confirmDelete ? (
+          <div className="absolute top-3 right-3 flex items-center gap-2">
+            <button
+              onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending}
+              className="text-xs text-red-500 dark:text-red-400 hover:underline disabled:opacity-50"
+            >
+              {deleteMutation.isPending ? 'Suppression…' : 'Confirmer'}
+            </button>
+            <button onClick={() => setConfirmDelete(false)}
+              className="text-xs text-gray-400 hover:underline">
+              Annuler
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            title="Supprimer ce document"
+            className="absolute top-3 right-3 p-1 rounded-full text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )
+      )}
+
       {/* ── Header ── */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -1242,42 +1270,18 @@ function DocumentUploadCard({
           </div>
         </div>
 
-        {/* Actions for received documents */}
+        {/* "Changer" button for received documents */}
         {doc.status === 'received' && !showReplace && !unavailChecked && !confirmDelete && (
-          <div className="ml-3 flex-shrink-0 flex flex-col items-end gap-1">
-            <button onClick={() => setShowReplace(true)}
-              className="text-xs text-primary-600 dark:text-primary-400 hover:underline">
-              Changer
-            </button>
-            <button onClick={() => setConfirmDelete(true)}
-              className="text-xs text-red-500 dark:text-red-400 hover:underline">
-              Supprimer
-            </button>
-          </div>
+          <button onClick={() => setShowReplace(true)}
+            className="ml-3 mr-6 flex-shrink-0 text-xs text-primary-600 dark:text-primary-400 hover:underline">
+            Changer
+          </button>
         )}
         {showReplace && (
           <button onClick={() => setShowReplace(false)}
-            className="ml-3 flex-shrink-0 text-xs text-gray-400 hover:underline">
+            className="ml-3 mr-6 flex-shrink-0 text-xs text-gray-400 hover:underline">
             Annuler
           </button>
-        )}
-        {confirmDelete && (
-          <div className="ml-3 flex-shrink-0 flex flex-col items-end gap-1">
-            <p className="text-xs text-gray-600 dark:text-gray-400 text-right">Confirmer ?</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => deleteMutation.mutate()}
-                disabled={deleteMutation.isPending}
-                className="text-xs text-red-500 dark:text-red-400 hover:underline disabled:opacity-50"
-              >
-                {deleteMutation.isPending ? 'Suppression…' : 'Oui, supprimer'}
-              </button>
-              <button onClick={() => setConfirmDelete(false)}
-                className="text-xs text-gray-400 hover:underline">
-                Annuler
-              </button>
-            </div>
-          </div>
         )}
       </div>
 
