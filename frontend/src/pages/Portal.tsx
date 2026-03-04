@@ -183,6 +183,9 @@ export default function Portal() {
         (d.is_unavailable && !!d.unavailability_reason),
     );
 
+  const hasExpiredDoc =
+    !!docsData && docsData.documents.some((d) => d.status === 'expired');
+
   // Natural step: 0=infos société, 1=documents, 2=confirmation (post-submit)
   const naturalStep = isDocumentUpload
     ? !hasSiren ? 0 : submitted ? 2 : 1
@@ -305,7 +308,8 @@ export default function Portal() {
           {docsData.documents.length > 0 && (
             <SubmitDocumentsButton
               token={token!}
-              enabled={allDocsHandled}
+              enabled={allDocsHandled && !hasExpiredDoc}
+              expiredBlocked={hasExpiredDoc}
               onSubmitted={() => {
                 setSubmitted(true);
                 setForceStep(null);
@@ -1030,10 +1034,12 @@ function PortalSpinner() {
 function SubmitDocumentsButton({
   token,
   enabled,
+  expiredBlocked,
   onSubmitted,
 }: {
   token: string;
   enabled: boolean;
+  expiredBlocked?: boolean;
   onSubmitted: () => void;
 }) {
   const submitMutation = useMutation({
@@ -1070,7 +1076,12 @@ function SubmitDocumentsButton({
             </>
           )}
         </Button>
-        {!enabled && (
+        {expiredBlocked && (
+          <p className="text-xs text-red-500 dark:text-red-400">
+            Un ou plusieurs documents sont expirés. Veuillez les remplacer avant de valider.
+          </p>
+        )}
+        {!enabled && !expiredBlocked && (
           <p className="text-xs text-gray-400 dark:text-gray-500">
             Chaque document doit être téléversé ou signalé comme indisponible avec une raison.
           </p>
