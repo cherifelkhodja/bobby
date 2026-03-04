@@ -31,6 +31,16 @@ class InvalidDocumentTypeError(DomainError):
         super().__init__(f"Type de document inconnu : {document_type}")
 
 
+class ExpiredDocumentError(DomainError):
+    """Raised when an uploaded document is already expired."""
+
+    def __init__(self, expiry_date: str) -> None:
+        super().__init__(
+            f"Ce document est expiré depuis le {expiry_date}. "
+            "Veuillez fournir un document en cours de validité."
+        )
+
+
 class ComplianceBlockError(DomainError):
     """Raised when a compliance check blocks an operation."""
 

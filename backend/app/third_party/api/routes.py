@@ -32,6 +32,7 @@ from app.third_party.domain.exceptions import (
 from app.vigilance.domain.exceptions import (
     DocumentNotAllowedError,
     DocumentNotFoundError,
+    ExpiredDocumentError,
     InvalidDocumentTransitionError,
 )
 from app.third_party.domain.value_objects.magic_link_purpose import MagicLinkPurpose
@@ -258,6 +259,8 @@ async def upload_portal_document(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except DocumentNotAllowedError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ExpiredDocumentError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except InvalidDocumentTransitionError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 

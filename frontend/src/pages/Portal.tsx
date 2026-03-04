@@ -1137,7 +1137,10 @@ function DocumentUploadCard({
       setShowReplace(false);
       onSuccess();
     },
-    onError: () => { toast.error('Erreur lors du téléversement.'); },
+    onError: (error: unknown) => {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ?? 'Erreur lors du téléversement.');
+    },
   });
 
   const availabilityMutation = useMutation({

@@ -9,6 +9,7 @@ import structlog
 from app.vigilance.domain.exceptions import (
     DocumentNotAllowedError,
     DocumentNotFoundError,
+    ExpiredDocumentError,
 )
 from app.vigilance.domain.value_objects.document_status import DocumentStatus
 from app.vigilance.domain.services.vigilance_requirements import (
@@ -83,6 +84,23 @@ class UploadDocumentUseCase:
         _, ext = os.path.splitext(command.file_name)
         extension = ext.lstrip(".").lower() or "pdf"
 
+        # Run extraction BEFORE uploading to S3 so we can reject expired documents early
+        extracted: dict = {}
+        if self._extractor is not None:
+            try:
+                extracted = await self._extractor.extract(
+                    document_type=document.document_type.value,
+                    file_content=command.file_content,
+                    content_type=command.content_type,
+                ) or {}
+            except Exception:
+                extracted = {}
+
+        # Block upload if the document is already expired
+        if extracted.get("is_valid") is False:
+            expiry_date_str = extracted.get("expiry_date") or "date inconnue"
+            raise ExpiredDocumentError(expiry_date_str)
+
         # Upload to S3
         s3_key = await self._document_storage.upload(
             third_party_id=document.third_party_id,
@@ -107,42 +125,33 @@ class UploadDocumentUseCase:
                 file_size=len(command.file_content),
             )
 
-        # AI extraction (best-effort — never blocks the upload on failure)
-        if self._extractor is not None:
-            extracted = await self._extractor.extract(
-                document_type=document.document_type.value,
-                file_content=command.file_content,
-                content_type=command.content_type,
-            )
-            if extracted:
-                document.auto_check_results = extracted
-                # Persist dedicated columns when available
-                doc_date_str = extracted.get("document_date")
-                if doc_date_str:
-                    try:
-                        document.document_date = date.fromisoformat(doc_date_str)
-                    except ValueError:
-                        pass
-                expiry_date_str = extracted.get("expiry_date")
-                if expiry_date_str:
-                    try:
-                        expiry_d = date.fromisoformat(expiry_date_str)
-                        document.expires_at = datetime(
-                            expiry_d.year, expiry_d.month, expiry_d.day,
-                        )
-                    except ValueError:
-                        pass
-                is_valid = extracted.get("is_valid")
-                if is_valid is not None:
-                    document.is_valid_at_upload = bool(is_valid)
+        # Persist extracted data (extraction was done before S3 upload)
+        if extracted:
+            document.auto_check_results = extracted
+            doc_date_str = extracted.get("document_date")
+            if doc_date_str:
+                try:
+                    document.document_date = date.fromisoformat(doc_date_str)
+                except ValueError:
+                    pass
+            expiry_date_str = extracted.get("expiry_date")
+            if expiry_date_str:
+                try:
+                    expiry_d = date.fromisoformat(expiry_date_str)
+                    document.expires_at = datetime(expiry_d.year, expiry_d.month, expiry_d.day)
+                except ValueError:
+                    pass
+            is_valid = extracted.get("is_valid")
+            if is_valid is not None:
+                document.is_valid_at_upload = bool(is_valid)
 
-                logger.info(
-                    "document_extraction_done",
-                    document_id=str(document.id),
-                    document_type=document.document_type.value,
-                    document_date=doc_date_str,
-                    is_valid=is_valid,
-                )
+            logger.info(
+                "document_extraction_done",
+                document_id=str(document.id),
+                document_type=document.document_type.value,
+                document_date=extracted.get("document_date"),
+                is_valid=is_valid,
+            )
 
         saved = await self._document_repo.save(document)
 
