@@ -1,7 +1,7 @@
 """Use case: Upload a document for a third party."""
 
 import os
-from datetime import date
+from datetime import date, datetime, timezone
 from uuid import UUID
 
 import structlog
@@ -121,6 +121,16 @@ class UploadDocumentUseCase:
                 if doc_date_str:
                     try:
                         document.document_date = date.fromisoformat(doc_date_str)
+                    except ValueError:
+                        pass
+                expiry_date_str = extracted.get("expiry_date")
+                if expiry_date_str:
+                    try:
+                        expiry_d = date.fromisoformat(expiry_date_str)
+                        document.expires_at = datetime(
+                            expiry_d.year, expiry_d.month, expiry_d.day,
+                            tzinfo=timezone.utc,
+                        )
                     except ValueError:
                         pass
                 is_valid = extracted.get("is_valid")

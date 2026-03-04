@@ -81,6 +81,17 @@ function ExpiryBadge({ expiresAt }: { expiresAt: string | null }) {
   );
 }
 
+// ─── Auto-check labels ────────────────────────────────────────────────────────
+
+const AUTO_CHECK_CONFIG: Record<string, { label: string; isDate?: boolean; isText?: boolean }> = {
+  document_date: { label: "Date d'émission détectée", isDate: true },
+  expiry_date:   { label: "Date d'expiration détectée", isDate: true },
+  is_valid:      { label: 'Document valide à la date d\'émission' },
+  beneficiaire:  { label: 'Bénéficiaire identifié', isText: true },
+  iban:          { label: 'IBAN détecté', isText: true },
+  bic:           { label: 'BIC détecté', isText: true },
+};
+
 // ─── Document Viewer Modal ────────────────────────────────────────────────────
 
 function DocumentViewerModal({
@@ -107,6 +118,11 @@ function DocumentViewerModal({
     doc.file_name?.toLowerCase().endsWith('.pdf') ||
     urlData?.url?.includes('.pdf');
   const canValidate = doc.status === 'received';
+
+  // Fallback: use values from auto_check_results if dedicated columns are null
+  const acr = doc.auto_check_results ?? {};
+  const docDate = doc.document_date ?? (acr.document_date as string | null | undefined) ?? null;
+  const expiryDate = doc.expires_at ?? (acr.expiry_date as string | null | undefined) ?? null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -226,37 +242,35 @@ function DocumentViewerModal({
                 </div>
               )}
 
-              {doc.document_date && (
-                <div className="flex items-start gap-2">
-                  <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Date du document</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {formatDate(doc.document_date)}
-                    </p>
-                    {doc.is_valid_at_upload === false && (
-                      <span className="inline-flex items-center gap-1 mt-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 px-2 py-0.5 text-xs font-medium">
-                        <XCircle className="h-3 w-3" /> Document invalide à l'émission
-                      </span>
-                    )}
-                  </div>
+              <div className="flex items-start gap-2">
+                <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Date du document</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {formatDate(docDate)}
+                  </p>
+                  {doc.is_valid_at_upload === false && (
+                    <span className="inline-flex items-center gap-1 mt-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 px-2 py-0.5 text-xs font-medium">
+                      <XCircle className="h-3 w-3" /> Document invalide à l'émission
+                    </span>
+                  )}
                 </div>
-              )}
+              </div>
 
-              {doc.expires_at && (
-                <div className="flex items-start gap-2">
-                  <Timer className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Valide jusqu'au</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {formatDate(doc.expires_at)}
-                    </p>
+              <div className="flex items-start gap-2">
+                <Timer className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Valide jusqu'au</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {formatDate(expiryDate)}
+                  </p>
+                  {expiryDate && (
                     <div className="mt-1">
-                      <ExpiryBadge expiresAt={doc.expires_at} />
+                      <ExpiryBadge expiresAt={expiryDate} />
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
 
               {doc.file_size && (
                 <div className="flex items-start gap-2">
@@ -284,16 +298,35 @@ function DocumentViewerModal({
             {/* Auto-check results */}
             {doc.auto_check_results && Object.keys(doc.auto_check_results).length > 0 && (
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Vérifications auto</p>
-                <div className="space-y-1">
-                  {Object.entries(doc.auto_check_results).map(([k, v]) => (
-                    <div key={k} className="flex items-center justify-between text-xs">
-                      <span className="text-gray-600 dark:text-gray-400">{k}</span>
-                      <span className={v ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                        {v ? '✓' : '✗'}
-                      </span>
-                    </div>
-                  ))}
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Vérifications auto</p>
+                <div className="space-y-2">
+                  {Object.entries(doc.auto_check_results).map(([k, v]) => {
+                    const cfg = AUTO_CHECK_CONFIG[k];
+                    const label = cfg?.label ?? k;
+                    const isPresent = v !== null && v !== undefined && v !== false && v !== '';
+                    const displayValue = cfg?.isDate && typeof v === 'string'
+                      ? formatDate(v)
+                      : cfg?.isText && typeof v === 'string'
+                      ? v
+                      : null;
+                    return (
+                      <div key={k} className="flex items-start gap-2">
+                        {isPresent ? (
+                          <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                        )}
+                        <div className="min-w-0">
+                          <p className={`text-xs font-medium ${isPresent ? 'text-gray-700 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>
+                            {label}
+                          </p>
+                          {displayValue && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{displayValue}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
