@@ -25,7 +25,7 @@ import {
 import { toast } from 'sonner';
 
 import { apiClient } from '../../api/client';
-import { adminApi, type CvAiTestResponse, type CvAiModelInfo, type CvGeneratorBetaSettings, type SireneTestResponse } from '../../api/admin';
+import { adminApi, type CvAiTestResponse, type CvAiModelInfo, type CvGeneratorBetaSettings, type SireneTestResponse, type InpiTestResponse } from '../../api/admin';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -90,6 +90,7 @@ export function ApiTab() {
   const [betaModel, setBetaModel] = useState('');
   const [betaTestResult, setBetaTestResult] = useState<CvAiTestResponse | null>(null);
   const [sireneTestResult, setSireneTestResult] = useState<SireneTestResponse | null>(null);
+  const [inpiTestResult, setInpiTestResult] = useState<InpiTestResponse | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch services status
@@ -225,6 +226,21 @@ export function ApiTab() {
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Erreur lors du test INSEE');
+    },
+  });
+
+  const inpiTestMutation = useMutation({
+    mutationFn: adminApi.testInpi,
+    onSuccess: (result) => {
+      setInpiTestResult(result);
+      if (result.success) {
+        toast.success(`INPI RNE fonctionne (${result.response_time_ms}ms)`);
+      } else {
+        toast.error(result.message);
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erreur lors du test INPI');
     },
   });
 
@@ -495,7 +511,7 @@ export function ApiTab() {
         </div>
 
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Les credentials OAuth2 sont configurés via les variables <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">INSEE_CONSUMER_KEY</code> et <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">INSEE_CONSUMER_SECRET</code> (ou AWS Secrets Manager).
+          Clé API configurée via la variable <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">SIRENE_API_KEY</code> (ou AWS Secrets Manager).
         </p>
 
         {/* Test Result */}
@@ -528,6 +544,61 @@ export function ApiTab() {
           disabled={sireneTestMutation.isPending}
         >
           {sireneTestMutation.isPending ? 'Test en cours...' : 'Tester INSEE Sirene'}
+        </Button>
+      </Card>
+
+      {/* INPI RNE Settings */}
+      <Card>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-3 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+            <Key className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <div>
+            <h3 className="font-medium text-gray-900 dark:text-white">
+              INPI RNE API
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Ville du greffe, capital social et forme juridique
+            </p>
+          </div>
+          {inpiTestResult && (
+            <Badge variant={inpiTestResult.success ? 'success' : 'error'} className="ml-auto">
+              {inpiTestResult.success ? 'Opérationnel' : 'Erreur'}
+            </Badge>
+          )}
+        </div>
+
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Identifiants configurés via les variables <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">INPI_USERNAME</code> et <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">INPI_PASSWORD</code> (ou AWS Secrets Manager).
+        </p>
+
+        {/* Test Result */}
+        {inpiTestResult && (
+          <div
+            className={`mb-4 p-3 rounded-lg text-sm flex items-center gap-2 ${
+              inpiTestResult.success
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300'
+                : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300'
+            }`}
+          >
+            {inpiTestResult.success ? (
+              <CheckCircle className="h-4 w-4 flex-shrink-0" />
+            ) : (
+              <XCircle className="h-4 w-4 flex-shrink-0" />
+            )}
+            <span>{inpiTestResult.message}</span>
+          </div>
+        )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => inpiTestMutation.mutate()}
+          isLoading={inpiTestMutation.isPending}
+          leftIcon={inpiTestMutation.isPending ? undefined : <RefreshCw className="h-4 w-4" />}
+          disabled={inpiTestMutation.isPending}
+        >
+          {inpiTestMutation.isPending ? 'Test en cours...' : 'Tester INPI RNE'}
         </Button>
       </Card>
 

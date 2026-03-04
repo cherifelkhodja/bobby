@@ -277,3 +277,12 @@ class SireneTestResponse(BaseModel):
     configured: bool
     response_time_ms: int
     message: str
+
+
+class InpiTestResponse(BaseModel):
+    """Response from INPI RNE API test."""
+
+    success: bool
+    configured: bool
+    response_time_ms: int
+    message: str

@@ -117,6 +117,13 @@ export interface SireneTestResponse {
   message: string;
 }
 
+export interface InpiTestResponse {
+  success: boolean;
+  configured: boolean;
+  response_time_ms: number;
+  message: string;
+}
+
 export const adminApi = {
   // BoondManager
   getBoondStatus: async (): Promise<BoondStatus> => {
@@ -270,6 +277,12 @@ export const adminApi = {
   // INSEE Sirene
   testSirene: async (): Promise<SireneTestResponse> => {
     const response = await apiClient.post<SireneTestResponse>('/admin/sirene/test');
+    return response.data;
+  },
+
+  // INPI RNE
+  testInpi: async (): Promise<InpiTestResponse> => {
+    const response = await apiClient.post<InpiTestResponse>('/admin/inpi/test');
     return response.data;
   },
 };

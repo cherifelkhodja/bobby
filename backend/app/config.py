@@ -97,6 +97,10 @@ class Settings(BaseSettings):
     INSEE_CONSUMER_KEY: str = ""
     INSEE_CONSUMER_SECRET: str = ""
 
+    # INPI RNE API (username/password → Bearer token)
+    INPI_USERNAME: str = ""
+    INPI_PASSWORD: str = ""
+
     # Bobby Portal
     BOBBY_BASE_URL: str = "https://bobby.geminiconsulting.fr"
     BOBBY_PORTAL_BASE_URL: str = "https://bobby.geminiconsulting.fr/portal"
@@ -257,6 +261,8 @@ def get_settings() -> Settings:
             "ADMIN_PASSWORD": "ADMIN_PASSWORD",
             "ANTHROPIC_API_KEY": "ANTHROPIC_API_KEY",
             "SIRENE_API_KEY": "SIRENE_API_KEY",
+            "INPI_USERNAME": "INPI_USERNAME",
+            "INPI_PASSWORD": "INPI_PASSWORD",
             "SMTP_USER": "SMTP_USER",
             "SMTP_PASSWORD": "SMTP_PASSWORD",
             "FRONTEND_URL": "FRONTEND_URL",

@@ -23,6 +23,7 @@ from app.api.schemas.admin import (
     GeminiSettingsResponse,
     GeminiTestResponse,
     MessageResponse,
+    InpiTestResponse,
     SireneTestResponse,
     SyncResponse,
     TestConnectionResponse,
@@ -909,6 +910,81 @@ async def test_sirene_connection(
     except Exception as e:
         elapsed = int((time.time() - start) * 1000)
         return SireneTestResponse(
+            success=False,
+            configured=True,
+            response_time_ms=elapsed,
+            message=f"Erreur: {str(e)[:200]}",
+        )
+
+
+# =============================================================================
+# INPI RNE Endpoints
+# =============================================================================
+
+
+@router.post("/inpi/test", response_model=InpiTestResponse)
+async def test_inpi_connection(
+    admin_id: AdminUser,
+    settings: AppSettings,
+):
+    """Test INPI RNE API connection (admin only).
+
+    Authenticates with INPI credentials and queries a known SIREN.
+    Credentials (INPI_USERNAME / INPI_PASSWORD) should be stored in AWS Secrets Manager.
+    """
+    import time
+
+    from app.third_party.infrastructure.adapters.inpi_client import InpiClient
+
+    configured = bool(settings.INPI_USERNAME and settings.INPI_PASSWORD)
+
+    if not configured:
+        return InpiTestResponse(
+            success=False,
+            configured=False,
+            response_time_ms=0,
+            message="INPI_USERNAME / INPI_PASSWORD non configurés",
+        )
+
+    inpi_client = InpiClient(
+        username=settings.INPI_USERNAME,
+        password=settings.INPI_PASSWORD,
+    )
+
+    # Test with INSEE's own SIREN (known stable public entity)
+    test_siren = "120014019"
+    start = time.time()
+    try:
+        result = await inpi_client.get_company(test_siren)
+        elapsed = int((time.time() - start) * 1000)
+
+        if result is not None:
+            details = []
+            if result.legal_form:
+                details.append(f"Forme: {result.legal_form}")
+            if result.capital_amount is not None:
+                details.append(f"Capital: {result.capital_amount:,.0f} {result.capital_currency or 'EUR'}")
+            if result.greffe_city:
+                details.append(f"Greffe: {result.greffe_city}")
+            detail_str = " | ".join(details) if details else "données récupérées"
+            return InpiTestResponse(
+                success=True,
+                configured=True,
+                response_time_ms=elapsed,
+                message=f"INPI RNE fonctionne ({elapsed}ms) — {result.company_name} — {detail_str}",
+            )
+        else:
+            # 404 = SIREN introuvable, but auth worked (token was obtained)
+            return InpiTestResponse(
+                success=True,
+                configured=True,
+                response_time_ms=elapsed,
+                message=f"INPI RNE accessible ({elapsed}ms) — authentification OK",
+            )
+
+    except Exception as e:
+        elapsed = int((time.time() - start) * 1000)
+        return InpiTestResponse(
             success=False,
             configured=True,
             response_time_ms=elapsed,
