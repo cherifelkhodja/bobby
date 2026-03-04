@@ -242,35 +242,39 @@ function DocumentViewerModal({
                 </div>
               )}
 
-              <div className="flex items-start gap-2">
-                <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Date du document</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {formatDate(docDate)}
-                  </p>
-                  {doc.is_valid_at_upload === false && (
-                    <span className="inline-flex items-center gap-1 mt-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 px-2 py-0.5 text-xs font-medium">
-                      <XCircle className="h-3 w-3" /> Document invalide à l'émission
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2">
-                <Timer className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Valide jusqu'au</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {formatDate(expiryDate)}
-                  </p>
-                  {expiryDate && (
-                    <div className="mt-1">
-                      <ExpiryBadge expiresAt={expiryDate} />
+              {doc.document_type !== 'rib' && (
+                <>
+                  <div className="flex items-start gap-2">
+                    <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Date du document</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {formatDate(docDate)}
+                      </p>
+                      {doc.is_valid_at_upload === false && (
+                        <span className="inline-flex items-center gap-1 mt-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 px-2 py-0.5 text-xs font-medium">
+                          <XCircle className="h-3 w-3" /> Document invalide à l'émission
+                        </span>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <Timer className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Valide jusqu'au</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {formatDate(expiryDate)}
+                      </p>
+                      {expiryDate && (
+                        <div className="mt-1">
+                          <ExpiryBadge expiresAt={expiryDate} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
 
               {doc.file_size && (
                 <div className="flex items-start gap-2">
@@ -291,6 +295,16 @@ function DocumentViewerModal({
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Motif du rejet</p>
                 <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg p-2">
                   {doc.rejection_reason}
+                </p>
+              </div>
+            )}
+
+            {/* Unavailability reason */}
+            {doc.is_unavailable && doc.unavailability_reason && (
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Raison d'indisponibilité</p>
+                <p className="text-sm text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 rounded-lg p-2">
+                  {doc.unavailability_reason}
                 </p>
               </div>
             )}
@@ -417,7 +431,7 @@ function DocumentCard({
       </div>
 
       {/* Metadata row */}
-      <div className="grid grid-cols-4 gap-2 mb-3 text-xs">
+      <div className={`grid gap-2 mb-3 text-xs ${doc.document_type === 'rib' ? 'grid-cols-1' : 'grid-cols-4'}`}>
         <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2">
           <p className="text-gray-400 mb-0.5 flex items-center gap-1">
             <Calendar className="h-3 w-3" /> Déposé le
@@ -426,38 +440,42 @@ function DocumentCard({
             {formatDate(doc.uploaded_at)}
           </p>
         </div>
-        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2">
-          <p className="text-gray-400 mb-0.5 flex items-center gap-1">
-            <FileText className="h-3 w-3" /> Date document
-          </p>
-          <p className="font-medium text-gray-900 dark:text-white">
-            {formatDate(doc.document_date)}
-          </p>
-        </div>
-        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2">
-          <p className="text-gray-400 mb-0.5 flex items-center gap-1">
-            <CalendarCheck className="h-3 w-3" /> Valide jusqu'au
-          </p>
-          <p className="font-medium text-gray-900 dark:text-white">
-            {formatDate(doc.expires_at)}
-          </p>
-        </div>
-        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2">
-          <p className="text-gray-400 mb-0.5 flex items-center gap-1">
-            <Timer className="h-3 w-3" /> Délai
-          </p>
-          <div className="mt-0.5">
-            {doc.expires_at ? (
-              <ExpiryBadge expiresAt={doc.expires_at} />
-            ) : doc.is_valid_at_upload === false ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 px-2 py-0.5 text-xs font-medium">
-                <XCircle className="h-3 w-3" /> Invalide
-              </span>
-            ) : (
-              <span className="font-medium text-gray-400">—</span>
-            )}
-          </div>
-        </div>
+        {doc.document_type !== 'rib' && (
+          <>
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2">
+              <p className="text-gray-400 mb-0.5 flex items-center gap-1">
+                <FileText className="h-3 w-3" /> Date document
+              </p>
+              <p className="font-medium text-gray-900 dark:text-white">
+                {formatDate(doc.document_date)}
+              </p>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2">
+              <p className="text-gray-400 mb-0.5 flex items-center gap-1">
+                <CalendarCheck className="h-3 w-3" /> Valide jusqu'au
+              </p>
+              <p className="font-medium text-gray-900 dark:text-white">
+                {formatDate(doc.expires_at)}
+              </p>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2">
+              <p className="text-gray-400 mb-0.5 flex items-center gap-1">
+                <Timer className="h-3 w-3" /> Délai
+              </p>
+              <div className="mt-0.5">
+                {doc.expires_at ? (
+                  <ExpiryBadge expiresAt={doc.expires_at} />
+                ) : doc.is_valid_at_upload === false ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 px-2 py-0.5 text-xs font-medium">
+                    <XCircle className="h-3 w-3" /> Invalide
+                  </span>
+                ) : (
+                  <span className="font-medium text-gray-400">—</span>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* File info + actions */}
@@ -499,7 +517,14 @@ function DocumentCard({
       {/* Rejection reason display */}
       {doc.rejection_reason && (
         <p className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-2 py-1">
-          Motif : {doc.rejection_reason}
+          Motif de rejet : {doc.rejection_reason}
+        </p>
+      )}
+
+      {/* Unavailability reason display */}
+      {doc.is_unavailable && doc.unavailability_reason && (
+        <p className="mt-2 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 rounded-lg px-2 py-1">
+          Non disponible : {doc.unavailability_reason}
         </p>
       )}
 
