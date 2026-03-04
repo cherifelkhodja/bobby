@@ -403,6 +403,7 @@ function DocumentCard({
   onRejectConfirm: () => void;
   onRejectCancel: () => void;
   isValidating: boolean;
+  isTempValidating: boolean;
   isRejecting: boolean;
 }) {
   const [confirmTempValidate, setConfirmTempValidate] = useState(false);
@@ -547,10 +548,10 @@ function DocumentCard({
               <span className="text-gray-600 dark:text-gray-300">Confirmer la validation temporaire ?</span>
               <button
                 onClick={() => { onTempValidate(); setConfirmTempValidate(false); }}
-                disabled={isValidating}
+                disabled={isTempValidating}
                 className="font-medium text-green-600 dark:text-green-400 hover:underline disabled:opacity-50"
               >
-                Oui
+                {isTempValidating ? '...' : 'Oui'}
               </button>
               <button
                 onClick={() => setConfirmTempValidate(false)}
@@ -599,6 +600,7 @@ function ThirdPartyDocumentsPanel({
   tpDocs,
   onRequestDocs,
   onValidate,
+  onTempValidate,
   onRejectStart,
   rejectDocId,
   rejectReason,
@@ -607,11 +609,13 @@ function ThirdPartyDocumentsPanel({
   onRejectCancel,
   isRequesting,
   isValidating,
+  isTempValidating,
   isRejecting,
 }: {
   tpDocs: ThirdPartyWithDocuments;
   onRequestDocs: () => void;
   onValidate: (docId: string) => void;
+  onTempValidate: (docId: string) => void;
   onRejectStart: (docId: string) => void;
   rejectDocId: string | null;
   rejectReason: string;
@@ -620,6 +624,7 @@ function ThirdPartyDocumentsPanel({
   onRejectCancel: () => void;
   isRequesting: boolean;
   isValidating: boolean;
+  isTempValidating: boolean;
   isRejecting: boolean;
 }) {
   const queryClient = useQueryClient();
@@ -745,7 +750,7 @@ function ThirdPartyDocumentsPanel({
             doc={doc}
             onView={() => setViewingDoc(doc)}
             onValidate={() => handleValidateFromModal(doc.id)}
-            onTempValidate={() => validateMutationForModal.mutate(doc.id)}
+            onTempValidate={() => onTempValidate(doc.id)}
             onRejectStart={() => onRejectStart(doc.id)}
             isRejectingThis={rejectDocId === doc.id}
             rejectReason={rejectDocId === doc.id ? rejectReason : ''}
@@ -753,6 +758,7 @@ function ThirdPartyDocumentsPanel({
             onRejectConfirm={onRejectConfirm}
             onRejectCancel={onRejectCancel}
             isValidating={isValidating}
+            isTempValidating={isTempValidating}
             isRejecting={isRejecting}
           />
         ))}
@@ -805,7 +811,13 @@ export default function ComplianceDashboard() {
   });
 
   const requestDocsMutation = useMutation({
-    mutationFn: (tpId: string) => vigilanceApi.requestDocuments(tpId),
+    mutationFn: (tpId: string) => {
+      const category = tpDocs?.entity_category as 'ei' | 'societe' | null;
+      if (!category) {
+        return Promise.reject(new Error('Catégorie d\'entité inconnue. Le tiers doit compléter ses informations sur le portail.'));
+      }
+      return vigilanceApi.requestDocuments(tpId, category);
+    },
     onSuccess: () => {
       toast.success('Documents demandés.');
       queryClient.invalidateQueries({ queryKey: ['vigilance-documents', selectedThirdPartyId] });
@@ -817,6 +829,16 @@ export default function ComplianceDashboard() {
     mutationFn: (docId: string) => vigilanceApi.validateDocument(docId),
     onSuccess: () => {
       toast.success('Document validé.');
+      queryClient.invalidateQueries({ queryKey: ['vigilance-documents', selectedThirdPartyId] });
+      queryClient.invalidateQueries({ queryKey: ['compliance-dashboard'] });
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const tempValidateMutation = useMutation({
+    mutationFn: (docId: string) => vigilanceApi.tempValidateDocument(docId),
+    onSuccess: () => {
+      toast.success('Document validé temporairement (15 jours).');
       queryClient.invalidateQueries({ queryKey: ['vigilance-documents', selectedThirdPartyId] });
       queryClient.invalidateQueries({ queryKey: ['compliance-dashboard'] });
     },
@@ -1007,6 +1029,7 @@ export default function ComplianceDashboard() {
               tpDocs={tpDocs}
               onRequestDocs={() => requestDocsMutation.mutate(selectedThirdPartyId)}
               onValidate={(docId) => validateMutation.mutate(docId)}
+              onTempValidate={(docId) => tempValidateMutation.mutate(docId)}
               onRejectStart={(docId) => setRejectDocId(docId)}
               rejectDocId={rejectDocId}
               rejectReason={rejectReason}
@@ -1015,6 +1038,7 @@ export default function ComplianceDashboard() {
               onRejectCancel={() => { setRejectDocId(null); setRejectReason(''); }}
               isRequesting={requestDocsMutation.isPending}
               isValidating={validateMutation.isPending}
+              isTempValidating={tempValidateMutation.isPending}
               isRejecting={rejectMutation.isPending}
             />
           ) : (

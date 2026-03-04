@@ -33,9 +33,12 @@ export const vigilanceApi = {
 
   requestDocuments: async (
     thirdPartyId: string,
+    entityCategory: 'ei' | 'societe',
   ): Promise<VigilanceDocument[]> => {
     const response = await apiClient.post<VigilanceDocument[]>(
       `/vigilance/third-parties/${thirdPartyId}/request-documents`,
+      null,
+      { params: { entity_category: entityCategory } },
     );
     return response.data;
   },
@@ -43,6 +46,16 @@ export const vigilanceApi = {
   validateDocument: async (documentId: string): Promise<VigilanceDocument> => {
     const response = await apiClient.post<VigilanceDocument>(
       `/vigilance/documents/${documentId}/validate`,
+    );
+    return response.data;
+  },
+
+  tempValidateDocument: async (documentId: string): Promise<VigilanceDocument> => {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 15);
+    const response = await apiClient.post<VigilanceDocument>(
+      `/vigilance/documents/${documentId}/validate`,
+      { expires_at: expiresAt.toISOString() },
     );
     return response.data;
   },

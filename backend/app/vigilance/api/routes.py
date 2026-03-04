@@ -159,6 +159,7 @@ async def get_third_party_documents(
         company_name=tp.company_name,
         siren=tp.siren,
         type=tp.type.value,
+        entity_category=tp.entity_category,
         compliance_status=tp.compliance_status.value,
         contact_email=tp.contact_email,
         documents=[_document_to_response(d) for d in documents],

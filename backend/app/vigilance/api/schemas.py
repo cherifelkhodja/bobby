@@ -59,6 +59,7 @@ class ThirdPartyWithDocumentsResponse(BaseModel):
     company_name: str | None = None
     siren: str | None = None
     type: str
+    entity_category: str | None = None
     compliance_status: str
     contact_email: str
     documents: list[DocumentResponse]

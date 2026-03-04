@@ -851,6 +851,7 @@ export interface ThirdPartyWithDocuments {
   company_name: string;
   siren: string;
   type: string;
+  entity_category: string | null;
   compliance_status: string;
   contact_email: string;
   documents: VigilanceDocument[];
