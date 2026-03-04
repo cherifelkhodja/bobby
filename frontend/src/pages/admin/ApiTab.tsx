@@ -495,7 +495,7 @@ export function ApiTab() {
         </div>
 
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          La clé API est configurée via la variable d'environnement <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">SIRENE_API_KEY</code> (ou AWS Secrets Manager).
+          Les credentials OAuth2 sont configurés via les variables <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">INSEE_CONSUMER_KEY</code> et <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">INSEE_CONSUMER_SECRET</code> (ou AWS Secrets Manager).
         </p>
 
         {/* Test Result */}
