@@ -488,28 +488,15 @@ async def submit_company_info(
 # ── INSEE Sirene Lookup ─────────────────────────────────────────
 
 
-def _map_legal_form(code: str) -> str:
-    """Map INSEE categorieJuridiqueUniteLegale code to human-readable form."""
-    _MAPPING: dict[str, str] = {
-        "1000": "Entrepreneur individuel",
-        "1100": "Artisan-commerçant",
-        "1200": "Commerçant",
-        "1300": "Artisan",
-        "2110": "Société en nom collectif",
-        "2120": "Société en commandite simple",
-        "5110": "SAS unipersonnelle (SASU)",
-        "5120": "Société par actions simplifiée (SAS)",
-        "5422": "SARL de famille",
-        "5498": "EURL",
-        "5499": "Société à responsabilité limitée (SARL)",
-        "5599": "SA à conseil d'administration",
-        "5710": "Société anonyme (SA)",
-        "5720": "SA à directoire",
-        "5800": "Société en commandite par actions",
-        "6540": "Association loi 1901",
-        "9220": "Association déclarée",
-    }
-    return _MAPPING.get(code, code)
+def _map_legal_form(code: str) -> str | None:
+    """Map INSEE categorieJuridiqueUniteLegale code to human-readable form.
+
+    Delegates to the canonical FORME_JURIDIQUE_LABELS dict (same source as the
+    frontend dropdown) so the returned label always matches a select option.
+    """
+    from app.third_party.infrastructure.adapters.inpi_client import forme_juridique_label
+
+    return forme_juridique_label(code)
 
 
 @router.get(
