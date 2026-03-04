@@ -58,6 +58,13 @@ export const vigilanceApi = {
     return response.data;
   },
 
+  getDocumentDownloadUrl: async (documentId: string): Promise<{ url: string; file_name: string | null }> => {
+    const response = await apiClient.get<{ url: string; file_name: string | null }>(
+      `/vigilance/documents/${documentId}/download-url`,
+    );
+    return response.data;
+  },
+
   getDashboard: async (): Promise<ComplianceDashboard> => {
     const response = await apiClient.get<ComplianceDashboard>(
       '/compliance/dashboard',

@@ -22,10 +22,12 @@ from app.vigilance.api.schemas import (
     RejectDocumentRequest,
     ThirdPartyWithDocumentsResponse,
 )
+from app.infrastructure.storage.s3_client import S3StorageClient
 from app.vigilance.application.use_cases.reject_document import RejectDocumentUseCase
 from app.vigilance.application.use_cases.request_documents import RequestDocumentsUseCase
 from app.vigilance.application.use_cases.validate_document import ValidateDocumentUseCase
 from app.vigilance.infrastructure.adapters.postgres_document_repo import DocumentRepository
+from app.vigilance.infrastructure.adapters.s3_document_storage import VigilanceDocumentStorage
 
 logger = structlog.get_logger()
 
@@ -185,6 +187,30 @@ async def request_documents(
         raise HTTPException(status_code=400, detail=str(exc))
 
     return [_document_to_response(d) for d in created]
+
+
+@router.get(
+    "/documents/{document_id}/download-url",
+    summary="Get presigned download URL for a vigilance document",
+)
+async def get_document_download_url(
+    document_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate a presigned S3 URL to view/download a vigilance document."""
+    settings = get_settings()
+    doc_repo = DocumentRepository(db)
+
+    doc = await doc_repo.get_by_id(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document non trouvé.")
+    if not doc.s3_key:
+        raise HTTPException(status_code=404, detail="Aucun fichier associé à ce document.")
+
+    storage = VigilanceDocumentStorage(S3StorageClient(settings))
+    url = await storage.get_download_url(doc.s3_key, expires_in=1800)
+    return {"url": url, "file_name": doc.file_name}
 
 
 @router.post(
