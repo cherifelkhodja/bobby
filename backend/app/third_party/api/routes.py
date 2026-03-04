@@ -386,14 +386,6 @@ async def submit_company_info(
     # Derive SIREN from first 9 digits of SIRET
     siren = body.siret[:9]
 
-    # Check SIREN uniqueness upfront (another third party may already have it)
-    existing = await tp_repo.get_by_siren(siren)
-    if existing and existing.id != tp.id:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Le SIREN {siren} est déjà associé à un autre tiers.",
-        )
-
     tp.company_name = body.company_name
     tp.legal_form = body.legal_form
     tp.capital = body.capital
