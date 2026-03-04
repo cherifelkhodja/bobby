@@ -69,6 +69,7 @@ export default function ContractDetail() {
   const [showOverride, setShowOverride] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [tempValidatingDocId, setTempValidatingDocId] = useState<string | null>(null);
 
   // Commercial validation form state — pre-filled from Boond data
   const [validationForm, setValidationForm] = useState({
@@ -162,6 +163,19 @@ export default function ContractDetail() {
       toast.success('Conformité forcée.');
       setShowOverride(false);
       setOverrideReason('');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  const tempValidateMutation = useMutation({
+    mutationFn: (docId: string) => vigilanceApi.validateDocument(docId),
+    onSuccess: () => {
+      toast.success('Document validé temporairement.');
+      setTempValidatingDocId(null);
+      queryClient.invalidateQueries({ queryKey: ['compliance-docs', cr?.third_party_id] });
       queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
     },
     onError: (error) => {
@@ -737,22 +751,60 @@ export default function ContractDetail() {
                 expiring_soon: 'Expire bientôt',
                 expired: 'Expiré',
               };
+              const canTempValidate = doc.status === 'requested' && doc.is_unavailable;
+              const isTempValidating = tempValidatingDocId === doc.id;
               return (
                 <div
                   key={doc.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                  className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
                 >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {doc.document_type_display}
-                    </p>
-                    {doc.file_name && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{doc.file_name}</p>
-                    )}
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {doc.document_type_display}
+                      </p>
+                      {doc.file_name && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{doc.file_name}</p>
+                      )}
+                    </div>
+                    <span className={`ml-3 flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[doc.status] ?? statusColors.requested}`}>
+                      {statusLabels[doc.status] ?? doc.status}
+                    </span>
                   </div>
-                  <span className={`ml-3 flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[doc.status] ?? statusColors.requested}`}>
-                    {statusLabels[doc.status] ?? doc.status}
-                  </span>
+                  {doc.is_unavailable && doc.unavailability_reason && (
+                    <p className="mt-1.5 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 rounded px-2 py-1">
+                      Indisponible : {doc.unavailability_reason}
+                    </p>
+                  )}
+                  {canTempValidate && (
+                    <div className="mt-2">
+                      {!isTempValidating ? (
+                        <button
+                          onClick={() => setTempValidatingDocId(doc.id)}
+                          className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+                        >
+                          Valider temporairement
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">Confirmer la validation temporaire ?</span>
+                          <button
+                            onClick={() => tempValidateMutation.mutate(doc.id)}
+                            disabled={tempValidateMutation.isPending}
+                            className="text-xs font-medium text-green-600 dark:text-green-400 hover:underline disabled:opacity-50"
+                          >
+                            Oui
+                          </button>
+                          <button
+                            onClick={() => setTempValidatingDocId(null)}
+                            className="text-xs text-gray-400 hover:underline"
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
