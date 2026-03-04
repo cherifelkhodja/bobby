@@ -77,6 +77,11 @@ class TestLoginInpi:
             result = await _login_inpi("user@test.fr", "pass")
 
         assert result == "fresh-jwt"
+        # Verify correct endpoint and body
+        mock_client.post.assert_called_once()
+        call_kwargs = mock_client.post.call_args
+        assert "sso/login" in call_kwargs[0][0]
+        assert call_kwargs[1]["json"]["username"] == "user@test.fr"
 
     @pytest.mark.asyncio
     async def test_login_invalid_credentials(self):

@@ -975,12 +975,23 @@ async def test_inpi_connection(
                 message=f"INPI RNE fonctionne ({elapsed}ms) — {result.company_name} — {detail_str}",
             )
         else:
-            # 404 = SIREN introuvable mais token valide (pas d'erreur 401/403)
+            # result is None : soit SIREN non trouvé, soit token non obtenu
+            from app.third_party.infrastructure.adapters.inpi_client import _get_inpi_token
+            token_check = await _get_inpi_token(
+                settings.INPI_USERNAME, settings.INPI_PASSWORD, settings.INPI_TOKEN
+            )
+            if not token_check:
+                return InpiTestResponse(
+                    success=False,
+                    configured=False,
+                    response_time_ms=elapsed,
+                    message="INPI : authentification échouée — vérifier INPI_USERNAME/INPI_PASSWORD dans AWS Secrets",
+                )
             return InpiTestResponse(
                 success=True,
                 configured=True,
                 response_time_ms=elapsed,
-                message=f"INPI RNE accessible ({elapsed}ms) — token valide",
+                message=f"INPI RNE accessible ({elapsed}ms) — authentification OK",
             )
 
     except Exception as e:

@@ -336,10 +336,10 @@ _TOKEN_TTL = 3600  # Refresh token after 1 hour
 
 async def _login_inpi(username: str, password: str) -> str | None:
     """Login to INPI RNE API and return a fresh Bearer token."""
-    url = f"{INPI_BASE_URL}/login"
+    url = f"{INPI_BASE_URL}/sso/login"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(url, json={"login": username, "password": password})
+            resp = await client.post(url, json={"username": username, "password": password})
         if resp.status_code == 200:
             token = resp.json().get("token")
             logger.info("inpi_login_success")
