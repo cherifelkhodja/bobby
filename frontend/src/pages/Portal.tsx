@@ -123,6 +123,7 @@ function PortalStepper({ steps }: { steps: Step[] }) {
 export default function Portal() {
   const { token } = useParams<{ token: string }>();
   const queryClient = useQueryClient();
+  const [forceStep, setForceStep] = useState<number | null>(null);
 
   // Verify magic link
   const { data: portalInfo, isLoading, isError } = useQuery({
@@ -175,40 +176,38 @@ export default function Portal() {
     docsData.documents.every((d) => ['received', 'validated', 'expiring_soon'].includes(d.status));
   const allDocsEmpty = !!docsData && docsData.documents.length === 0;
 
+  // Natural step based on server state (document_upload: 0=infos, 1=docs, 2=verif)
+  const naturalStep = isDocumentUpload
+    ? !hasSiren ? 0 : allDocsUploaded || allDocsEmpty ? 2 : 1
+    : 0;
+
+  // displayStep: forceStep allows going back; clamp to [0, naturalStep]
+  const displayStep = forceStep !== null ? Math.min(forceStep, naturalStep) : naturalStep;
+
+  const buildStepStatus = (stepIndex: number): StepStatus => {
+    if (stepIndex < displayStep) return 'done';
+    if (stepIndex === displayStep) return 'current';
+    // Steps beyond displayStep: show natural server status
+    if (isDocumentUpload) {
+      if (stepIndex === 1) return hasSiren ? (allDocsUploaded || allDocsEmpty ? 'done' : 'upcoming') : 'upcoming';
+      if (stepIndex === 2) return allDocsUploaded || allDocsEmpty ? 'upcoming' : 'upcoming';
+    }
+    return 'upcoming';
+  };
+
   const steps: Step[] = isDocumentUpload
     ? [
-        {
-          label: 'Infos société',
-          icon: Building2,
-          status: hasSiren ? 'done' : 'current',
-        },
-        {
-          label: 'Documents',
-          icon: Upload,
-          status: !hasSiren
-            ? 'upcoming'
-            : allDocsUploaded || allDocsEmpty
-            ? 'done'
-            : 'current',
-        },
-        {
-          label: 'Vérification',
-          icon: ShieldCheck,
-          status: allDocsUploaded || allDocsEmpty ? 'current' : 'upcoming',
-        },
+        { label: 'Infos société', icon: Building2, status: buildStepStatus(0) },
+        { label: 'Documents',     icon: Upload,    status: buildStepStatus(1) },
+        { label: 'Vérification',  icon: ShieldCheck, status: buildStepStatus(2) },
       ]
     : [
-        {
-          label: 'Relecture',
-          icon: FileText,
-          status: 'current',
-        },
-        {
-          label: 'Signature',
-          icon: PenLine,
-          status: 'upcoming',
-        },
+        { label: 'Relecture', icon: FileText, status: 'current' },
+        { label: 'Signature', icon: PenLine,  status: 'upcoming' },
       ];
+
+  const goBack = () => setForceStep(displayStep - 1);
+  const goForward = () => setForceStep(null); // snap back to natural step
 
   return (
     <PortalLayout>
@@ -230,16 +229,34 @@ export default function Portal() {
       {/* Progress stepper */}
       <PortalStepper steps={steps} />
 
-      {/* Company info form — shown when SIRET not yet filled */}
-      {isDocumentUpload && !portalInfo.third_party.siren && (
+      {/* Back button */}
+      {displayStep > 0 && (
+        <div className="max-w-3xl mx-auto mb-4">
+          <button
+            onClick={goBack}
+            className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Retour
+          </button>
+        </div>
+      )}
+
+      {/* Company info form — step 0 */}
+      {isDocumentUpload && displayStep === 0 && (
         <CompanyInfoForm
           token={token!}
-          onSuccess={() => queryClient.invalidateQueries({ queryKey: ['portal', token] })}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['portal', token] });
+            goForward();
+          }}
         />
       )}
 
-      {/* Document upload section — shown once company info is filled */}
-      {isDocumentUpload && portalInfo.third_party.siren && docsData && (
+      {/* Document upload section — step 1 */}
+      {isDocumentUpload && displayStep === 1 && docsData && (
         <div className="max-w-3xl mx-auto">
           <Card className="mb-6">
             <div className="flex items-center gap-3 mb-4">
@@ -276,6 +293,22 @@ export default function Portal() {
               </Card>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Verification message — step 2 (all docs uploaded) */}
+      {isDocumentUpload && displayStep === 2 && (
+        <div className="max-w-3xl mx-auto">
+          <Card className="text-center py-10">
+            <ShieldCheck className="h-12 w-12 text-green-500 mx-auto mb-4" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Documents transmis avec succès
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Vos documents sont en cours de vérification par notre équipe.
+              Vous serez contacté si des informations complémentaires sont nécessaires.
+            </p>
+          </Card>
         </div>
       )}
 
