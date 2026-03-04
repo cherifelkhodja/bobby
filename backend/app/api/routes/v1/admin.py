@@ -960,8 +960,8 @@ async def test_inpi_connection(
 
         if result is not None:
             details = []
-            if result.legal_form:
-                details.append(f"Forme: {result.legal_form}")
+            if result.legal_form_label:
+                details.append(f"Forme: {result.legal_form_label}")
             if result.capital_amount is not None:
                 details.append(f"Capital: {result.capital_amount:,.0f} {result.capital_currency or 'EUR'}")
             if result.greffe_city:

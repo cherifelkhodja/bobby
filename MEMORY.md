@@ -161,6 +161,35 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-04 (intégration API INPI RNE)
+- **feat(inpi)**: Nouveau client `InpiClient` pour l'API INPI Registre National des Entreprises
+  - **Fichier** : `backend/app/third_party/infrastructure/adapters/inpi_client.py`
+  - **Auth** : POST `https://registre-national-entreprises.inpi.fr/api/sso/login` username/password → Bearer token (cache 1h)
+  - **Endpoint** : `GET /api/companies/{siren}` → JSON formality
+  - **Champs extraits** :
+    - `legal_form_code` + `legal_form_label` : code INSEE (ex: "5710") + libellé ("SAS") via `FORME_JURIDIQUE_LABELS`
+    - `capital_amount` + `capital_currency` + `capital_variable` : depuis `identite.description`
+    - `greffe_city` : déduit du code postal via `DEPT_TO_GREFFE` + `derive_greffe_city()`
+  - **Chemins JSON vérifiés sur payload réel** (GEMINI/842799959) :
+    ```
+    formality.content.personneMorale.identite.entreprise.denomination      → company_name
+    formality.content.personneMorale.identite.entreprise.formeJuridique    → code forme juridique
+    formality.content.personneMorale.identite.description.montantCapital   → capital
+    formality.content.personneMorale.identite.description.deviseCapital    → devise
+    formality.content.personneMorale.adresseEntreprise.adresse.codePostal  → pour déduire greffe
+    ```
+  - **Nomenclatures embarquées** (pas d'appel API supplémentaire) :
+    - `FORME_JURIDIQUE_LABELS` : ~80 codes INSEE → libellés (SAS, SARL, SA, SASU, SNC, EURL, etc.)
+    - `DEPT_TO_GREFFE` : 96 départements + 5 DOM-TOM → ville principale du Tribunal de Commerce
+  - **Config** : `INPI_USERNAME` + `INPI_PASSWORD` dans `Settings` + mapping AWS Secrets Manager
+  - **Admin test** : `POST /api/v1/admin/inpi/test` + card "INPI RNE API" dans `ApiTab.tsx`
+
+### 2026-03-04 (fix test connexion INSEE Sirene)
+- **fix(admin)**: Test Sirene rebasé sur `SIRENE_API_KEY` (méthode identique au portail partenaire)
+  - Avant : utilisait OAuth2 (`INSEE_CONSUMER_KEY`/`INSEE_CONSUMER_SECRET`) → variables non configurées → always KO
+  - Après : `X-INSEE-Api-Key-Integration: SIRENE_API_KEY` + accepte HTTP 200 ET 404 comme succès (404 = SIRET inexistant ≠ erreur auth)
+  - Description de la card corrigée dans `ApiTab.tsx`
+
 ### 2026-03-03 (initiation collecte documents via email contact commercial)
 - **feat(contract-management)**: Nouvel endpoint `POST /contract-requests/{id}/initiate-document-collection`
   - **Use case** : `InitiateDocumentCollectionUseCase` dans `backend/app/contract_management/application/use_cases/initiate_document_collection.py`
