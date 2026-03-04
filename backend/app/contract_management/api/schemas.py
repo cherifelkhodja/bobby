@@ -35,6 +35,7 @@ class ContractRequestResponse(BaseModel):
     third_party_id: UUID | None = None
     portal_url: str | None = None
     compliance_override: bool
+    contract_config: dict | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -69,7 +70,11 @@ class CommercialValidationRequest(BaseModel):
 
 
 class ContractConfigRequest(BaseModel):
-    """Request to configure a contract."""
+    """Request to configure a contract.
+
+    payment_terms values: "immediate" (comptant), "net_30" (30 jours), "net_45_eom" (45 jours fin de mois)
+    invoice_submission_method values: "email" (factures@geminiconsulting.fr), "boondmanager"
+    """
 
     mission_description: str = ""
     start_date: date | None = None
@@ -85,7 +90,9 @@ class ContractConfigRequest(BaseModel):
     non_compete_geographic_scope: str = ""
     include_intellectual_property: bool = True
     include_liability: bool = True
+    include_mediation: bool = False
     special_conditions: str = ""
+    article_overrides: dict[str, str] = Field(default_factory=dict)
 
 
 class ComplianceOverrideRequest(BaseModel):

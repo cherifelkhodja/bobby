@@ -13,6 +13,11 @@ import {
   Mail,
   Copy,
   Check,
+  Settings,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  PenLine,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -56,6 +61,24 @@ const ACTION_CONFIG: Partial<
   },
 };
 
+const ARTICLE_LABELS: Record<string, string> = {
+  objet: 'Objet',
+  duree: 'Durée',
+  conditions_financieres: 'Conditions financières',
+  modalites_facturation: 'Modalités de facturation',
+  obligations_prestataire: 'Obligations du prestataire',
+  confidentialite: 'Confidentialité',
+  non_concurrence: 'Non-concurrence',
+  propriete_intellectuelle: 'Propriété intellectuelle',
+  responsabilite: 'Responsabilité',
+  mediation: 'Médiation',
+  resiliation: 'Résiliation',
+  droit_applicable: 'Droit applicable',
+};
+
+const INPUT_CLS =
+  'w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300';
+
 export default function ContractDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -90,6 +113,24 @@ export default function ContractDetail() {
     mission_city: '',
   });
   const [formInitialized, setFormInitialized] = useState(false);
+
+  // Contract configuration form state
+  const [configForm, setConfigForm] = useState({
+    payment_terms: 'net_30',
+    invoice_submission_method: 'email',
+    estimated_days: '',
+    include_confidentiality: true,
+    include_non_compete: false,
+    non_compete_duration_months: '',
+    non_compete_geographic_scope: '',
+    include_intellectual_property: true,
+    include_liability: true,
+    include_mediation: false,
+    special_conditions: '',
+  });
+  const [configFormInitialized, setConfigFormInitialized] = useState(false);
+  const [showArticleEditor, setShowArticleEditor] = useState(false);
+  const [articleOverrides, setArticleOverrides] = useState<Record<string, string>>({});
 
   const { data: cr, isLoading } = useQuery({
     queryKey: ['contract-request', id],
@@ -131,6 +172,32 @@ export default function ContractDetail() {
       setFormInitialized(true);
     }
   }, [cr, formInitialized]);
+
+  // Pre-fill config form from existing contract_config
+  useEffect(() => {
+    if (cr && !configFormInitialized && cr.contract_config) {
+      const cfg = cr.contract_config as Record<string, unknown>;
+      setConfigForm({
+        payment_terms: (cfg.payment_terms as string) ?? 'net_30',
+        invoice_submission_method: (cfg.invoice_submission_method as string) ?? 'email',
+        estimated_days: cfg.estimated_days != null ? String(cfg.estimated_days) : '',
+        include_confidentiality: (cfg.include_confidentiality as boolean) ?? true,
+        include_non_compete: (cfg.include_non_compete as boolean) ?? false,
+        non_compete_duration_months: cfg.non_compete_duration_months != null ? String(cfg.non_compete_duration_months) : '',
+        non_compete_geographic_scope: (cfg.non_compete_geographic_scope as string) ?? '',
+        include_intellectual_property: (cfg.include_intellectual_property as boolean) ?? true,
+        include_liability: (cfg.include_liability as boolean) ?? true,
+        include_mediation: (cfg.include_mediation as boolean) ?? false,
+        special_conditions: (cfg.special_conditions as string) ?? '',
+      });
+      if (cfg.article_overrides && typeof cfg.article_overrides === 'object' && !Array.isArray(cfg.article_overrides)) {
+        setArticleOverrides(Object.fromEntries(
+          Object.entries(cfg.article_overrides as Record<string, unknown>).map(([k, val]) => [k, String(val ?? '')]),
+        ));
+      }
+      setConfigFormInitialized(true);
+    }
+  }, [cr, configFormInitialized]);
 
   const actionMutation = useMutation({
     mutationFn: async (action: string) => {
@@ -206,6 +273,37 @@ export default function ContractDetail() {
     },
   });
 
+  const configureMutation = useMutation({
+    mutationFn: () => {
+      const nonEmptyOverrides: Record<string, string> = Object.fromEntries(
+        Object.entries(articleOverrides).filter(([, v]) => (v as string).trim() !== ''),
+      );
+      return contractsApi.configure(id!, {
+        payment_terms: configForm.payment_terms,
+        invoice_submission_method: configForm.invoice_submission_method,
+        estimated_days: configForm.estimated_days ? parseInt(configForm.estimated_days, 10) : undefined,
+        include_confidentiality: configForm.include_confidentiality,
+        include_non_compete: configForm.include_non_compete,
+        non_compete_duration_months: configForm.non_compete_duration_months
+          ? parseInt(configForm.non_compete_duration_months, 10)
+          : undefined,
+        non_compete_geographic_scope: configForm.non_compete_geographic_scope || undefined,
+        include_intellectual_property: configForm.include_intellectual_property,
+        include_liability: configForm.include_liability,
+        include_mediation: configForm.include_mediation,
+        special_conditions: configForm.special_conditions || undefined,
+        article_overrides: Object.keys(nonEmptyOverrides).length > 0 ? nonEmptyOverrides : undefined,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Contrat configuré. Vous pouvez maintenant générer le brouillon.');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
   const validateCommercialMutation = useMutation({
     mutationFn: () =>
       contractsApi.validateCommercial(id!, {
@@ -244,6 +342,23 @@ export default function ContractDetail() {
 
   const canCancel = cr && isAdv && cr.status !== 'cancelled' && cr.status !== 'signed' && cr.status !== 'archived' && cr.status !== 'redirected_payfit';
 
+  const showConfigForm = isAdv && (
+    cr?.status === 'collecting_documents' ||
+    cr?.status === 'commercial_validated' ||
+    cr?.status === 'partner_requested_changes'
+  );
+
+  // Active articles based on current config form state
+  const activeArticles = [
+    'objet', 'duree', 'conditions_financieres', 'modalites_facturation', 'obligations_prestataire',
+    ...(configForm.include_confidentiality ? ['confidentialite'] : []),
+    ...(configForm.include_non_compete ? ['non_concurrence'] : []),
+    ...(configForm.include_intellectual_property ? ['propriete_intellectuelle'] : []),
+    ...(configForm.include_liability ? ['responsabilite'] : []),
+    ...(configForm.include_mediation ? ['mediation'] : []),
+    'resiliation', 'droit_applicable',
+  ];
+
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('fr-FR', {
       day: 'numeric',
@@ -257,6 +372,11 @@ export default function ContractDetail() {
 
   const statusConfig = CONTRACT_STATUS_CONFIG[cr.status];
   const actionConfig = isAdv ? ACTION_CONFIG[cr.status] : undefined;
+
+  // Latest contract (for partner_comments)
+  const latestContract = contracts && contracts.length > 0
+    ? contracts[contracts.length - 1]
+    : null;
 
   return (
     <div>
@@ -328,7 +448,7 @@ export default function ContractDetail() {
                 onChange={(e) =>
                   setValidationForm((f) => ({ ...f, third_party_type: e.target.value }))
                 }
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                className={INPUT_CLS}
               >
                 <option value="">Sélectionner...</option>
                 <option value="freelance">Freelance</option>
@@ -349,7 +469,7 @@ export default function ContractDetail() {
                   setValidationForm((f) => ({ ...f, daily_rate: e.target.value }))
                 }
                 placeholder={cr.daily_rate ? String(cr.daily_rate) : ''}
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                className={INPUT_CLS}
               />
             </div>
             <div>
@@ -362,7 +482,7 @@ export default function ContractDetail() {
                 onChange={(e) =>
                   setValidationForm((f) => ({ ...f, start_date: e.target.value }))
                 }
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                className={INPUT_CLS}
               />
             </div>
             <div>
@@ -375,7 +495,7 @@ export default function ContractDetail() {
                 onChange={(e) =>
                   setValidationForm((f) => ({ ...f, end_date: e.target.value }))
                 }
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                className={INPUT_CLS}
               />
             </div>
             <div>
@@ -388,7 +508,7 @@ export default function ContractDetail() {
                 onChange={(e) =>
                   setValidationForm((f) => ({ ...f, contact_email: e.target.value }))
                 }
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                className={INPUT_CLS}
               />
             </div>
             <div>
@@ -402,7 +522,7 @@ export default function ContractDetail() {
                   setValidationForm((f) => ({ ...f, client_name: e.target.value }))
                 }
                 placeholder={cr.client_name ?? ''}
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                className={INPUT_CLS}
               />
             </div>
             <div className="md:col-span-2">
@@ -415,7 +535,7 @@ export default function ContractDetail() {
                 onChange={(e) =>
                   setValidationForm((f) => ({ ...f, mission_title: e.target.value }))
                 }
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                className={INPUT_CLS}
               />
             </div>
 
@@ -432,7 +552,7 @@ export default function ContractDetail() {
                     onChange={(e) =>
                       setValidationForm((f) => ({ ...f, consultant_civility: e.target.value }))
                     }
-                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                    className={INPUT_CLS}
                   >
                     <option value="">-</option>
                     <option value="M.">M.</option>
@@ -449,7 +569,7 @@ export default function ContractDetail() {
                     onChange={(e) =>
                       setValidationForm((f) => ({ ...f, consultant_first_name: e.target.value }))
                     }
-                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                    className={INPUT_CLS}
                   />
                 </div>
                 <div>
@@ -462,7 +582,7 @@ export default function ContractDetail() {
                     onChange={(e) =>
                       setValidationForm((f) => ({ ...f, consultant_last_name: e.target.value }))
                     }
-                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                    className={INPUT_CLS}
                   />
                 </div>
               </div>
@@ -482,7 +602,7 @@ export default function ContractDetail() {
                     onChange={(e) =>
                       setValidationForm((f) => ({ ...f, mission_site_name: e.target.value }))
                     }
-                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                    className={INPUT_CLS}
                   />
                 </div>
                 <div>
@@ -495,7 +615,7 @@ export default function ContractDetail() {
                     onChange={(e) =>
                       setValidationForm((f) => ({ ...f, mission_address: e.target.value }))
                     }
-                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                    className={INPUT_CLS}
                   />
                 </div>
                 <div>
@@ -508,7 +628,7 @@ export default function ContractDetail() {
                     onChange={(e) =>
                       setValidationForm((f) => ({ ...f, mission_postal_code: e.target.value }))
                     }
-                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                    className={INPUT_CLS}
                   />
                 </div>
                 <div>
@@ -521,7 +641,7 @@ export default function ContractDetail() {
                     onChange={(e) =>
                       setValidationForm((f) => ({ ...f, mission_city: e.target.value }))
                     }
-                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                    className={INPUT_CLS}
                   />
                 </div>
               </div>
@@ -618,6 +738,32 @@ export default function ContractDetail() {
         </Card>
       )}
 
+      {/* Partner requested changes — banner with comments */}
+      {isAdv && cr.status === 'partner_requested_changes' && (
+        <Card className="mb-6 border-orange-200 dark:border-orange-800">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-orange-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-semibold text-orange-800 dark:text-orange-300">
+                Le partenaire demande des modifications
+              </h3>
+              {latestContract?.partner_comments ? (
+                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                  {latestContract.partner_comments}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Aucun commentaire fourni.
+                </p>
+              )}
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                Modifiez la configuration ci-dessous puis re-générez le brouillon.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Collecting documents — info banner + resend button */}
       {isAdv && (cr.status === 'collecting_documents' || cr.status === 'compliance_blocked') && (
         <Card className="mb-6 border-indigo-200 dark:border-indigo-800">
@@ -670,6 +816,40 @@ export default function ContractDetail() {
         </Card>
       )}
 
+      {/* Draft sent to partner — waiting banner */}
+      {cr.status === 'draft_sent_to_partner' && (
+        <Card className="mb-6 border-sky-200 dark:border-sky-800">
+          <div className="flex items-start gap-3">
+            <Clock className="h-5 w-5 text-sky-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-semibold text-sky-800 dark:text-sky-300">
+                Brouillon envoyé au partenaire
+              </h3>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                En attente de la réponse du partenaire (approbation ou demande de modifications).
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Sent for signature — waiting banner */}
+      {cr.status === 'sent_for_signature' && (
+        <Card className="mb-6 border-violet-200 dark:border-violet-800">
+          <div className="flex items-start gap-3">
+            <PenTool className="h-5 w-5 text-violet-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-semibold text-violet-800 dark:text-violet-300">
+                Contrat envoyé pour signature électronique
+              </h3>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                En attente de la signature via YouSign. Cette page se mettra à jour automatiquement.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Compliance override (for blocked status) */}
       {isAdv && cr.status === 'compliance_blocked' && (
         <Card className="mb-6 border-orange-200 dark:border-orange-800">
@@ -697,7 +877,7 @@ export default function ContractDetail() {
                     value={overrideReason}
                     onChange={(e) => setOverrideReason(e.target.value)}
                     placeholder="Raison du forçage (min. 10 caractères)..."
-                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                    className={INPUT_CLS}
                     rows={2}
                   />
                   <div className="flex gap-2">
@@ -722,6 +902,226 @@ export default function ContractDetail() {
                 </div>
               )}
             </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Contract configuration form */}
+      {showConfigForm && (
+        <Card className="mb-6 border-purple-200 dark:border-purple-800">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2">
+            <Settings className="h-4 w-4 text-purple-500" />
+            Configuration du contrat
+          </h3>
+
+          {/* Section 1 — Conditions financières */}
+          <div className="mb-5">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
+              Conditions financières
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Délai de paiement
+                </label>
+                <select
+                  value={configForm.payment_terms}
+                  onChange={(e) => setConfigForm((f) => ({ ...f, payment_terms: e.target.value }))}
+                  className={INPUT_CLS}
+                >
+                  <option value="immediate">Comptant</option>
+                  <option value="net_30">30 jours</option>
+                  <option value="net_45_eom">45 jours fin de mois</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Dépôt des factures
+                </label>
+                <select
+                  value={configForm.invoice_submission_method}
+                  onChange={(e) => setConfigForm((f) => ({ ...f, invoice_submission_method: e.target.value }))}
+                  className={INPUT_CLS}
+                >
+                  <option value="email">Email — factures@geminiconsulting.fr</option>
+                  <option value="boondmanager">BoondManager</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Nombre de jours estimés
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={configForm.estimated_days}
+                  onChange={(e) => setConfigForm((f) => ({ ...f, estimated_days: e.target.value }))}
+                  placeholder="Ex: 20"
+                  className={INPUT_CLS}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2 — Clauses */}
+          <div className="mb-5 border-t border-gray-200 dark:border-gray-700 pt-4">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
+              Clauses optionnelles
+            </p>
+            <div className="space-y-3">
+              {/* Confidentialité */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={configForm.include_confidentiality}
+                  onChange={(e) => setConfigForm((f) => ({ ...f, include_confidentiality: e.target.checked }))}
+                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Clause de confidentialité</span>
+              </label>
+
+              {/* Propriété intellectuelle */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={configForm.include_intellectual_property}
+                  onChange={(e) => setConfigForm((f) => ({ ...f, include_intellectual_property: e.target.checked }))}
+                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Clause de propriété intellectuelle</span>
+              </label>
+
+              {/* Responsabilité */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={configForm.include_liability}
+                  onChange={(e) => setConfigForm((f) => ({ ...f, include_liability: e.target.checked }))}
+                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Clause de responsabilité</span>
+              </label>
+
+              {/* Non-concurrence */}
+              <div>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={configForm.include_non_compete}
+                    onChange={(e) => setConfigForm((f) => ({ ...f, include_non_compete: e.target.checked }))}
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Clause de non-concurrence</span>
+                </label>
+                {configForm.include_non_compete && (
+                  <div className="ml-7 mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Durée (mois)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={configForm.non_compete_duration_months}
+                        onChange={(e) => setConfigForm((f) => ({ ...f, non_compete_duration_months: e.target.value }))}
+                        placeholder="Ex: 12"
+                        className={INPUT_CLS}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Périmètre géographique
+                      </label>
+                      <input
+                        type="text"
+                        value={configForm.non_compete_geographic_scope}
+                        onChange={(e) => setConfigForm((f) => ({ ...f, non_compete_geographic_scope: e.target.value }))}
+                        placeholder="Ex: France métropolitaine"
+                        className={INPUT_CLS}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Médiation */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={configForm.include_mediation}
+                  onChange={(e) => setConfigForm((f) => ({ ...f, include_mediation: e.target.checked }))}
+                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Clause de médiation</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Section 3 — Conditions particulières */}
+          <div className="mb-5 border-t border-gray-200 dark:border-gray-700 pt-4">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wide">
+              Conditions particulières
+            </p>
+            <textarea
+              value={configForm.special_conditions}
+              onChange={(e) => setConfigForm((f) => ({ ...f, special_conditions: e.target.value }))}
+              placeholder="Clauses libres, conditions spécifiques à cette mission..."
+              className={INPUT_CLS}
+              rows={3}
+            />
+          </div>
+
+          {/* Section 4 — Éditeur d'articles (dépliable, uniquement si partner_requested_changes) */}
+          {cr.status === 'partner_requested_changes' && (
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mb-5">
+              <button
+                type="button"
+                onClick={() => setShowArticleEditor((v) => !v)}
+                className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white w-full text-left"
+              >
+                <PenLine className="h-4 w-4 text-gray-400" />
+                Édition manuelle des articles
+                {showArticleEditor ? (
+                  <ChevronUp className="h-4 w-4 ml-auto text-gray-400" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 ml-auto text-gray-400" />
+                )}
+              </button>
+              {showArticleEditor && (
+                <div className="mt-3 space-y-4">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Laissez un champ vide pour utiliser le texte du template. Le texte saisi remplace entièrement l'article correspondant dans le contrat généré.
+                  </p>
+                  {activeArticles.map((key, idx) => (
+                    <div key={key}>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Article {idx + 1} — {ARTICLE_LABELS[key] ?? key}
+                      </label>
+                      <textarea
+                        value={articleOverrides[key] ?? ''}
+                        onChange={(e) =>
+                          setArticleOverrides((prev) => ({ ...prev, [key]: e.target.value }))
+                        }
+                        placeholder="Laisser vide pour utiliser le texte du template..."
+                        className={INPUT_CLS}
+                        rows={3}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <Button
+              onClick={() => configureMutation.mutate()}
+              disabled={configureMutation.isPending}
+              isLoading={configureMutation.isPending}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Configurer le contrat
+            </Button>
           </div>
         </Card>
       )}

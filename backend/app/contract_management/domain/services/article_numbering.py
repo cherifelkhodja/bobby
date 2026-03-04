@@ -35,6 +35,9 @@ def compute_article_numbers(config: dict[str, Any]) -> dict[str, int]:
     if config.get("include_liability", True):
         articles.append("responsabilite")
 
+    if config.get("include_mediation", False):
+        articles.append("mediation")
+
     # Fixed final articles
     articles.append("resiliation")
     articles.append("droit_applicable")

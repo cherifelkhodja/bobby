@@ -70,7 +70,9 @@ export const contractsApi = {
       non_compete_geographic_scope?: string;
       include_intellectual_property?: boolean;
       include_liability?: boolean;
+      include_mediation?: boolean;
       special_conditions?: string;
+      article_overrides?: Record<string, string>;
     },
   ): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(

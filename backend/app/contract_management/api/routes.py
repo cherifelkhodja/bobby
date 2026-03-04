@@ -106,6 +106,7 @@ def _cr_to_response(
         third_party_id=cr.third_party_id,
         portal_url=portal_url,
         compliance_override=cr.compliance_override,
+        contract_config=cr.contract_config,
         created_at=cr.created_at,
         updated_at=cr.updated_at,
     )

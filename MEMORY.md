@@ -219,6 +219,23 @@ INPI_PASSWORD = <mot de passe>
   - **Config** : `INPI_USERNAME` + `INPI_PASSWORD` dans `Settings` + mapping AWS Secrets Manager
   - **Admin test** : `POST /api/v1/admin/inpi/test` + card "INPI RNE API" dans `ApiTab.tsx`
 
+### 2026-03-04 (workflow contrat — configuration, rédaction, validation tiers, signature)
+- **feat(contract-management)**: Formulaire de configuration du contrat dans `ContractDetail.tsx`
+  - Affiché quand statut = `collecting_documents`, `commercial_validated` ou `partner_requested_changes`
+  - **Section 1 — Conditions financières** : délai de paiement (`immediate`/`net_30`/`net_45_eom`), dépôt des factures (`email`/`boondmanager`), jours estimés
+  - **Section 2 — Clauses optionnelles** : confidentialité (défaut ON), propriété intellectuelle (défaut ON), responsabilité (défaut ON), non-concurrence avec durée+périmètre, médiation (nouvelle clause)
+  - **Section 3 — Conditions particulières** : textarea libre
+  - **Section 4 — Éditeur d'articles** (uniquement `partner_requested_changes`) : textarea par article actif, texte remplace le template DOCX via `article_overrides`
+  - Pre-rempli depuis `cr.contract_config` si déjà configuré
+  - Submit → `POST /configure` → transition `CONFIGURING_CONTRACT`
+- **feat(contract-management)**: Bandeau `partner_requested_changes` — affiche les commentaires du partenaire (`contracts[latest].partner_comments`)
+- **feat(contract-management)**: Bandeau `draft_sent_to_partner` — info d'attente de réponse partenaire
+- **feat(contract-management)**: Bandeau `sent_for_signature` — info d'attente signature YouSign
+- **feat(backend)**: `ContractConfigRequest` enrichi : `include_mediation`, `article_overrides: dict[str,str]`, valeurs `immediate`/`net_45_eom`, `boondmanager`
+- **feat(backend)**: `article_numbering.py` — article `mediation` conditionnel (avant `resiliation`)
+- **feat(backend)**: `ContractRequestResponse` expose `contract_config` (pour pre-remplissage frontend)
+- **Fichiers modifiés** : `contract_management/api/schemas.py`, `contract_management/api/routes.py`, `contract_management/domain/services/article_numbering.py`, `frontend/src/pages/ContractDetail.tsx`, `frontend/src/api/contracts.ts`, `frontend/src/types/index.ts`
+
 ### 2026-03-04 (fix test connexion INSEE Sirene)
 - **fix(admin)**: Test Sirene rebasé sur `SIRENE_API_KEY` (méthode identique au portail partenaire)
   - Avant : utilisait OAuth2 (`INSEE_CONSUMER_KEY`/`INSEE_CONSUMER_SECRET`) → variables non configurées → always KO

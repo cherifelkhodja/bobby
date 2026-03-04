@@ -766,6 +766,7 @@ export interface ContractRequest {
   third_party_id: string | null;
   portal_url: string | null;
   compliance_override: boolean;
+  contract_config: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
