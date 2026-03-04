@@ -427,6 +427,28 @@ async def submit_portal_documents(
             error=str(exc),
         )
 
+    # Transition contract request from COLLECTING_DOCUMENTS → CONFIGURING_CONTRACT (best-effort)
+    if result.contract_request_id:
+        try:
+            from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+                ContractRequestRepository,
+            )
+            from app.contract_management.domain.value_objects.contract_request_status import (
+                ContractRequestStatus,
+            )
+
+            cr_repo = ContractRequestRepository(db)
+            cr = await cr_repo.get_by_id(result.contract_request_id)
+            if cr and cr.status == ContractRequestStatus.COLLECTING_DOCUMENTS:
+                cr.transition_to(ContractRequestStatus.CONFIGURING_CONTRACT)
+                await cr_repo.save(cr)
+        except Exception as exc:
+            logger.warning(
+                "contract_request_status_update_failed",
+                contract_request_id=str(result.contract_request_id),
+                error=str(exc),
+            )
+
     # Collect recipients: ADV contact + all active admin users
     settings = get_settings()
     email_sender = EmailSender(settings)

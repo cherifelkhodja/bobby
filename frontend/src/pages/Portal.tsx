@@ -255,16 +255,18 @@ export default function Portal() {
         </div>
       )}
 
-      {/* Company info form — step 0 */}
-      {isDocumentUpload && displayStep === 0 && (
-        <CompanyInfoForm
-          token={token!}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['portal', token] });
-            queryClient.invalidateQueries({ queryKey: ['portal-documents', token] });
-            goForward();
-          }}
-        />
+      {/* Company info form — step 0 (keep mounted to preserve state when going back) */}
+      {isDocumentUpload && displayStep !== 2 && (
+        <div className={displayStep !== 0 ? 'hidden' : undefined}>
+          <CompanyInfoForm
+            token={token!}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['portal', token] });
+              queryClient.invalidateQueries({ queryKey: ['portal-documents', token] });
+              goForward();
+            }}
+          />
+        </div>
       )}
 
       {/* Document upload section — step 1 */}
