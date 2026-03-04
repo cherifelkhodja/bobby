@@ -178,8 +178,9 @@ export default function Portal() {
   const allDocsEmpty = !!docsData && docsData.documents.length === 0;
 
   // Natural step based on server state (document_upload: 0=infos, 1=docs, 2=verif)
+  // Only advance to step 2 when documents were actually uploaded — not when none were requested.
   const naturalStep = isDocumentUpload
-    ? !hasSiren ? 0 : allDocsUploaded || allDocsEmpty ? 2 : 1
+    ? !hasSiren ? 0 : allDocsUploaded ? 2 : 1
     : 0;
 
   // displayStep: forceStep allows going back; clamp to [0, naturalStep]
@@ -285,9 +286,12 @@ export default function Portal() {
 
             {docsData.documents.length === 0 && (
               <Card className="text-center py-8">
-                <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Tous les documents ont été fournis. Merci !
+                <ShieldCheck className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Aucun document demandé pour le moment
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Vous serez notifié si des documents sont nécessaires.
                 </p>
               </Card>
             )}
