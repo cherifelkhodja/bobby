@@ -625,8 +625,7 @@ async def lookup_siret(
                 if inpi_info.legal_form_label:
                     legal_form = inpi_info.legal_form_label
                 if inpi_info.capital_amount is not None:
-                    currency = inpi_info.capital_currency or "EUR"
-                    capital_str = f"{inpi_info.capital_amount:,.0f} {currency}".replace(",", " ")
+                    capital_str = f"{inpi_info.capital_amount:,.0f}".replace(",", " ")
                 rcs_city = inpi_info.greffe_city
         except Exception:
             logger.warning("inpi_enrich_failed", siren=siren)

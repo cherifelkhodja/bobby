@@ -173,6 +173,115 @@ export default function Portal() {
 const INPUT_CLS =
   'w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500';
 
+// INSEE nomenclature — catégories juridiques (source : INPI / FORME_JURIDIQUE_LABELS backend)
+const LEGAL_FORM_COMMON = [
+  'SAS',
+  'SASU',
+  'SARL',
+  'EURL',
+  'SA',
+  'SNC',
+  'Entrepreneur individuel',
+  'EARL',
+];
+const LEGAL_FORM_ALL = [
+  'Agriculteur exploitant',
+  'Artisan',
+  'Association agréée',
+  'Association de droit local Alsace-Moselle',
+  'Association des Alsaciens-Mosellans',
+  "Association d'insertion par l'activité économique",
+  'Association déclarée de bienfaisance ou de charité',
+  'Association intermédiaire',
+  'Association loi 1901',
+  'Association loi 1901 (autre)',
+  'Association loi 1905 (culte)',
+  'Association reconnue d\'utilité publique',
+  'Association sportive',
+  'Association syndicale libre',
+  'Autre organisme professionnel',
+  'Autre personne morale de droit privé',
+  'Autre personne physique',
+  'Autre SA',
+  'Autre syndicat',
+  "Caisse d'épargne et de prévoyance",
+  'Comité central d\'entreprise',
+  'Comité d\'établissement',
+  'Comité de groupe',
+  'Comité interentreprises ou sectoriel d\'activité',
+  'Comité social et économique',
+  'Commerçant',
+  'Coopérative',
+  'EARL',
+  'Entrepreneur individuel',
+  'EURL',
+  'EURL (gérant associé)',
+  'EURL (gérant non associé)',
+  'Fondation',
+  'Fonds commun de placement',
+  'Fonds de pension',
+  'GAEC',
+  'GEIE',
+  'GIE',
+  'Groupement d\'investissement immobilier',
+  'Groupement de propriétaires',
+  'Indivision avec personne morale',
+  'Indivision entre personnes physiques',
+  'Mutuelle',
+  'Organisme d\'investissement alternatif (OIA)',
+  'Organisme de placement collectif en valeurs mobilières (OPCVM)',
+  'Organisme gérant des régimes de protection sociale',
+  'Organisme mutualiste',
+  'Organisme professionnel',
+  'SA',
+  'SA (autre)',
+  'SA à conseil d\'administration',
+  'SA à directoire',
+  "SA coopérative",
+  'SA coopérative à conseil d\'administration',
+  "SA coopérative à directoire",
+  "SA d'attribution d'immeubles en jouissance à temps partagé",
+  'SARL',
+  'SARL (avant 1985)',
+  'SARL coopérative',
+  'SAS',
+  'SASU',
+  'SCA',
+  'SCPI',
+  'SE (Societas Europaea)',
+  'SE à conseil d\'administration',
+  'SE à directoire',
+  'SICOMI',
+  'SNC',
+  'SNC avec conseil d\'administration',
+  'Société à intérêt collectif agricole (SICA)',
+  'Société anonyme à responsabilité limitée',
+  'Société anonyme coopérative de construction',
+  "Société anonyme coopérative d'intérêt collectif",
+  'Société anonyme de HLM',
+  'Société anonyme mixte d\'investissement local (SEMIL)',
+  'Société coopérative agricole',
+  "Société coopérative de production (SCOP) SA",
+  'Société créée de fait avec personne morale',
+  'Société créée de fait entre personnes physiques',
+  'Société de caution mutuelle',
+  "Société d'exercice libéral par actions simplifiée (SELAS)",
+  'Société en participation avec personne morale',
+  'Société en participation de personnes morales',
+  'Société en participation de personnes physiques',
+  'Société en participation entre personnes physiques',
+  'Société par actions simplifiée',
+  'Syndicat',
+  'Syndicat de propriétaires',
+  'Association foncière',
+].filter((v) => !LEGAL_FORM_COMMON.includes(v)).sort();
+
+function formatCapital(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+}
+
 type Civility = 'M.' | 'Mme';
 
 interface ContactFields {
@@ -296,7 +405,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
           head_office_street: data.head_office_street ?? f.head_office_street,
           head_office_postal_code: data.head_office_postal_code ?? f.head_office_postal_code,
           head_office_city: data.head_office_city ?? f.head_office_city,
-          capital: data.capital ?? f.capital,
+          capital: data.capital ? formatCapital(data.capital) : f.capital,
           rcs_city: data.rcs_city ?? f.rcs_city,
         }));
         if (data.entity_category === 'ei' || data.entity_category === 'societe') {
@@ -478,19 +587,44 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Forme juridique *
             </label>
-            <input
-              type="text"
-              {...field('legal_form')}
-              placeholder={entityCategory === 'ei' ? 'Ex : EI' : 'Ex : SAS'}
+            <select
+              value={form.legal_form}
+              onChange={(e) => setForm((f) => ({ ...f, legal_form: e.target.value }))}
               className={INPUT_CLS}
-            />
+            >
+              <option value="">— Sélectionner —</option>
+              <optgroup label="Formes courantes">
+                {LEGAL_FORM_COMMON.map((v) => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Autres formes">
+                {LEGAL_FORM_ALL.map((v) => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </optgroup>
+            </select>
           </div>
           {entityCategory === 'societe' && (
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Capital social
               </label>
-              <input type="text" {...field('capital')} placeholder="Ex : 10 000" className={INPUT_CLS} />
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={form.capital}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, capital: formatCapital(e.target.value) }))
+                  }
+                  placeholder="Ex : 10 000"
+                  className={INPUT_CLS}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
+                  EUR
+                </span>
+              </div>
             </div>
           )}
           <div className="md:col-span-2">
