@@ -929,23 +929,28 @@ async def test_inpi_connection(
 ):
     """Test INPI RNE API connection (admin only).
 
-    Uses the static Bearer token (INPI_TOKEN) stored in AWS Secrets Manager.
+    Utilise INPI_USERNAME/INPI_PASSWORD pour auto-login (JWT rafraîchi automatiquement).
+    Fallback sur INPI_TOKEN statique si les credentials ne sont pas configurés.
     """
     import time
 
     from app.third_party.infrastructure.adapters.inpi_client import InpiClient
 
-    configured = bool(settings.INPI_TOKEN)
+    configured = bool(settings.INPI_USERNAME and settings.INPI_PASSWORD) or bool(settings.INPI_TOKEN)
 
     if not configured:
         return InpiTestResponse(
             success=False,
             configured=False,
             response_time_ms=0,
-            message="INPI_TOKEN non configuré (AWS Secrets Manager)",
+            message="INPI non configuré — ajouter INPI_USERNAME + INPI_PASSWORD dans AWS Secrets Manager",
         )
 
-    inpi_client = InpiClient(token=settings.INPI_TOKEN)
+    inpi_client = InpiClient(
+        username=settings.INPI_USERNAME,
+        password=settings.INPI_PASSWORD,
+        token=settings.INPI_TOKEN,
+    )
 
     # Test with GEMINI's own SIREN (real payload verified)
     test_siren = "842799959"

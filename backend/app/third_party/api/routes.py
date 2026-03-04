@@ -602,7 +602,8 @@ async def lookup_siret(
     # Enrich with INPI RNE data (forme juridique, capital, greffe) — uses SIREN (first 9 digits)
     capital_str: str | None = None
     rcs_city: str | None = None
-    if siren and settings.INPI_TOKEN:
+    inpi_configured = bool(settings.INPI_USERNAME and settings.INPI_PASSWORD) or bool(settings.INPI_TOKEN)
+    if siren and inpi_configured:
         from app.third_party.infrastructure.adapters.inpi_client import InpiClient
         try:
             inpi = InpiClient(
