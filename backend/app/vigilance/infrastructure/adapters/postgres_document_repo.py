@@ -68,7 +68,7 @@ class DocumentRepository:
         if status:
             query = query.where(VigilanceDocumentModel.status == status.value)
 
-        query = query.order_by(VigilanceDocumentModel.created_at.desc())
+        query = query.order_by(VigilanceDocumentModel.created_at.asc())
         result = await self.session.execute(query)
         return [self._to_entity(m) for m in result.scalars().all()]
 
