@@ -408,7 +408,7 @@ function DocumentCard({
   const [confirmTempValidate, setConfirmTempValidate] = useState(false);
   const statusCfg = DOCUMENT_STATUS_CONFIG[doc.status as keyof typeof DOCUMENT_STATUS_CONFIG];
   const canValidate = doc.status === 'received';
-  const canTempValidate = doc.status === 'requested' && doc.is_unavailable;
+  const canTempValidate = doc.status === 'requested';
   const hasFile = !!doc.s3_key;
 
   return (
@@ -525,38 +525,40 @@ function DocumentCard({
         </p>
       )}
 
-      {/* Unavailability reason + temp validate */}
+      {/* Unavailability reason */}
       {doc.is_unavailable && doc.unavailability_reason && (
-        <div className="mt-2 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 rounded-lg px-2 py-1">
-          <p>Non disponible : {doc.unavailability_reason}</p>
-          {canTempValidate && (
-            <div className="mt-1.5">
-              {!confirmTempValidate ? (
-                <button
-                  onClick={() => setConfirmTempValidate(true)}
-                  className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
-                >
-                  Valider temporairement
-                </button>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <span className="text-gray-600 dark:text-gray-300">Confirmer la validation temporaire ?</span>
-                  <button
-                    onClick={() => { onTempValidate(); setConfirmTempValidate(false); }}
-                    disabled={isValidating}
-                    className="font-medium text-green-600 dark:text-green-400 hover:underline disabled:opacity-50"
-                  >
-                    Oui
-                  </button>
-                  <button
-                    onClick={() => setConfirmTempValidate(false)}
-                    className="text-gray-400 hover:underline"
-                  >
-                    Annuler
-                  </button>
-                </span>
-              )}
-            </div>
+        <p className="mt-2 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 rounded-lg px-2 py-1">
+          Raison d'indisponibilité : {doc.unavailability_reason}
+        </p>
+      )}
+
+      {/* Temp validate — available for any requested doc */}
+      {canTempValidate && !isRejectingThis && (
+        <div className="mt-2">
+          {!confirmTempValidate ? (
+            <button
+              onClick={() => setConfirmTempValidate(true)}
+              className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+            >
+              Valider temporairement
+            </button>
+          ) : (
+            <span className="flex items-center gap-2 text-xs">
+              <span className="text-gray-600 dark:text-gray-300">Confirmer la validation temporaire ?</span>
+              <button
+                onClick={() => { onTempValidate(); setConfirmTempValidate(false); }}
+                disabled={isValidating}
+                className="font-medium text-green-600 dark:text-green-400 hover:underline disabled:opacity-50"
+              >
+                Oui
+              </button>
+              <button
+                onClick={() => setConfirmTempValidate(false)}
+                className="text-gray-400 hover:underline"
+              >
+                Annuler
+              </button>
+            </span>
           )}
         </div>
       )}
