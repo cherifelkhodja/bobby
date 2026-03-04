@@ -143,7 +143,7 @@ class PortalDocumentsListResponse(BaseModel):
     """List of documents for portal."""
 
     third_party_id: UUID
-    company_name: str
+    company_name: str | None = None
     documents: list[PortalDocumentResponse]
 
 
