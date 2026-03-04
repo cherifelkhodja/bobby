@@ -68,6 +68,7 @@ class ComplianceDashboardResponse(BaseModel):
     non_compliant: int
     expiring_soon: int
     pending: int
+    under_review: int
     compliance_rate: float
     documents_pending_review: int
     documents_expiring_soon: int

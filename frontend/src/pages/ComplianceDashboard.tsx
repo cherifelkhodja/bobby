@@ -9,6 +9,7 @@ import {
   FileX,
   Search,
   ChevronRight,
+  Hourglass,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -105,7 +106,7 @@ export default function ComplianceDashboard() {
 
       {/* Stats cards */}
       {dashboard && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <Card>
             <div className="flex items-center gap-3">
               <ShieldCheck className="h-8 w-8 text-green-500" />
@@ -125,6 +126,17 @@ export default function ComplianceDashboard() {
                   {dashboard.non_compliant}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Non conformes</p>
+              </div>
+            </div>
+          </Card>
+          <Card>
+            <div className="flex items-center gap-3">
+              <Hourglass className="h-8 w-8 text-blue-500" />
+              <div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {dashboard.under_review}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">En vérification</p>
               </div>
             </div>
           </Card>

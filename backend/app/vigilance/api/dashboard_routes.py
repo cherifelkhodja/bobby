@@ -39,6 +39,7 @@ async def get_compliance_dashboard(
     non_compliant = compliance_counts.get("non_compliant", 0)
     expiring_soon = compliance_counts.get("expiring_soon", 0)
     pending = compliance_counts.get("pending", 0)
+    under_review = compliance_counts.get("under_review", 0)
 
     compliance_rate = (compliant / total * 100) if total > 0 else 0.0
 
@@ -66,6 +67,7 @@ async def get_compliance_dashboard(
         non_compliant=non_compliant,
         expiring_soon=expiring_soon,
         pending=pending,
+        under_review=under_review,
         compliance_rate=round(compliance_rate, 1),
         documents_pending_review=documents_pending_review,
         documents_expiring_soon=documents_expiring_soon,

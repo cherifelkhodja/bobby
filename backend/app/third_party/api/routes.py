@@ -393,9 +393,16 @@ async def submit_portal_documents(
 ):
     """Called when the third party clicks 'Valider le dépôt'.
 
-    Sends a notification email to the ADV contact of the third party.
+    - Sets compliance_status to UNDER_REVIEW on the third party.
+    - Sends notification email to the ADV contact and all admin users.
     Never blocks on email failure.
     """
+    from app.config import get_settings
+    from app.infrastructure.database.repositories.user_repository import UserRepository
+    from app.infrastructure.email.sender import EmailSender
+    from app.domain.value_objects import UserRole
+    from app.third_party.domain.value_objects.compliance_status import ComplianceStatus
+
     result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
 
     doc_repo = DocumentRepository(db)
@@ -407,19 +414,33 @@ async def submit_portal_documents(
     )
     total_count = len(documents)
 
-    # Send notification to ADV contact (best-effort)
-    adv_email = result.third_party.adv_contact_email
-    if adv_email:
+    # Update compliance status to "En cours de vérification"
+    tp_repo = ThirdPartyRepository(db)
+    result.third_party.update_compliance_status(ComplianceStatus.UNDER_REVIEW)
+    await tp_repo.save(result.third_party)
+
+    # Collect recipients: ADV contact + all active admin users
+    settings = get_settings()
+    email_sender = EmailSender(settings)
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
+    compliance_url = f"{frontend_url}/compliance"
+    third_party_name = result.third_party.company_name or result.third_party.contact_email
+
+    recipients: list[str] = []
+    if result.third_party.adv_contact_email:
+        recipients.append(result.third_party.adv_contact_email)
+    user_repo = UserRepository(db)
+    admin_users = await user_repo.list_by_roles([UserRole.ADMIN])
+    for u in admin_users:
+        email = str(u.email)
+        if email and email not in recipients:
+            recipients.append(email)
+
+    for recipient in recipients:
         try:
-            from app.config import get_settings
-            from app.infrastructure.email.sender import EmailSender
-            settings = get_settings()
-            email_sender = EmailSender(settings)
-            frontend_url = settings.FRONTEND_URL.rstrip("/")
-            compliance_url = f"{frontend_url}/compliance"
             await email_sender.send_documents_submitted_notification(
-                to=adv_email,
-                third_party_name=result.third_party.company_name or result.third_party.contact_email,
+                to=recipient,
+                third_party_name=third_party_name,
                 uploaded_count=uploaded_count,
                 total_count=total_count,
                 compliance_url=compliance_url,
@@ -428,7 +449,7 @@ async def submit_portal_documents(
             logger.warning(
                 "submit_notification_email_failed",
                 third_party_id=str(result.third_party.id),
-                adv_email=adv_email,
+                recipient=recipient,
                 error=str(exc),
             )
 

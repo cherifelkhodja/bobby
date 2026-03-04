@@ -7,6 +7,7 @@ class ComplianceStatus(str, Enum):
     """Overall compliance status of a third party's document portfolio."""
 
     PENDING = "pending"
+    UNDER_REVIEW = "under_review"
     COMPLIANT = "compliant"
     EXPIRING_SOON = "expiring_soon"
     NON_COMPLIANT = "non_compliant"
@@ -19,6 +20,7 @@ class ComplianceStatus(str, Enum):
         """Human-readable status name."""
         names = {
             ComplianceStatus.PENDING: "Dossier en cours",
+            ComplianceStatus.UNDER_REVIEW: "En cours de vérification",
             ComplianceStatus.COMPLIANT: "Conforme",
             ComplianceStatus.EXPIRING_SOON: "Expiration proche",
             ComplianceStatus.NON_COMPLIANT: "Non conforme",

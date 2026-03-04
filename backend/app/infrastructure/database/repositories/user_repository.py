@@ -122,6 +122,16 @@ class UserRepository:
         )
         return [self._to_entity(m) for m in result.scalars().all()]
 
+    async def list_by_roles(self, roles: list[UserRole]) -> list[User]:
+        """List active users matching any of the given roles."""
+        role_values = [r.value for r in roles]
+        result = await self.session.execute(
+            select(UserModel)
+            .where(UserModel.role.in_(role_values), UserModel.is_active.is_(True))
+            .order_by(UserModel.created_at.desc())
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
     async def count(self) -> int:
         """Count total users."""
         result = await self.session.execute(select(func.count(UserModel.id)))

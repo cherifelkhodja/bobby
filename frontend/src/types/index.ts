@@ -791,7 +791,7 @@ export interface Contract {
 }
 
 // Vigilance
-export type ComplianceStatus = 'pending' | 'compliant' | 'expiring_soon' | 'non_compliant';
+export type ComplianceStatus = 'pending' | 'under_review' | 'compliant' | 'expiring_soon' | 'non_compliant';
 
 export type DocumentStatus = 'requested' | 'received' | 'validated' | 'rejected' | 'expiring_soon' | 'expired';
 
@@ -859,6 +859,7 @@ export interface ComplianceDashboard {
   non_compliant: number;
   expiring_soon: number;
   pending: number;
+  under_review: number;
   compliance_rate: number;
   documents_pending_review: number;
   documents_expiring_soon: number;
@@ -866,6 +867,7 @@ export interface ComplianceDashboard {
 
 export const COMPLIANCE_STATUS_CONFIG: Record<ComplianceStatus, { label: string; color: string }> = {
   pending: { label: 'En attente', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
+  under_review: { label: 'En cours de vérification', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
   compliant: { label: 'Conforme', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
   expiring_soon: { label: 'Expire bientôt', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' },
   non_compliant: { label: 'Non conforme', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
