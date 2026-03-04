@@ -528,7 +528,7 @@ function ThirdPartyDocumentsPanel({
   // Count by status for summary
   const receivedCount = tpDocs.documents.filter((d) => d.status === 'received').length;
   const validatedCount = tpDocs.documents.filter((d) => d.status === 'validated').length;
-  const pendingCount = tpDocs.documents.filter((d) => d.status === 'pending').length;
+  const pendingCount = tpDocs.documents.filter((d) => d.status === 'requested').length;
 
   return (
     <div>
