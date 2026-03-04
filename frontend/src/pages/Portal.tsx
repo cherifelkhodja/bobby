@@ -126,7 +126,10 @@ export default function Portal() {
   const { token } = useParams<{ token: string }>();
   const queryClient = useQueryClient();
   const [forceStep, setForceStep] = useState<number | null>(null);
-  const [submitted, setSubmitted] = useState(false);  // must be before any early return
+  const [submitted, setSubmitted] = useState(() => {
+    // Persist submitted state so magic link always returns to confirmation page
+    return token ? localStorage.getItem(`portal-submitted-${token}`) === 'true' : false;
+  });
 
   // Verify magic link
   const { data: portalInfo, isLoading, isError } = useQuery({
@@ -239,8 +242,8 @@ export default function Portal() {
       {/* Progress stepper */}
       <PortalStepper steps={steps} />
 
-      {/* Back button */}
-      {displayStep > 0 && (
+      {/* Back button — hidden after submission */}
+      {displayStep > 0 && !submitted && (
         <div className="max-w-3xl mx-auto mb-4">
           <button
             onClick={goBack}
@@ -312,6 +315,7 @@ export default function Portal() {
               enabled={allDocsHandled && !hasExpiredDoc}
               expiredBlocked={hasExpiredDoc}
               onSubmitted={() => {
+                localStorage.setItem(`portal-submitted-${token}`, 'true');
                 setSubmitted(true);
                 setForceStep(null);
               }}
