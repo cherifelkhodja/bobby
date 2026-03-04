@@ -161,6 +161,41 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-04 (portail tiers — formulaire infos société + INPI auto-login)
+
+#### Formulaire infos société (Portal.tsx)
+- **feat(portal)**: `legal_form` → `<select>` avec optgroups (formes courantes + toutes les formes INSEE ~80 options)
+  - `LEGAL_FORM_COMMON` : SAS, SASU, SARL, EURL, SA, SNC, EI, EARL (en premier)
+  - `LEGAL_FORM_ALL` : toutes les formes `FORME_JURIDIQUE_LABELS` triées alphabétiquement
+  - Option dynamique ajoutée si la valeur retournée par l'API n'est pas dans la liste (défensif)
+- **feat(portal)**: `capital` → input numérique uniquement, séparateur de milliers espace insécable (`\u00a0`), label "EUR" overlay
+  - Helper `formatCapital(raw)` : strip non-digits + regex milliers
+- **fix(portal)**: Toast raccourci → `"Données pré-remplies."`
+- **fix(backend)**: `capital_str` ne contient plus la devise EUR — le domaine génère déjà `"au capital de X euros"` (sinon "10 000 EUR euros")
+- **fix(schemas)**: `PortalDocumentsListResponse.company_name` → `str | None = None` (était `str` → 400 quand le tiers n'a pas encore soumis ses infos)
+
+#### INPI RNE — forme juridique cohérente
+- **fix(backend)**: `_map_legal_form()` utilise maintenant `forme_juridique_label()` (même dict `FORME_JURIDIQUE_LABELS` que le frontend) → libellé INSEE identique aux options du select
+  - Avant : "Société anonyme (SA)" (non trouvé dans le select)
+  - Après : "SAS", "SARL", etc. (trouvé dans le select)
+
+#### INPI auto-login (SSO)
+- **feat(inpi)**: Auto-login via `POST /api/sso/login` avec `{"username": ..., "password": ...}`
+  - Token mis en cache 1h (`_token_cache` module-level)
+  - Sur 401 : invalidation cache + 1 retry automatique
+  - Fallback `INPI_TOKEN` statique si credentials absents
+- **fix(inpi)**: Endpoint corrigé `/api/login` → `/api/sso/login`, body `"login"` → `"username"`
+- **fix(config)**: `INPI_USERNAME` + `INPI_PASSWORD` ajoutés à `Settings` et mapping AWS Secrets
+- **fix(routes)**: Condition `inpi_configured` vérifie credentials OU token statique (au lieu de seulement `INPI_TOKEN`)
+- **fix(admin)**: Test INPI — distingue "auth échouée" de "SIREN non trouvé" (élimine faux positif)
+- **test(inpi)**: `tests/unit/third_party/test_inpi_client.py` — 10 tests unitaires couvrant `_login_inpi`, `_get_inpi_token`, `InpiClient.get_company` (cache, retry 401, fallback statique, sans token)
+
+#### Config requise (AWS Secrets Manager)
+```
+INPI_USERNAME = <email data.inpi.fr>
+INPI_PASSWORD = <mot de passe>
+```
+
 ### 2026-03-04 (intégration API INPI RNE)
 - **feat(inpi)**: Nouveau client `InpiClient` pour l'API INPI Registre National des Entreprises
   - **Fichier** : `backend/app/third_party/infrastructure/adapters/inpi_client.py`
