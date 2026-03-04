@@ -98,12 +98,13 @@ def compute_compliance_status(
             # Cron already transitioned it — trust the status as fallback
             has_expiring = True
 
-        elif doc.status in (
-            DocumentStatus.REQUESTED,
-            DocumentStatus.REJECTED,
-            DocumentStatus.EXPIRED,
-        ):
+        elif doc.status in (DocumentStatus.REJECTED, DocumentStatus.EXPIRED):
             has_missing_or_invalid = True
+
+        elif doc.status == DocumentStatus.REQUESTED:
+            # Document requested but not yet provided by the third party
+            # → still waiting, not a hard block
+            has_waiting_review = True
 
         elif doc.status == DocumentStatus.RECEIVED:
             # Use AI extraction result to qualify the wait
