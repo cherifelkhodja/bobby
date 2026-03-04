@@ -174,6 +174,8 @@ async def get_portal_documents(
             PortalDocumentResponse(
                 id=doc.id,
                 document_type=doc.document_type.value,
+                display_name=doc.document_type.display_name,
+                validity_label=doc.document_type.validity_label,
                 status=doc.status.value,
                 file_name=doc.file_name,
                 uploaded_at=doc.uploaded_at,

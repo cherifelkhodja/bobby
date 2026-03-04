@@ -897,6 +897,8 @@ export interface PortalInfo {
 export interface PortalDocument {
   id: string;
   document_type: string;
+  display_name: string;
+  validity_label: string | null;
   status: string;
   file_name: string | null;
   uploaded_at: string | null;

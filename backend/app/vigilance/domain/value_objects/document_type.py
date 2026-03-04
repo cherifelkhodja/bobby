@@ -21,18 +21,35 @@ class DocumentType(str, Enum):
     def display_name(self) -> str:
         """Return a human-readable label for this document type."""
         labels = {
-            "kbis": "Extrait Kbis (≤ 3 mois)",
-            "extrait_insee": "Avis de situation SIRENE (≤ 3 mois)",
+            "kbis": "Extrait Kbis",
+            "extrait_insee": "Avis de situation SIRENE",
             "attestation_urssaf": "Attestation URSSAF",
-            "attestation_fiscale": "Attestation de régularité fiscale (≤ 6 mois)",
-            "attestation_assurance_rc_pro": "Attestation RC Pro (en cours de validité)",
-            "attestation_vigilance": "Attestation de vigilance URSSAF (≤ 6 mois)",
+            "attestation_fiscale": "Attestation de régularité fiscale",
+            "attestation_assurance_rc_pro": "Attestation RC Pro",
+            "attestation_vigilance": "Attestation de vigilance URSSAF",
             "certificat_regularite_fiscale": "Certificat de régularité fiscale",
             "rib": "RIB",
             "cni_representant": "CNI du représentant",
             "liste_salaries_etrangers": "Liste des salariés étrangers",
         }
         return labels.get(self.value, self.value)
+
+    @property
+    def validity_label(self) -> str | None:
+        """Return the maximum document age requirement, or None if not applicable."""
+        labels: dict[str, str | None] = {
+            "kbis": "≤ 3 mois",
+            "extrait_insee": "≤ 3 mois",
+            "attestation_urssaf": "≤ 6 mois",
+            "attestation_fiscale": "≤ 6 mois",
+            "attestation_assurance_rc_pro": "En cours de validité",
+            "attestation_vigilance": "≤ 6 mois",
+            "certificat_regularite_fiscale": "≤ 6 mois",
+            "rib": None,
+            "cni_representant": None,
+            "liste_salaries_etrangers": None,
+        }
+        return labels.get(self.value)
 
 
 # Documents interdits par le RGPD

@@ -132,6 +132,8 @@ class PortalDocumentResponse(BaseModel):
 
     id: UUID
     document_type: str
+    display_name: str
+    validity_label: str | None = None
     status: str
     file_name: str | None = None
     uploaded_at: datetime | None = None

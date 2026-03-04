@@ -1016,7 +1016,7 @@ function DocumentUploadCard({
   token,
   onSuccess,
 }: {
-  doc: { id: string; document_type: string; status: string; file_name: string | null; rejection_reason: string | null };
+  doc: { id: string; document_type: string; display_name: string; validity_label: string | null; status: string; file_name: string | null; rejection_reason: string | null };
   token: string;
   onSuccess: () => void;
 }) {
@@ -1064,9 +1064,16 @@ function DocumentUploadCard({
         <div className="flex items-start gap-3">
           <Icon className={`h-5 w-5 mt-0.5 ${iconColor}`} />
           <div>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">
-              {doc.document_type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                {doc.display_name}
+              </p>
+              {doc.validity_label && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
+                  {doc.validity_label}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               {statusLabel}
             </p>
