@@ -1,6 +1,6 @@
 """Add is_unavailable and unavailability_reason to vig_documents.
 
-Revision ID: 033_add_doc_unavailability_fields
+Revision ID: 033_add_doc_unavailability
 Revises: 032_add_doc_extraction_fields
 Create Date: 2026-03-04
 """
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "033_add_doc_unavailability_fields"
+revision = "033_add_doc_unavailability"
 down_revision = "032_add_doc_extraction_fields"
 branch_labels = None
 depends_on = None
