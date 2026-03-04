@@ -169,7 +169,7 @@ class ContractReviewResponse(BaseModel):
 
 
 class SiretLookupResponse(BaseModel):
-    """Auto-fill data returned from INSEE Sirene lookup."""
+    """Auto-fill data returned from INSEE Sirene + INPI RNE lookup."""
 
     siren: str | None = None
     company_name: str | None = None
@@ -178,6 +178,8 @@ class SiretLookupResponse(BaseModel):
     head_office_street: str | None = None
     head_office_postal_code: str | None = None
     head_office_city: str | None = None
+    capital: str | None = None       # From INPI RNE (e.g. "10 000 EUR")
+    rcs_city: str | None = None      # From INPI RNE (ville du greffe)
 
 
 class CompanyInfoRequest(BaseModel):

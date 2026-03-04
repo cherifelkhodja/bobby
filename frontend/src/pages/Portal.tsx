@@ -296,11 +296,13 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
           head_office_street: data.head_office_street ?? f.head_office_street,
           head_office_postal_code: data.head_office_postal_code ?? f.head_office_postal_code,
           head_office_city: data.head_office_city ?? f.head_office_city,
+          capital: data.capital ?? f.capital,
+          rcs_city: data.rcs_city ?? f.rcs_city,
         }));
         if (data.entity_category === 'ei' || data.entity_category === 'societe') {
           setEntityCategory(data.entity_category);
         }
-        toast.success('Informations pré-remplies depuis INSEE Sirene.');
+        toast.success('Informations pré-remplies depuis INSEE Sirene + INPI.');
       } catch {
         // Silently ignore — user can fill manually
       } finally {
