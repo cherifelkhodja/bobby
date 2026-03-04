@@ -612,7 +612,7 @@ async def lookup_siret(
     postal_code = _clean(adresse.get("codePostalEtablissement"))
     city = _clean(adresse.get("libelleCommuneEtablissement"))
 
-    # Enrich with INPI RNE data (capital, greffe) — uses SIREN (first 9 digits)
+    # Enrich with INPI RNE data (forme juridique, capital, greffe) — uses SIREN (first 9 digits)
     capital_str: str | None = None
     rcs_city: str | None = None
     if siren and settings.INPI_TOKEN:
@@ -621,6 +621,9 @@ async def lookup_siret(
             inpi = InpiClient(token=settings.INPI_TOKEN)
             inpi_info = await inpi.get_company(siren)
             if inpi_info:
+                # Forme juridique : INPI est source de vérité (RNE officiel)
+                if inpi_info.legal_form_label:
+                    legal_form = inpi_info.legal_form_label
                 if inpi_info.capital_amount is not None:
                     currency = inpi_info.capital_currency or "EUR"
                     capital_str = f"{inpi_info.capital_amount:,.0f} {currency}".replace(",", " ")
