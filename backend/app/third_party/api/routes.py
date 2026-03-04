@@ -607,6 +607,8 @@ async def lookup_siret(
         try:
             inpi = InpiClient(token=settings.INPI_TOKEN)
             inpi_info = await inpi.get_company(siren)
+            if not inpi_info:
+                logger.warning("inpi_no_data_returned", siren=siren)
             if inpi_info:
                 # Forme juridique : INPI est source de vérité (RNE officiel)
                 if inpi_info.legal_form_label:
@@ -614,8 +616,8 @@ async def lookup_siret(
                 if inpi_info.capital_amount is not None:
                     capital_str = f"{inpi_info.capital_amount:,.0f}".replace(",", " ")
                 rcs_city = inpi_info.greffe_city
-        except Exception:
-            logger.warning("inpi_enrich_failed", siren=siren)
+        except Exception as exc:
+            logger.warning("inpi_enrich_failed", siren=siren, error=str(exc), error_type=type(exc).__name__)
 
     return SiretLookupResponse(
         siren=siren,
