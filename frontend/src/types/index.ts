@@ -908,4 +908,7 @@ export interface PortalDocument {
   document_date: string | null;
   is_valid_at_upload: boolean | null;
   extracted_info: Record<string, string | null> | null;
+  // Third-party declared unavailability
+  is_unavailable: boolean;
+  unavailability_reason: string | null;
 }

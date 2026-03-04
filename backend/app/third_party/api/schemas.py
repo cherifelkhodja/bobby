@@ -142,7 +142,17 @@ class PortalDocumentResponse(BaseModel):
     # AI-extracted fields
     document_date: date | None = None
     is_valid_at_upload: bool | None = None
-    extracted_info: dict | None = None  # IBAN/BIC/bénéficiaire for RIB, expiry_date for RC Pro
+    extracted_info: dict | None = None
+    # Third-party declared unavailability
+    is_unavailable: bool = False
+    unavailability_reason: str | None = None
+
+
+class UpdateDocumentAvailabilityRequest(BaseModel):
+    """Request from third party to declare a document unavailable."""
+
+    is_unavailable: bool
+    unavailability_reason: str | None = Field(None, max_length=500)
 
 
 class PortalDocumentsListResponse(BaseModel):

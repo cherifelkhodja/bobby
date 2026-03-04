@@ -108,6 +108,19 @@ export const portalApi = {
     return response.data;
   },
 
+  updateDocumentAvailability: async (
+    token: string,
+    documentId: string,
+    isUnavailable: boolean,
+    reason?: string | null,
+  ): Promise<{ message: string }> => {
+    const response = await portalClient.patch(`/${token}/documents/${documentId}/availability`, {
+      is_unavailable: isUnavailable,
+      unavailability_reason: reason ?? null,
+    });
+    return response.data;
+  },
+
   submitDocuments: async (token: string): Promise<{ message: string }> => {
     const response = await portalClient.post(`/${token}/submit-documents`);
     return response.data;

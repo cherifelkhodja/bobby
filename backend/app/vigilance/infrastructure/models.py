@@ -33,6 +33,8 @@ class VigilanceDocumentModel(Base):
     auto_check_results: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     document_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_valid_at_upload: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    is_unavailable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    unavailability_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

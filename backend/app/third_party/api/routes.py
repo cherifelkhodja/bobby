@@ -19,6 +19,7 @@ from app.third_party.api.schemas import (
     PortalDocumentsListResponse,
     SiretLookupResponse,
     ThirdPartyPortalResponse,
+    UpdateDocumentAvailabilityRequest,
 )
 from app.third_party.application.use_cases.verify_magic_link import (
     VerifyMagicLinkUseCase,
@@ -188,6 +189,8 @@ async def get_portal_documents(
                 document_date=doc.document_date,
                 is_valid_at_upload=doc.is_valid_at_upload,
                 extracted_info=doc.auto_check_results,
+                is_unavailable=doc.is_unavailable,
+                unavailability_reason=doc.unavailability_reason,
             )
             for doc in documents
         ],
@@ -264,6 +267,58 @@ async def upload_portal_document(
         document_type=updated.document_type.value,
         status=updated.status.value,
         file_name=updated.file_name or "",
+    )
+
+
+# ── Portal Document Availability ────────────────────────────────
+
+
+@router.patch(
+    "/portal/{token}/documents/{document_id}/availability",
+    response_model=PortalDocumentResponse,
+    summary="Declare a document unavailable (or reset)",
+)
+async def update_document_availability(
+    token: str,
+    document_id: UUID,
+    body: UpdateDocumentAvailabilityRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Third party declares they cannot provide a document, or resets that declaration."""
+    result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
+
+    doc_repo = DocumentRepository(db)
+    doc = await doc_repo.get_by_id(document_id)
+    if not doc or doc.third_party_id != result.third_party.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document introuvable.")
+
+    if body.is_unavailable:
+        if not body.unavailability_reason or not body.unavailability_reason.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Une raison est requise pour signaler un document indisponible.",
+            )
+        doc.mark_unavailable(body.unavailability_reason)
+    else:
+        doc.mark_available()
+
+    saved = await doc_repo.save(doc)
+
+    return PortalDocumentResponse(
+        id=saved.id,
+        document_type=saved.document_type.value,
+        display_name=saved.document_type.display_name,
+        validity_label=saved.document_type.validity_label,
+        status=saved.status.value,
+        file_name=saved.file_name,
+        uploaded_at=saved.uploaded_at,
+        rejected_at=saved.rejected_at,
+        rejection_reason=saved.rejection_reason,
+        document_date=saved.document_date,
+        is_valid_at_upload=saved.is_valid_at_upload,
+        extracted_info=saved.auto_check_results,
+        is_unavailable=saved.is_unavailable,
+        unavailability_reason=saved.unavailability_reason,
     )
 
 

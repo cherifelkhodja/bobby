@@ -50,6 +50,8 @@ class DocumentRepository:
             model.auto_check_results = document.auto_check_results
             model.document_date = document.document_date
             model.is_valid_at_upload = document.is_valid_at_upload
+            model.is_unavailable = document.is_unavailable
+            model.unavailability_reason = document.unavailability_reason
             model.updated_at = document.updated_at
         else:
             model = self._to_model(document)
@@ -169,6 +171,8 @@ class DocumentRepository:
             auto_check_results=model.auto_check_results,
             document_date=model.document_date,
             is_valid_at_upload=model.is_valid_at_upload,
+            is_unavailable=model.is_unavailable,
+            unavailability_reason=model.unavailability_reason,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -192,6 +196,8 @@ class DocumentRepository:
             auto_check_results=entity.auto_check_results,
             document_date=entity.document_date,
             is_valid_at_upload=entity.is_valid_at_upload,
+            is_unavailable=entity.is_unavailable,
+            unavailability_reason=entity.unavailability_reason,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
         )

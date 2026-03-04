@@ -35,6 +35,8 @@ class VigilanceDocument:
     auto_check_results: dict[str, Any] | None = None
     document_date: date | None = None
     is_valid_at_upload: bool | None = None
+    is_unavailable: bool = False
+    unavailability_reason: str | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -158,6 +160,25 @@ class VigilanceDocument:
         self.document_date = None
         self.is_valid_at_upload = None
         self.updated_at = datetime.utcnow()
+
+    def mark_unavailable(self, reason: str) -> None:
+        """Third party declares they cannot provide this document."""
+        self.is_unavailable = True
+        self.unavailability_reason = reason.strip()
+        self.updated_at = datetime.utcnow()
+
+    def mark_available(self) -> None:
+        """Reset unavailability (third party will upload the document)."""
+        self.is_unavailable = False
+        self.unavailability_reason = None
+        self.updated_at = datetime.utcnow()
+
+    @property
+    def is_handled(self) -> bool:
+        """True when the document is either uploaded or explicitly declared unavailable."""
+        return self.status.value in ("received", "validated", "expiring_soon") or (
+            self.is_unavailable and bool(self.unavailability_reason)
+        )
 
     @property
     def is_valid(self) -> bool:

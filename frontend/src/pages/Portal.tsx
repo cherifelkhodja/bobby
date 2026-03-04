@@ -176,6 +176,15 @@ export default function Portal() {
   const hasAnyReceived =
     !!docsData && docsData.documents.some((d) => d.status === 'received');
 
+  const allDocsHandled =
+    !!docsData &&
+    docsData.documents.length > 0 &&
+    docsData.documents.every(
+      (d) =>
+        ['received', 'validated', 'expiring_soon'].includes(d.status) ||
+        (d.is_unavailable && !!d.unavailability_reason),
+    );
+
   // Natural step: 0=infos société, 1=documents, 2=confirmation (post-submit)
   const naturalStep = isDocumentUpload
     ? !hasSiren ? 0 : submitted ? 2 : 1
@@ -298,7 +307,7 @@ export default function Portal() {
           {docsData.documents.length > 0 && (
             <SubmitDocumentsButton
               token={token!}
-              enabled={hasAnyReceived}
+              enabled={allDocsHandled}
               onSubmitted={() => {
                 setSubmitted(true);
                 setForceStep(null);
@@ -1065,7 +1074,7 @@ function SubmitDocumentsButton({
         </Button>
         {!enabled && (
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            Téléversez au moins un document pour valider.
+            Chaque document doit être téléversé ou signalé comme indisponible avec une raison.
           </p>
         )}
       </div>
@@ -1078,16 +1087,32 @@ function DocumentUploadCard({
   token,
   onSuccess,
 }: {
-  doc: { id: string; document_type: string; display_name: string; validity_label: string | null; status: string; file_name: string | null; rejection_reason: string | null; document_date: string | null; is_valid_at_upload: boolean | null; extracted_info: Record<string, string | null> | null };
+  doc: {
+    id: string; document_type: string; display_name: string; validity_label: string | null;
+    status: string; file_name: string | null; rejection_reason: string | null;
+    document_date: string | null; is_valid_at_upload: boolean | null;
+    extracted_info: Record<string, string | null> | null;
+    is_unavailable: boolean; unavailability_reason: string | null;
+  };
   token: string;
   onSuccess: () => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
   const [showReplace, setShowReplace] = useState(false);
+  // Unavailability form state — initialised from server data
+  const [unavailChecked, setUnavailChecked] = useState(doc.is_unavailable);
+  const [unavailReason, setUnavailReason] = useState(doc.unavailability_reason ?? '');
+
   const Icon = DOCUMENT_STATUS_ICONS[doc.status] ?? FileText;
-  const iconColor = DOCUMENT_STATUS_COLORS[doc.status] ?? 'text-gray-400';
-  const statusLabel = DOCUMENT_STATUS_LABELS[doc.status] ?? doc.status;
-  const needsUpload = doc.status === 'requested' || doc.status === 'rejected' || showReplace;
+  const iconColor = doc.is_unavailable
+    ? 'text-gray-400'
+    : DOCUMENT_STATUS_COLORS[doc.status] ?? 'text-gray-400';
+  const statusLabel = doc.is_unavailable
+    ? 'Document indisponible'
+    : DOCUMENT_STATUS_LABELS[doc.status] ?? doc.status;
+
+  // Upload zone shown for requested/rejected, or when user clicks "Changer"
+  const needsUpload = !unavailChecked && (doc.status === 'requested' || doc.status === 'rejected' || showReplace);
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => portalApi.uploadDocument(token, doc.id, file),
@@ -1096,38 +1121,51 @@ function DocumentUploadCard({
       setShowReplace(false);
       onSuccess();
     },
-    onError: () => {
-      toast.error('Erreur lors du téléversement.');
-    },
+    onError: () => { toast.error('Erreur lors du téléversement.'); },
   });
 
-  const handleFileSelect = useCallback(
-    (file: File) => {
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error('Le fichier dépasse 10 Mo.');
-        return;
-      }
-      uploadMutation.mutate(file);
+  const availabilityMutation = useMutation({
+    mutationFn: ({ isUnavail, reason }: { isUnavail: boolean; reason?: string }) =>
+      portalApi.updateDocumentAvailability(token, doc.id, isUnavail, reason),
+    onSuccess: () => {
+      toast.success(unavailChecked ? 'Raison enregistrée.' : 'Document remis en attente de téléversement.');
+      onSuccess();
     },
-    [uploadMutation],
-  );
+    onError: () => { toast.error('Erreur lors de l\'enregistrement.'); },
+  });
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOver(false);
-      const file = e.dataTransfer.files[0];
-      if (file) handleFileSelect(file);
-    },
-    [handleFileSelect],
-  );
+  const handleFileSelect = useCallback((file: File) => {
+    if (file.size > 10 * 1024 * 1024) { toast.error('Le fichier dépasse 10 Mo.'); return; }
+    uploadMutation.mutate(file);
+  }, [uploadMutation]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
+  }, [handleFileSelect]);
+
+  const handleCheckboxChange = (checked: boolean) => {
+    setUnavailChecked(checked);
+    if (!checked) {
+      // Immediately reset on the server when unchecked
+      setUnavailReason('');
+      availabilityMutation.mutate({ isUnavail: false });
+    }
+  };
+
+  const handleSaveReason = () => {
+    if (!unavailReason.trim()) { toast.error('Veuillez indiquer une raison.'); return; }
+    availabilityMutation.mutate({ isUnavail: true, reason: unavailReason });
+  };
 
   return (
     <Card>
+      {/* ── Header ── */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3 flex-1 min-w-0">
           <Icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${iconColor}`} />
-          <div>
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-sm font-medium text-gray-900 dark:text-white">
                 {doc.display_name}
@@ -1138,38 +1176,29 @@ function DocumentUploadCard({
                 </span>
               )}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              {statusLabel}
-            </p>
-            {doc.file_name && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                Fichier : {doc.file_name}
-              </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{statusLabel}</p>
+            {doc.file_name && !doc.is_unavailable && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Fichier : {doc.file_name}</p>
             )}
             {doc.rejection_reason && (
-              <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                Motif du rejet : {doc.rejection_reason}
-              </p>
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">Motif du rejet : {doc.rejection_reason}</p>
             )}
 
             {/* AI-extracted data */}
-            {doc.document_type !== 'rib' && (doc.document_date || doc.extracted_info?.expiry_date) && (
+            {!doc.is_unavailable && doc.document_type !== 'rib' && (doc.document_date || doc.extracted_info?.expiry_date) && (
               <div className="mt-2 space-y-1">
-                {/* Date d'émission */}
                 {doc.document_date && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     <span className="font-medium text-gray-600 dark:text-gray-300">Date du document :</span>{' '}
                     {new Date(doc.document_date).toLocaleDateString('fr-FR')}
                   </p>
                 )}
-                {/* Date de fin de validité (calculée ou extraite) */}
                 {doc.extracted_info?.expiry_date && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     <span className="font-medium text-gray-600 dark:text-gray-300">Valide jusqu'au :</span>{' '}
                     {new Date(doc.extracted_info.expiry_date).toLocaleDateString('fr-FR')}
                   </p>
                 )}
-                {/* Badge validité */}
                 {doc.is_valid_at_upload === true && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-700">
                     <CheckCircle className="h-3 w-3" /> Valide
@@ -1182,7 +1211,7 @@ function DocumentUploadCard({
                 )}
               </div>
             )}
-            {doc.document_type === 'rib' && doc.extracted_info && (
+            {!doc.is_unavailable && doc.document_type === 'rib' && doc.extracted_info && (
               <div className="mt-2 space-y-0.5">
                 {doc.extracted_info.beneficiaire && (
                   <p className="text-xs text-gray-600 dark:text-gray-300">
@@ -1204,31 +1233,26 @@ function DocumentUploadCard({
           </div>
         </div>
 
-        {/* "Changer" button for already-received documents */}
-        {doc.status === 'received' && !showReplace && (
-          <button
-            onClick={() => setShowReplace(true)}
-            className="ml-3 flex-shrink-0 text-xs text-primary-600 dark:text-primary-400 hover:underline"
-          >
+        {/* "Changer" button for received documents */}
+        {doc.status === 'received' && !showReplace && !unavailChecked && (
+          <button onClick={() => setShowReplace(true)}
+            className="ml-3 flex-shrink-0 text-xs text-primary-600 dark:text-primary-400 hover:underline">
             Changer
           </button>
         )}
         {showReplace && (
-          <button
-            onClick={() => setShowReplace(false)}
-            className="ml-3 flex-shrink-0 text-xs text-gray-400 hover:underline"
-          >
+          <button onClick={() => setShowReplace(false)}
+            className="ml-3 flex-shrink-0 text-xs text-gray-400 hover:underline">
             Annuler
           </button>
         )}
       </div>
 
+      {/* ── Upload zone ── */}
       {needsUpload && (
         <div
           className={`mt-3 border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
-            dragOver
-              ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/20'
-              : 'border-gray-300 dark:border-gray-600'
+            dragOver ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-300 dark:border-gray-600'
           }`}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
@@ -1243,19 +1267,61 @@ function DocumentUploadCard({
                 Glissez un fichier ici ou{' '}
                 <label className="text-primary-600 hover:text-primary-700 cursor-pointer">
                   parcourir
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileSelect(file);
-                    }}
-                  />
+                  <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }} />
                 </label>
               </p>
               <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG — max 10 Mo</p>
             </>
+          )}
+        </div>
+      )}
+
+      {/* ── "Je ne dispose pas de ce document" checkbox ── */}
+      {(doc.status === 'requested' || doc.status === 'rejected' || doc.is_unavailable) && !showReplace && (
+        <div className="mt-3 border-t border-gray-100 dark:border-gray-700 pt-3">
+          <label className="flex items-start gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={unavailChecked}
+              onChange={(e) => handleCheckboxChange(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              disabled={availabilityMutation.isPending}
+            />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Je ne dispose pas de ce document
+            </span>
+          </label>
+
+          {unavailChecked && (
+            <div className="mt-2 ml-6 space-y-2">
+              <textarea
+                value={unavailReason}
+                onChange={(e) => setUnavailReason(e.target.value)}
+                placeholder="Précisez la raison (ex : document en cours d'obtention, non applicable à notre situation…)"
+                rows={3}
+                maxLength={500}
+                className="w-full text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">{unavailReason.length}/500</span>
+                <Button
+                  size="sm"
+                  onClick={handleSaveReason}
+                  disabled={!unavailReason.trim() || availabilityMutation.isPending}
+                >
+                  {availabilityMutation.isPending ? (
+                    <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Enregistrement…</>
+                  ) : 'Enregistrer'}
+                </Button>
+              </div>
+              {/* Show saved reason from server */}
+              {doc.is_unavailable && doc.unavailability_reason && unavailReason === doc.unavailability_reason && (
+                <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <CheckCircle className="h-3 w-3" /> Raison enregistrée
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}
