@@ -173,9 +173,6 @@ export default function Portal() {
 
   const hasSiren = !!portalInfo.third_party.siren;
   const allDocsEmpty = !!docsData && docsData.documents.length === 0;
-  const hasAnyReceived =
-    !!docsData && docsData.documents.some((d) => d.status === 'received');
-
   const allDocsHandled =
     !!docsData &&
     docsData.documents.length > 0 &&
