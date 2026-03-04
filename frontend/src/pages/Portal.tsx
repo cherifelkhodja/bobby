@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 import {
   ShieldCheck,
   Upload,
@@ -362,7 +364,13 @@ function ContactSection({
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone</label>
-            <input type="tel" value={contact.phone} onChange={set('phone')} placeholder="Ex : +33 6 12 34 56 78" className={INPUT_CLS} />
+            <PhoneInput
+              international
+              defaultCountry="FR"
+              value={contact.phone}
+              onChange={(val) => onChange({ ...contact, phone: val || '' })}
+              className="phone-input-container"
+            />
           </div>
         </div>
       )}
@@ -699,12 +707,12 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone</label>
-              <input
-                type="tel"
+              <PhoneInput
+                international
+                defaultCountry="FR"
                 value={signatory.phone}
-                onChange={(e) => setSignatory((c) => ({ ...c, phone: e.target.value }))}
-                placeholder="Ex : +33 6 12 34 56 78"
-                className={INPUT_CLS}
+                onChange={(val) => setSignatory((c) => ({ ...c, phone: val || '' }))}
+                className="phone-input-container"
               />
             </div>
             <div className="md:col-span-2">
@@ -763,6 +771,39 @@ function PortalLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className="px-6 py-8">{children}</main>
+      <style>{`
+        .phone-input-container { display: flex; align-items: center; }
+        .PhoneInputCountry {
+          padding: 0.5rem;
+          border: 1px solid #d1d5db;
+          border-right: none;
+          border-radius: 0.5rem 0 0 0.5rem;
+          background: white;
+        }
+        .dark .PhoneInputCountry {
+          border-color: #4b5563;
+          background: #374151;
+        }
+        .PhoneInputInput {
+          flex: 1;
+          padding: 0.5rem 0.75rem;
+          border: 1px solid #d1d5db;
+          border-radius: 0 0.5rem 0.5rem 0;
+          background: white;
+          color: #111827;
+          font-size: 0.875rem;
+        }
+        .dark .PhoneInputInput {
+          border-color: #4b5563;
+          background: #374151;
+          color: white;
+        }
+        .PhoneInputInput:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+        }
+      `}</style>
     </div>
   );
 }
