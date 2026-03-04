@@ -219,34 +219,51 @@ export default function ComplianceDashboard() {
             <div className="space-y-2">
               {thirdParties?.items.map((tp) => {
                 const cs = COMPLIANCE_STATUS_CONFIG[tp.compliance_status as ComplianceStatus];
+                const isPending = tp.compliance_status === 'pending';
+                const isSelected = selectedThirdPartyId === tp.id;
                 return (
                   <button
                     key={tp.id}
-                    onClick={() => setSelectedThirdPartyId(tp.id)}
+                    onClick={() => !isPending && setSelectedThirdPartyId(tp.id)}
+                    disabled={isPending}
+                    title={isPending ? 'En attente que le tiers complète son portail' : undefined}
                     className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                      selectedThirdPartyId === tp.id
-                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      isPending
+                        ? 'border-gray-200 dark:border-gray-700 opacity-60 cursor-not-allowed'
+                        : isSelected
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                          : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                          {tp.company_name}
+                          {tp.company_name ?? (
+                            <span className="italic text-gray-400 dark:text-gray-500">
+                              Nom inconnu
+                            </span>
+                          )}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {tp.siren}
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          {tp.siren ? `SIREN ${tp.siren}` : tp.contact_email}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
                         {cs && (
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cs.color}`}>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ${cs.color}`}>
                             {cs.label}
                           </span>
                         )}
-                        <ChevronRight className="h-4 w-4 text-gray-400" />
+                        {!isPending && (
+                          <ChevronRight className="h-4 w-4 text-gray-400" />
+                        )}
                       </div>
                     </div>
+                    {isPending && (
+                      <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                        En attente de complétion du portail
+                      </p>
+                    )}
                   </button>
                 );
               })}
@@ -327,10 +344,12 @@ function ThirdPartyDocumentsPanel({
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {tpDocs.company_name}
+              {tpDocs.company_name ?? (
+                <span className="italic text-gray-400 dark:text-gray-500">Nom inconnu</span>
+              )}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {tpDocs.siren} — {tpDocs.contact_email}
+              {tpDocs.siren ? `SIREN ${tpDocs.siren} — ` : ''}{tpDocs.contact_email}
             </p>
           </div>
           <div className="flex items-center gap-3">
