@@ -1,7 +1,7 @@
 """Vigilance document domain entity."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -33,6 +33,8 @@ class VigilanceDocument:
     rejection_reason: str | None = None
     expires_at: datetime | None = None
     auto_check_results: dict[str, Any] | None = None
+    document_date: date | None = None
+    is_valid_at_upload: bool | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -125,6 +127,8 @@ class VigilanceDocument:
         self.rejection_reason = None
         self.expires_at = None
         self.auto_check_results = None
+        self.document_date = None
+        self.is_valid_at_upload = None
 
     @property
     def is_valid(self) -> bool:

@@ -1016,7 +1016,7 @@ function DocumentUploadCard({
   token,
   onSuccess,
 }: {
-  doc: { id: string; document_type: string; display_name: string; validity_label: string | null; status: string; file_name: string | null; rejection_reason: string | null };
+  doc: { id: string; document_type: string; display_name: string; validity_label: string | null; status: string; file_name: string | null; rejection_reason: string | null; document_date: string | null; is_valid_at_upload: boolean | null; extracted_info: Record<string, string | null> | null };
   token: string;
   onSuccess: () => void;
 }) {
@@ -1086,6 +1086,63 @@ function DocumentUploadCard({
               <p className="text-xs text-red-600 dark:text-red-400 mt-1">
                 Motif du rejet : {doc.rejection_reason}
               </p>
+            )}
+
+            {/* AI-extracted data */}
+            {doc.document_date && (
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Date du document :&nbsp;
+                  {new Date(doc.document_date).toLocaleDateString('fr-FR')}
+                </span>
+                {doc.is_valid_at_upload === true && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-700">
+                    Valide à la date de dépôt
+                  </span>
+                )}
+                {doc.is_valid_at_upload === false && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-700">
+                    Document périmé
+                  </span>
+                )}
+              </div>
+            )}
+            {doc.document_type === 'attestation_assurance_rc_pro' && doc.extracted_info?.expiry_date && (
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Valide jusqu'au :&nbsp;
+                  {new Date(doc.extracted_info.expiry_date).toLocaleDateString('fr-FR')}
+                </span>
+                {doc.is_valid_at_upload === true && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-700">
+                    En cours de validité
+                  </span>
+                )}
+                {doc.is_valid_at_upload === false && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-700">
+                    RC Pro expirée
+                  </span>
+                )}
+              </div>
+            )}
+            {doc.document_type === 'rib' && doc.extracted_info && (
+              <div className="mt-2 space-y-0.5">
+                {doc.extracted_info.beneficiaire && (
+                  <p className="text-xs text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Bénéficiaire :</span> {doc.extracted_info.beneficiaire}
+                  </p>
+                )}
+                {doc.extracted_info.iban && (
+                  <p className="text-xs text-gray-600 dark:text-gray-300 font-mono">
+                    <span className="font-sans font-medium">IBAN :</span> {doc.extracted_info.iban}
+                  </p>
+                )}
+                {doc.extracted_info.bic && (
+                  <p className="text-xs text-gray-600 dark:text-gray-300 font-mono">
+                    <span className="font-sans font-medium">BIC :</span> {doc.extracted_info.bic}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </div>

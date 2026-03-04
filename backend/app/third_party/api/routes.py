@@ -34,6 +34,9 @@ from app.third_party.infrastructure.adapters.postgres_magic_link_repo import (
 from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
     ThirdPartyRepository,
 )
+from app.vigilance.infrastructure.adapters.gemini_document_extractor import (
+    GeminiDocumentExtractor,
+)
 from app.vigilance.infrastructure.adapters.postgres_document_repo import (
     DocumentRepository,
 )
@@ -181,6 +184,9 @@ async def get_portal_documents(
                 uploaded_at=doc.uploaded_at,
                 rejected_at=doc.rejected_at,
                 rejection_reason=doc.rejection_reason,
+                document_date=doc.document_date,
+                is_valid_at_upload=doc.is_valid_at_upload,
+                extracted_info=doc.auto_check_results,
             )
             for doc in documents
         ],
@@ -211,6 +217,7 @@ async def upload_portal_document(
     doc_repo = DocumentRepository(db)
     s3_client = S3StorageClient(get_settings())
     storage = VigilanceDocumentStorage(s3_client)
+    extractor = GeminiDocumentExtractor(get_settings())
 
     # Verify the document belongs to this third party
     doc = await doc_repo.get_by_id(document_id)
@@ -224,6 +231,7 @@ async def upload_portal_document(
     use_case = UploadDocumentUseCase(
         document_repository=doc_repo,
         document_storage=storage,
+        document_extractor=extractor,
     )
 
     try:

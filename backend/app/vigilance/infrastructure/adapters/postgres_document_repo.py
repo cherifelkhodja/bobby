@@ -48,6 +48,8 @@ class DocumentRepository:
             model.rejection_reason = document.rejection_reason
             model.expires_at = document.expires_at
             model.auto_check_results = document.auto_check_results
+            model.document_date = document.document_date
+            model.is_valid_at_upload = document.is_valid_at_upload
             model.updated_at = document.updated_at
         else:
             model = self._to_model(document)
@@ -165,6 +167,8 @@ class DocumentRepository:
             rejection_reason=model.rejection_reason,
             expires_at=model.expires_at,
             auto_check_results=model.auto_check_results,
+            document_date=model.document_date,
+            is_valid_at_upload=model.is_valid_at_upload,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -186,6 +190,8 @@ class DocumentRepository:
             rejection_reason=entity.rejection_reason,
             expires_at=entity.expires_at,
             auto_check_results=entity.auto_check_results,
+            document_date=entity.document_date,
+            is_valid_at_upload=entity.is_valid_at_upload,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
         )

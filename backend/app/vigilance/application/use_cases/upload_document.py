@@ -1,6 +1,7 @@
 """Use case: Upload a document for a third party."""
 
 import os
+from datetime import date
 from uuid import UUID
 
 import structlog
@@ -42,12 +43,15 @@ class UploadDocumentUseCase:
     """Upload a document file to S3 and update the document status.
 
     Validates file format, size, RGPD rules, then uploads to S3
-    and transitions document to RECEIVED.
+    and transitions document to RECEIVED.  Optionally runs an AI
+    extractor to populate document_date, is_valid_at_upload and
+    auto_check_results.
     """
 
-    def __init__(self, document_repository, document_storage) -> None:
+    def __init__(self, document_repository, document_storage, document_extractor=None) -> None:
         self._document_repo = document_repository
         self._document_storage = document_storage
+        self._extractor = document_extractor
 
     async def execute(self, command: UploadDocumentCommand):
         """Execute the use case.
@@ -94,6 +98,34 @@ class UploadDocumentUseCase:
             file_name=command.file_name,
             file_size=len(command.file_content),
         )
+
+        # AI extraction (best-effort — never blocks the upload on failure)
+        if self._extractor is not None:
+            extracted = await self._extractor.extract(
+                document_type=document.document_type.value,
+                file_content=command.file_content,
+                content_type=command.content_type,
+            )
+            if extracted:
+                document.auto_check_results = extracted
+                # Persist dedicated columns when available
+                doc_date_str = extracted.get("document_date")
+                if doc_date_str:
+                    try:
+                        document.document_date = date.fromisoformat(doc_date_str)
+                    except ValueError:
+                        pass
+                is_valid = extracted.get("is_valid")
+                if is_valid is not None:
+                    document.is_valid_at_upload = bool(is_valid)
+
+                logger.info(
+                    "document_extraction_done",
+                    document_id=str(document.id),
+                    document_type=document.document_type.value,
+                    document_date=doc_date_str,
+                    is_valid=is_valid,
+                )
 
         saved = await self._document_repo.save(document)
 

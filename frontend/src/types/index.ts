@@ -904,4 +904,8 @@ export interface PortalDocument {
   uploaded_at: string | null;
   rejected_at: string | null;
   rejection_reason: string | null;
+  // AI-extracted fields
+  document_date: string | null;
+  is_valid_at_upload: boolean | null;
+  extracted_info: Record<string, string | null> | null;
 }

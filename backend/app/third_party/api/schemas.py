@@ -1,6 +1,6 @@
 """Pydantic schemas for third party portal API."""
 
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
@@ -139,6 +139,10 @@ class PortalDocumentResponse(BaseModel):
     uploaded_at: datetime | None = None
     rejected_at: datetime | None = None
     rejection_reason: str | None = None
+    # AI-extracted fields
+    document_date: date | None = None
+    is_valid_at_upload: bool | None = None
+    extracted_info: dict | None = None  # IBAN/BIC/bénéficiaire for RIB, expiry_date for RC Pro
 
 
 class PortalDocumentsListResponse(BaseModel):
