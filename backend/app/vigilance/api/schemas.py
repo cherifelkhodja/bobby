@@ -51,8 +51,8 @@ class ThirdPartyWithDocumentsResponse(BaseModel):
     """Third party with documents summary."""
 
     id: UUID
-    company_name: str
-    siren: str
+    company_name: str | None = None
+    siren: str | None = None
     type: str
     compliance_status: str
     contact_email: str

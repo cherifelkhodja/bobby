@@ -36,16 +36,16 @@ class ThirdPartyResponse(BaseModel):
     id: UUID
     boond_provider_id: int | None = None
     type: str
-    company_name: str
-    legal_form: str
+    company_name: str | None = None
+    legal_form: str | None = None
     capital: str | None = None
-    siren: str
-    siret: str
-    rcs_city: str
-    rcs_number: str
-    head_office_address: str
-    representative_name: str
-    representative_title: str
+    siren: str | None = None
+    siret: str | None = None
+    rcs_city: str | None = None
+    rcs_number: str | None = None
+    head_office_address: str | None = None
+    representative_name: str | None = None
+    representative_title: str | None = None
     contact_email: str
     compliance_status: str
     created_at: datetime
