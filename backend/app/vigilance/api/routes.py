@@ -21,6 +21,7 @@ from app.vigilance.api.schemas import (
     DocumentResponse,
     RejectDocumentRequest,
     ThirdPartyWithDocumentsResponse,
+    ValidateDocumentRequest,
 )
 from app.infrastructure.storage.s3_client import S3StorageClient
 from app.vigilance.application.use_cases.reject_document import RejectDocumentUseCase
@@ -51,6 +52,8 @@ def _document_to_response(doc) -> DocumentResponse:
         rejected_at=doc.rejected_at,
         rejection_reason=doc.rejection_reason,
         expires_at=doc.expires_at,
+        document_date=doc.document_date,
+        is_valid_at_upload=doc.is_valid_at_upload,
         auto_check_results=doc.auto_check_results,
         created_at=doc.created_at,
         updated_at=doc.updated_at,
@@ -222,6 +225,7 @@ async def validate_document(
     document_id: UUID,
     user_id: AdvOrAdminUser,
     db: AsyncSession = Depends(get_db),
+    body: ValidateDocumentRequest | None = None,
 ):
     """Validate a received document. ADV/admin only."""
     doc_repo = DocumentRepository(db)
@@ -236,6 +240,8 @@ async def validate_document(
         doc = await use_case.execute(
             document_id=document_id,
             validated_by=str(user_id),
+            document_date=body.document_date if body else None,
+            expires_at_override=body.expires_at if body else None,
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))

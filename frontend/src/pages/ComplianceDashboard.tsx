@@ -226,6 +226,23 @@ function DocumentViewerModal({
                 </div>
               )}
 
+              {doc.document_date && (
+                <div className="flex items-start gap-2">
+                  <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Date du document</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {formatDate(doc.document_date)}
+                    </p>
+                    {doc.is_valid_at_upload === false && (
+                      <span className="inline-flex items-center gap-1 mt-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 px-2 py-0.5 text-xs font-medium">
+                        <XCircle className="h-3 w-3" /> Document invalide à l'émission
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {doc.expires_at && (
                 <div className="flex items-start gap-2">
                   <Timer className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
@@ -367,13 +384,21 @@ function DocumentCard({
       </div>
 
       {/* Metadata row */}
-      <div className="grid grid-cols-3 gap-2 mb-3 text-xs">
+      <div className="grid grid-cols-4 gap-2 mb-3 text-xs">
         <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2">
           <p className="text-gray-400 mb-0.5 flex items-center gap-1">
             <Calendar className="h-3 w-3" /> Déposé le
           </p>
           <p className="font-medium text-gray-900 dark:text-white">
             {formatDate(doc.uploaded_at)}
+          </p>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2">
+          <p className="text-gray-400 mb-0.5 flex items-center gap-1">
+            <FileText className="h-3 w-3" /> Date document
+          </p>
+          <p className="font-medium text-gray-900 dark:text-white">
+            {formatDate(doc.document_date)}
           </p>
         </div>
         <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2">
@@ -391,6 +416,10 @@ function DocumentCard({
           <div className="mt-0.5">
             {doc.expires_at ? (
               <ExpiryBadge expiresAt={doc.expires_at} />
+            ) : doc.is_valid_at_upload === false ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 px-2 py-0.5 text-xs font-medium">
+                <XCircle className="h-3 w-3" /> Invalide
+              </span>
             ) : (
               <span className="font-medium text-gray-400">—</span>
             )}

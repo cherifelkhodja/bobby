@@ -810,6 +810,8 @@ export interface VigilanceDocument {
   rejected_at: string | null;
   rejection_reason: string | null;
   expires_at: string | null;
+  document_date: string | null;
+  is_valid_at_upload: boolean | null;
   auto_check_results: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;

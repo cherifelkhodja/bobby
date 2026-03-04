@@ -1,6 +1,6 @@
 """Pydantic schemas for vigilance API."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -24,6 +24,8 @@ class DocumentResponse(BaseModel):
     rejected_at: datetime | None = None
     rejection_reason: str | None = None
     expires_at: datetime | None = None
+    document_date: date | None = None
+    is_valid_at_upload: bool | None = None
     auto_check_results: dict[str, Any] | None = None
     created_at: datetime
     updated_at: datetime
@@ -32,7 +34,8 @@ class DocumentResponse(BaseModel):
 class ValidateDocumentRequest(BaseModel):
     """Request to validate a document."""
 
-    pass
+    document_date: date | None = None  # Date on the document (used to compute expiry)
+    expires_at: datetime | None = None  # Direct expiry override (takes precedence)
 
 
 class RejectDocumentRequest(BaseModel):

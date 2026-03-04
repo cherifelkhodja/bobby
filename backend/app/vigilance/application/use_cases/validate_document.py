@@ -1,6 +1,6 @@
 """Use case: Validate a vigilance document."""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from uuid import UUID
 
 import structlog
@@ -31,6 +31,8 @@ class ValidateDocumentUseCase:
         self,
         document_id: UUID,
         validated_by: str,
+        document_date: date | None = None,
+        expires_at_override: datetime | None = None,
     ):
         """Execute the use case.
 
@@ -52,8 +54,15 @@ class ValidateDocumentUseCase:
         if not third_party:
             raise DocumentNotFoundError(str(document_id))
 
-        # Compute expiration based on requirements
-        expires_at = self._compute_expiration(document.document_type)
+        # Expiry: direct override > manual date > AI-extracted date > now
+        if expires_at_override:
+            expires_at = expires_at_override
+        elif document_date:
+            expires_at = self._compute_expiration_from_date(document.document_type, document_date)
+        elif document.document_date:
+            expires_at = self._compute_expiration_from_date(document.document_type, document.document_date)
+        else:
+            expires_at = self._compute_expiration(document.document_type)
 
         document.validate(validated_by=validated_by, expires_at=expires_at)
         saved = await self._document_repo.save(document)
@@ -77,6 +86,15 @@ class ValidateDocumentUseCase:
             expires_at=str(expires_at) if expires_at else None,
         )
         return saved
+
+    def _compute_expiration_from_date(self, document_type, document_date: date) -> datetime | None:
+        """Compute expiration from the document's own date."""
+        for requirements in REQUIREMENTS_BY_ENTITY_CATEGORY.values():
+            for req in requirements:
+                if req["type"] == document_type and req["validity_months"]:
+                    base = datetime(document_date.year, document_date.month, document_date.day)
+                    return base + timedelta(days=req["validity_months"] * 30)
+        return None
 
     def _compute_expiration(self, document_type) -> datetime | None:
         """Compute the expiration date based on vigilance requirements.
