@@ -643,8 +643,10 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
       });
       toast.success('Informations enregistrées.');
       onSuccess();
-    } catch {
-      toast.error("Erreur lors de l'enregistrement.");
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ?? "Erreur lors de l'enregistrement.");
     } finally {
       setIsSubmitting(false);
     }
