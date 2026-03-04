@@ -156,6 +156,7 @@ class InitiateDocumentCollectionUseCase:
                 third_party_id=third_party.id,
                 purpose=MagicLinkPurpose.DOCUMENT_UPLOAD,
                 email=contact_email,
+                contract_request_id=cr.id,
             )
         )
 

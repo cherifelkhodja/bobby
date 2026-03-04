@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 
 import { contractsApi } from '../api/contracts';
+import { vigilanceApi } from '../api/vigilance';
 import { useAuthStore } from '../stores/authStore';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -99,6 +100,12 @@ export default function ContractDetail() {
     queryKey: ['contracts', id],
     queryFn: () => contractsApi.listContracts(id!),
     enabled: !!id,
+  });
+
+  const { data: complianceDocs } = useQuery({
+    queryKey: ['compliance-docs', cr?.third_party_id],
+    queryFn: () => vigilanceApi.getThirdPartyDocuments(cr!.third_party_id!),
+    enabled: !!cr?.third_party_id && isAdv,
   });
 
   // Pre-fill validation form with Boond data when CR loads
@@ -701,6 +708,54 @@ export default function ContractDetail() {
                 </div>
               )}
             </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Compliance documents */}
+      {isAdv && complianceDocs && complianceDocs.documents.length > 0 && (
+        <Card className="mb-6">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 text-gray-400" />
+            Documents de conformité
+          </h3>
+          <div className="space-y-2">
+            {complianceDocs.documents.map((doc) => {
+              const statusColors: Record<string, string> = {
+                validated: 'text-green-600 bg-green-50 dark:bg-green-900/20',
+                rejected: 'text-red-600 bg-red-50 dark:bg-red-900/20',
+                received: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20',
+                requested: 'text-gray-500 bg-gray-50 dark:bg-gray-800',
+                expiring_soon: 'text-orange-600 bg-orange-50 dark:bg-orange-900/20',
+                expired: 'text-red-600 bg-red-50 dark:bg-red-900/20',
+              };
+              const statusLabels: Record<string, string> = {
+                validated: 'Validé',
+                rejected: 'Rejeté',
+                received: 'Reçu',
+                requested: 'En attente',
+                expiring_soon: 'Expire bientôt',
+                expired: 'Expiré',
+              };
+              return (
+                <div
+                  key={doc.id}
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {doc.document_type_display}
+                    </p>
+                    {doc.file_name && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{doc.file_name}</p>
+                    )}
+                  </div>
+                  <span className={`ml-3 flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[doc.status] ?? statusColors.requested}`}>
+                    {statusLabels[doc.status] ?? doc.status}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}
