@@ -258,6 +258,7 @@ export default function Portal() {
           token={token!}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ['portal', token] });
+            queryClient.invalidateQueries({ queryKey: ['portal-documents', token] });
             goForward();
           }}
         />
