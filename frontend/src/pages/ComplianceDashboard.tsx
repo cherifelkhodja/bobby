@@ -382,6 +382,7 @@ function DocumentCard({
   doc,
   onView,
   onValidate,
+  onTempValidate,
   onRejectStart,
   isRejectingThis,
   rejectReason,
@@ -394,6 +395,7 @@ function DocumentCard({
   doc: VigilanceDocument;
   onView: () => void;
   onValidate: () => void;
+  onTempValidate: () => void;
   onRejectStart: () => void;
   isRejectingThis: boolean;
   rejectReason: string;
@@ -403,8 +405,10 @@ function DocumentCard({
   isValidating: boolean;
   isRejecting: boolean;
 }) {
+  const [confirmTempValidate, setConfirmTempValidate] = useState(false);
   const statusCfg = DOCUMENT_STATUS_CONFIG[doc.status as keyof typeof DOCUMENT_STATUS_CONFIG];
   const canValidate = doc.status === 'received';
+  const canTempValidate = doc.status === 'requested' && doc.is_unavailable;
   const hasFile = !!doc.s3_key;
 
   return (
@@ -521,11 +525,40 @@ function DocumentCard({
         </p>
       )}
 
-      {/* Unavailability reason display */}
+      {/* Unavailability reason + temp validate */}
       {doc.is_unavailable && doc.unavailability_reason && (
-        <p className="mt-2 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 rounded-lg px-2 py-1">
-          Non disponible : {doc.unavailability_reason}
-        </p>
+        <div className="mt-2 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 rounded-lg px-2 py-1">
+          <p>Non disponible : {doc.unavailability_reason}</p>
+          {canTempValidate && (
+            <div className="mt-1.5">
+              {!confirmTempValidate ? (
+                <button
+                  onClick={() => setConfirmTempValidate(true)}
+                  className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                >
+                  Valider temporairement
+                </button>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <span className="text-gray-600 dark:text-gray-300">Confirmer la validation temporaire ?</span>
+                  <button
+                    onClick={() => { onTempValidate(); setConfirmTempValidate(false); }}
+                    disabled={isValidating}
+                    className="font-medium text-green-600 dark:text-green-400 hover:underline disabled:opacity-50"
+                  >
+                    Oui
+                  </button>
+                  <button
+                    onClick={() => setConfirmTempValidate(false)}
+                    className="text-gray-400 hover:underline"
+                  >
+                    Annuler
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Inline rejection form */}
@@ -710,6 +743,7 @@ function ThirdPartyDocumentsPanel({
             doc={doc}
             onView={() => setViewingDoc(doc)}
             onValidate={() => handleValidateFromModal(doc.id)}
+            onTempValidate={() => validateMutationForModal.mutate(doc.id)}
             onRejectStart={() => onRejectStart(doc.id)}
             isRejectingThis={rejectDocId === doc.id}
             rejectReason={rejectDocId === doc.id ? rejectReason : ''}
