@@ -28,6 +28,7 @@ dependencies = [
     "openpyxl>=3.1.5",
     "pypdf>=4.0.0",
     "PyPDF2>=3.0.1",
+    "pymupdf>=1.24.0",
     "aioboto3>=13.2.0",
     "boto3>=1.35.0",
     # Security (rate limiting)
