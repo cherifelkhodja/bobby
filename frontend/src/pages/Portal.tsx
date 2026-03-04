@@ -125,6 +125,7 @@ export default function Portal() {
   const { token } = useParams<{ token: string }>();
   const queryClient = useQueryClient();
   const [forceStep, setForceStep] = useState<number | null>(null);
+  const [submitted, setSubmitted] = useState(false);  // must be before any early return
 
   // Verify magic link
   const { data: portalInfo, isLoading, isError } = useQuery({
@@ -174,9 +175,6 @@ export default function Portal() {
   const allDocsEmpty = !!docsData && docsData.documents.length === 0;
   const hasAnyReceived =
     !!docsData && docsData.documents.some((d) => d.status === 'received');
-
-  // step 2 is reached only after explicit "Valider le dépôt" — never automatically
-  const [submitted, setSubmitted] = useState(false);
 
   // Natural step: 0=infos société, 1=documents, 2=confirmation (post-submit)
   const naturalStep = isDocumentUpload
