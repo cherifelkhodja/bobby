@@ -14,6 +14,7 @@ import {
   Building2,
   Loader2,
   PenLine,
+  ChevronLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -62,22 +63,22 @@ interface Step {
 function PortalStepper({ steps }: { steps: Step[] }) {
   return (
     <div className="max-w-3xl mx-auto mb-8">
-      <div className="flex items-center">
+      <div className="flex items-start">
         {steps.map((step, i) => {
           const Icon = step.icon;
           const isLast = i === steps.length - 1;
           return (
-            <div key={i} className="flex items-center flex-1 min-w-0">
+            <div key={i} className={`flex items-start ${isLast ? '' : 'flex-1'} min-w-0`}>
               {/* Step bubble + label */}
               <div className="flex flex-col items-center flex-shrink-0">
                 <div
                   className={[
-                    'flex items-center justify-center w-9 h-9 rounded-full border-2 transition-colors',
+                    'flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all',
                     step.status === 'done'
-                      ? 'bg-green-500 border-green-500 text-white'
+                      ? 'bg-green-500 border-green-500 text-white shadow-sm'
                       : step.status === 'current'
-                      ? 'bg-primary-600 border-primary-600 text-white'
-                      : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400',
+                      ? 'bg-primary-600 border-primary-600 text-white shadow-md shadow-primary-200 dark:shadow-primary-900/40'
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-300 dark:text-gray-500',
                   ].join(' ')}
                 >
                   {step.status === 'done' ? (
@@ -88,7 +89,7 @@ function PortalStepper({ steps }: { steps: Step[] }) {
                 </div>
                 <span
                   className={[
-                    'mt-1.5 text-xs font-medium text-center leading-tight max-w-[80px]',
+                    'mt-2 text-xs font-medium text-center leading-tight max-w-[72px]',
                     step.status === 'done'
                       ? 'text-green-600 dark:text-green-400'
                       : step.status === 'current'
@@ -99,11 +100,11 @@ function PortalStepper({ steps }: { steps: Step[] }) {
                   {step.label}
                 </span>
               </div>
-              {/* Connector */}
+              {/* Connector — aligned with center of the 40px bubble (mt-5 = 20px) */}
               {!isLast && (
                 <div
                   className={[
-                    'flex-1 h-0.5 mx-2 mb-5',
+                    'flex-1 h-0.5 mx-3 self-start mt-5 transition-colors',
                     step.status === 'done'
                       ? 'bg-green-400'
                       : 'bg-gray-200 dark:bg-gray-700',
@@ -212,16 +213,16 @@ export default function Portal() {
   return (
     <PortalLayout>
       {/* Header */}
-      <div className="max-w-3xl mx-auto mb-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Building2 className="h-8 w-8 text-primary-600" />
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-              Portail partenaire
-            </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+      <div className="max-w-3xl mx-auto mb-8">
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center gap-4 shadow-sm">
+          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center">
+            <Building2 className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Portail partenaire</p>
+            <h1 className="text-base font-semibold text-gray-900 dark:text-white truncate">
               {portalInfo.third_party.company_name ?? portalInfo.third_party.contact_email}
-            </p>
+            </h1>
           </div>
         </div>
       </div>
@@ -234,11 +235,9 @@ export default function Portal() {
         <div className="max-w-3xl mx-auto mb-4">
           <button
             onClick={goBack}
-            className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
+            <ChevronLeft className="h-4 w-4" />
             Retour
           </button>
         </div>
@@ -485,10 +484,10 @@ function ContactSection({
     onChange({ ...contact, [key]: e.target.value });
 
   return (
-    <div className="border-t border-gray-100 dark:border-gray-700 pt-5 mt-5">
-      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">{title}</p>
+    <div className="border-t border-gray-100 dark:border-gray-700 pt-5 mt-6">
+      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4 pl-3 border-l-2 border-primary-500">{title}</p>
       {checkboxLabel && onToggleSameAsRep !== undefined && (
-        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-3 cursor-pointer">
+        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-3 cursor-pointer select-none">
           <input
             type="checkbox"
             checked={sameAsRep}
@@ -501,11 +500,19 @@ function ContactSection({
       {!sameAsRep && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Civilité / Prénom / Nom *</label>
-            <div className="flex gap-2">
-              <CivilitySelect value={contact.civility} onChange={(v) => onChange({ ...contact, civility: v })} />
-              <input type="text" value={contact.first_name} onChange={set('first_name')} placeholder="Prénom" className={INPUT_CLS} />
-              <input type="text" value={contact.last_name} onChange={set('last_name')} placeholder="Nom" className={INPUT_CLS} />
+            <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-end">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Civilité *</label>
+                <CivilitySelect value={contact.civility} onChange={(v) => onChange({ ...contact, civility: v })} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Prénom *</label>
+                <input type="text" value={contact.first_name} onChange={set('first_name')} placeholder="Prénom" className={INPUT_CLS} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Nom *</label>
+                <input type="text" value={contact.last_name} onChange={set('last_name')} placeholder="Nom" className={INPUT_CLS} />
+              </div>
             </div>
           </div>
           <div>
@@ -820,29 +827,37 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
         </div>
 
         {/* Signataire du contrat (= représentant légal) */}
-        <div className="border-t border-gray-100 dark:border-gray-700 pt-5 mt-5">
-          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
+        <div className="border-t border-gray-100 dark:border-gray-700 pt-5 mt-6">
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4 pl-3 border-l-2 border-primary-500">
             Signataire du contrat
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Civilité / Prénom / Nom *</label>
-              <div className="flex gap-2">
-                <CivilitySelect value={signatory.civility} onChange={(v) => setSignatory((c) => ({ ...c, civility: v }))} />
-                <input
-                  type="text"
-                  value={signatory.first_name}
-                  onChange={(e) => setSignatory((c) => ({ ...c, first_name: e.target.value }))}
-                  placeholder="Prénom"
-                  className={INPUT_CLS}
-                />
-                <input
-                  type="text"
-                  value={signatory.last_name}
-                  onChange={(e) => setSignatory((c) => ({ ...c, last_name: e.target.value }))}
-                  placeholder="Nom"
-                  className={INPUT_CLS}
-                />
+              <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-end">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Civilité *</label>
+                  <CivilitySelect value={signatory.civility} onChange={(v) => setSignatory((c) => ({ ...c, civility: v }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Prénom *</label>
+                  <input
+                    type="text"
+                    value={signatory.first_name}
+                    onChange={(e) => setSignatory((c) => ({ ...c, first_name: e.target.value }))}
+                    placeholder="Prénom"
+                    className={INPUT_CLS}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Nom *</label>
+                  <input
+                    type="text"
+                    value={signatory.last_name}
+                    onChange={(e) => setSignatory((c) => ({ ...c, last_name: e.target.value }))}
+                    placeholder="Nom"
+                    className={INPUT_CLS}
+                  />
+                </div>
               </div>
             </div>
             <div>
@@ -922,36 +937,60 @@ function PortalLayout({ children }: { children: React.ReactNode }) {
       </header>
       <main className="px-6 py-8">{children}</main>
       <style>{`
-        .phone-input-container { display: flex; align-items: center; }
-        .PhoneInputCountry {
-          padding: 0.5rem;
+        /* Phone input — single unified border */
+        .phone-input-container {
+          display: flex;
+          align-items: center;
           border: 1px solid #d1d5db;
-          border-right: none;
-          border-radius: 0.5rem 0 0 0.5rem;
+          border-radius: 0.5rem;
           background: white;
+          overflow: hidden;
+          transition: border-color 0.15s, box-shadow 0.15s;
         }
-        .dark .PhoneInputCountry {
+        .dark .phone-input-container {
           border-color: #4b5563;
           background: #374151;
+        }
+        .phone-input-container:focus-within {
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+        }
+        .PhoneInputCountry {
+          display: flex;
+          align-items: center;
+          padding: 0 0.625rem;
+          height: 100%;
+          border: none;
+          border-right: 1px solid #e5e7eb;
+          background: #f9fafb;
+          gap: 0.375rem;
+        }
+        .dark .PhoneInputCountry {
+          border-right-color: #374151;
+          background: #1f2937;
+        }
+        .PhoneInputCountrySelect {
+          opacity: 0;
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          cursor: pointer;
         }
         .PhoneInputInput {
           flex: 1;
           padding: 0.5rem 0.75rem;
-          border: 1px solid #d1d5db;
-          border-radius: 0 0.5rem 0.5rem 0;
-          background: white;
+          border: none;
+          background: transparent;
           color: #111827;
           font-size: 0.875rem;
+          outline: none;
+          min-width: 0;
         }
         .dark .PhoneInputInput {
-          border-color: #4b5563;
-          background: #374151;
-          color: white;
+          color: #f3f4f6;
         }
-        .PhoneInputInput:focus {
-          outline: none;
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+        .PhoneInputInput::placeholder {
+          color: #9ca3af;
         }
       `}</style>
     </div>
