@@ -29,6 +29,11 @@ from app.third_party.domain.exceptions import (
     MagicLinkNotFoundError,
     MagicLinkRevokedError,
 )
+from app.vigilance.domain.exceptions import (
+    DocumentNotAllowedError,
+    DocumentNotFoundError,
+    InvalidDocumentTransitionError,
+)
 from app.third_party.domain.value_objects.magic_link_purpose import MagicLinkPurpose
 from app.third_party.infrastructure.adapters.postgres_magic_link_repo import (
     MagicLinkRepository,
@@ -249,6 +254,12 @@ async def upload_portal_document(
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except DocumentNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except DocumentNotAllowedError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except InvalidDocumentTransitionError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
     audit_logger.log(
         AuditAction.DOCUMENT_UPLOADED,

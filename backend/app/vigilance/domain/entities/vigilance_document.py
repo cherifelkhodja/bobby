@@ -73,6 +73,9 @@ class VigilanceDocument:
     ) -> None:
         """Mark document as received after upload.
 
+        Clears any previous validation/rejection metadata so the ADV
+        must re-validate the new file.
+
         Args:
             s3_key: The S3 storage key.
             file_name: Original file name.
@@ -83,6 +86,15 @@ class VigilanceDocument:
         self.file_name = file_name
         self.file_size = file_size
         self.uploaded_at = datetime.utcnow()
+        # Reset previous validation/rejection — new file must be reviewed again
+        self.validated_at = None
+        self.validated_by = None
+        self.expires_at = None
+        self.rejected_at = None
+        self.rejection_reason = None
+        self.auto_check_results = None
+        self.document_date = None
+        self.is_valid_at_upload = None
 
     def validate(self, validated_by: str, expires_at: datetime | None = None) -> None:
         """Validate the document.

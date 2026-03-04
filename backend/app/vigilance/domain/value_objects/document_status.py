@@ -29,16 +29,28 @@ class DocumentStatus(str, Enum):
                 {
                     DocumentStatus.EXPIRING_SOON,
                     DocumentStatus.EXPIRED,
+                    DocumentStatus.RECEIVED,  # Re-upload by third party
                 }
             ),
-            DocumentStatus.REJECTED: frozenset({DocumentStatus.REQUESTED}),
+            DocumentStatus.REJECTED: frozenset(
+                {
+                    DocumentStatus.REQUESTED,
+                    DocumentStatus.RECEIVED,  # Re-upload by third party
+                }
+            ),
             DocumentStatus.EXPIRING_SOON: frozenset(
                 {
                     DocumentStatus.EXPIRED,
                     DocumentStatus.VALIDATED,
+                    DocumentStatus.RECEIVED,  # Re-upload by third party
                 }
             ),
-            DocumentStatus.EXPIRED: frozenset({DocumentStatus.REQUESTED}),
+            DocumentStatus.EXPIRED: frozenset(
+                {
+                    DocumentStatus.REQUESTED,
+                    DocumentStatus.RECEIVED,  # Re-upload by third party
+                }
+            ),
         }
         return transitions.get(self, frozenset())
 
