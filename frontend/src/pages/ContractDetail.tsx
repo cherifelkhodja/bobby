@@ -324,10 +324,9 @@ export default function ContractDetail() {
   const canCancel = cr && isAdv && cr.status !== 'cancelled' && cr.status !== 'signed' && cr.status !== 'archived' && cr.status !== 'redirected_payfit';
 
   const showConfigForm = isAdv && (
-    cr?.status === 'collecting_documents' ||
-    cr?.status === 'reviewing_compliance' ||
-    cr?.status === 'compliance_blocked' ||
     cr?.status === 'commercial_validated' ||
+    cr?.status === 'compliance_blocked' ||
+    cr?.status === 'configuring_contract' ||
     cr?.status === 'partner_requested_changes'
   );
 
