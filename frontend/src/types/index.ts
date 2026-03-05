@@ -935,6 +935,7 @@ export interface PortalInfo {
     billing_contact_last_name: string | null;
     billing_contact_email: string | null;
     billing_contact_phone: string | null;
+    company_info_submitted: boolean;
   };
   purpose: string;
   contract_request_id: string | null;

@@ -47,6 +47,7 @@ class ThirdPartyPortalResponse(BaseModel):
     billing_contact_last_name: str | None = None
     billing_contact_email: str | None = None
     billing_contact_phone: str | None = None
+    company_info_submitted: bool = False
 
 
 class MagicLinkPortalResponse(BaseModel):

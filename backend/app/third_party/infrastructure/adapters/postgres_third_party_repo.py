@@ -80,6 +80,7 @@ class ThirdPartyRepository:
             model.billing_contact_email = third_party.billing_contact_email
             model.billing_contact_phone = third_party.billing_contact_phone
             model.entity_category = third_party.entity_category
+            model.company_info_submitted = third_party.company_info_submitted
             model.contact_email = third_party.contact_email
             model.compliance_status = third_party.compliance_status.value
         else:
@@ -206,6 +207,7 @@ class ThirdPartyRepository:
             billing_contact_email=model.billing_contact_email,
             billing_contact_phone=model.billing_contact_phone,
             entity_category=model.entity_category,
+            company_info_submitted=model.company_info_submitted,
             contact_email=model.contact_email,
             compliance_status=ComplianceStatus(model.compliance_status),
             created_at=model.created_at,
@@ -252,6 +254,7 @@ class ThirdPartyRepository:
             billing_contact_email=entity.billing_contact_email,
             billing_contact_phone=entity.billing_contact_phone,
             entity_category=entity.entity_category,
+            company_info_submitted=entity.company_info_submitted,
             contact_email=entity.contact_email,
             compliance_status=entity.compliance_status.value,
             created_at=entity.created_at,

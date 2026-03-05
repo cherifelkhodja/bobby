@@ -147,6 +147,7 @@ async def get_portal_info(
             billing_contact_last_name=tp.billing_contact_last_name,
             billing_contact_email=tp.billing_contact_email,
             billing_contact_phone=tp.billing_contact_phone,
+            company_info_submitted=tp.company_info_submitted,
         ),
         purpose=result.purpose.value,
         contract_request_id=result.contract_request_id,
@@ -673,6 +674,7 @@ async def submit_company_info(
     siren = body.siret[:9]
 
     tp.entity_category = body.entity_category
+    tp.company_info_submitted = True
     tp.company_name = body.company_name
     tp.legal_form = body.legal_form
     tp.capital = body.capital

@@ -175,7 +175,7 @@ export default function Portal() {
   const isDocumentUpload = portalInfo.purpose === 'document_upload';
   const isContractReview = portalInfo.purpose === 'contract_review';
 
-  const hasSiren = !!portalInfo.third_party.siren;
+  const hasSiren = !!portalInfo.third_party.company_info_submitted;
   const allDocsEmpty = !!docsData && docsData.documents.length === 0;
   const allDocsHandled =
     !!docsData &&

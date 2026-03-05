@@ -52,6 +52,7 @@ class ThirdPartyModel(Base):
     billing_contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     billing_contact_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     entity_category: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    company_info_submitted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     contact_email: Mapped[str] = mapped_column(String(255), nullable=False)
     compliance_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
