@@ -54,6 +54,7 @@ class ThirdParty:
     id: UUID = field(default_factory=uuid4)
     boond_provider_id: int | None = None
     capital: str | None = None
+    entity_category: str | None = None  # "ei" or "societe", set when portal company-info is submitted
     compliance_status: ComplianceStatus = ComplianceStatus.PENDING
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)

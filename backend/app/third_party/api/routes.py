@@ -640,6 +640,7 @@ async def submit_company_info(
     # Derive SIREN from first 9 digits of SIRET
     siren = body.siret[:9]
 
+    tp.entity_category = body.entity_category
     tp.company_name = body.company_name
     tp.legal_form = body.legal_form
     tp.capital = body.capital
