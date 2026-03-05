@@ -3,13 +3,22 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install system dependencies including LibreOffice for PDF conversion
+# Install system dependencies including LibreOffice and WeasyPrint dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libreoffice-calc \
     libreoffice-writer \
     fonts-liberation \
     fonts-dejavu \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libharfbuzz0b \
+    libfontconfig1 \
+    libcairo2 \
+    libgdk-pixbuf2.0-0 \
+    libffi-dev \
+    libjpeg-dev \
+    libopenjp2-7 \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /var/cache/apt/*
 
@@ -49,10 +58,12 @@ RUN pip install --no-cache-dir \
     "slowapi>=0.1.9" \
     "anthropic>=0.40.0" \
     "apscheduler>=3.10.0" \
-    "pymupdf>=1.24.0"
+    "pymupdf>=1.24.0" \
+    "weasyprint>=62.0" \
+    "jinja2>=3.1.0"
 
 # Force fresh copy - change this value to bust Docker cache
-RUN echo "build-20260304-pymupdf"
+RUN echo "build-20260305-weasyprint"
 
 # Copy application code
 COPY . .

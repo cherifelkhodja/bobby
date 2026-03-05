@@ -64,15 +64,8 @@ export const contractsApi = {
       payment_terms?: string;
       invoice_submission_method?: string;
       invoice_email?: string;
-      include_confidentiality?: boolean;
-      include_non_compete?: boolean;
-      non_compete_duration_months?: number;
-      non_compete_geographic_scope?: string;
-      include_intellectual_property?: boolean;
-      include_liability?: boolean;
-      include_mediation?: boolean;
+      tacit_renewal_months?: number;
       special_conditions?: string;
-      article_overrides?: Record<string, string>;
     },
   ): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
@@ -145,6 +138,33 @@ export const contractsApi = {
   listContracts: async (id: string): Promise<Contract[]> => {
     const response = await apiClient.get<Contract[]>(
       `/contract-requests/${id}/contracts`,
+    );
+    return response.data;
+  },
+};
+
+export interface ArticleTemplate {
+  article_key: string;
+  article_number: number;
+  title: string;
+  content: string;
+  is_editable: boolean;
+  is_active: boolean;
+}
+
+export const contractArticlesApi = {
+  list: async (): Promise<ArticleTemplate[]> => {
+    const response = await apiClient.get<ArticleTemplate[]>('/admin/contract-articles');
+    return response.data;
+  },
+
+  update: async (
+    articleKey: string,
+    data: Partial<Pick<ArticleTemplate, 'content' | 'title' | 'is_editable' | 'is_active'>>,
+  ): Promise<ArticleTemplate> => {
+    const response = await apiClient.patch<ArticleTemplate>(
+      `/admin/contract-articles/${articleKey}`,
+      data,
     );
     return response.data;
   },

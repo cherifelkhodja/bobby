@@ -34,7 +34,7 @@
 | Security Headers | ✅ Done | HSTS, CSP, etc. |
 | Row Level Security | ✅ Done | PostgreSQL RLS |
 | Audit Logging | ✅ Done | Structuré |
-| Contractualisation | ✅ Done | Workflow BoondManager → validation → contrat → signature YouSign → push Boond |
+| Contractualisation | ✅ Done | Workflow BoondManager → validation → contrat PDF (HTML+WeasyPrint) → signature YouSign → push Boond |
 | Vigilance documentaire | ✅ Done | Cycle de vie docs légaux tiers (request → upload → validate/reject → expiration) |
 | Portail tiers (magic link) | ✅ Done | Upload documents + review contrat via lien sécurisé |
 | CRON jobs (APScheduler) | ✅ Done | Expirations documents, relances, purge magic links |
@@ -94,7 +94,7 @@
 - **Architecture** :
   - `third_party/` : Entités ThirdParty et MagicLink partagées par vigilance et contractualisation
   - `vigilance/` : Documents légaux, compliance checker, dashboard conformité
-  - `contract_management/` : Workflow contrat (14 statuts), génération DOCX, signature YouSign, push BoondManager
+  - `contract_management/` : Workflow contrat (14 statuts), génération PDF (HTML+WeasyPrint), signature YouSign, push BoondManager
   - `shared/` : Scheduler APScheduler, event bus in-process
 - **Rôle ADV** : Nouveau rôle `adv` dans UserRole pour la gestion des contrats et de la vigilance (Direction = admin)
 - **Pattern suivi** : Identique à `quotation_generator/` (module top-level sous `app/`)
@@ -160,6 +160,38 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-03-05 (génération contrat AT — HTML → PDF WeasyPrint)
+
+#### Remplacement DOCX par HTML → PDF (WeasyPrint)
+- **feat(contract)**: Nouveau générateur `HtmlPdfContractGenerator` (WeasyPrint + Jinja2)
+  - Remplace `DocxContractGenerator` (docxtpl + template binaire Word)
+  - Template HTML/CSS : `backend/templates/contrat_at.html`
+  - Reproduit fidèlement la mise en page AT-118 (logo, articles numérotés, annexe, signatures)
+  - Logo Gemini embarqué en base64
+  - Couleur teal `#4BBEA8` pour les séparateurs d'articles
+- **feat(db)**: Migration `034_add_contract_article_templates` → table `cm_contract_article_templates`
+  - 11 articles seedés (textes du contrat AT-118 réel)
+  - Champs : `article_key`, `article_number`, `title`, `content`, `is_editable`, `is_active`
+  - Articles éditables par défaut : `facturation` (art.6), `resiliation` (art.7), `litiges` (art.9)
+- **feat(admin)**: Nouveau tab "Contrat AT" dans le panel admin (`ContractArticlesTab.tsx`)
+  - Toggle actif/inactif par article (inclure/exclure du PDF)
+  - Toggle fixe/modifiable (contrôle depuis l'admin)
+  - Éditeur de contenu pour articles modifiables (textarea + save)
+- **feat(api)**: Endpoints admin `GET/PATCH /admin/contract-articles/{key}`
+- **feat(contract)**: Champ `tacit_renewal_months` ajouté à `ContractConfigRequest`
+  - Affiché dans l'annexe du PDF : "Tacite reconduction par période de X mois ensuite"
+- **refactor(contract)**: Suppression des champs `include_*` (confidentialité, non-concurrence, IP, responsabilité, médiation) et `article_overrides`
+  - La gestion des articles se fait désormais globalement depuis Admin > Contrat AT
+- **infra(docker)**: Ajout deps système WeasyPrint (`libpango`, `libcairo`, `libharfbuzz`, etc.)
+- **infra(docker)**: Ajout pip `weasyprint>=62.0` et `jinja2>=3.1.0`
+- S3 key : `draft_v1.docx` → `draft_v1.pdf`, content-type `application/pdf`
+
+#### ADR-009 : HTML → PDF pour les contrats
+- **Contexte** : Génération de contrats AT (assistance technique) pour l'ESN Gemini
+- **Décision** : HTML/CSS + WeasyPrint au lieu de docxtpl (template Word binaire)
+- **Raisons** : Template lisible/modifiable, CSS pour la mise en page, contenu des articles en BDD
+- **Compromis** : Output PDF uniquement (pas de DOCX éditable) — acceptable car le partenaire approuve via portail, YouSign gère la signature
 
 ### 2026-03-04 (portail tiers — formulaire infos société + INPI auto-login)
 

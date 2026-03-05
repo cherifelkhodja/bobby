@@ -1002,3 +1002,88 @@ async def test_inpi_connection(
             response_time_ms=elapsed,
             message=f"Erreur: {str(e)[:200]}",
         )
+
+
+# ─── Contract Article Templates ───────────────────────────────────────────────
+
+from pydantic import BaseModel as _PydanticBase
+from sqlalchemy.ext.asyncio import AsyncSession as _AsyncSession
+from app.dependencies import get_db as _get_db
+
+
+class ArticleTemplateResponse(_PydanticBase):
+    article_key: str
+    article_number: int
+    title: str
+    content: str
+    is_editable: bool
+    is_active: bool
+
+
+class ArticleTemplateUpdateRequest(_PydanticBase):
+    content: str | None = None
+    title: str | None = None
+    is_editable: bool | None = None
+    is_active: bool | None = None
+
+
+@router.get(
+    "/contract-articles",
+    response_model=list[ArticleTemplateResponse],
+    summary="List all contract article templates",
+)
+async def list_contract_articles(
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """List all contract article templates ordered by article number. Admin only."""
+    from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
+        ArticleTemplateRepository,
+    )
+    articles = await ArticleTemplateRepository(db).get_all()
+    return [
+        ArticleTemplateResponse(
+            article_key=a.article_key,
+            article_number=a.article_number,
+            title=a.title,
+            content=a.content,
+            is_editable=a.is_editable,
+            is_active=a.is_active,
+        )
+        for a in articles
+    ]
+
+
+@router.patch(
+    "/contract-articles/{article_key}",
+    response_model=ArticleTemplateResponse,
+    summary="Update a contract article template",
+)
+async def update_contract_article(
+    article_key: str,
+    body: ArticleTemplateUpdateRequest,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Update content, title, is_editable or is_active of a contract article. Admin only."""
+    from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
+        ArticleTemplateRepository,
+    )
+    updated = await ArticleTemplateRepository(db).update(
+        article_key,
+        content=body.content,
+        title=body.title,
+        is_editable=body.is_editable,
+        is_active=body.is_active,
+        updated_by=admin_id,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Article '{article_key}' introuvable")
+    return ArticleTemplateResponse(
+        article_key=updated.article_key,
+        article_number=updated.article_number,
+        title=updated.title,
+        content=updated.content,
+        is_editable=updated.is_editable,
+        is_active=updated.is_active,
+    )

@@ -17,10 +17,10 @@ logger = structlog.get_logger()
 
 
 class GenerateDraftUseCase:
-    """Generate a contract draft DOCX and upload to S3.
+    """Generate a contract draft PDF and upload to S3.
 
     Verifies compliance (soft block unless overridden), generates
-    the document using the template, uploads to S3, and creates
+    the PDF using the HTML template, uploads to S3, and creates
     a Contract entity.
     """
 
@@ -30,6 +30,7 @@ class GenerateDraftUseCase:
         contract_repository,
         third_party_repository,
         contract_generator,
+        article_template_repository,
         s3_service,
         settings,
     ) -> None:
@@ -37,6 +38,7 @@ class GenerateDraftUseCase:
         self._contract_repo = contract_repository
         self._tp_repo = third_party_repository
         self._generator = contract_generator
+        self._article_repo = article_template_repository
         self._s3 = s3_service
         self._settings = settings
 
@@ -68,17 +70,18 @@ class GenerateDraftUseCase:
 
         # Build template context
         tp = await self._tp_repo.get_by_id(cr.third_party_id) if cr.third_party_id else None
-        template_context = self._build_context(cr, tp)
+        articles = await self._article_repo.get_active()
+        template_context = self._build_context(cr, tp, articles)
 
-        # Generate DOCX
-        docx_content = await self._generator.generate_draft(template_context)
+        # Generate PDF
+        pdf_content = await self._generator.generate_draft(template_context)
 
         # Upload to S3
-        s3_key = f"contracts/{cr.reference}/draft_v1.docx"
+        s3_key = f"contracts/{cr.reference}/draft_v1.pdf"
         await self._s3.upload_file(
             key=s3_key,
-            content=docx_content,
-            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            content=pdf_content,
+            content_type="application/pdf",
         )
 
         # Create Contract entity
@@ -102,7 +105,7 @@ class GenerateDraftUseCase:
         )
         return saved_contract
 
-    def _build_context(self, cr, tp) -> dict:
+    def _build_context(self, cr, tp, articles: list) -> dict:
         """Build template context from contract request and third party."""
         context = {
             # Gemini company info
@@ -148,8 +151,11 @@ class GenerateDraftUseCase:
                 }
             )
 
-        # Contract config (clauses)
+        # Contract config (clauses, including tacit_renewal_months)
         if cr.contract_config:
             context.update(cr.contract_config)
+
+        # Articles from DB (dynamically re-numbered)
+        context["articles"] = articles
 
         return context

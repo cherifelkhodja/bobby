@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<style>
+  /* ===== PAGE SETUP ===== */
+  @page {
+    size: A4;
+    margin: 2.5cm 2.2cm 2.8cm 2.2cm;
+  }
+  @page :first {
+    margin-bottom: 2.8cm;
+  }
+
+  /* Footer on every page */
+  @page {
+    @bottom-center {
+      content: "Référence du contrat N° " string(contract-ref);
+      font-family: Arial, sans-serif;
+      font-size: 9pt;
+      font-style: italic;
+      color: #333;
+    }
+  }
+
+  /* ===== BASE ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 11pt;
+    color: #000;
+    line-height: 1.5;
+  }
+
+  /* Store reference for footer */
+  .contract-ref-store {
+    string-set: contract-ref content();
+    height: 0;
+    overflow: hidden;
+    font-size: 0;
+  }
+
+  /* ===== COVER PAGE ===== */
+  .cover-page {
+    page-break-after: always;
+    height: 24cm;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .cover-title {
+    font-size: 18pt;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+    text-align: center;
+    margin-top: 0.5cm;
+    margin-bottom: 0.4cm;
+  }
+  .cover-separator {
+    border: none;
+    border-top: 2px solid #4BBEA8;
+    width: 100%;
+    margin-bottom: 4cm;
+  }
+  .cover-logo {
+    display: block;
+    width: 9cm;
+    margin: auto;
+  }
+
+  /* ===== CONTRACT BODY ===== */
+  .section-header {
+    font-weight: bold;
+    margin-top: 0.6cm;
+    margin-bottom: 0.5cm;
+  }
+
+  /* Parties block */
+  .parties-block {
+    margin-bottom: 0.4cm;
+  }
+  .party-name {
+    font-weight: bold;
+    margin-bottom: 0.25cm;
+  }
+  .party-detail {
+    margin-bottom: 0.1cm;
+    line-height: 1.6;
+  }
+
+  .partner-label {
+    margin-top: 0.6cm;
+    margin-bottom: 0.6cm;
+  }
+  .decision-header {
+    font-weight: bold;
+    margin-top: 0.5cm;
+    margin-bottom: 0.7cm;
+  }
+
+  /* ===== ARTICLES ===== */
+  .article {
+    margin-bottom: 0.7cm;
+    page-break-inside: avoid;
+  }
+  .article-title {
+    font-size: 11pt;
+    font-weight: bold;
+    margin-bottom: 0.15cm;
+  }
+  .article-separator {
+    border: none;
+    border-top: 1.5px solid #4BBEA8;
+    margin-bottom: 0.3cm;
+  }
+  .article-body p {
+    text-align: justify;
+    margin-bottom: 0.3cm;
+  }
+  .article-body p:last-child {
+    margin-bottom: 0;
+  }
+  .article-body ul {
+    margin-left: 1cm;
+    margin-top: 0.2cm;
+    margin-bottom: 0.2cm;
+  }
+  .article-body ul li {
+    text-align: justify;
+    margin-bottom: 0.15cm;
+    list-style-type: "- ";
+  }
+
+  /* ===== SIGNATURE BLOCK ===== */
+  .signature-section {
+    margin-top: 1cm;
+    page-break-inside: avoid;
+  }
+  .signature-location {
+    margin-bottom: 0.8cm;
+  }
+  .signature-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .signature-col {
+    width: 50%;
+    vertical-align: top;
+    padding-right: 0.5cm;
+  }
+  .signature-col:last-child {
+    padding-right: 0;
+  }
+  .signer-company {
+    font-weight: bold;
+    margin-bottom: 0.1cm;
+  }
+  .signer-name {
+    font-weight: bold;
+  }
+
+  /* ===== ANNEXE ===== */
+  .annexe-page {
+    page-break-before: always;
+  }
+  .annexe-title {
+    font-size: 13pt;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 1.5cm;
+  }
+  .annexe-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.5cm;
+  }
+  .annexe-label {
+    font-weight: bold;
+    vertical-align: top;
+    padding: 0.35cm 1cm 0.35cm 0;
+    width: 42%;
+  }
+  .annexe-value {
+    vertical-align: top;
+    padding: 0.35cm 0;
+  }
+  .annexe-value-sub {
+    margin-top: 0.1cm;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<!-- Store contract reference for footer -->
+<div class="contract-ref-store">{{ reference }}</div>
+
+<!-- ===== PAGE 1: COVER ===== -->
+<div class="cover-page">
+  <div class="cover-title">CONTRAT {{ reference }}</div>
+  <hr class="cover-separator">
+  <img class="cover-logo" src="data:image/png;base64,{{ logo_b64 }}" alt="Logo Gemini">
+</div>
+
+<!-- ===== PAGE 2+: CONTRACT BODY ===== -->
+<p class="section-header">Entre les soussignés:</p>
+
+<div class="parties-block">
+  <p class="party-name">La société {{ gemini_company_name }}</p>
+  <p class="party-detail">
+    <strong>{{ gemini_legal_form }}</strong> au capital de <strong>{{ gemini_capital }}</strong>,<br>
+    Dont le siège social est situé <strong>{{ gemini_head_office }}</strong>,<br>
+    Inscrite au <strong>RCS de {{ gemini_rcs_city }}</strong> sous le n° <strong>{{ gemini_rcs_number }}</strong>,<br>
+    Représentée par {{ gemini_representative_entity }},<br>
+    Agissant en qualité de <strong>{{ gemini_representative_quality }}</strong>,<br>
+    Représentée par {{ gemini_representative_sub }} Dûment habilité aux fins des présentes.
+  </p>
+</div>
+
+<div class="parties-block" style="margin-top: 0.5cm;">
+  <p class="party-name">Et la société <strong>{{ partner_company_name }}</strong></p>
+  <p class="party-detail">
+    <strong>{{ partner_legal_form }}</strong> au capital de <strong>{{ partner_capital }}</strong>,<br>
+    Dont le siège social est situé <strong>{{ partner_head_office }}</strong>,<br>
+    Inscrite au <strong>RCS de {{ partner_rcs_city }}</strong> sous le n° <strong>{{ partner_rcs_number }}</strong>,<br>
+    Représentée par <strong>{{ partner_representative_name }}</strong>,<br>
+    Agissant en qualité de <strong>{{ partner_representative_title }}</strong>, Dûment habilité aux fins des présentes.
+  </p>
+</div>
+
+<p class="partner-label">Ci après désigné le « PARTENAIRE »</p>
+
+<p class="decision-header">Il a été décidé ce qui suit :</p>
+
+<!-- ===== ARTICLES ===== -->
+{% for article in articles %}
+<div class="article">
+  <div class="article-title">{{ loop.index }} – {{ article.title }}</div>
+  <hr class="article-separator">
+  <div class="article-body">
+    {% for paragraph in article.content.split('\n\n') %}
+      {% set stripped = paragraph.strip() %}
+      {% if stripped %}
+        {% if stripped.startswith('- ') %}
+          {# Convert dash-prefixed lines to list #}
+          <ul>
+            {% for line in stripped.split('\n') %}
+              {% set l = line.strip() %}
+              {% if l.startswith('- ') %}
+                <li>{{ l[2:] }}</li>
+              {% elif l %}
+                <li>{{ l }}</li>
+              {% endif %}
+            {% endfor %}
+          </ul>
+        {% else %}
+          {# Handle inline line breaks within paragraph #}
+          <p>{{ stripped | replace('\n', '<br>') | safe }}</p>
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+
+<!-- ===== SIGNATURE ===== -->
+<div class="signature-section">
+  <p class="signature-location">Fait à Paris,<br>le</p>
+  <table class="signature-table">
+    <tr>
+      <td class="signature-col">
+        <p class="signer-company">{{ gemini_legal_form }} {{ gemini_company_name }}</p>
+        <p class="signer-name">{{ gemini_signatory_name }}</p>
+      </td>
+      <td class="signature-col">
+        <p class="signer-company">{{ partner_legal_form }} {{ partner_company_name }}</p>
+        <p class="signer-name">{{ partner_representative_name }}</p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<!-- ===== ANNEXE ===== -->
+<div class="annexe-page">
+  <div class="annexe-title">ANNEXE N° 1 AU CONTRAT</div>
+
+  <table class="annexe-table">
+    <tr>
+      <td class="annexe-label">Nom et Prénom du consultant :</td>
+      <td class="annexe-value">{{ consultant_civility }} {{ consultant_first_name }} {{ consultant_last_name }}</td>
+    </tr>
+    <tr>
+      <td class="annexe-label">Client Final :</td>
+      <td class="annexe-value">{{ client_name }}</td>
+    </tr>
+    <tr>
+      <td class="annexe-label">Nature de la prestation :</td>
+      <td class="annexe-value">{{ mission_title }}</td>
+    </tr>
+    <tr>
+      <td class="annexe-label">Lieu de la prestation :</td>
+      <td class="annexe-value">
+        {% if mission_site_name %}{{ mission_site_name }}<br>{% endif %}
+        {{ mission_address }}{% if mission_postal_code or mission_city %}, {% endif %}{{ mission_postal_code }} {{ mission_city }}
+      </td>
+    </tr>
+    <tr>
+      <td class="annexe-label">Date de début de la prestation :</td>
+      <td class="annexe-value">{{ start_date }}</td>
+    </tr>
+    <tr>
+      <td class="annexe-label">Date de fin de la prestation :</td>
+      <td class="annexe-value">
+        {{ end_date }}
+        {% if tacit_renewal_months %}
+        <div class="annexe-value-sub">Tacite reconduction par période de {{ tacit_renewal_months }} mois ensuite</div>
+        {% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td class="annexe-label">Tarif de la prestation :</td>
+      <td class="annexe-value">{{ daily_rate }} Euros Hors Taxe / Jour</td>
+    </tr>
+  </table>
+
+  <table class="signature-table">
+    <tr>
+      <td class="signature-col">
+        <p class="signer-company">{{ gemini_legal_form }} {{ gemini_company_name }}</p>
+        <p class="signer-name">{{ gemini_signatory_name }}</p>
+      </td>
+      <td class="signature-col">
+        <p class="signer-company">{{ partner_legal_form }} {{ partner_company_name }}</p>
+        <p class="signer-name">{{ partner_representative_name }}</p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+</body>
+</html>

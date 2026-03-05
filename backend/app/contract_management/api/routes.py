@@ -643,12 +643,15 @@ async def generate_draft(
     user_id: AdvOrAdminUser,
     db: AsyncSession = Depends(get_db),
 ):
-    """Generate a DOCX contract draft. ADV/admin only."""
+    """Generate a PDF contract draft. ADV/admin only."""
     from app.contract_management.application.use_cases.generate_draft import (
         GenerateDraftUseCase,
     )
-    from app.contract_management.infrastructure.adapters.docx_contract_generator import (
-        DocxContractGenerator,
+    from app.contract_management.infrastructure.adapters.html_pdf_contract_generator import (
+        HtmlPdfContractGenerator,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
+        ArticleTemplateRepository,
     )
     from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
         ContractRepository,
@@ -659,13 +662,15 @@ async def generate_draft(
     cr_repo = ContractRequestRepository(db)
     contract_repo = ContractRepository(db)
     tp_repo = ThirdPartyRepository(db)
+    article_repo = ArticleTemplateRepository(db)
     s3_service = S3StorageClient(settings)
 
     use_case = GenerateDraftUseCase(
         contract_request_repository=cr_repo,
         contract_repository=contract_repo,
         third_party_repository=tp_repo,
-        contract_generator=DocxContractGenerator(),
+        contract_generator=HtmlPdfContractGenerator(),
+        article_template_repository=article_repo,
         s3_service=s3_service,
         settings=settings,
     )

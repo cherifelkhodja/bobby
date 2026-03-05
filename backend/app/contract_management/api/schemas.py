@@ -84,15 +84,8 @@ class ContractConfigRequest(BaseModel):
     payment_terms: str = "net_30"
     invoice_submission_method: str = "email"
     invoice_email: str = ""
-    include_confidentiality: bool = True
-    include_non_compete: bool = False
-    non_compete_duration_months: int = 0
-    non_compete_geographic_scope: str = ""
-    include_intellectual_property: bool = True
-    include_liability: bool = True
-    include_mediation: bool = False
+    tacit_renewal_months: int | None = Field(None, ge=1, le=24, description="Nombre de mois pour la tacite reconduction (annexe)")
     special_conditions: str = ""
-    article_overrides: dict[str, str] = Field(default_factory=dict)
 
 
 class ComplianceOverrideRequest(BaseModel):

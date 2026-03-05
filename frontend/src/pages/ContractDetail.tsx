@@ -14,10 +14,7 @@ import {
   Copy,
   Check,
   Settings,
-  ChevronDown,
-  ChevronUp,
   Clock,
-  PenLine,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -61,20 +58,6 @@ const ACTION_CONFIG: Partial<
   },
 };
 
-const ARTICLE_LABELS: Record<string, string> = {
-  objet: 'Objet',
-  duree: 'Durée',
-  conditions_financieres: 'Conditions financières',
-  modalites_facturation: 'Modalités de facturation',
-  obligations_prestataire: 'Obligations du prestataire',
-  confidentialite: 'Confidentialité',
-  non_concurrence: 'Non-concurrence',
-  propriete_intellectuelle: 'Propriété intellectuelle',
-  responsabilite: 'Responsabilité',
-  mediation: 'Médiation',
-  resiliation: 'Résiliation',
-  droit_applicable: 'Droit applicable',
-};
 
 const INPUT_CLS =
   'w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300';
@@ -119,18 +102,10 @@ export default function ContractDetail() {
     payment_terms: 'net_30',
     invoice_submission_method: 'email',
     estimated_days: '',
-    include_confidentiality: true,
-    include_non_compete: false,
-    non_compete_duration_months: '',
-    non_compete_geographic_scope: '',
-    include_intellectual_property: true,
-    include_liability: true,
-    include_mediation: false,
+    tacit_renewal_months: '',
     special_conditions: '',
   });
   const [configFormInitialized, setConfigFormInitialized] = useState(false);
-  const [showArticleEditor, setShowArticleEditor] = useState(false);
-  const [articleOverrides, setArticleOverrides] = useState<Record<string, string>>({});
 
   const { data: cr, isLoading } = useQuery({
     queryKey: ['contract-request', id],
@@ -181,20 +156,9 @@ export default function ContractDetail() {
         payment_terms: (cfg.payment_terms as string) ?? 'net_30',
         invoice_submission_method: (cfg.invoice_submission_method as string) ?? 'email',
         estimated_days: cfg.estimated_days != null ? String(cfg.estimated_days) : '',
-        include_confidentiality: (cfg.include_confidentiality as boolean) ?? true,
-        include_non_compete: (cfg.include_non_compete as boolean) ?? false,
-        non_compete_duration_months: cfg.non_compete_duration_months != null ? String(cfg.non_compete_duration_months) : '',
-        non_compete_geographic_scope: (cfg.non_compete_geographic_scope as string) ?? '',
-        include_intellectual_property: (cfg.include_intellectual_property as boolean) ?? true,
-        include_liability: (cfg.include_liability as boolean) ?? true,
-        include_mediation: (cfg.include_mediation as boolean) ?? false,
+        tacit_renewal_months: cfg.tacit_renewal_months != null ? String(cfg.tacit_renewal_months) : '',
         special_conditions: (cfg.special_conditions as string) ?? '',
       });
-      if (cfg.article_overrides && typeof cfg.article_overrides === 'object' && !Array.isArray(cfg.article_overrides)) {
-        setArticleOverrides(Object.fromEntries(
-          Object.entries(cfg.article_overrides as Record<string, unknown>).map(([k, val]) => [k, String(val ?? '')]),
-        ));
-      }
       setConfigFormInitialized(true);
     }
   }, [cr, configFormInitialized]);
@@ -275,24 +239,12 @@ export default function ContractDetail() {
 
   const configureMutation = useMutation({
     mutationFn: () => {
-      const nonEmptyOverrides: Record<string, string> = Object.fromEntries(
-        Object.entries(articleOverrides).filter(([, v]) => (v as string).trim() !== ''),
-      );
       return contractsApi.configure(id!, {
         payment_terms: configForm.payment_terms,
         invoice_submission_method: configForm.invoice_submission_method,
         estimated_days: configForm.estimated_days ? parseInt(configForm.estimated_days, 10) : undefined,
-        include_confidentiality: configForm.include_confidentiality,
-        include_non_compete: configForm.include_non_compete,
-        non_compete_duration_months: configForm.non_compete_duration_months
-          ? parseInt(configForm.non_compete_duration_months, 10)
-          : undefined,
-        non_compete_geographic_scope: configForm.non_compete_geographic_scope || undefined,
-        include_intellectual_property: configForm.include_intellectual_property,
-        include_liability: configForm.include_liability,
-        include_mediation: configForm.include_mediation,
+        tacit_renewal_months: configForm.tacit_renewal_months ? parseInt(configForm.tacit_renewal_months, 10) : undefined,
         special_conditions: configForm.special_conditions || undefined,
-        article_overrides: Object.keys(nonEmptyOverrides).length > 0 ? nonEmptyOverrides : undefined,
       });
     },
     onSuccess: () => {
@@ -348,16 +300,7 @@ export default function ContractDetail() {
     cr?.status === 'partner_requested_changes'
   );
 
-  // Active articles based on current config form state
-  const activeArticles = [
-    'objet', 'duree', 'conditions_financieres', 'modalites_facturation', 'obligations_prestataire',
-    ...(configForm.include_confidentiality ? ['confidentialite'] : []),
-    ...(configForm.include_non_compete ? ['non_concurrence'] : []),
-    ...(configForm.include_intellectual_property ? ['propriete_intellectuelle'] : []),
-    ...(configForm.include_liability ? ['responsabilite'] : []),
-    ...(configForm.include_mediation ? ['mediation'] : []),
-    'resiliation', 'droit_applicable',
-  ];
+  // Articles are now managed globally from Admin > Contrat AT tab
 
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('fr-FR', {
@@ -963,97 +906,24 @@ export default function ContractDetail() {
             </div>
           </div>
 
-          {/* Section 2 — Clauses */}
+          {/* Section 2 — Annexe */}
           <div className="mb-5 border-t border-gray-200 dark:border-gray-700 pt-4">
             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
-              Clauses optionnelles
+              Annexe
             </p>
-            <div className="space-y-3">
-              {/* Confidentialité */}
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={configForm.include_confidentiality}
-                  onChange={(e) => setConfigForm((f) => ({ ...f, include_confidentiality: e.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Clause de confidentialité</span>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Tacite reconduction (mois)
               </label>
-
-              {/* Propriété intellectuelle */}
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={configForm.include_intellectual_property}
-                  onChange={(e) => setConfigForm((f) => ({ ...f, include_intellectual_property: e.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Clause de propriété intellectuelle</span>
-              </label>
-
-              {/* Responsabilité */}
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={configForm.include_liability}
-                  onChange={(e) => setConfigForm((f) => ({ ...f, include_liability: e.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Clause de responsabilité</span>
-              </label>
-
-              {/* Non-concurrence */}
-              <div>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={configForm.include_non_compete}
-                    onChange={(e) => setConfigForm((f) => ({ ...f, include_non_compete: e.target.checked }))}
-                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Clause de non-concurrence</span>
-                </label>
-                {configForm.include_non_compete && (
-                  <div className="ml-7 mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Durée (mois)
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={configForm.non_compete_duration_months}
-                        onChange={(e) => setConfigForm((f) => ({ ...f, non_compete_duration_months: e.target.value }))}
-                        placeholder="Ex: 12"
-                        className={INPUT_CLS}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Périmètre géographique
-                      </label>
-                      <input
-                        type="text"
-                        value={configForm.non_compete_geographic_scope}
-                        onChange={(e) => setConfigForm((f) => ({ ...f, non_compete_geographic_scope: e.target.value }))}
-                        placeholder="Ex: France métropolitaine"
-                        className={INPUT_CLS}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Médiation */}
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={configForm.include_mediation}
-                  onChange={(e) => setConfigForm((f) => ({ ...f, include_mediation: e.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Clause de médiation</span>
-              </label>
+              <input
+                type="number"
+                min="1"
+                max="24"
+                value={configForm.tacit_renewal_months}
+                onChange={(e) => setConfigForm((f) => ({ ...f, tacit_renewal_months: e.target.value }))}
+                placeholder="Ex: 3 (laisser vide si pas de tacite reconduction)"
+                className={INPUT_CLS}
+              />
             </div>
           </div>
 
@@ -1071,47 +941,10 @@ export default function ContractDetail() {
             />
           </div>
 
-          {/* Section 4 — Éditeur d'articles (dépliable, uniquement si partner_requested_changes) */}
-          {cr.status === 'partner_requested_changes' && (
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mb-5">
-              <button
-                type="button"
-                onClick={() => setShowArticleEditor((v) => !v)}
-                className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white w-full text-left"
-              >
-                <PenLine className="h-4 w-4 text-gray-400" />
-                Édition manuelle des articles
-                {showArticleEditor ? (
-                  <ChevronUp className="h-4 w-4 ml-auto text-gray-400" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 ml-auto text-gray-400" />
-                )}
-              </button>
-              {showArticleEditor && (
-                <div className="mt-3 space-y-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Laissez un champ vide pour utiliser le texte du template. Le texte saisi remplace entièrement l'article correspondant dans le contrat généré.
-                  </p>
-                  {activeArticles.map((key, idx) => (
-                    <div key={key}>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Article {idx + 1} — {ARTICLE_LABELS[key] ?? key}
-                      </label>
-                      <textarea
-                        value={articleOverrides[key] ?? ''}
-                        onChange={(e) =>
-                          setArticleOverrides((prev) => ({ ...prev, [key]: e.target.value }))
-                        }
-                        placeholder="Laisser vide pour utiliser le texte du template..."
-                        className={INPUT_CLS}
-                        rows={3}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            Pour modifier le texte des articles, rendez-vous dans{' '}
+            <strong>Administration &gt; Contrat AT</strong>.
+          </p>
 
           <div className="flex justify-end">
             <Button
