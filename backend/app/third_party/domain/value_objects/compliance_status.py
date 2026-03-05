@@ -29,5 +29,8 @@ class ComplianceStatus(str, Enum):
 
     @property
     def allows_contract_generation(self) -> bool:
-        """Check if compliance status allows contract generation."""
-        return self == ComplianceStatus.COMPLIANT
+        """Check if compliance status allows contract generation.
+
+        EXPIRING_SOON documents are still valid and must not block the workflow.
+        """
+        return self in (ComplianceStatus.COMPLIANT, ComplianceStatus.EXPIRING_SOON)

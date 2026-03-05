@@ -296,6 +296,7 @@ export default function ContractDetail() {
 
   const showConfigForm = isAdv && (
     cr?.status === 'commercial_validated' ||
+    cr?.status === 'reviewing_compliance' ||
     cr?.status === 'compliance_blocked' ||
     cr?.status === 'configuring_contract' ||
     cr?.status === 'partner_requested_changes'
