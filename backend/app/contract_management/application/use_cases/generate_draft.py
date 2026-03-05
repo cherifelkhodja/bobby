@@ -151,9 +151,31 @@ class GenerateDraftUseCase:
                 }
             )
 
-        # Contract config (clauses, including tacit_renewal_months)
+        # Contract config (clauses, including tacit_renewal_months).
+        # Merge config first, then re-apply the authoritative cr fields so that
+        # None/0 values from a partially-filled config cannot overwrite formatted values.
         if cr.contract_config:
             context.update(cr.contract_config)
+
+        # Re-apply authoritative formatted fields from cr (they take priority over config).
+        from datetime import date as _date
+
+        def _fmt_date(d) -> str:
+            if d is None:
+                return ""
+            if isinstance(d, _date):
+                return d.strftime("%d/%m/%Y")
+            return str(d) if d else ""
+
+        context["start_date"] = _fmt_date(cr.start_date) or _fmt_date(context.get("start_date"))
+        context["end_date"] = _fmt_date(cr.end_date) or _fmt_date(context.get("end_date"))
+        context["daily_rate"] = str(cr.daily_rate) if cr.daily_rate else ""
+        context["mission_title"] = cr.mission_title or ""
+
+        # Convert any remaining None values to empty strings so the template never shows "None".
+        for key, value in list(context.items()):
+            if value is None:
+                context[key] = ""
 
         # Resolve human-readable display values for payment config
         from app.contract_management.domain.value_objects.payment_terms import (

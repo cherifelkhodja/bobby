@@ -319,7 +319,7 @@
     </tr>
     <tr>
       <td class="annexe-label">Tarif de la prestation :</td>
-      <td class="annexe-value">{{ daily_rate }} Euros Hors Taxe / Jour</td>
+      <td class="annexe-value">{% if daily_rate %}{{ daily_rate }} Euros Hors Taxe / Jour{% endif %}</td>
     </tr>
   </table>
 
