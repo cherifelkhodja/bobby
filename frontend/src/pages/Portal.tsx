@@ -479,8 +479,6 @@ interface ContactFields {
   phone: string;
 }
 
-const EMPTY_CONTACT: ContactFields = { civility: '', first_name: '', last_name: '', email: '', phone: '' };
-
 function isContactValid(c: ContactFields): boolean {
   return c.civility !== '' && c.first_name !== '' && c.last_name !== '' && /\S+@\S+\.\S+/.test(c.email);
 }
