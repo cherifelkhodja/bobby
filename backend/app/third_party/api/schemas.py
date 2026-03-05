@@ -17,6 +17,36 @@ class ThirdPartyPortalResponse(BaseModel):
     compliance_status: str
     type: str
     siren: str | None = None
+    # Draft pre-fill fields
+    entity_category: str | None = None
+    legal_form: str | None = None
+    capital: str | None = None
+    siret: str | None = None
+    rcs_city: str | None = None
+    head_office_street: str | None = None
+    head_office_postal_code: str | None = None
+    head_office_city: str | None = None
+    representative_title: str | None = None
+    representative_civility: str | None = None
+    representative_first_name: str | None = None
+    representative_last_name: str | None = None
+    representative_email: str | None = None
+    representative_phone: str | None = None
+    signatory_civility: str | None = None
+    signatory_first_name: str | None = None
+    signatory_last_name: str | None = None
+    signatory_email: str | None = None
+    signatory_phone: str | None = None
+    adv_contact_civility: str | None = None
+    adv_contact_first_name: str | None = None
+    adv_contact_last_name: str | None = None
+    adv_contact_email: str | None = None
+    adv_contact_phone: str | None = None
+    billing_contact_civility: str | None = None
+    billing_contact_first_name: str | None = None
+    billing_contact_last_name: str | None = None
+    billing_contact_email: str | None = None
+    billing_contact_phone: str | None = None
 
 
 class MagicLinkPortalResponse(BaseModel):
@@ -242,6 +272,43 @@ class CompanyInfoRequest(BaseModel):
     adv_contact_phone: str | None = Field(None, max_length=50)
     # Contact facturation
     billing_contact_same_as_representative: bool = False
+    billing_contact_civility: str | None = Field(None, pattern=r"^(M\.|Mme)$")
+    billing_contact_first_name: str | None = Field(None, max_length=100)
+    billing_contact_last_name: str | None = Field(None, max_length=100)
+    billing_contact_email: EmailStr | None = None
+    billing_contact_phone: str | None = Field(None, max_length=50)
+
+
+class CompanyInfoDraftRequest(BaseModel):
+    """Partial/draft save of company info — all fields optional, no validation constraints."""
+
+    entity_category: str | None = Field(None, pattern=r"^(ei|societe|portage_salarial)$")
+    company_name: str | None = Field(None, max_length=255)
+    legal_form: str | None = Field(None, max_length=100)
+    capital: str | None = Field(None, max_length=50)
+    siret: str | None = Field(None, max_length=14)
+    head_office_street: str | None = Field(None, max_length=255)
+    head_office_postal_code: str | None = Field(None, max_length=10)
+    head_office_city: str | None = Field(None, max_length=100)
+    rcs_city: str | None = Field(None, max_length=100)
+    representative_title: str | None = Field(None, max_length=255)
+    representative_civility: str | None = Field(None, pattern=r"^(M\.|Mme)$")
+    representative_first_name: str | None = Field(None, max_length=100)
+    representative_last_name: str | None = Field(None, max_length=100)
+    representative_email: EmailStr | None = None
+    representative_phone: str | None = Field(None, max_length=50)
+    signatory_civility: str | None = Field(None, pattern=r"^(M\.|Mme)$")
+    signatory_first_name: str | None = Field(None, max_length=100)
+    signatory_last_name: str | None = Field(None, max_length=100)
+    signatory_email: EmailStr | None = None
+    signatory_phone: str | None = Field(None, max_length=50)
+    adv_contact_same_as_representative: bool | None = None
+    adv_contact_civility: str | None = Field(None, pattern=r"^(M\.|Mme)$")
+    adv_contact_first_name: str | None = Field(None, max_length=100)
+    adv_contact_last_name: str | None = Field(None, max_length=100)
+    adv_contact_email: EmailStr | None = None
+    adv_contact_phone: str | None = Field(None, max_length=50)
+    billing_contact_same_as_representative: bool | None = None
     billing_contact_civility: str | None = Field(None, pattern=r"^(M\.|Mme)$")
     billing_contact_first_name: str | None = Field(None, max_length=100)
     billing_contact_last_name: str | None = Field(None, max_length=100)

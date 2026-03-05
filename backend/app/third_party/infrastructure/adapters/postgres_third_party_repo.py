@@ -54,6 +54,9 @@ class ThirdPartyRepository:
             model.rcs_city = third_party.rcs_city
             model.rcs_number = third_party.rcs_number
             model.head_office_address = third_party.head_office_address
+            model.head_office_street = third_party.head_office_street
+            model.head_office_postal_code = third_party.head_office_postal_code
+            model.head_office_city = third_party.head_office_city
             model.representative_name = third_party.representative_name
             model.representative_title = third_party.representative_title
             model.representative_civility = third_party.representative_civility
@@ -177,6 +180,9 @@ class ThirdPartyRepository:
             rcs_city=model.rcs_city,
             rcs_number=model.rcs_number,
             head_office_address=model.head_office_address,
+            head_office_street=model.head_office_street,
+            head_office_postal_code=model.head_office_postal_code,
+            head_office_city=model.head_office_city,
             representative_name=model.representative_name,
             representative_title=model.representative_title,
             representative_civility=model.representative_civility,
@@ -220,6 +226,9 @@ class ThirdPartyRepository:
             rcs_city=entity.rcs_city,
             rcs_number=entity.rcs_number,
             head_office_address=entity.head_office_address,
+            head_office_street=entity.head_office_street,
+            head_office_postal_code=entity.head_office_postal_code,
+            head_office_city=entity.head_office_city,
             representative_name=entity.representative_name,
             representative_title=entity.representative_title,
             representative_civility=entity.representative_civility,

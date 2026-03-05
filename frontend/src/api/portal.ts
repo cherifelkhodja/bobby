@@ -131,6 +131,47 @@ export const portalApi = {
     return response.data;
   },
 
+  saveCompanyInfoDraft: async (
+    token: string,
+    data: Partial<{
+      entity_category: 'ei' | 'societe' | 'portage_salarial';
+      company_name: string;
+      legal_form: string;
+      capital: string;
+      siret: string;
+      head_office_street: string;
+      head_office_postal_code: string;
+      head_office_city: string;
+      rcs_city: string;
+      representative_title: string;
+      representative_civility: 'M.' | 'Mme';
+      representative_first_name: string;
+      representative_last_name: string;
+      representative_email: string;
+      representative_phone: string;
+      signatory_civility: 'M.' | 'Mme';
+      signatory_first_name: string;
+      signatory_last_name: string;
+      signatory_email: string;
+      signatory_phone: string;
+      adv_contact_same_as_representative: boolean;
+      adv_contact_civility: 'M.' | 'Mme';
+      adv_contact_first_name: string;
+      adv_contact_last_name: string;
+      adv_contact_email: string;
+      adv_contact_phone: string;
+      billing_contact_same_as_representative: boolean;
+      billing_contact_civility: 'M.' | 'Mme';
+      billing_contact_first_name: string;
+      billing_contact_last_name: string;
+      billing_contact_email: string;
+      billing_contact_phone: string;
+    }>,
+  ): Promise<{ message: string }> => {
+    const response = await portalClient.patch(`/${token}/company-info`, data);
+    return response.data;
+  },
+
   submitContractReview: async (
     token: string,
     decision: 'approved' | 'changes_requested',

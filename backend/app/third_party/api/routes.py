@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_db
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
 from app.third_party.api.schemas import (
+    CompanyInfoDraftRequest,
     CompanyInfoRequest,
     ContractReviewRequest,
     ContractReviewResponse,
@@ -107,14 +108,44 @@ async def get_portal_info(
         },
     )
 
+    tp = result.third_party
     return MagicLinkPortalResponse(
         third_party=ThirdPartyPortalResponse(
-            id=result.third_party.id,
-            company_name=result.third_party.company_name,
-            contact_email=result.third_party.contact_email,
-            compliance_status=result.third_party.compliance_status.value,
-            type=result.third_party.type.value,
-            siren=result.third_party.siren,
+            id=tp.id,
+            company_name=tp.company_name,
+            contact_email=tp.contact_email,
+            compliance_status=tp.compliance_status.value,
+            type=tp.type.value,
+            siren=tp.siren,
+            entity_category=tp.entity_category,
+            legal_form=tp.legal_form,
+            capital=tp.capital,
+            siret=tp.siret,
+            rcs_city=tp.rcs_city,
+            head_office_street=tp.head_office_street,
+            head_office_postal_code=tp.head_office_postal_code,
+            head_office_city=tp.head_office_city,
+            representative_title=tp.representative_title,
+            representative_civility=tp.representative_civility,
+            representative_first_name=tp.representative_first_name,
+            representative_last_name=tp.representative_last_name,
+            representative_email=tp.representative_email,
+            representative_phone=tp.representative_phone,
+            signatory_civility=tp.signatory_civility,
+            signatory_first_name=tp.signatory_first_name,
+            signatory_last_name=tp.signatory_last_name,
+            signatory_email=tp.signatory_email,
+            signatory_phone=tp.signatory_phone,
+            adv_contact_civility=tp.adv_contact_civility,
+            adv_contact_first_name=tp.adv_contact_first_name,
+            adv_contact_last_name=tp.adv_contact_last_name,
+            adv_contact_email=tp.adv_contact_email,
+            adv_contact_phone=tp.adv_contact_phone,
+            billing_contact_civility=tp.billing_contact_civility,
+            billing_contact_first_name=tp.billing_contact_first_name,
+            billing_contact_last_name=tp.billing_contact_last_name,
+            billing_contact_email=tp.billing_contact_email,
+            billing_contact_phone=tp.billing_contact_phone,
         ),
         purpose=result.purpose.value,
         contract_request_id=result.contract_request_id,
@@ -648,6 +679,9 @@ async def submit_company_info(
     tp.siret = body.siret
     tp.rcs_city = body.rcs_city or body.head_office_city
     tp.rcs_number = None
+    tp.head_office_street = body.head_office_street
+    tp.head_office_postal_code = body.head_office_postal_code
+    tp.head_office_city = body.head_office_city
     tp.head_office_address = (
         f"{body.head_office_street}, {body.head_office_postal_code} {body.head_office_city}"
     )
@@ -730,6 +764,93 @@ async def submit_company_info(
     )
 
     return {"message": "Informations enregistrées avec succès."}
+
+
+@router.patch(
+    "/portal/{token}/company-info",
+    summary="Save partial/draft company info via portal",
+)
+async def save_company_info_draft(
+    token: str,
+    body: CompanyInfoDraftRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Save a partial draft of company info without completing the form.
+
+    Unlike POST (which validates all required fields and creates document stubs),
+    PATCH accepts any subset of fields and simply persists them so the tiers can
+    resume filling the form later.
+    """
+    result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
+    tp = result.third_party
+    tp_repo = ThirdPartyRepository(db)
+
+    if body.entity_category is not None:
+        tp.entity_category = body.entity_category
+    if body.company_name is not None:
+        tp.company_name = body.company_name
+    if body.legal_form is not None:
+        tp.legal_form = body.legal_form
+    if body.capital is not None:
+        tp.capital = body.capital
+    if body.siret is not None:
+        tp.siret = body.siret
+        if len(body.siret) >= 9:
+            tp.siren = body.siret[:9]
+    if body.head_office_street is not None:
+        tp.head_office_street = body.head_office_street
+    if body.head_office_postal_code is not None:
+        tp.head_office_postal_code = body.head_office_postal_code
+    if body.head_office_city is not None:
+        tp.head_office_city = body.head_office_city
+    if body.rcs_city is not None:
+        tp.rcs_city = body.rcs_city
+    if body.representative_title is not None:
+        tp.representative_title = body.representative_title
+    if body.representative_civility is not None:
+        tp.representative_civility = body.representative_civility
+    if body.representative_first_name is not None:
+        tp.representative_first_name = body.representative_first_name
+    if body.representative_last_name is not None:
+        tp.representative_last_name = body.representative_last_name
+    if body.representative_email is not None:
+        tp.representative_email = str(body.representative_email)
+    if body.representative_phone is not None:
+        tp.representative_phone = body.representative_phone
+    if body.signatory_civility is not None:
+        tp.signatory_civility = body.signatory_civility
+    if body.signatory_first_name is not None:
+        tp.signatory_first_name = body.signatory_first_name
+    if body.signatory_last_name is not None:
+        tp.signatory_last_name = body.signatory_last_name
+    if body.signatory_email is not None:
+        tp.signatory_email = str(body.signatory_email)
+    if body.signatory_phone is not None:
+        tp.signatory_phone = body.signatory_phone
+    if body.adv_contact_civility is not None:
+        tp.adv_contact_civility = body.adv_contact_civility
+    if body.adv_contact_first_name is not None:
+        tp.adv_contact_first_name = body.adv_contact_first_name
+    if body.adv_contact_last_name is not None:
+        tp.adv_contact_last_name = body.adv_contact_last_name
+    if body.adv_contact_email is not None:
+        tp.adv_contact_email = str(body.adv_contact_email)
+    if body.adv_contact_phone is not None:
+        tp.adv_contact_phone = body.adv_contact_phone
+    if body.billing_contact_civility is not None:
+        tp.billing_contact_civility = body.billing_contact_civility
+    if body.billing_contact_first_name is not None:
+        tp.billing_contact_first_name = body.billing_contact_first_name
+    if body.billing_contact_last_name is not None:
+        tp.billing_contact_last_name = body.billing_contact_last_name
+    if body.billing_contact_email is not None:
+        tp.billing_contact_email = str(body.billing_contact_email)
+    if body.billing_contact_phone is not None:
+        tp.billing_contact_phone = body.billing_contact_phone
+
+    await tp_repo.save(tp)
+
+    return {"message": "Brouillon enregistré."}
 
 
 # ── INSEE Sirene Lookup ─────────────────────────────────────────

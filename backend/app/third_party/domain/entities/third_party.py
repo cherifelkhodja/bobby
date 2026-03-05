@@ -25,6 +25,9 @@ class ThirdParty:
     rcs_city: str | None = None
     rcs_number: str | None = None
     head_office_address: str | None = None
+    head_office_street: str | None = None
+    head_office_postal_code: str | None = None
+    head_office_city: str | None = None
     representative_name: str | None = None
     representative_title: str | None = None
     # Structured representative fields

@@ -264,6 +264,7 @@ export default function Portal() {
           <CompanyInfoForm
             token={token!}
             thirdPartyType={portalInfo.third_party.type}
+            initialData={portalInfo.third_party}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['portal', token] });
               queryClient.invalidateQueries({ queryKey: ['portal-documents', token] });
@@ -570,29 +571,61 @@ function ContactSection({
   );
 }
 
-function CompanyInfoForm({ token, thirdPartyType, onSuccess }: { token: string; thirdPartyType?: string; onSuccess: () => void }) {
+interface CompanyInfoFormProps {
+  token: string;
+  thirdPartyType?: string;
+  initialData?: import('../types').PortalInfo['third_party'] | null;
+  onSuccess: () => void;
+}
+
+function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: CompanyInfoFormProps) {
   const isPortageSalarial = thirdPartyType === 'portage_salarial';
-  const [entityCategory, setEntityCategory] = useState<'ei' | 'societe' | 'portage_salarial'>(
-    isPortageSalarial ? 'portage_salarial' : 'ei'
-  );
+
+  const resolveCategory = (): 'ei' | 'societe' | 'portage_salarial' => {
+    if (isPortageSalarial) return 'portage_salarial';
+    if (initialData?.entity_category === 'societe') return 'societe';
+    if (initialData?.entity_category === 'portage_salarial') return 'portage_salarial';
+    return 'ei';
+  };
+
+  const [entityCategory, setEntityCategory] = useState<'ei' | 'societe' | 'portage_salarial'>(resolveCategory);
   const [form, setForm] = useState({
-    company_name: '',
-    legal_form: '',
-    capital: '',
-    siret: '',
-    head_office_street: '',
-    head_office_postal_code: '',
-    head_office_city: '',
-    rcs_city: '',
-    representative_title: '',
+    company_name: initialData?.company_name ?? '',
+    legal_form: initialData?.legal_form ?? '',
+    capital: initialData?.capital ?? '',
+    siret: initialData?.siret ?? '',
+    head_office_street: initialData?.head_office_street ?? '',
+    head_office_postal_code: initialData?.head_office_postal_code ?? '',
+    head_office_city: initialData?.head_office_city ?? '',
+    rcs_city: initialData?.rcs_city ?? '',
+    representative_title: initialData?.representative_title ?? '',
   });
   const [siretLoading, setSiretLoading] = useState(false);
-  const [signatory, setSignatory] = useState<ContactFields>(EMPTY_CONTACT);
-  const [advContact, setAdvContact] = useState<ContactFields>(EMPTY_CONTACT);
+  const [signatory, setSignatory] = useState<ContactFields>({
+    civility: (initialData?.representative_civility as Civility | '') ?? '',
+    first_name: initialData?.representative_first_name ?? '',
+    last_name: initialData?.representative_last_name ?? '',
+    email: initialData?.representative_email ?? '',
+    phone: initialData?.representative_phone ?? '',
+  });
+  const [advContact, setAdvContact] = useState<ContactFields>({
+    civility: (initialData?.adv_contact_civility as Civility | '') ?? '',
+    first_name: initialData?.adv_contact_first_name ?? '',
+    last_name: initialData?.adv_contact_last_name ?? '',
+    email: initialData?.adv_contact_email ?? '',
+    phone: initialData?.adv_contact_phone ?? '',
+  });
   const [advIsSame, setAdvIsSame] = useState(false);
-  const [billingContact, setBillingContact] = useState<ContactFields>(EMPTY_CONTACT);
+  const [billingContact, setBillingContact] = useState<ContactFields>({
+    civility: (initialData?.billing_contact_civility as Civility | '') ?? '',
+    first_name: initialData?.billing_contact_first_name ?? '',
+    last_name: initialData?.billing_contact_last_name ?? '',
+    email: initialData?.billing_contact_email ?? '',
+    phone: initialData?.billing_contact_phone ?? '',
+  });
   const [billingIsSame, setBillingIsSame] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleSiretChange = async (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 14);
@@ -637,6 +670,51 @@ function CompanyInfoForm({ token, thirdPartyType, onSuccess }: { token: string; 
     isContactValid(signatory) &&
     (advIsSame || isContactValid(advContact)) &&
     (billingIsSame || isContactValid(billingContact));
+
+  const handleSaveDraft = async () => {
+    setIsSaving(true);
+    try {
+      await portalApi.saveCompanyInfoDraft(token, {
+        ...(entityCategory ? { entity_category: entityCategory } : {}),
+        ...(form.company_name ? { company_name: form.company_name } : {}),
+        ...(form.legal_form ? { legal_form: form.legal_form } : {}),
+        ...(form.capital ? { capital: form.capital } : {}),
+        ...(form.siret ? { siret: form.siret } : {}),
+        ...(form.head_office_street ? { head_office_street: form.head_office_street } : {}),
+        ...(form.head_office_postal_code ? { head_office_postal_code: form.head_office_postal_code } : {}),
+        ...(form.head_office_city ? { head_office_city: form.head_office_city } : {}),
+        ...(form.rcs_city ? { rcs_city: form.rcs_city } : {}),
+        ...(form.representative_title ? { representative_title: form.representative_title } : {}),
+        ...(signatory.civility ? { representative_civility: signatory.civility as 'M.' | 'Mme' } : {}),
+        ...(signatory.first_name ? { representative_first_name: signatory.first_name } : {}),
+        ...(signatory.last_name ? { representative_last_name: signatory.last_name } : {}),
+        ...(signatory.email ? { representative_email: signatory.email } : {}),
+        ...(signatory.phone ? { representative_phone: signatory.phone } : {}),
+        ...(signatory.civility ? { signatory_civility: signatory.civility as 'M.' | 'Mme' } : {}),
+        ...(signatory.first_name ? { signatory_first_name: signatory.first_name } : {}),
+        ...(signatory.last_name ? { signatory_last_name: signatory.last_name } : {}),
+        ...(signatory.email ? { signatory_email: signatory.email } : {}),
+        ...(signatory.phone ? { signatory_phone: signatory.phone } : {}),
+        adv_contact_same_as_representative: advIsSame,
+        ...(!advIsSame && advContact.civility ? { adv_contact_civility: advContact.civility as 'M.' | 'Mme' } : {}),
+        ...(!advIsSame && advContact.first_name ? { adv_contact_first_name: advContact.first_name } : {}),
+        ...(!advIsSame && advContact.last_name ? { adv_contact_last_name: advContact.last_name } : {}),
+        ...(!advIsSame && advContact.email ? { adv_contact_email: advContact.email } : {}),
+        ...(!advIsSame && advContact.phone ? { adv_contact_phone: advContact.phone } : {}),
+        billing_contact_same_as_representative: billingIsSame,
+        ...(!billingIsSame && billingContact.civility ? { billing_contact_civility: billingContact.civility as 'M.' | 'Mme' } : {}),
+        ...(!billingIsSame && billingContact.first_name ? { billing_contact_first_name: billingContact.first_name } : {}),
+        ...(!billingIsSame && billingContact.last_name ? { billing_contact_last_name: billingContact.last_name } : {}),
+        ...(!billingIsSame && billingContact.email ? { billing_contact_email: billingContact.email } : {}),
+        ...(!billingIsSame && billingContact.phone ? { billing_contact_phone: billingContact.phone } : {}),
+      });
+      toast.success('Brouillon enregistré.');
+    } catch {
+      toast.error("Erreur lors de l'enregistrement du brouillon.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!isValid) return;
@@ -963,8 +1041,11 @@ function CompanyInfoForm({ token, thirdPartyType, onSuccess }: { token: string; 
           onToggleSameAsRep={() => setBillingIsSame((v) => !v)}
         />
 
-        <div className="flex justify-end mt-6">
-          <Button onClick={handleSubmit} disabled={!isValid || isSubmitting} isLoading={isSubmitting}>
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="secondary" onClick={handleSaveDraft} disabled={isSaving || isSubmitting} isLoading={isSaving}>
+            Enregistrer
+          </Button>
+          <Button onClick={handleSubmit} disabled={!isValid || isSubmitting || isSaving} isLoading={isSubmitting}>
             Valider et continuer
           </Button>
         </div>
