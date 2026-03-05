@@ -31,7 +31,7 @@ _DATED_TYPES: dict[str, int] = {
 }
 
 # Types où la validité est portée par une date d'expiration explicite
-_EXPIRY_DATE_TYPES: set[str] = {"attestation_assurance_rc_pro"}
+_EXPIRY_DATE_TYPES: set[str] = {"attestation_assurance_rc_pro", "garantie_financiere"}
 
 # ── Mapping mois français ────────────────────────────────────────────────────
 

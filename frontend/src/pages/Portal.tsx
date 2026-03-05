@@ -263,6 +263,7 @@ export default function Portal() {
         <div className={displayStep !== 0 ? 'hidden' : undefined}>
           <CompanyInfoForm
             token={token!}
+            thirdPartyType={portalInfo.third_party.type}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['portal', token] });
               queryClient.invalidateQueries({ queryKey: ['portal-documents', token] });
@@ -569,8 +570,11 @@ function ContactSection({
   );
 }
 
-function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () => void }) {
-  const [entityCategory, setEntityCategory] = useState<'ei' | 'societe'>('ei');
+function CompanyInfoForm({ token, thirdPartyType, onSuccess }: { token: string; thirdPartyType?: string; onSuccess: () => void }) {
+  const isPortageSalarial = thirdPartyType === 'portage_salarial';
+  const [entityCategory, setEntityCategory] = useState<'ei' | 'societe' | 'portage_salarial'>(
+    isPortageSalarial ? 'portage_salarial' : 'ei'
+  );
   const [form, setForm] = useState({
     company_name: '',
     legal_form: '',
@@ -607,7 +611,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
           capital: data.capital ? formatCapital(data.capital) : f.capital,
           rcs_city: data.rcs_city ?? f.rcs_city,
         }));
-        if (data.entity_category === 'ei' || data.entity_category === 'societe') {
+        if (!isPortageSalarial && (data.entity_category === 'ei' || data.entity_category === 'societe')) {
           setEntityCategory(data.entity_category);
         }
         toast.success('Données pré-remplies.');
@@ -619,6 +623,8 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
     }
   };
 
+  const isSocieteOrPortage = entityCategory === 'societe' || entityCategory === 'portage_salarial';
+
   const isValid =
     /^\d{14}$/.test(form.siret) &&
     form.company_name !== '' &&
@@ -626,7 +632,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
     form.head_office_street !== '' &&
     /^\d{5}$/.test(form.head_office_postal_code) &&
     form.head_office_city !== '' &&
-    (entityCategory === 'ei' || form.rcs_city !== '') &&
+    (!isSocieteOrPortage || form.rcs_city !== '') &&
     form.representative_title !== '' &&
     isContactValid(signatory) &&
     (advIsSame || isContactValid(advContact)) &&
@@ -713,28 +719,35 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
           <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
             Structure juridique *
           </p>
-          <div className="grid grid-cols-2 gap-3">
-            {(
-              [
-                { value: 'ei', label: 'Entreprise individuelle', sub: 'EI, Micro-entreprise' },
-                { value: 'societe', label: 'Société', sub: 'SAS, SASU, EURL, SARL…' },
-              ] as const
-            ).map(({ value, label, sub }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setEntityCategory(value)}
-                className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                  entityCategory === value
-                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sub}</p>
-              </button>
-            ))}
-          </div>
+          {isPortageSalarial ? (
+            <div className="p-3 rounded-lg border-2 border-primary-500 bg-primary-50 dark:bg-primary-900/20">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">Société de portage salarial</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Structure juridique imposée par le type de tiers</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {(
+                [
+                  { value: 'ei', label: 'Entreprise individuelle', sub: 'EI, Micro-entreprise' },
+                  { value: 'societe', label: 'Société', sub: 'SAS, SASU, EURL, SARL…' },
+                ] as const
+              ).map(({ value, label, sub }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setEntityCategory(value)}
+                  className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                    entityCategory === value
+                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sub}</p>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Identité */}
@@ -762,16 +775,16 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {entityCategory === 'ei' ? 'Nom commercial / Enseigne *' : 'Raison sociale *'}
+              {!isSocieteOrPortage ? 'Nom commercial / Enseigne *' : 'Raison sociale *'}
             </label>
             <input
               type="text"
               {...field('company_name')}
-              placeholder={entityCategory === 'ei' ? 'Ex : Jean Dupont Consulting' : 'Ex : Acme SAS'}
+              placeholder={!isSocieteOrPortage ? 'Ex : Jean Dupont Consulting' : 'Ex : Acme SAS'}
               className={INPUT_CLS}
             />
           </div>
-          {entityCategory === 'societe' && (
+          {isSocieteOrPortage && (
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Ville du greffe *
@@ -811,7 +824,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
               </optgroup>
             </select>
           </div>
-          {entityCategory === 'societe' && (
+          {isSocieteOrPortage && (
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Capital social
@@ -923,7 +936,7 @@ function CompanyInfoForm({ token, onSuccess }: { token: string; onSuccess: () =>
               <input
                 type="text"
                 {...field('representative_title')}
-                placeholder={entityCategory === 'ei' ? 'Ex : Entrepreneur individuel' : 'Ex : Président'}
+                placeholder={!isSocieteOrPortage ? 'Ex : Entrepreneur individuel' : 'Ex : Président'}
                 className={INPUT_CLS}
               />
             </div>

@@ -396,6 +396,7 @@ export default function ContractDetail() {
                 <option value="">Sélectionner...</option>
                 <option value="freelance">Freelance</option>
                 <option value="sous_traitant">Sous-traitant</option>
+                <option value="portage_salarial">Portage salarial</option>
                 <option value="salarie">Salarié</option>
               </select>
             </div>
@@ -616,7 +617,7 @@ export default function ContractDetail() {
                 <div>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Type de tiers</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">
-                    {cr.third_party_type === 'freelance' ? 'Freelance / EI' : cr.third_party_type === 'sous_traitant' ? 'Sous-traitant' : 'Salarié'}
+                    {cr.third_party_type === 'freelance' ? 'Freelance / EI' : cr.third_party_type === 'sous_traitant' ? 'Sous-traitant' : cr.third_party_type === 'portage_salarial' ? 'Portage salarial' : 'Salarié'}
                   </p>
                 </div>
               )}

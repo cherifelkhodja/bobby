@@ -1,10 +1,12 @@
 """Vigilance document requirements per entity category.
 
 The entity_category discriminates based on the legal structure:
-  - "ei"      : Entreprise Individuelle / Micro-entreprise
-  - "societe" : Société dotée de la personnalité morale (SAS, SASU, SARL, EURL, SA…)
+  - "ei"              : Entreprise Individuelle / Micro-entreprise
+  - "societe"         : Société dotée de la personnalité morale (SAS, SASU, SARL, EURL, SA…)
+  - "portage_salarial": Société de portage salarial (toujours une société + garantie financière)
 
-A FREELANCE may be structured as either; a SOUS_TRAITANT is always a société.
+A FREELANCE may be structured as either ei or societe; a SOUS_TRAITANT is always a société.
+A PORTAGE_SALARIAL is always a société and requires an additional garantie financière.
 Documents must be determined from entity_category, not from third_party_type alone.
 """
 
@@ -30,6 +32,12 @@ REQUIREMENTS_BY_ENTITY_CATEGORY: dict[str, list[dict]] = {
     "societe": [
         {"type": DocumentType.KBIS, "validity_months": 3, "mandatory": True},
         *_COMMON,
+    ],
+    # Société de portage salarial : mêmes docs qu'une société + garantie financière obligatoire
+    "portage_salarial": [
+        {"type": DocumentType.KBIS, "validity_months": 3, "mandatory": True},
+        *_COMMON,
+        {"type": DocumentType.GARANTIE_FINANCIERE, "validity_months": None, "mandatory": True},
     ],
 }
 

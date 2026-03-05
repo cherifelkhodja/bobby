@@ -17,6 +17,7 @@ import { CONTRACT_STATUS_CONFIG } from '../types';
 const THIRD_PARTY_TYPE_LABELS: Record<string, string> = {
   freelance: 'Freelance',
   sous_traitant: 'Sous-traitant',
+  portage_salarial: 'Portage salarial',
   salarie: 'Salarié',
 };
 

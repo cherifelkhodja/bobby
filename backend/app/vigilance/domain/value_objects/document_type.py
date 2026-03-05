@@ -16,6 +16,7 @@ class DocumentType(str, Enum):
     RIB = "rib"
     CNI_REPRESENTANT = "cni_representant"
     LISTE_SALARIES_ETRANGERS = "liste_salaries_etrangers"
+    GARANTIE_FINANCIERE = "garantie_financiere"
 
     @property
     def display_name(self) -> str:
@@ -31,6 +32,7 @@ class DocumentType(str, Enum):
             "rib": "RIB",
             "cni_representant": "CNI du représentant",
             "liste_salaries_etrangers": "Liste des salariés étrangers",
+            "garantie_financiere": "Garantie financière",
         }
         return labels.get(self.value, self.value)
 
@@ -48,6 +50,7 @@ class DocumentType(str, Enum):
             "rib": None,
             "cni_representant": None,
             "liste_salaries_etrangers": None,
+            "garantie_financiere": "En cours de validité",
         }
         return labels.get(self.value)
 
