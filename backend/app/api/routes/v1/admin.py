@@ -67,6 +67,11 @@ from app.infrastructure.settings import (
     AVAILABLE_GEMINI_MODELS,
 )
 from app.infrastructure.turnoverit.client import TurnoverITClient
+from app.contract_management.api.schemas import (
+    ContractCompanyRequest,
+    ContractCompanyResponse,
+)
+from app.contract_management.infrastructure.models import ContractCompanyModel
 
 router = APIRouter()
 
@@ -1087,3 +1092,151 @@ async def update_contract_article(
         is_editable=updated.is_editable,
         is_active=updated.is_active,
     )
+
+
+# ── Contract companies (sociétés émettrices) ──────────────────────────────────
+
+def _company_to_response(m: ContractCompanyModel) -> ContractCompanyResponse:
+    return ContractCompanyResponse(
+        id=m.id,
+        name=m.name,
+        legal_form=m.legal_form,
+        capital=m.capital,
+        head_office=m.head_office,
+        rcs_city=m.rcs_city,
+        rcs_number=m.rcs_number,
+        representative_is_entity=m.representative_is_entity,
+        representative_name=m.representative_name,
+        representative_quality=m.representative_quality,
+        representative_sub_name=m.representative_sub_name,
+        representative_sub_quality=m.representative_sub_quality,
+        signatory_name=m.signatory_name,
+        color_code=m.color_code,
+        is_default=m.is_default,
+        is_active=m.is_active,
+        created_at=m.created_at,
+        updated_at=m.updated_at,
+    )
+
+
+@router.get(
+    "/contract-companies",
+    response_model=list[ContractCompanyResponse],
+    summary="List issuing companies",
+)
+async def list_contract_companies(
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """List all contract issuing companies. Admin only."""
+    from sqlalchemy import select as _select
+    result = await db.execute(_select(ContractCompanyModel).order_by(ContractCompanyModel.created_at))
+    return [_company_to_response(m) for m in result.scalars().all()]
+
+
+@router.post(
+    "/contract-companies",
+    response_model=ContractCompanyResponse,
+    status_code=201,
+    summary="Create issuing company",
+)
+async def create_contract_company(
+    body: ContractCompanyRequest,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Create a new contract issuing company. Admin only."""
+    from uuid import uuid4 as _uuid4
+    from datetime import datetime as _dt
+    # If this one is set as default, unset the others
+    if body.is_default:
+        await db.execute(
+            ContractCompanyModel.__table__.update().values(is_default=False)
+        )
+    m = ContractCompanyModel(
+        id=_uuid4(),
+        name=body.name,
+        legal_form=body.legal_form,
+        capital=body.capital,
+        head_office=body.head_office,
+        rcs_city=body.rcs_city,
+        rcs_number=body.rcs_number,
+        representative_is_entity=body.representative_is_entity,
+        representative_name=body.representative_name,
+        representative_quality=body.representative_quality,
+        representative_sub_name=body.representative_sub_name,
+        representative_sub_quality=body.representative_sub_quality,
+        signatory_name=body.signatory_name,
+        color_code=body.color_code,
+        is_default=body.is_default,
+        is_active=body.is_active,
+        created_at=_dt.utcnow(),
+        updated_at=_dt.utcnow(),
+    )
+    db.add(m)
+    await db.commit()
+    await db.refresh(m)
+    return _company_to_response(m)
+
+
+@router.patch(
+    "/contract-companies/{company_id}",
+    response_model=ContractCompanyResponse,
+    summary="Update issuing company",
+)
+async def update_contract_company(
+    company_id: UUID,
+    body: ContractCompanyRequest,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Update an issuing company. Admin only."""
+    from sqlalchemy import select as _select
+    from datetime import datetime as _dt
+    result = await db.execute(_select(ContractCompanyModel).where(ContractCompanyModel.id == company_id))
+    m = result.scalar_one_or_none()
+    if not m:
+        raise HTTPException(status_code=404, detail="Société introuvable")
+    if body.is_default and not m.is_default:
+        await db.execute(
+            ContractCompanyModel.__table__.update().values(is_default=False)
+        )
+    m.name = body.name
+    m.legal_form = body.legal_form
+    m.capital = body.capital
+    m.head_office = body.head_office
+    m.rcs_city = body.rcs_city
+    m.rcs_number = body.rcs_number
+    m.representative_is_entity = body.representative_is_entity
+    m.representative_name = body.representative_name
+    m.representative_quality = body.representative_quality
+    m.representative_sub_name = body.representative_sub_name
+    m.representative_sub_quality = body.representative_sub_quality
+    m.signatory_name = body.signatory_name
+    m.color_code = body.color_code
+    m.is_default = body.is_default
+    m.is_active = body.is_active
+    m.updated_at = _dt.utcnow()
+    await db.commit()
+    await db.refresh(m)
+    return _company_to_response(m)
+
+
+@router.delete(
+    "/contract-companies/{company_id}",
+    status_code=204,
+    summary="Delete issuing company",
+)
+async def delete_contract_company(
+    company_id: UUID,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Delete an issuing company. Admin only."""
+    from sqlalchemy import select as _select, delete as _delete
+    result = await db.execute(_select(ContractCompanyModel).where(ContractCompanyModel.id == company_id))
+    m = result.scalar_one_or_none()
+    if not m:
+        raise HTTPException(status_code=404, detail="Société introuvable")
+    await db.execute(_delete(ContractCompanyModel).where(ContractCompanyModel.id == company_id))
+    await db.commit()

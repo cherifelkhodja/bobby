@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { contractsApi } from '../api/contracts';
+import { contractsApi, contractCompaniesApi } from '../api/contracts';
 import { vigilanceApi } from '../api/vigilance';
 import { useAuthStore } from '../stores/authStore';
 import { Card } from '../components/ui/Card';
@@ -100,6 +100,7 @@ export default function ContractDetail() {
 
   // Contract configuration form state
   const [configForm, setConfigForm] = useState({
+    company_id: '' as string,
     payment_terms: 'net_30',
     invoice_submission_method: 'email',
     estimated_days: '',
@@ -118,6 +119,12 @@ export default function ContractDetail() {
     queryKey: ['contracts', id],
     queryFn: () => contractsApi.listContracts(id!),
     enabled: !!id,
+  });
+
+  const { data: companies = [] } = useQuery({
+    queryKey: ['contract-companies'],
+    queryFn: contractCompaniesApi.list,
+    enabled: isAdv,
   });
 
   const { data: complianceDocs } = useQuery({
@@ -154,6 +161,7 @@ export default function ContractDetail() {
     if (cr && !configFormInitialized && cr.contract_config) {
       const cfg = cr.contract_config as Record<string, unknown>;
       setConfigForm({
+        company_id: (cfg.company_id as string) ?? '',
         payment_terms: (cfg.payment_terms as string) ?? 'net_30',
         invoice_submission_method: (cfg.invoice_submission_method as string) ?? 'email',
         estimated_days: cfg.estimated_days != null ? String(cfg.estimated_days) : '',
@@ -241,6 +249,7 @@ export default function ContractDetail() {
   const configureMutation = useMutation({
     mutationFn: () => {
       return contractsApi.configure(id!, {
+        company_id: configForm.company_id || null,
         payment_terms: configForm.payment_terms,
         invoice_submission_method: configForm.invoice_submission_method,
         estimated_days: configForm.estimated_days ? parseInt(configForm.estimated_days, 10) : undefined,
@@ -863,8 +872,35 @@ export default function ContractDetail() {
             Configuration du contrat
           </h3>
 
-          {/* Section 1 — Conditions financières */}
+          {/* Section 0 — Société émettrice */}
           <div className="mb-5">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
+              Société émettrice du contrat
+            </p>
+            <select
+              value={configForm.company_id}
+              onChange={(e) => setConfigForm((f) => ({ ...f, company_id: e.target.value }))}
+              className={INPUT_CLS}
+            >
+              <option value="">— Utiliser la société par défaut —</option>
+              {companies
+                .filter((c) => c.is_active)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.legal_form} {c.name}{c.is_default ? ' (par défaut)' : ''}
+                  </option>
+                ))}
+            </select>
+            {companies.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">
+                Aucune société configurée — rendez-vous dans{' '}
+                <strong>Administration &gt; Sociétés</strong> pour en ajouter.
+              </p>
+            )}
+          </div>
+
+          {/* Section 1 — Conditions financières */}
+          <div className="mb-5 border-t border-gray-200 dark:border-gray-700 pt-4">
             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
               Conditions financières
             </p>

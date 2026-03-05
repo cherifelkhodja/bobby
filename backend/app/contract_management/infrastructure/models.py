@@ -45,6 +45,9 @@ class ContractRequestModel(Base):
     contract_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     commercial_email: Mapped[str] = mapped_column(String(255), nullable=False)
     commercial_validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    company_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_contract_companies.id"), nullable=True
+    )
     compliance_override: Mapped[bool] = mapped_column(Boolean, default=False)
     compliance_override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     status_history: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
@@ -95,6 +98,37 @@ class ContractArticleTemplateModel(Base):
     )
     updated_by: Mapped[UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+
+
+class ContractCompanyModel(Base):
+    """Issuing company for contracts (société émettrice du contrat)."""
+
+    __tablename__ = "cm_contract_companies"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    legal_form: Mapped[str] = mapped_column(String(50), nullable=False)
+    capital: Mapped[str] = mapped_column(String(100), nullable=False)
+    head_office: Mapped[str] = mapped_column(String(500), nullable=False)
+    rcs_city: Mapped[str] = mapped_column(String(100), nullable=False)
+    rcs_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    # Representative — personne physique ou morale
+    representative_is_entity: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    representative_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    representative_quality: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Champs supplémentaires si le représentant est une personne morale
+    representative_sub_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    representative_sub_quality: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Bloc signature
+    signatory_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Identité visuelle
+    color_code: Mapped[str] = mapped_column(String(7), nullable=False, default="#4BBEA8")
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
 

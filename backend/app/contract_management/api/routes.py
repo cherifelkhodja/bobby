@@ -802,6 +802,7 @@ async def generate_draft(
         article_template_repository=article_repo,
         s3_service=s3_service,
         settings=settings,
+        db=db,
     )
 
     try:

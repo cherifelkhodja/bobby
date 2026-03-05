@@ -77,6 +77,7 @@ class ContractConfigRequest(BaseModel):
     invoice_submission_method values: "email" (factures@geminiconsulting.fr), "boondmanager"
     """
 
+    company_id: UUID | None = None
     mission_description: str = ""
     start_date: date | None = None
     end_date: date | None = None
@@ -87,6 +88,51 @@ class ContractConfigRequest(BaseModel):
     invoice_email: str = ""
     tacit_renewal_months: int | None = Field(None, ge=1, le=24, description="Nombre de mois pour la tacite reconduction (annexe)")
     special_conditions: str = ""
+
+
+# ── Contract companies ────────────────────────────────────────────────────────
+
+class ContractCompanyRequest(BaseModel):
+    """Create or update an issuing company."""
+
+    name: str = Field(..., max_length=255)
+    legal_form: str = Field(..., max_length=50)
+    capital: str = Field(..., max_length=100)
+    head_office: str = Field(..., max_length=500)
+    rcs_city: str = Field(..., max_length=100)
+    rcs_number: str = Field(..., max_length=50)
+    representative_is_entity: bool = False
+    representative_name: str = Field(..., max_length=255)
+    representative_quality: str = Field(..., max_length=255)
+    representative_sub_name: str | None = Field(None, max_length=255)
+    representative_sub_quality: str | None = Field(None, max_length=255)
+    signatory_name: str = Field(..., max_length=255)
+    color_code: str = Field("#4BBEA8", pattern=r"^#[0-9A-Fa-f]{6}$")
+    is_default: bool = False
+    is_active: bool = True
+
+
+class ContractCompanyResponse(BaseModel):
+    """Issuing company response."""
+
+    id: UUID
+    name: str
+    legal_form: str
+    capital: str
+    head_office: str
+    rcs_city: str
+    rcs_number: str
+    representative_is_entity: bool
+    representative_name: str
+    representative_quality: str
+    representative_sub_name: str | None = None
+    representative_sub_quality: str | None = None
+    signatory_name: str
+    color_code: str
+    is_default: bool
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
 
 
 class ComplianceOverrideRequest(BaseModel):

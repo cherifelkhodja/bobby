@@ -56,6 +56,7 @@ export const contractsApi = {
   configure: async (
     id: string,
     data: {
+      company_id?: string | null;
       mission_description?: string;
       start_date?: string;
       end_date?: string;
@@ -163,6 +164,52 @@ export const contractsApi = {
       { params: { which } },
     );
     return response.data.url;
+  },
+};
+
+// ── Contract companies ──────────────────────────────────────────────────────
+
+export interface ContractCompany {
+  id: string;
+  name: string;
+  legal_form: string;
+  capital: string;
+  head_office: string;
+  rcs_city: string;
+  rcs_number: string;
+  representative_is_entity: boolean;
+  representative_name: string;
+  representative_quality: string;
+  representative_sub_name?: string | null;
+  representative_sub_quality?: string | null;
+  signatory_name: string;
+  color_code: string;
+  is_default: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ContractCompanyRequest = Omit<ContractCompany, 'id' | 'created_at' | 'updated_at'>;
+
+export const contractCompaniesApi = {
+  list: async (): Promise<ContractCompany[]> => {
+    const response = await apiClient.get<ContractCompany[]>('/admin/contract-companies');
+    return response.data;
+  },
+
+  create: async (data: ContractCompanyRequest): Promise<ContractCompany> => {
+    const response = await apiClient.post<ContractCompany>('/admin/contract-companies', data);
+    return response.data;
+  },
+
+  update: async (id: string, data: ContractCompanyRequest): Promise<ContractCompany> => {
+    const response = await apiClient.patch<ContractCompany>(`/admin/contract-companies/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/admin/contract-companies/${id}`);
   },
 };
 

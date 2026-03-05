@@ -58,7 +58,7 @@
   }
   .cover-separator {
     border: none;
-    border-top: 2px solid #4BBEA8;
+    border-top: 2px solid {{ issuer_color_code }};
     width: 100%;
     margin-bottom: 4cm;
   }
@@ -110,7 +110,7 @@
   }
   .article-separator {
     border: none;
-    border-top: 1.5px solid #4BBEA8;
+    border-top: 1.5px solid {{ issuer_color_code }};
     margin-bottom: 0.3cm;
   }
   .article-body p {
@@ -206,14 +206,19 @@
 <p class="section-header">Entre les soussignés:</p>
 
 <div class="parties-block">
-  <p class="party-name">La société {{ gemini_company_name }}</p>
+  <p class="party-name">La société {{ issuer_company_name }}</p>
   <p class="party-detail">
-    <strong>{{ gemini_legal_form }}</strong> au capital de <strong>{{ gemini_capital }}</strong>,<br>
-    Dont le siège social est situé <strong>{{ gemini_head_office }}</strong>,<br>
-    Inscrite au <strong>RCS de {{ gemini_rcs_city }}</strong> sous le n° <strong>{{ gemini_rcs_number }}</strong>,<br>
-    Représentée par {{ gemini_representative_entity }},<br>
-    Agissant en qualité de <strong>{{ gemini_representative_quality }}</strong>,<br>
-    Représentée par {{ gemini_representative_sub }} Dûment habilité aux fins des présentes.
+    <strong>{{ issuer_legal_form }}</strong> au capital de <strong>{{ issuer_capital }}</strong>,<br>
+    Dont le siège social est situé <strong>{{ issuer_head_office }}</strong>,<br>
+    Inscrite au <strong>RCS de {{ issuer_rcs_city }}</strong> sous le n° <strong>{{ issuer_rcs_number }}</strong>,<br>
+    {% if issuer_representative_is_entity %}
+    Représentée par la société <strong>{{ issuer_representative_name }}</strong>,<br>
+    Agissant en qualité de <strong>{{ issuer_representative_quality }}</strong>,<br>
+    Représentée par <strong>{{ issuer_representative_sub_name }}</strong>{% if issuer_representative_sub_quality %}, {{ issuer_representative_sub_quality }}{% endif %}, Dûment habilité aux fins des présentes.
+    {% else %}
+    Représentée par <strong>{{ issuer_representative_name }}</strong>,<br>
+    Agissant en qualité de <strong>{{ issuer_representative_quality }}</strong>, Dûment habilité aux fins des présentes.
+    {% endif %}
   </p>
 </div>
 
@@ -269,8 +274,8 @@
   <table class="signature-table">
     <tr>
       <td class="signature-col">
-        <p class="signer-company">{{ gemini_legal_form }} {{ gemini_company_name }}</p>
-        <p class="signer-name">{{ gemini_signatory_name }}</p>
+        <p class="signer-company">{{ issuer_legal_form }} {{ issuer_company_name }}</p>
+        <p class="signer-name">{{ issuer_signatory_name }}</p>
       </td>
       <td class="signature-col">
         <p class="signer-company">{{ partner_legal_form }} {{ partner_company_name }}</p>
@@ -326,8 +331,8 @@
   <table class="signature-table">
     <tr>
       <td class="signature-col">
-        <p class="signer-company">{{ gemini_legal_form }} {{ gemini_company_name }}</p>
-        <p class="signer-name">{{ gemini_signatory_name }}</p>
+        <p class="signer-company">{{ issuer_legal_form }} {{ issuer_company_name }}</p>
+        <p class="signer-name">{{ issuer_signatory_name }}</p>
       </td>
       <td class="signature-col">
         <p class="signer-company">{{ partner_legal_form }} {{ partner_company_name }}</p>

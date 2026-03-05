@@ -33,6 +33,7 @@ class GenerateDraftUseCase:
         article_template_repository,
         s3_service,
         settings,
+        db=None,
     ) -> None:
         self._cr_repo = contract_request_repository
         self._contract_repo = contract_repository
@@ -41,6 +42,7 @@ class GenerateDraftUseCase:
         self._article_repo = article_template_repository
         self._s3 = s3_service
         self._settings = settings
+        self._db = db  # AsyncSession for loading company
 
     async def execute(self, contract_request_id: UUID) -> Contract:
         """Execute the use case.
@@ -71,7 +73,8 @@ class GenerateDraftUseCase:
         # Build template context
         tp = await self._tp_repo.get_by_id(cr.third_party_id) if cr.third_party_id else None
         articles = await self._article_repo.get_active()
-        template_context = self._build_context(cr, tp, articles)
+        company = await self._load_company(cr)
+        template_context = self._build_context(cr, tp, articles, company)
 
         # Generate PDF
         pdf_content = await self._generator.generate_draft(template_context)
@@ -105,20 +108,93 @@ class GenerateDraftUseCase:
         )
         return saved_contract
 
-    def _build_context(self, cr, tp, articles: list) -> dict:
+    async def _load_company(self, cr):
+        """Load the issuing company from DB, or return None to use settings fallback."""
+        if not self._db:
+            return None
+        company_id = None
+        if cr.contract_config and isinstance(cr.contract_config, dict):
+            raw = cr.contract_config.get("company_id")
+            if raw:
+                from uuid import UUID as _UUID
+                try:
+                    company_id = _UUID(str(raw))
+                except (ValueError, AttributeError):
+                    pass
+        if not company_id:
+            # Fall back to default company
+            from sqlalchemy import select as _select
+            from app.contract_management.infrastructure.models import ContractCompanyModel
+            result = await self._db.execute(
+                _select(ContractCompanyModel)
+                .where(ContractCompanyModel.is_default.is_(True))
+                .where(ContractCompanyModel.is_active.is_(True))
+            )
+            return result.scalar_one_or_none()
+        from sqlalchemy import select as _select
+        from app.contract_management.infrastructure.models import ContractCompanyModel
+        result = await self._db.execute(
+            _select(ContractCompanyModel).where(ContractCompanyModel.id == company_id)
+        )
+        return result.scalar_one_or_none()
+
+    def _build_context(self, cr, tp, articles: list, company=None) -> dict:
         """Build template context from contract request and third party."""
+        # ── Issuing company info (from DB or settings fallback) ──
+        if company:
+            issuer_company_name = company.name
+            issuer_legal_form = company.legal_form
+            issuer_capital = company.capital
+            issuer_head_office = company.head_office
+            issuer_rcs_city = company.rcs_city
+            issuer_rcs_number = company.rcs_number
+            issuer_representative_is_entity = company.representative_is_entity
+            issuer_representative_name = company.representative_name
+            issuer_representative_quality = company.representative_quality
+            issuer_representative_sub_name = company.representative_sub_name or ""
+            issuer_representative_sub_quality = company.representative_sub_quality or ""
+            issuer_signatory_name = company.signatory_name
+            issuer_color_code = company.color_code
+        else:
+            # Legacy fallback: use settings
+            issuer_company_name = self._settings.GEMINI_COMPANY_NAME_CONTRACT
+            issuer_legal_form = self._settings.GEMINI_LEGAL_FORM
+            issuer_capital = self._settings.GEMINI_CAPITAL
+            issuer_head_office = self._settings.GEMINI_HEAD_OFFICE
+            issuer_rcs_city = self._settings.GEMINI_RCS_CITY
+            issuer_rcs_number = self._settings.GEMINI_RCS_NUMBER
+            # Settings use the old "entity" style by default
+            issuer_representative_is_entity = True
+            issuer_representative_name = self._settings.GEMINI_REPRESENTATIVE_ENTITY
+            issuer_representative_quality = self._settings.GEMINI_REPRESENTATIVE_QUALITY
+            issuer_representative_sub_name = self._settings.GEMINI_REPRESENTATIVE_SUB
+            issuer_representative_sub_quality = ""
+            issuer_signatory_name = self._settings.GEMINI_SIGNATORY_NAME
+            issuer_color_code = "#4BBEA8"
+
         context = {
-            # Gemini company info
-            "gemini_company_name": self._settings.GEMINI_COMPANY_NAME_CONTRACT,
-            "gemini_legal_form": self._settings.GEMINI_LEGAL_FORM,
-            "gemini_capital": self._settings.GEMINI_CAPITAL,
-            "gemini_head_office": self._settings.GEMINI_HEAD_OFFICE,
-            "gemini_rcs_city": self._settings.GEMINI_RCS_CITY,
-            "gemini_rcs_number": self._settings.GEMINI_RCS_NUMBER,
-            "gemini_representative_entity": self._settings.GEMINI_REPRESENTATIVE_ENTITY,
-            "gemini_representative_quality": self._settings.GEMINI_REPRESENTATIVE_QUALITY,
-            "gemini_representative_sub": self._settings.GEMINI_REPRESENTATIVE_SUB,
-            "gemini_signatory_name": self._settings.GEMINI_SIGNATORY_NAME,
+            # Issuing company (new unified variables)
+            "issuer_company_name": issuer_company_name,
+            "issuer_legal_form": issuer_legal_form,
+            "issuer_capital": issuer_capital,
+            "issuer_head_office": issuer_head_office,
+            "issuer_rcs_city": issuer_rcs_city,
+            "issuer_rcs_number": issuer_rcs_number,
+            "issuer_representative_is_entity": issuer_representative_is_entity,
+            "issuer_representative_name": issuer_representative_name,
+            "issuer_representative_quality": issuer_representative_quality,
+            "issuer_representative_sub_name": issuer_representative_sub_name,
+            "issuer_representative_sub_quality": issuer_representative_sub_quality,
+            "issuer_signatory_name": issuer_signatory_name,
+            "issuer_color_code": issuer_color_code,
+            # Keep legacy aliases so existing article templates still work
+            "gemini_company_name": issuer_company_name,
+            "gemini_legal_form": issuer_legal_form,
+            "gemini_capital": issuer_capital,
+            "gemini_head_office": issuer_head_office,
+            "gemini_rcs_city": issuer_rcs_city,
+            "gemini_rcs_number": issuer_rcs_number,
+            "gemini_signatory_name": issuer_signatory_name,
             # Contract details
             "reference": cr.reference,
             "daily_rate": str(cr.daily_rate) if cr.daily_rate else "",
