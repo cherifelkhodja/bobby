@@ -237,23 +237,6 @@ export default function ContractDetail() {
     },
   });
 
-  const [blockReason, setBlockReason] = useState('');
-  const [showBlockForm, setShowBlockForm] = useState(false);
-
-  const blockComplianceMutation = useMutation({
-    mutationFn: () => contractsApi.blockCompliance(id!, blockReason),
-    onSuccess: () => {
-      toast.success('Conformité bloquée. Le fournisseur devra re-soumettre ses documents.');
-      setShowBlockForm(false);
-      setBlockReason('');
-      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
-      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
-    },
-    onError: (error) => {
-      toast.error(getErrorMessage(error));
-    },
-  });
-
   const configureMutation = useMutation({
     mutationFn: () => {
       return contractsApi.configure(id!, {
