@@ -888,6 +888,14 @@ export const DOCUMENT_STATUS_CONFIG: Record<DocumentStatus, { label: string; col
   expired: { label: 'Expiré', color: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' },
 };
 
+/** Returns the badge config for a document, distinguishing temporary validations. */
+export function getDocumentBadgeConfig(doc: Pick<VigilanceDocument, 'status' | 'is_unavailable'>): { label: string; color: string } {
+  if (doc.status === 'validated' && doc.is_unavailable) {
+    return { label: 'Validation temporaire', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' };
+  }
+  return DOCUMENT_STATUS_CONFIG[doc.status] ?? { label: doc.status, color: 'bg-gray-100 text-gray-600' };
+}
+
 // Portal
 export interface PortalInfo {
   third_party: {

@@ -26,7 +26,7 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
 import { getErrorMessage } from '../api/client';
-import { CONTRACT_STATUS_CONFIG } from '../types';
+import { CONTRACT_STATUS_CONFIG, getDocumentBadgeConfig } from '../types';
 import type { ContractRequestStatus } from '../types';
 
 const ACTION_CONFIG: Partial<
@@ -968,22 +968,7 @@ export default function ContractDetail() {
           </h3>
           <div className="space-y-2">
             {complianceDocs.documents.map((doc) => {
-              const statusColors: Record<string, string> = {
-                validated: 'text-green-600 bg-green-50 dark:bg-green-900/20',
-                rejected: 'text-red-600 bg-red-50 dark:bg-red-900/20',
-                received: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20',
-                requested: 'text-gray-500 bg-gray-50 dark:bg-gray-800',
-                expiring_soon: 'text-orange-600 bg-orange-50 dark:bg-orange-900/20',
-                expired: 'text-red-600 bg-red-50 dark:bg-red-900/20',
-              };
-              const statusLabels: Record<string, string> = {
-                validated: 'Validé',
-                rejected: 'Rejeté',
-                received: 'Reçu',
-                requested: 'En attente',
-                expiring_soon: 'Expire bientôt',
-                expired: 'Expiré',
-              };
+              const docBadge = getDocumentBadgeConfig(doc);
               const canTempValidate = doc.status === 'requested' && doc.is_unavailable;
               const isTempValidating = tempValidatingDocId === doc.id;
               return (
@@ -1000,8 +985,8 @@ export default function ContractDetail() {
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{doc.file_name}</p>
                       )}
                     </div>
-                    <span className={`ml-3 flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[doc.status] ?? statusColors.requested}`}>
-                      {statusLabels[doc.status] ?? doc.status}
+                    <span className={`ml-3 flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${docBadge.color}`}>
+                      {docBadge.label}
                     </span>
                   </div>
                   {doc.is_unavailable && doc.unavailability_reason && (

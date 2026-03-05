@@ -34,6 +34,7 @@ import { getErrorMessage } from '../api/client';
 import {
   COMPLIANCE_STATUS_CONFIG,
   DOCUMENT_STATUS_CONFIG,
+  getDocumentBadgeConfig,
 } from '../types';
 import type {
   ComplianceStatus,
@@ -195,10 +196,10 @@ function DocumentViewerModal({
             <div className="p-4 border-b border-gray-200 dark:border-gray-700">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Statut</p>
               {(() => {
-                const cfg = DOCUMENT_STATUS_CONFIG[doc.status as keyof typeof DOCUMENT_STATUS_CONFIG];
+                const cfg = getDocumentBadgeConfig(doc);
                 return (
-                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${cfg?.color ?? 'bg-gray-100 text-gray-600'}`}>
-                    {cfg?.label ?? doc.status}
+                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${cfg.color}`}>
+                    {cfg.label}
                   </span>
                 );
               })()}
@@ -408,7 +409,8 @@ function DocumentCard({
   isRejecting: boolean;
 }) {
   const [confirmTempValidate, setConfirmTempValidate] = useState(false);
-  const statusCfg = DOCUMENT_STATUS_CONFIG[doc.status as keyof typeof DOCUMENT_STATUS_CONFIG];
+  const statusCfg = getDocumentBadgeConfig(doc);
+  const isTempValidated = doc.status === 'validated' && doc.is_unavailable;
   const canValidate = doc.status === 'received';
   const canTempValidate = doc.status === 'requested';
   const hasFile = !!doc.s3_key;
@@ -418,7 +420,9 @@ function DocumentCard({
       {/* Top bar: type + status */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          {doc.status === 'validated' ? (
+          {isTempValidated ? (
+            <FileCheck className="h-5 w-5 text-amber-500 flex-shrink-0" />
+          ) : doc.status === 'validated' ? (
             <FileCheck className="h-5 w-5 text-green-500 flex-shrink-0" />
           ) : doc.status === 'rejected' || doc.status === 'expired' ? (
             <FileX className="h-5 w-5 text-red-500 flex-shrink-0" />
@@ -431,8 +435,8 @@ function DocumentCard({
             {doc.document_type_display}
           </span>
         </div>
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusCfg?.color ?? 'bg-gray-100 text-gray-600'}`}>
-          {statusCfg?.label ?? doc.status}
+        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusCfg.color}`}>
+          {statusCfg.label}
         </span>
       </div>
 
