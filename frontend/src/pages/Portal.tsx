@@ -798,7 +798,7 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
           {isPortageSalarial ? (
             <div className="p-3 rounded-lg border-2 border-primary-500 bg-primary-50 dark:bg-primary-900/20">
               <p className="text-sm font-medium text-gray-900 dark:text-white">Société de portage salarial</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Votre structure est identifiée comme société de portage salarial</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Votre structure est une société de portage salarial</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
