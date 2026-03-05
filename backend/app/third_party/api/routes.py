@@ -4,6 +4,7 @@ from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy import text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db
@@ -780,76 +781,67 @@ async def save_company_info_draft(
     Unlike POST (which validates all required fields and creates document stubs),
     PATCH accepts any subset of fields and simply persists them so the tiers can
     resume filling the form later.
+    Uses a targeted SQL UPDATE to avoid loading/saving the full ORM entity.
     """
     result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
-    tp = result.third_party
-    tp_repo = ThirdPartyRepository(db)
+    third_party_id = result.third_party.id
 
-    if body.entity_category is not None:
-        tp.entity_category = body.entity_category
-    if body.company_name is not None:
-        tp.company_name = body.company_name
-    if body.legal_form is not None:
-        tp.legal_form = body.legal_form
-    if body.capital is not None:
-        tp.capital = body.capital
-    if body.siret is not None:
-        tp.siret = body.siret
-        if len(body.siret) >= 9:
-            tp.siren = body.siret[:9]
-    if body.head_office_street is not None:
-        tp.head_office_street = body.head_office_street
-    if body.head_office_postal_code is not None:
-        tp.head_office_postal_code = body.head_office_postal_code
-    if body.head_office_city is not None:
-        tp.head_office_city = body.head_office_city
-    if body.rcs_city is not None:
-        tp.rcs_city = body.rcs_city
-    if body.representative_title is not None:
-        tp.representative_title = body.representative_title
-    if body.representative_civility is not None:
-        tp.representative_civility = body.representative_civility
-    if body.representative_first_name is not None:
-        tp.representative_first_name = body.representative_first_name
-    if body.representative_last_name is not None:
-        tp.representative_last_name = body.representative_last_name
-    if body.representative_email is not None:
-        tp.representative_email = str(body.representative_email)
-    if body.representative_phone is not None:
-        tp.representative_phone = body.representative_phone
-    if body.signatory_civility is not None:
-        tp.signatory_civility = body.signatory_civility
-    if body.signatory_first_name is not None:
-        tp.signatory_first_name = body.signatory_first_name
-    if body.signatory_last_name is not None:
-        tp.signatory_last_name = body.signatory_last_name
-    if body.signatory_email is not None:
-        tp.signatory_email = str(body.signatory_email)
-    if body.signatory_phone is not None:
-        tp.signatory_phone = body.signatory_phone
-    if body.adv_contact_civility is not None:
-        tp.adv_contact_civility = body.adv_contact_civility
-    if body.adv_contact_first_name is not None:
-        tp.adv_contact_first_name = body.adv_contact_first_name
-    if body.adv_contact_last_name is not None:
-        tp.adv_contact_last_name = body.adv_contact_last_name
-    if body.adv_contact_email is not None:
-        tp.adv_contact_email = str(body.adv_contact_email)
-    if body.adv_contact_phone is not None:
-        tp.adv_contact_phone = body.adv_contact_phone
-    if body.billing_contact_civility is not None:
-        tp.billing_contact_civility = body.billing_contact_civility
-    if body.billing_contact_first_name is not None:
-        tp.billing_contact_first_name = body.billing_contact_first_name
-    if body.billing_contact_last_name is not None:
-        tp.billing_contact_last_name = body.billing_contact_last_name
-    if body.billing_contact_email is not None:
-        tp.billing_contact_email = str(body.billing_contact_email)
-    if body.billing_contact_phone is not None:
-        tp.billing_contact_phone = body.billing_contact_phone
+    # Build only the columns that were explicitly provided
+    updates: dict[str, object] = {}
 
-    await tp_repo.save(tp)
+    field_map = {
+        "entity_category": body.entity_category,
+        "company_name": body.company_name,
+        "legal_form": body.legal_form,
+        "capital": body.capital,
+        "siret": body.siret,
+        "head_office_street": body.head_office_street,
+        "head_office_postal_code": body.head_office_postal_code,
+        "head_office_city": body.head_office_city,
+        "rcs_city": body.rcs_city,
+        "representative_title": body.representative_title,
+        "representative_civility": body.representative_civility,
+        "representative_first_name": body.representative_first_name,
+        "representative_last_name": body.representative_last_name,
+        "representative_email": str(body.representative_email) if body.representative_email else None,
+        "representative_phone": body.representative_phone,
+        "signatory_civility": body.signatory_civility,
+        "signatory_first_name": body.signatory_first_name,
+        "signatory_last_name": body.signatory_last_name,
+        "signatory_email": str(body.signatory_email) if body.signatory_email else None,
+        "signatory_phone": body.signatory_phone,
+        "adv_contact_civility": body.adv_contact_civility,
+        "adv_contact_first_name": body.adv_contact_first_name,
+        "adv_contact_last_name": body.adv_contact_last_name,
+        "adv_contact_email": str(body.adv_contact_email) if body.adv_contact_email else None,
+        "adv_contact_phone": body.adv_contact_phone,
+        "billing_contact_civility": body.billing_contact_civility,
+        "billing_contact_first_name": body.billing_contact_first_name,
+        "billing_contact_last_name": body.billing_contact_last_name,
+        "billing_contact_email": str(body.billing_contact_email) if body.billing_contact_email else None,
+        "billing_contact_phone": body.billing_contact_phone,
+    }
 
+    for col, val in field_map.items():
+        if val is not None:
+            updates[col] = val
+
+    # Also derive siren from siret when provided
+    if body.siret and len(body.siret) >= 9:
+        updates["siren"] = body.siret[:9]
+
+    if not updates:
+        return {"message": "Rien à enregistrer."}
+
+    from app.third_party.infrastructure.models import ThirdPartyModel
+
+    await db.execute(
+        update(ThirdPartyModel)
+        .where(ThirdPartyModel.id == third_party_id)
+        .values(**updates)
+    )
+
+    logger.info("company_info_draft_saved", third_party_id=str(third_party_id), fields=list(updates.keys()))
     return {"message": "Brouillon enregistré."}
 
 
