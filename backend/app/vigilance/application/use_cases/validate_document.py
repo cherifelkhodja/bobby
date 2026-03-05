@@ -56,7 +56,8 @@ class ValidateDocumentUseCase:
 
         # Expiry: direct override > manual date > AI-extracted date > now
         if expires_at_override:
-            expires_at = expires_at_override
+            # Strip timezone: DB column is TIMESTAMP WITHOUT TIME ZONE
+            expires_at = expires_at_override.replace(tzinfo=None)
         elif document_date:
             expires_at = self._compute_expiration_from_date(document.document_type, document_date)
         elif document.document_date:
