@@ -1064,63 +1064,6 @@ function PortalLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className="px-6 py-8">{children}</main>
-      <style>{`
-        /* Phone input — single unified border */
-        .phone-input-container {
-          display: flex;
-          align-items: center;
-          border: 1px solid #d1d5db;
-          border-radius: 0.5rem;
-          background: white;
-          overflow: hidden;
-          transition: border-color 0.15s, box-shadow 0.15s;
-        }
-        .dark .phone-input-container {
-          border-color: #4b5563;
-          background: #374151;
-        }
-        .phone-input-container:focus-within {
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
-        }
-        .PhoneInputCountry {
-          display: flex;
-          align-items: center;
-          padding: 0 0.625rem;
-          height: 100%;
-          border: none;
-          border-right: 1px solid #e5e7eb;
-          background: #f9fafb;
-          gap: 0.375rem;
-        }
-        .dark .PhoneInputCountry {
-          border-right-color: #374151;
-          background: #1f2937;
-        }
-        .PhoneInputCountrySelect {
-          opacity: 0;
-          position: absolute;
-          width: 100%;
-          height: 100%;
-          cursor: pointer;
-        }
-        .PhoneInputInput {
-          flex: 1;
-          padding: 0.5rem 0.75rem;
-          border: none;
-          background: transparent;
-          color: #111827;
-          font-size: 0.875rem;
-          outline: none;
-          min-width: 0;
-        }
-        .dark .PhoneInputInput {
-          color: #f3f4f6;
-        }
-        .PhoneInputInput::placeholder {
-          color: #9ca3af;
-        }
-      `}</style>
     </div>
   );
 }
