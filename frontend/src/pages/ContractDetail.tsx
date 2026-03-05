@@ -237,18 +237,6 @@ export default function ContractDetail() {
     },
   });
 
-  const startComplianceReviewMutation = useMutation({
-    mutationFn: () => contractsApi.startComplianceReview(id!),
-    onSuccess: () => {
-      toast.success('Vérification de conformité démarrée.');
-      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
-      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
-    },
-    onError: (error) => {
-      toast.error(getErrorMessage(error));
-    },
-  });
-
   const [blockReason, setBlockReason] = useState('');
   const [showBlockForm, setShowBlockForm] = useState(false);
 
@@ -785,18 +773,6 @@ export default function ContractDetail() {
                 <Mail className="h-4 w-4 mr-2" />
                 Renvoyer le lien
               </Button>
-              {cr.status === 'collecting_documents' && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => startComplianceReviewMutation.mutate()}
-                  disabled={startComplianceReviewMutation.isPending}
-                  isLoading={startComplianceReviewMutation.isPending}
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Démarrer la vérification
-                </Button>
-              )}
             </div>
           </div>
         </Card>
