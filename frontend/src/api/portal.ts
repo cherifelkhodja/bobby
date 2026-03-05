@@ -69,7 +69,7 @@ export const portalApi = {
   submitCompanyInfo: async (
     token: string,
     data: {
-      entity_category: 'ei' | 'societe';
+      entity_category: 'ei' | 'societe' | 'portage_salarial';
       company_name: string;
       legal_form: string;
       capital?: string;
