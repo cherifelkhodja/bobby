@@ -978,9 +978,13 @@ export default function ContractDetail() {
             {complianceDocs.legal_form && (
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Forme juridique</p>
-                <p className="font-medium text-gray-900 dark:text-white">
-                  {complianceDocs.legal_form}{complianceDocs.capital ? ` · ${complianceDocs.capital}` : ''}
-                </p>
+                <p className="font-medium text-gray-900 dark:text-white">{complianceDocs.legal_form}</p>
+              </div>
+            )}
+            {complianceDocs.capital && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Capital</p>
+                <p className="font-medium text-gray-900 dark:text-white">{complianceDocs.capital} €</p>
               </div>
             )}
             {complianceDocs.siren && (
@@ -1011,30 +1015,78 @@ export default function ContractDetail() {
             )}
           </div>
 
-          {(complianceDocs.representative_name || complianceDocs.contact_email || cr.contractualization_contact_email) && (
-            <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4 grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
-              {complianceDocs.representative_name && (
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Représentant légal</p>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {complianceDocs.representative_title ? `${complianceDocs.representative_title} ` : ''}{complianceDocs.representative_name}
-                  </p>
+          {(() => {
+            const hasRepresentative = complianceDocs.representative_first_name || complianceDocs.representative_last_name || complianceDocs.representative_name;
+            const hasSignatory = complianceDocs.signatory_first_name || complianceDocs.signatory_last_name;
+            const hasAdv = complianceDocs.adv_contact_first_name || complianceDocs.adv_contact_last_name || complianceDocs.adv_contact_email;
+            const hasBilling = complianceDocs.billing_contact_first_name || complianceDocs.billing_contact_last_name || complianceDocs.billing_contact_email;
+            const hasContractContact = cr.contractualization_contact_email || complianceDocs.contact_email;
+            if (!hasRepresentative && !hasSignatory && !hasAdv && !hasBilling && !hasContractContact) return null;
+
+            const formatName = (civility: string | null, firstName: string | null, lastName: string | null) =>
+              [civility, firstName, lastName].filter(Boolean).join(' ') || null;
+
+            const ContactCard = ({ title, name, email, phone }: { title: string; name: string | null; email: string | null; phone: string | null }) => (
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 text-sm">
+                <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">{title}</p>
+                {name && <p className="font-medium text-gray-900 dark:text-white mb-1">{name}</p>}
+                {email && <p className="text-gray-600 dark:text-gray-400 text-xs">{email}</p>}
+                {phone && <p className="text-gray-500 dark:text-gray-500 text-xs">{phone}</p>}
+                {!name && !email && !phone && <p className="text-gray-400 dark:text-gray-600 text-xs italic">Non renseigné</p>}
+              </div>
+            );
+
+            return (
+              <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Contacts</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {hasRepresentative && (
+                    <ContactCard
+                      title="Représentant légal"
+                      name={
+                        formatName(complianceDocs.representative_civility, complianceDocs.representative_first_name, complianceDocs.representative_last_name)
+                        || (complianceDocs.representative_title ? `${complianceDocs.representative_title} ${complianceDocs.representative_name ?? ''}`.trim() : complianceDocs.representative_name)
+                      }
+                      email={complianceDocs.representative_email}
+                      phone={complianceDocs.representative_phone}
+                    />
+                  )}
+                  {hasSignatory && (
+                    <ContactCard
+                      title="Signataire"
+                      name={formatName(complianceDocs.signatory_civility, complianceDocs.signatory_first_name, complianceDocs.signatory_last_name)}
+                      email={complianceDocs.signatory_email}
+                      phone={complianceDocs.signatory_phone}
+                    />
+                  )}
+                  {hasAdv && (
+                    <ContactCard
+                      title="Contact ADV"
+                      name={formatName(complianceDocs.adv_contact_civility, complianceDocs.adv_contact_first_name, complianceDocs.adv_contact_last_name)}
+                      email={complianceDocs.adv_contact_email}
+                      phone={complianceDocs.adv_contact_phone}
+                    />
+                  )}
+                  {hasBilling && (
+                    <ContactCard
+                      title="Contact facturation"
+                      name={formatName(complianceDocs.billing_contact_civility, complianceDocs.billing_contact_first_name, complianceDocs.billing_contact_last_name)}
+                      email={complianceDocs.billing_contact_email}
+                      phone={complianceDocs.billing_contact_phone}
+                    />
+                  )}
+                  {hasContractContact && (
+                    <ContactCard
+                      title="Contact contractualisation"
+                      name={null}
+                      email={cr.contractualization_contact_email ?? complianceDocs.contact_email}
+                      phone={null}
+                    />
+                  )}
                 </div>
-              )}
-              {complianceDocs.contact_email && (
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Email de contact</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{complianceDocs.contact_email}</p>
-                </div>
-              )}
-              {cr.contractualization_contact_email && (
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Contact contractualisation</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{cr.contractualization_contact_email}</p>
-                </div>
-              )}
-            </div>
-          )}
+              </div>
+            );
+          })()}
         </Card>
       )}
 

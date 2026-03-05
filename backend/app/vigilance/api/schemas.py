@@ -66,6 +66,26 @@ class ThirdPartyWithDocumentsResponse(BaseModel):
     head_office_address: str | None = None
     representative_name: str | None = None
     representative_title: str | None = None
+    representative_civility: str | None = None
+    representative_first_name: str | None = None
+    representative_last_name: str | None = None
+    representative_email: str | None = None
+    representative_phone: str | None = None
+    signatory_civility: str | None = None
+    signatory_first_name: str | None = None
+    signatory_last_name: str | None = None
+    signatory_email: str | None = None
+    signatory_phone: str | None = None
+    adv_contact_civility: str | None = None
+    adv_contact_first_name: str | None = None
+    adv_contact_last_name: str | None = None
+    adv_contact_email: str | None = None
+    adv_contact_phone: str | None = None
+    billing_contact_civility: str | None = None
+    billing_contact_first_name: str | None = None
+    billing_contact_last_name: str | None = None
+    billing_contact_email: str | None = None
+    billing_contact_phone: str | None = None
     type: str
     entity_category: str | None = None
     compliance_status: str
