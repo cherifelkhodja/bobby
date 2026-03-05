@@ -47,6 +47,7 @@ class ContractRequest:
     commercial_validated_at: datetime | None = None
     compliance_override: bool = False
     compliance_override_reason: str | None = None
+    status_history: list[dict[str, Any]] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -65,8 +66,10 @@ class ContractRequest:
         """
         if not self.can_transition_to(target):
             raise InvalidContractStatusError(self.status.value, target.value)
+        now = datetime.utcnow()
+        self.status_history.append({"status": target.value, "entered_at": now.isoformat()})
         self.status = target
-        self.updated_at = datetime.utcnow()
+        self.updated_at = now
 
     def validate_commercial(
         self,

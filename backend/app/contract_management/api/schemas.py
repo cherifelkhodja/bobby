@@ -36,6 +36,7 @@ class ContractRequestResponse(BaseModel):
     portal_url: str | None = None
     compliance_override: bool
     contract_config: dict | None = None
+    status_history: list[dict] = []
     created_at: datetime
     updated_at: datetime
 

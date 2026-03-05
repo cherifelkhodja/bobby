@@ -79,6 +79,7 @@ class ContractRequestRepository:
             model.commercial_validated_at = request.commercial_validated_at
             model.compliance_override = request.compliance_override
             model.compliance_override_reason = request.compliance_override_reason
+            model.status_history = request.status_history
             model.updated_at = request.updated_at
         else:
             model = self._to_model(request)
@@ -193,6 +194,7 @@ class ContractRequestRepository:
             commercial_validated_at=model.commercial_validated_at,
             compliance_override=model.compliance_override,
             compliance_override_reason=model.compliance_override_reason,
+            status_history=model.status_history or [],
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -227,6 +229,7 @@ class ContractRequestRepository:
             commercial_validated_at=entity.commercial_validated_at,
             compliance_override=entity.compliance_override,
             compliance_override_reason=entity.compliance_override_reason,
+            status_history=entity.status_history,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
         )

@@ -47,6 +47,7 @@ class ContractRequestModel(Base):
     commercial_validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     compliance_override: Mapped[bool] = mapped_column(Boolean, default=False)
     compliance_override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status_history: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

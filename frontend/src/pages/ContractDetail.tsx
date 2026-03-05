@@ -1172,7 +1172,7 @@ export default function ContractDetail() {
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
           Informations
         </h3>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mb-4">
           <dt className="text-gray-500 dark:text-gray-400">Positionnement Boond</dt>
           <dd className="text-gray-900 dark:text-white">#{cr.boond_positioning_id}</dd>
           <dt className="text-gray-500 dark:text-gray-400">Conformité forcée</dt>
@@ -1184,6 +1184,35 @@ export default function ContractDetail() {
           <dt className="text-gray-500 dark:text-gray-400">Mis à jour le</dt>
           <dd className="text-gray-900 dark:text-white">{formatDate(cr.updated_at)}</dd>
         </dl>
+
+        {cr.status_history.length > 0 && (
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+              Historique des états
+            </p>
+            <ol className="relative border-l border-gray-200 dark:border-gray-700 space-y-3 ml-2">
+              {cr.status_history.map((entry, index) => {
+                const cfg = CONTRACT_STATUS_CONFIG[entry.status as ContractRequestStatus];
+                return (
+                  <li key={index} className="ml-4">
+                    <span className="absolute -left-1.5 mt-1 h-3 w-3 rounded-full border-2 border-white dark:border-gray-800 bg-gray-400 dark:bg-gray-500" />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cfg?.color ?? 'bg-gray-100 text-gray-700'}`}>
+                        {cfg?.label ?? entry.status}
+                      </span>
+                      <time className="text-xs text-gray-400 dark:text-gray-500">
+                        {new Date(entry.entered_at).toLocaleString('fr-FR', {
+                          day: 'numeric', month: 'short', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </time>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        )}
       </Card>
 
       {/* Cancel confirmation modal */}
