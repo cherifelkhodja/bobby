@@ -237,6 +237,35 @@ export default function ContractDetail() {
     },
   });
 
+  const startComplianceReviewMutation = useMutation({
+    mutationFn: () => contractsApi.startComplianceReview(id!),
+    onSuccess: () => {
+      toast.success('Vérification de conformité démarrée.');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  const [blockReason, setBlockReason] = useState('');
+  const [showBlockForm, setShowBlockForm] = useState(false);
+
+  const blockComplianceMutation = useMutation({
+    mutationFn: () => contractsApi.blockCompliance(id!, blockReason),
+    onSuccess: () => {
+      toast.success('Conformité bloquée. Le fournisseur devra re-soumettre ses documents.');
+      setShowBlockForm(false);
+      setBlockReason('');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
   const configureMutation = useMutation({
     mutationFn: () => {
       return contractsApi.configure(id!, {
@@ -296,6 +325,8 @@ export default function ContractDetail() {
 
   const showConfigForm = isAdv && (
     cr?.status === 'collecting_documents' ||
+    cr?.status === 'reviewing_compliance' ||
+    cr?.status === 'compliance_blocked' ||
     cr?.status === 'commercial_validated' ||
     cr?.status === 'partner_requested_changes'
   );
@@ -755,6 +786,94 @@ export default function ContractDetail() {
                 <Mail className="h-4 w-4 mr-2" />
                 Renvoyer le lien
               </Button>
+              {cr.status === 'collecting_documents' && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => startComplianceReviewMutation.mutate()}
+                  disabled={startComplianceReviewMutation.isPending}
+                  isLoading={startComplianceReviewMutation.isPending}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Démarrer la vérification
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Reviewing compliance — ADV banner with block option */}
+      {isAdv && cr.status === 'reviewing_compliance' && (
+        <Card className="mb-6 border-amber-200 dark:border-amber-800">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Documents reçus — en cours de vérification conformité
+              </h3>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                Vérifiez les documents du tiers ci-dessous. Si tout est conforme, configurez le contrat via le formulaire.
+                Si des documents sont manquants ou incorrects, bloquez la conformité.
+              </p>
+              {!showBlockForm ? (
+                <div className="flex items-center gap-2 mt-3">
+                  {cr.portal_url && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(cr.portal_url!);
+                        setLinkCopied(true);
+                        setTimeout(() => setLinkCopied(false), 2000);
+                      }}
+                    >
+                      {linkCopied ? (
+                        <Check className="h-4 w-4 mr-2 text-green-500" />
+                      ) : (
+                        <Copy className="h-4 w-4 mr-2" />
+                      )}
+                      {linkCopied ? 'Copié !' : 'Copier le lien portail'}
+                    </Button>
+                  )}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowBlockForm(true)}
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    Bloquer la conformité
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  <textarea
+                    value={blockReason}
+                    onChange={(e) => setBlockReason(e.target.value)}
+                    placeholder="Raison du blocage (documents manquants, expirés…)"
+                    rows={2}
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => blockComplianceMutation.mutate()}
+                      disabled={!blockReason.trim() || blockComplianceMutation.isPending}
+                      isLoading={blockComplianceMutation.isPending}
+                    >
+                      Confirmer le blocage
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => { setShowBlockForm(false); setBlockReason(''); }}
+                    >
+                      Annuler
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </Card>

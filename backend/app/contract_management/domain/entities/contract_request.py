@@ -96,14 +96,37 @@ class ContractRequest:
         """Redirect to PayFit for salarié type."""
         self.transition_to(ContractRequestStatus.REDIRECTED_PAYFIT)
 
+    def start_compliance_review(self) -> None:
+        """Mark contract as under compliance review by ADV.
+
+        Transitions from COLLECTING_DOCUMENTS to REVIEWING_COMPLIANCE.
+        """
+        self.transition_to(ContractRequestStatus.REVIEWING_COMPLIANCE)
+
+    def block_compliance(self, reason: str | None = None) -> None:
+        """Block compliance due to non-conformant documents.
+
+        Transitions from REVIEWING_COMPLIANCE to COMPLIANCE_BLOCKED.
+
+        Args:
+            reason: Optional explanation of what is blocking compliance.
+        """
+        if reason:
+            self.compliance_override_reason = reason
+        self.transition_to(ContractRequestStatus.COMPLIANCE_BLOCKED)
+
     def set_contract_config(self, config: dict[str, Any]) -> None:
         """Set contract configuration and transition to configuring.
+
+        Idempotent: if already in CONFIGURING_CONTRACT, updates config in place.
 
         Args:
             config: Contract configuration dictionary.
         """
         self.contract_config = config
-        self.transition_to(ContractRequestStatus.CONFIGURING_CONTRACT)
+        if self.status != ContractRequestStatus.CONFIGURING_CONTRACT:
+            self.transition_to(ContractRequestStatus.CONFIGURING_CONTRACT)
+        self.updated_at = datetime.utcnow()
 
     def override_compliance(self, reason: str) -> None:
         """Override compliance check with a reason.

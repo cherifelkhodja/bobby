@@ -711,6 +711,7 @@ export type ContractRequestStatus =
   | 'pending_commercial_validation'
   | 'commercial_validated'
   | 'collecting_documents'
+  | 'reviewing_compliance'
   | 'compliance_blocked'
   | 'configuring_contract'
   | 'draft_generated'
@@ -727,6 +728,7 @@ export const CONTRACT_STATUS_CONFIG: Record<ContractRequestStatus, { label: stri
   pending_commercial_validation: { label: 'Attente validation', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300', group: 'active' },
   commercial_validated: { label: 'Validé', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300', group: 'active' },
   collecting_documents: { label: 'Collecte documents', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300', group: 'active' },
+  reviewing_compliance: { label: 'En vérification', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300', group: 'active' },
   compliance_blocked: { label: 'Bloqué conformité', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300', group: 'blocked' },
   configuring_contract: { label: 'Configuration', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300', group: 'active' },
   draft_generated: { label: 'Brouillon généré', color: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300', group: 'active' },

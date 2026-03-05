@@ -73,6 +73,7 @@ class InitiateDocumentCollectionUseCase:
         {
             ContractRequestStatus.COMMERCIAL_VALIDATED,
             ContractRequestStatus.COLLECTING_DOCUMENTS,
+            ContractRequestStatus.REVIEWING_COMPLIANCE,
             ContractRequestStatus.COMPLIANCE_BLOCKED,
         }
     )
@@ -110,7 +111,7 @@ class InitiateDocumentCollectionUseCase:
         if cr.status not in self.ALLOWED_STATUSES:
             raise InvalidContractStatusError(
                 cr.status.value,
-                "commercial_validated / collecting_documents / compliance_blocked",
+                "commercial_validated / collecting_documents / reviewing_compliance / compliance_blocked",
             )
 
         contact_email = cr.contractualization_contact_email
@@ -161,7 +162,9 @@ class InitiateDocumentCollectionUseCase:
         )
 
         # Transition to COLLECTING_DOCUMENTS if not already there
-        if cr.status != ContractRequestStatus.COLLECTING_DOCUMENTS:
+        if cr.status not in (
+            ContractRequestStatus.COLLECTING_DOCUMENTS,
+        ):
             cr.transition_to(ContractRequestStatus.COLLECTING_DOCUMENTS)
 
         saved = await self._cr_repo.save(cr)

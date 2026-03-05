@@ -161,6 +161,40 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-05 (machine à états contractualisation — ajout reviewing_compliance)
+
+#### Nouvel état `reviewing_compliance` dans le workflow contrat
+
+- **feat(contract_management)**: Ajout du statut `reviewing_compliance` entre `collecting_documents` et la décision de conformité ADV
+  - **Machine à états** : `collecting_documents` → `reviewing_compliance` → `configuring_contract` | `compliance_blocked`
+  - **Auto-transition** : quand le fournisseur clique "Valider le dépôt" sur le portail → `reviewing_compliance` (était `configuring_contract`)
+  - **Transition manuelle** : `POST /contract-requests/{id}/start-compliance-review` (ADV)
+  - **Blocage conformité** : nouveau `POST /contract-requests/{id}/block-compliance` (depuis `reviewing_compliance`)
+- **feat(domain)**: Nouvelles méthodes entité `start_compliance_review()` et `block_compliance(reason)`
+- **feat(domain)**: `set_contract_config()` rendu idempotent (si déjà en `configuring_contract`, met à jour la config sans re-transitionner)
+- **feat(use_cases)**: `StartComplianceReviewUseCase`, `BlockComplianceUseCase`
+- **feat(api)**: Endpoints `start-compliance-review` et `block-compliance` dans routes contract_management
+- **feat(frontend)**: Nouveau badge amber "En vérification", bannière ADV avec bouton "Bloquer la conformité" + form raison
+- **feat(frontend)**: Bouton "Démarrer la vérification" dans la bannière `collecting_documents` (ADV uniquement)
+- **feat(frontend)**: `showConfigForm` étendu à `reviewing_compliance` et `compliance_blocked`
+- **feat(api)**: Contrat API client `startComplianceReview`, `blockCompliance`
+- **migration**: `039_add_reviewing_compliance_status` (VARCHAR, pas d'enum DB — no-op upgrade, downgrade rollback)
+
+**Flux mis à jour** :
+```
+pending_commercial_validation
+  ↓ commercial valide
+commercial_validated
+  ↓ ADV envoie magic link
+collecting_documents        ← ADV peut démarrer la vérification manuellement
+  ↓ fournisseur soumet (auto) ou ADV déclenche manuellement
+reviewing_compliance        ← ADV vérifie les documents
+  ↓ conforme (configure)    ↓ non conforme (block-compliance)
+configuring_contract      compliance_blocked
+  ↓ génère DOCX               ↓ re-envoi magic link
+draft_generated           collecting_documents
+```
+
 ### 2026-03-05 (génération contrat AT — HTML → PDF WeasyPrint)
 
 #### Remplacement DOCX par HTML → PDF (WeasyPrint)

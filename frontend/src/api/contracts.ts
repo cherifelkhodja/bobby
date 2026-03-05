@@ -135,6 +135,21 @@ export const contractsApi = {
     return response.data;
   },
 
+  startComplianceReview: async (id: string): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      `/contract-requests/${id}/start-compliance-review`,
+    );
+    return response.data;
+  },
+
+  blockCompliance: async (id: string, reason: string): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      `/contract-requests/${id}/block-compliance`,
+      { reason },
+    );
+    return response.data;
+  },
+
   listContracts: async (id: string): Promise<Contract[]> => {
     const response = await apiClient.get<Contract[]>(
       `/contract-requests/${id}/contracts`,

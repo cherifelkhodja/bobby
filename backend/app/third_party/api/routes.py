@@ -474,7 +474,7 @@ async def submit_portal_documents(
             error=str(exc),
         )
 
-    # Transition contract request from COLLECTING_DOCUMENTS → CONFIGURING_CONTRACT (best-effort)
+    # Transition contract request from COLLECTING_DOCUMENTS → REVIEWING_COMPLIANCE (best-effort)
     if result.contract_request_id:
         try:
             from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
@@ -487,7 +487,7 @@ async def submit_portal_documents(
             cr_repo = ContractRequestRepository(db)
             cr = await cr_repo.get_by_id(result.contract_request_id)
             if cr and cr.status == ContractRequestStatus.COLLECTING_DOCUMENTS:
-                cr.transition_to(ContractRequestStatus.CONFIGURING_CONTRACT)
+                cr.transition_to(ContractRequestStatus.REVIEWING_COMPLIANCE)
                 await cr_repo.save(cr)
         except Exception as exc:
             logger.warning(

@@ -9,6 +9,7 @@ class ContractRequestStatus(str, Enum):
     PENDING_COMMERCIAL_VALIDATION = "pending_commercial_validation"
     COMMERCIAL_VALIDATED = "commercial_validated"
     COLLECTING_DOCUMENTS = "collecting_documents"
+    REVIEWING_COMPLIANCE = "reviewing_compliance"
     COMPLIANCE_BLOCKED = "compliance_blocked"
     CONFIGURING_CONTRACT = "configuring_contract"
     DRAFT_GENERATED = "draft_generated"
@@ -41,8 +42,15 @@ class ContractRequestStatus(str, Enum):
             ),
             ContractRequestStatus.COLLECTING_DOCUMENTS: frozenset(
                 {
+                    ContractRequestStatus.REVIEWING_COMPLIANCE,
+                    ContractRequestStatus.CANCELLED,
+                }
+            ),
+            ContractRequestStatus.REVIEWING_COMPLIANCE: frozenset(
+                {
                     ContractRequestStatus.CONFIGURING_CONTRACT,
                     ContractRequestStatus.COMPLIANCE_BLOCKED,
+                    ContractRequestStatus.COLLECTING_DOCUMENTS,
                     ContractRequestStatus.CANCELLED,
                 }
             ),
@@ -113,6 +121,7 @@ class ContractRequestStatus(str, Enum):
             "pending_commercial_validation": "En attente validation commerciale",
             "commercial_validated": "Validé par le commercial",
             "collecting_documents": "Collecte de documents",
+            "reviewing_compliance": "En vérification conformité",
             "compliance_blocked": "Bloqué (conformité)",
             "configuring_contract": "Configuration du contrat",
             "draft_generated": "Brouillon généré",

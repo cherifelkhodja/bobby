@@ -16,8 +16,14 @@ from app.contract_management.api.schemas import (
     ContractRequestResponse,
     ContractResponse,
 )
+from app.contract_management.application.use_cases.block_compliance import (
+    BlockComplianceUseCase,
+)
 from app.contract_management.application.use_cases.configure_contract import (
     ConfigureContractUseCase,
+)
+from app.contract_management.application.use_cases.start_compliance_review import (
+    StartComplianceReviewUseCase,
 )
 from app.contract_management.application.use_cases.validate_commercial import (
     ValidateCommercialCommand,
@@ -465,11 +471,11 @@ async def resend_collection_email(
     if not cr:
         raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
 
-    allowed = {CRStatus.COLLECTING_DOCUMENTS, CRStatus.COMPLIANCE_BLOCKED}
+    allowed = {CRStatus.COLLECTING_DOCUMENTS, CRStatus.REVIEWING_COMPLIANCE, CRStatus.COMPLIANCE_BLOCKED}
     if cr.status not in allowed:
         raise HTTPException(
             status_code=400,
-            detail="Le renvoi du lien n'est possible qu'en cours de collecte ou en conformité bloquée.",
+            detail="Le renvoi du lien n'est possible qu'en cours de collecte, vérification ou en conformité bloquée.",
         )
 
     if not cr.third_party_id or not cr.contractualization_contact_email:
@@ -571,6 +577,76 @@ async def compliance_override(
 
     name = await _resolve_commercial_name(db, saved.commercial_email)
     return _cr_to_response(saved, commercial_name=name)
+
+
+@router.post(
+    "/{contract_request_id}/start-compliance-review",
+    response_model=ContractRequestResponse,
+    summary="Start compliance review",
+)
+async def start_compliance_review(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually transition to REVIEWING_COMPLIANCE. ADV/admin only.
+
+    Used when ADV wants to start reviewing documents without waiting for
+    the third party to click 'Valider le dépôt' on the portal.
+    """
+    cr_repo = ContractRequestRepository(db)
+    use_case = StartComplianceReviewUseCase(contract_request_repository=cr_repo)
+
+    try:
+        cr = await use_case.execute(contract_request_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    audit_logger.log(
+        AuditAction.COMPLIANCE_OVERRIDDEN,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(contract_request_id),
+        details={"action": "start_compliance_review"},
+    )
+
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
+
+
+@router.post(
+    "/{contract_request_id}/block-compliance",
+    response_model=ContractRequestResponse,
+    summary="Block compliance",
+)
+async def block_compliance(
+    contract_request_id: UUID,
+    body: ComplianceOverrideRequest,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Transition from REVIEWING_COMPLIANCE to COMPLIANCE_BLOCKED. ADV/admin only.
+
+    Called when documents are deemed non-conformant after review.
+    """
+    cr_repo = ContractRequestRepository(db)
+    use_case = BlockComplianceUseCase(contract_request_repository=cr_repo)
+
+    try:
+        cr = await use_case.execute(contract_request_id, body.reason)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    audit_logger.log(
+        AuditAction.COMPLIANCE_OVERRIDDEN,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(contract_request_id),
+        details={"action": "block_compliance", "reason": body.reason},
+    )
+
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
 
 
 @router.delete(
