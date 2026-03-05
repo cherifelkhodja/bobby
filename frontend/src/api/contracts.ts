@@ -156,6 +156,14 @@ export const contractsApi = {
     );
     return response.data;
   },
+
+  getContractDownloadUrl: async (contractRequestId: string, contractId: string, which: 'draft' | 'signed' = 'draft'): Promise<string> => {
+    const response = await apiClient.get<{ url: string }>(
+      `/contract-requests/${contractRequestId}/contracts/${contractId}/download`,
+      { params: { which } },
+    );
+    return response.data.url;
+  },
 };
 
 export interface ArticleTemplate {

@@ -1051,3 +1051,41 @@ async def list_contracts(
             signed_at=contract.signed_at,
         )
     ]
+
+
+@router.get(
+    "/{contract_request_id}/contracts/{contract_id}/download",
+    summary="Get presigned download URL for a contract document",
+)
+async def download_contract(
+    contract_request_id: UUID,
+    contract_id: UUID,
+    auth: ContractAccessUser,
+    which: str = "draft",
+    db: AsyncSession = Depends(get_db),
+):
+    """Return a presigned S3 URL to download a contract draft or signed PDF."""
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        ContractRepository,
+    )
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    _user_id, role, email = auth
+    settings = get_settings()
+
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+    if role == "commercial" and cr.commercial_email != email:
+        raise HTTPException(status_code=403, detail="Accès non autorisé.")
+
+    contract_repo = ContractRepository(db)
+    contract = await contract_repo.get_by_id(contract_id)
+    if not contract or contract.contract_request_id != contract_request_id:
+        raise HTTPException(status_code=404, detail="Document contractuel non trouvé.")
+
+    s3_key = contract.s3_key_signed if (which == "signed" and contract.s3_key_signed) else contract.s3_key_draft
+    s3 = S3StorageClient(settings)
+    url = await s3.get_presigned_url(s3_key, expires_in=600)
+    return {"url": url}

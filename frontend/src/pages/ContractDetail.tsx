@@ -15,6 +15,7 @@ import {
   Check,
   Settings,
   Clock,
+  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -299,6 +300,7 @@ export default function ContractDetail() {
     cr?.status === 'reviewing_compliance' ||
     cr?.status === 'compliance_blocked' ||
     cr?.status === 'configuring_contract' ||
+    cr?.status === 'draft_generated' ||
     cr?.status === 'partner_requested_changes'
   );
 
@@ -1197,6 +1199,22 @@ export default function ContractDetail() {
                       YouSign: {c.yousign_status}
                     </span>
                   )}
+                  <button
+                    onClick={async () => {
+                      try {
+                        const which = c.signed_at && c.s3_key_signed ? 'signed' : 'draft';
+                        const url = await contractsApi.getContractDownloadUrl(cr.id, c.id, which);
+                        window.open(url, '_blank');
+                      } catch {
+                        toast.error('Impossible de générer le lien de téléchargement.');
+                      }
+                    }}
+                    className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 transition-colors"
+                    title="Télécharger"
+                  >
+                    <Download className="h-4 w-4" />
+                    Télécharger
+                  </button>
                 </div>
               </div>
             ))}
