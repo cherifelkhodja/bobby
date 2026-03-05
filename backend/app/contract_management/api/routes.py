@@ -539,7 +539,7 @@ async def configure_contract(
     use_case = ConfigureContractUseCase(contract_request_repository=cr_repo)
 
     try:
-        cr = await use_case.execute(contract_request_id, body.model_dump())
+        cr = await use_case.execute(contract_request_id, body.model_dump(mode='json'))
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
