@@ -8,8 +8,8 @@ Create Date: 2026-03-05
 import sqlalchemy as sa
 from alembic import op
 
-revision = "035"
-down_revision = "034"
+revision = "035_add_entity_category"
+down_revision = "034_contract_articles"
 branch_labels = None
 depends_on = None
 
