@@ -979,6 +979,82 @@ export default function ContractDetail() {
         </Card>
       )}
 
+      {/* Third-party company info */}
+      {isAdv && complianceDocs && (
+        <Card className="mb-6">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
+            Informations société
+          </h3>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+            {complianceDocs.company_name && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Raison sociale</p>
+                <p className="font-medium text-gray-900 dark:text-white">{complianceDocs.company_name}</p>
+              </div>
+            )}
+            {complianceDocs.legal_form && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Forme juridique</p>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {complianceDocs.legal_form}{complianceDocs.capital ? ` · ${complianceDocs.capital}` : ''}
+                </p>
+              </div>
+            )}
+            {complianceDocs.siren && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">SIREN</p>
+                <p className="font-medium text-gray-900 dark:text-white">{complianceDocs.siren}</p>
+              </div>
+            )}
+            {complianceDocs.siret && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">SIRET</p>
+                <p className="font-medium text-gray-900 dark:text-white">{complianceDocs.siret}</p>
+              </div>
+            )}
+            {(complianceDocs.rcs_city || complianceDocs.rcs_number) && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">RCS</p>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {[complianceDocs.rcs_city, complianceDocs.rcs_number].filter(Boolean).join(' ')}
+                </p>
+              </div>
+            )}
+            {complianceDocs.head_office_address && (
+              <div className="col-span-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Siège social</p>
+                <p className="font-medium text-gray-900 dark:text-white">{complianceDocs.head_office_address}</p>
+              </div>
+            )}
+          </div>
+
+          {(complianceDocs.representative_name || complianceDocs.contact_email || cr.contractualization_contact_email) && (
+            <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4 grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+              {complianceDocs.representative_name && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Représentant légal</p>
+                  <p className="font-medium text-gray-900 dark:text-white">
+                    {complianceDocs.representative_title ? `${complianceDocs.representative_title} ` : ''}{complianceDocs.representative_name}
+                  </p>
+                </div>
+              )}
+              {complianceDocs.contact_email && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Email de contact</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{complianceDocs.contact_email}</p>
+                </div>
+              )}
+              {cr.contractualization_contact_email && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Contact contractualisation</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{cr.contractualization_contact_email}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
+
       {/* Compliance documents */}
       {isAdv && complianceDocs && complianceDocs.documents.length > 0 && (
         <Card className="mb-6">

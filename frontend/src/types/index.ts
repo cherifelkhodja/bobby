@@ -853,7 +853,15 @@ export interface ThirdPartyListResponse {
 export interface ThirdPartyWithDocuments {
   id: string;
   company_name: string;
+  legal_form: string | null;
+  capital: string | null;
   siren: string;
+  siret: string | null;
+  rcs_city: string | null;
+  rcs_number: string | null;
+  head_office_address: string | null;
+  representative_name: string | null;
+  representative_title: string | null;
   type: string;
   entity_category: string | null;
   compliance_status: string;

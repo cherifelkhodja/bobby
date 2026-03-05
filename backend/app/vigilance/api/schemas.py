@@ -57,7 +57,15 @@ class ThirdPartyWithDocumentsResponse(BaseModel):
 
     id: UUID
     company_name: str | None = None
+    legal_form: str | None = None
+    capital: str | None = None
     siren: str | None = None
+    siret: str | None = None
+    rcs_city: str | None = None
+    rcs_number: str | None = None
+    head_office_address: str | None = None
+    representative_name: str | None = None
+    representative_title: str | None = None
     type: str
     entity_category: str | None = None
     compliance_status: str
