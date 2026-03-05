@@ -105,9 +105,13 @@ class Settings(BaseSettings):
 
     # Bobby Portal
     BOBBY_BASE_URL: str = "https://bobby.geminiconsulting.fr"
-    BOBBY_PORTAL_BASE_URL: str = "https://bobby.geminiconsulting.fr/portal"
     MAGIC_LINK_EXPIRY_DAYS: int = 7
     MAGIC_LINK_SECRET_KEY: str = ""
+
+    @property
+    def BOBBY_PORTAL_BASE_URL(self) -> str:  # type: ignore[override]
+        """Portal base URL derived from FRONTEND_URL."""
+        return f"{self.frontend_url}/portal"
 
     # Gemini company info (pour contrats)
     GEMINI_COMPANY_NAME_CONTRACT: str = "GEMINI"
