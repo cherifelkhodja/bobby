@@ -49,6 +49,28 @@ logger = structlog.get_logger()
 router = APIRouter(tags=["Contract Management"])
 
 
+async def _notify_commercial(
+    email_service,
+    *,
+    to: str,
+    ref: str,
+    title: str,
+    msg: str,
+    color: str = "#0ea5e9",
+) -> None:
+    """Fire-and-forget contract progress notification to the commercial."""
+    try:
+        await email_service.send_contract_progress_to_commercial(
+            to=to,
+            contract_ref=ref,
+            step_title=title,
+            step_message=msg,
+            step_color=color,
+        )
+    except Exception as exc:
+        logger.warning("commercial_notification_failed", error=str(exc), to=to)
+
+
 async def _resolve_commercial_name(db: AsyncSession, email: str) -> str | None:
     """Resolve a commercial email to full name from users table."""
     from sqlalchemy import select
@@ -388,6 +410,25 @@ async def validate_commercial(
         resource_id=str(contract_request_id),
     )
 
+    client_label = f" pour <strong>{cr.client_name}</strong>" if cr.client_name else ""
+    if cr.status == ContractRequestStatus.COLLECTING_DOCUMENTS:
+        await _notify_commercial(
+            email_service,
+            to=cr.commercial_email,
+            ref=cr.reference,
+            title="Collecte de documents lancée",
+            msg=f"Votre validation commerciale a été enregistrée{client_label}. Le tiers a été contacté pour fournir ses documents légaux.",
+        )
+    elif cr.status == ContractRequestStatus.REDIRECTED_PAYFIT:
+        await _notify_commercial(
+            email_service,
+            to=cr.commercial_email,
+            ref=cr.reference,
+            title="Dossier redirigé vers PayFit",
+            msg=f"Ce consultant étant salarié{client_label}, la contractualisation sera gérée via PayFit.",
+            color="#f59e0b",
+        )
+
     name = await _resolve_commercial_name(db, cr.commercial_email)
     return _cr_to_response(cr, commercial_name=name)
 
@@ -550,6 +591,7 @@ async def cancel_contract_request(
         BoondCrmAdapter,
     )
     from app.infrastructure.boond.client import BoondClient
+    from app.infrastructure.email.sender import EmailService
 
     settings = get_settings()
     cr_repo = ContractRequestRepository(db)
@@ -613,6 +655,16 @@ async def cancel_contract_request(
         reference=saved.reference,
         boond_state=boond_state,
         webhook_events_cleared=deleted,
+    )
+
+    client_label = f" pour <strong>{saved.client_name}</strong>" if saved.client_name else ""
+    await _notify_commercial(
+        EmailService(settings),
+        to=saved.commercial_email,
+        ref=saved.reference,
+        title="Demande de contrat annulée",
+        msg=f"La demande de contrat{client_label} a été annulée (statut précédent : {previous_status}).",
+        color="#ef4444",
     )
 
     name = await _resolve_commercial_name(db, saved.commercial_email)
@@ -749,6 +801,15 @@ async def send_draft_to_partner(
         logger.error("send_draft_to_partner_failed", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
 
+    client_label = f" pour <strong>{cr.client_name}</strong>" if cr.client_name else ""
+    await _notify_commercial(
+        email_service,
+        to=cr.commercial_email,
+        ref=cr.reference,
+        title="Projet de contrat envoyé au partenaire",
+        msg=f"Le projet de contrat{client_label} a été transmis au partenaire pour relecture et validation.",
+    )
+
     name = await _resolve_commercial_name(db, cr.commercial_email)
     return _cr_to_response(cr, commercial_name=name)
 
@@ -771,6 +832,7 @@ async def send_for_signature(
         ContractRepository,
     )
     from app.contract_management.infrastructure.adapters.yousign_client import YouSignClient
+    from app.infrastructure.email.sender import EmailService
     from app.infrastructure.storage.s3_client import S3StorageClient
 
     settings = get_settings()
@@ -778,6 +840,7 @@ async def send_for_signature(
     contract_repo = ContractRepository(db)
     tp_repo = ThirdPartyRepository(db)
     s3_service = S3StorageClient(settings)
+    email_service = EmailService(settings)
     yousign = YouSignClient(
         api_key=settings.YOUSIGN_API_KEY,
         base_url=settings.YOUSIGN_API_BASE_URL,
@@ -797,6 +860,16 @@ async def send_for_signature(
     except Exception as exc:
         logger.error("send_for_signature_failed", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
+
+    client_label = f" pour <strong>{cr.client_name}</strong>" if cr.client_name else ""
+    await _notify_commercial(
+        email_service,
+        to=cr.commercial_email,
+        ref=cr.reference,
+        title="Contrat envoyé en signature électronique",
+        msg=f"Le contrat{client_label} a été transmis aux signataires via YouSign. Vous serez notifié dès qu'il sera signé.",
+        color="#8b5cf6",
+    )
 
     name = await _resolve_commercial_name(db, cr.commercial_email)
     return _cr_to_response(cr, commercial_name=name)
@@ -821,12 +894,14 @@ async def push_to_crm(
         ContractRepository,
     )
     from app.infrastructure.boond.client import BoondClient
+    from app.infrastructure.email.sender import EmailService
 
     settings = get_settings()
     cr_repo = ContractRequestRepository(db)
     contract_repo = ContractRepository(db)
     tp_repo = ThirdPartyRepository(db)
     crm_service = BoondCrmAdapter(BoondClient(settings))
+    email_service = EmailService(settings)
 
     use_case = PushToCrmUseCase(
         contract_request_repository=cr_repo,
@@ -840,6 +915,16 @@ async def push_to_crm(
     except Exception as exc:
         logger.error("push_to_crm_failed", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
+
+    client_label = f" pour <strong>{cr.client_name}</strong>" if cr.client_name else ""
+    await _notify_commercial(
+        email_service,
+        to=cr.commercial_email,
+        ref=cr.reference,
+        title="Contrat versé dans BoondManager",
+        msg=f"Le contrat{client_label} a été archivé et le bon de commande créé dans BoondManager.",
+        color="#10b981",
+    )
 
     name = await _resolve_commercial_name(db, cr.commercial_email)
     return _cr_to_response(cr, commercial_name=name)

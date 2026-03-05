@@ -55,6 +55,14 @@ class ProcessPartnerReviewUseCase:
         if approved:
             cr.transition_to(ContractRequestStatus.PARTNER_APPROVED)
             logger.info("partner_approved_contract", cr_id=str(cr.id))
+            client_label = f" pour <strong>{cr.client_name}</strong>" if cr.client_name else ""
+            await self._email_service.send_contract_progress_to_commercial(
+                to=cr.commercial_email,
+                contract_ref=cr.reference,
+                step_title="Partenaire a approuvé le contrat",
+                step_message=f"Le partenaire a validé le projet de contrat{client_label}. Le contrat peut maintenant être envoyé en signature.",
+                step_color="#10b981",
+            )
         else:
             cr.transition_to(ContractRequestStatus.PARTNER_REQUESTED_CHANGES)
 
@@ -64,13 +72,16 @@ class ProcessPartnerReviewUseCase:
                 contract.partner_comments = comments
                 await self._contract_repo.save(contract)
 
-            # Notify ADV
-            if comments:
-                await self._email_service.send_contract_changes_requested(
-                    to=cr.commercial_email,
-                    contract_ref=cr.reference,
-                    comments=comments,
-                )
+            # Notify commercial
+            await self._email_service.send_contract_progress_to_commercial(
+                to=cr.commercial_email,
+                contract_ref=cr.reference,
+                step_title="Partenaire demande des modifications",
+                step_message=f"Le partenaire a demandé des modifications sur le contrat"
+                f"{' pour <strong>' + cr.client_name + '</strong>' if cr.client_name else ''}."
+                f"{('<br><br><strong>Commentaires :</strong> ' + comments) if comments else ''}",
+                step_color="#f59e0b",
+            )
 
             logger.info(
                 "partner_requested_changes",

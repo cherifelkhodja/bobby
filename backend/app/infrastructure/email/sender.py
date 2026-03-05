@@ -639,6 +639,33 @@ class EmailService:
         """
         return await self._send_email(to, subject, html_body)
 
+    async def send_contract_progress_to_commercial(
+        self,
+        to: str,
+        contract_ref: str,
+        step_title: str,
+        step_message: str,
+        step_color: str = "#0ea5e9",
+    ) -> bool:
+        """Notify the commercial of a contract workflow progression step."""
+        subject = f"{step_title} — {contract_ref}"
+        html_body = f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="border-left: 4px solid {step_color}; padding-left: 15px; margin-bottom: 20px;">
+                    <h2 style="color: {step_color}; margin: 0 0 5px 0;">{step_title}</h2>
+                    <p style="color: #666; margin: 0;">Contrat <strong>{contract_ref}</strong></p>
+                </div>
+                <p>{step_message}</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby.</p>
+            </div>
+        </body></html>
+        """
+        return await self._send_email(to, subject, html_body)
+
     async def send_document_expired(
         self,
         to: str,
