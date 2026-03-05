@@ -1214,7 +1214,9 @@ function DocumentUploadCard({
   };
 
   const handleSaveReason = () => {
-    if (!unavailReason.trim()) { toast.error('Veuillez indiquer une raison.'); return; }
+    if (!unavailReason.trim()) return;
+    // Only call API if value differs from what's already on the server
+    if (unavailReason === doc.unavailability_reason) return;
     availabilityMutation.mutate({ isUnavail: true, reason: unavailReason });
   };
 
@@ -1399,33 +1401,24 @@ function DocumentUploadCard({
           </label>
 
           {unavailChecked && (
-            <div className="mt-2 ml-6 space-y-2">
+            <div className="mt-2 ml-6 space-y-1">
               <textarea
                 value={unavailReason}
                 onChange={(e) => setUnavailReason(e.target.value)}
+                onBlur={handleSaveReason}
                 placeholder="Précisez la raison (ex : document en cours d'obtention, non applicable à notre situation…)"
                 rows={3}
                 maxLength={500}
                 className="w-full text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
               />
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between min-h-[1.25rem]">
                 <span className="text-xs text-gray-400">{unavailReason.length}/500</span>
-                <Button
-                  size="sm"
-                  onClick={handleSaveReason}
-                  disabled={!unavailReason.trim() || availabilityMutation.isPending}
-                >
-                  {availabilityMutation.isPending ? (
-                    <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Enregistrement…</>
-                  ) : 'Enregistrer'}
-                </Button>
+                {availabilityMutation.isPending && (
+                  <span className="text-xs text-gray-400 flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Enregistrement…
+                  </span>
+                )}
               </div>
-              {/* Show saved reason from server */}
-              {doc.is_unavailable && doc.unavailability_reason && unavailReason === doc.unavailability_reason && (
-                <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                  <CheckCircle className="h-3 w-3" /> Raison enregistrée
-                </p>
-              )}
             </div>
           )}
         </div>
