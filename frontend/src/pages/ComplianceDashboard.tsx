@@ -33,7 +33,6 @@ import { PageSpinner } from '../components/ui/Spinner';
 import { getErrorMessage } from '../api/client';
 import {
   COMPLIANCE_STATUS_CONFIG,
-  DOCUMENT_STATUS_CONFIG,
   getDocumentBadgeConfig,
 } from '../types';
 import type {
