@@ -11,6 +11,7 @@ class PaymentTerms(str, Enum):
     NET_60 = "net_60"
     END_OF_MONTH_30 = "end_of_month_30"
     END_OF_MONTH_45 = "end_of_month_45"
+    NET_45_EOM = "net_45_eom"
 
     @property
     def display_text(self) -> str:
@@ -21,6 +22,7 @@ class PaymentTerms(str, Enum):
             "net_60": "60 jours nets",
             "end_of_month_30": "30 jours fin de mois",
             "end_of_month_45": "45 jours fin de mois",
+            "net_45_eom": "45 jours fin de mois",
         }
         return mapping.get(self.value, self.value)
 
@@ -31,6 +33,7 @@ class InvoiceSubmissionMethod(str, Enum):
     EMAIL = "email"
     PLATFORM = "platform"
     POSTAL = "postal"
+    BOONDMANAGER = "boondmanager"
 
     @property
     def display_text(self) -> str:
@@ -39,5 +42,6 @@ class InvoiceSubmissionMethod(str, Enum):
             "email": "par email",
             "platform": "via la plateforme de facturation",
             "postal": "par voie postale",
+            "boondmanager": "via BoondManager",
         }
         return mapping.get(self.value, self.value)
