@@ -155,7 +155,40 @@ class GenerateDraftUseCase:
         if cr.contract_config:
             context.update(cr.contract_config)
 
-        # Articles from DB (dynamically re-numbered)
-        context["articles"] = articles
+        # Resolve human-readable display values for payment config
+        from app.contract_management.domain.value_objects.payment_terms import (
+            InvoiceSubmissionMethod,
+            PaymentTerms,
+        )
+
+        payment_terms_raw = context.get("payment_terms", "net_30")
+        try:
+            context["payment_terms_display"] = PaymentTerms(payment_terms_raw).display_text
+        except ValueError:
+            context["payment_terms_display"] = payment_terms_raw
+
+        invoice_method_raw = context.get("invoice_submission_method", "email")
+        try:
+            context["invoice_submission_method_display"] = InvoiceSubmissionMethod(invoice_method_raw).display_text
+        except ValueError:
+            context["invoice_submission_method_display"] = invoice_method_raw
+
+        # Pre-render each article's content as a Jinja2 template so that
+        # article authors can embed variables (e.g. {{ payment_terms_display }})
+        from copy import copy
+        from dataclasses import replace as dc_replace
+
+        from jinja2 import BaseLoader, Environment
+
+        jinja_env = Environment(loader=BaseLoader(), autoescape=False)
+        rendered_articles = []
+        for article in articles:
+            try:
+                rendered_content = jinja_env.from_string(article.content).render(**context)
+            except Exception:
+                rendered_content = article.content
+            rendered_articles.append(dc_replace(article, content=rendered_content))
+
+        context["articles"] = rendered_articles
 
         return context
