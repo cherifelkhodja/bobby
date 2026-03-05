@@ -70,17 +70,10 @@ export function ContractArticlesTab() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Articles du contrat AT
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              Gérez les articles du contrat d'assistance technique. Les articles actifs apparaissent
-              dans le PDF généré, numérotés séquentiellement.
-            </p>
-          </div>
-        </CardHeader>
+        <CardHeader
+          title="Articles du contrat AT"
+          subtitle="Gérez les articles du contrat d'assistance technique. Les articles actifs apparaissent dans le PDF généré, numérotés séquentiellement."
+        />
       </Card>
 
       <div className="space-y-2">
@@ -116,7 +109,7 @@ export function ContractArticlesTab() {
               {/* Badges */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 {article.is_editable ? (
-                  <Badge variant="info">Modifiable</Badge>
+                  <Badge variant="primary">Modifiable</Badge>
                 ) : (
                   <Badge variant="default">Fixe</Badge>
                 )}
