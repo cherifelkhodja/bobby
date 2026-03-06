@@ -219,7 +219,6 @@ export const contractCompaniesApi = {
     const response = await apiClient.post<{ logo_s3_key: string }>(
       `/admin/contract-companies/${id}/logo`,
       form,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
     );
     return response.data;
   },

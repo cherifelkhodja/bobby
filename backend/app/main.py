@@ -26,6 +26,7 @@ from app.api.routes.v1 import (
     settings_router,
     users_router,
 )
+from app.api.routes.v1.admin_company_logo import router as admin_company_logo_router
 from app.config import settings
 from app.contract_management.api.routes import router as contract_routes_router
 from app.contract_management.api.webhook_routes import router as webhook_router
@@ -106,6 +107,7 @@ app.include_router(
     tags=["Published Opportunities"],
 )
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
+app.include_router(admin_company_logo_router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(hr_router, prefix="/api/v1/hr", tags=["HR"])
 app.include_router(
     public_applications_router, prefix="/api/v1/postuler", tags=["Public Applications"]
