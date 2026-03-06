@@ -191,7 +191,7 @@ export interface ContractCompany {
   updated_at: string;
 }
 
-export type ContractCompanyRequest = Omit<ContractCompany, 'id' | 'created_at' | 'updated_at'>;
+export type ContractCompanyRequest = Omit<ContractCompany, 'id' | 'created_at' | 'updated_at' | 'has_logo'>;
 
 export const contractCompaniesApi = {
   list: async (): Promise<ContractCompany[]> => {
