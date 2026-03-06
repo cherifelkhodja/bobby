@@ -4,7 +4,7 @@ from datetime import UTC
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File as _File, HTTPException, Query, UploadFile as _UploadFile
 from sqlalchemy import delete, select
 
 from app.api.dependencies import AdminUser
@@ -1112,6 +1112,7 @@ def _company_to_response(m: ContractCompanyModel) -> ContractCompanyResponse:
         representative_sub_quality=m.representative_sub_quality,
         signatory_name=m.signatory_name,
         color_code=m.color_code,
+        has_logo=bool(m.logo_s3_key),
         is_default=m.is_default,
         is_active=m.is_active,
         created_at=m.created_at,
@@ -1240,3 +1241,103 @@ async def delete_contract_company(
         raise HTTPException(status_code=404, detail="Société introuvable")
     await db.execute(_delete(ContractCompanyModel).where(ContractCompanyModel.id == company_id))
     await db.commit()
+
+
+@router.post(
+    "/contract-companies/{company_id}/logo",
+    summary="Upload company logo",
+)
+async def upload_company_logo(
+    company_id: UUID,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+    file: _UploadFile = _File(..., description="Logo image (PNG, JPEG, SVG, max 2 Mo)"),
+):
+    """Upload or replace the logo for a company. Admin only."""
+    from sqlalchemy import select as _select
+    from datetime import datetime as _dt
+    from app.infrastructure.storage.s3_client import S3StorageClient
+    from app.config import get_settings as _get_settings
+
+    # Validate
+    allowed = {"image/png", "image/jpeg", "image/svg+xml", "image/webp"}
+    if file.content_type not in allowed:
+        raise HTTPException(status_code=400, detail="Format non supporté. Utilisez PNG, JPEG, SVG ou WebP.")
+    content = await file.read()
+    if len(content) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Logo trop volumineux (max 2 Mo).")
+
+    result = await db.execute(_select(ContractCompanyModel).where(ContractCompanyModel.id == company_id))
+    m = result.scalar_one_or_none()
+    if not m:
+        raise HTTPException(status_code=404, detail="Société introuvable")
+
+    settings = _get_settings()
+    s3 = S3StorageClient(settings)
+
+    # Delete old logo if any
+    if m.logo_s3_key:
+        await s3.delete_file(m.logo_s3_key)
+
+    ext = (file.filename or "logo").rsplit(".", 1)[-1].lower() if file.filename else "png"
+    s3_key = f"contract-companies/{company_id}/logo.{ext}"
+    await s3.upload_file(key=s3_key, content=content, content_type=file.content_type or "image/png")
+
+    m.logo_s3_key = s3_key
+    m.updated_at = _dt.utcnow()
+    await db.commit()
+    return {"logo_s3_key": s3_key}
+
+
+@router.get(
+    "/contract-companies/{company_id}/logo",
+    summary="Get company logo presigned URL",
+)
+async def get_company_logo_url(
+    company_id: UUID,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Return a short-lived presigned URL to view the company logo. Admin only."""
+    from sqlalchemy import select as _select
+    from app.infrastructure.storage.s3_client import S3StorageClient
+    from app.config import get_settings as _get_settings
+
+    result = await db.execute(_select(ContractCompanyModel).where(ContractCompanyModel.id == company_id))
+    m = result.scalar_one_or_none()
+    if not m or not m.logo_s3_key:
+        raise HTTPException(status_code=404, detail="Aucun logo pour cette société")
+
+    settings = _get_settings()
+    s3 = S3StorageClient(settings)
+    url = await s3.get_presigned_url(m.logo_s3_key, expires_in=300)
+    return {"url": url}
+
+
+@router.delete(
+    "/contract-companies/{company_id}/logo",
+    status_code=204,
+    summary="Delete company logo",
+)
+async def delete_company_logo(
+    company_id: UUID,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Remove the logo for a company. Admin only."""
+    from sqlalchemy import select as _select
+    from datetime import datetime as _dt
+    from app.infrastructure.storage.s3_client import S3StorageClient
+    from app.config import get_settings as _get_settings
+
+    result = await db.execute(_select(ContractCompanyModel).where(ContractCompanyModel.id == company_id))
+    m = result.scalar_one_or_none()
+    if not m:
+        raise HTTPException(status_code=404, detail="Société introuvable")
+    if m.logo_s3_key:
+        settings = _get_settings()
+        s3 = S3StorageClient(settings)
+        await s3.delete_file(m.logo_s3_key)
+        m.logo_s3_key = None
+        m.updated_at = _dt.utcnow()
+        await db.commit()

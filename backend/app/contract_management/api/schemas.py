@@ -129,6 +129,7 @@ class ContractCompanyResponse(BaseModel):
     representative_sub_quality: str | None = None
     signatory_name: str
     color_code: str
+    has_logo: bool
     is_default: bool
     is_active: bool
     created_at: datetime

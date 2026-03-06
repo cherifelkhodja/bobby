@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Plus, Pencil, Trash2, Star, Check } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, Star, ImagePlus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { contractCompaniesApi, ContractCompany, ContractCompanyRequest } from '../../api/contracts';
 
@@ -216,6 +216,119 @@ function CompanyForm({ initial, onSubmit, onCancel, isLoading }: FormProps) {
   );
 }
 
+// ── Logo manager ──────────────────────────────────────────────────────────────
+
+function LogoManager({ company }: { company: ContractCompany }) {
+  const queryClient = useQueryClient();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [loadingUrl, setLoadingUrl] = useState(false);
+
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => contractCompaniesApi.uploadLogo(company.id, file),
+    onSuccess: () => {
+      toast.success('Logo mis à jour.');
+      queryClient.invalidateQueries({ queryKey: ['contract-companies'] });
+      setPreviewUrl(null);
+    },
+    onError: () => toast.error('Erreur lors de l\'upload du logo.'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => contractCompaniesApi.deleteLogo(company.id),
+    onSuccess: () => {
+      toast.success('Logo supprimé.');
+      queryClient.invalidateQueries({ queryKey: ['contract-companies'] });
+      setPreviewUrl(null);
+    },
+    onError: () => toast.error('Erreur lors de la suppression du logo.'),
+  });
+
+  const handleFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => setPreviewUrl(e.target?.result as string);
+    reader.readAsDataURL(file);
+    uploadMutation.mutate(file);
+  };
+
+  const handleViewLogo = async () => {
+    if (previewUrl) { setPreviewUrl(null); return; }
+    setLoadingUrl(true);
+    try {
+      const url = await contractCompaniesApi.getLogoUrl(company.id);
+      setPreviewUrl(url);
+    } catch {
+      toast.error('Impossible de charger le logo.');
+    } finally {
+      setLoadingUrl(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      {/* Preview */}
+      {previewUrl && (
+        <div className="relative inline-block">
+          <img
+            src={previewUrl}
+            alt="Logo"
+            className="h-10 max-w-[120px] object-contain border border-gray-200 dark:border-gray-600 rounded p-1 bg-white"
+          />
+          <button
+            onClick={() => setPreviewUrl(null)}
+            className="absolute -top-1.5 -right-1.5 bg-gray-200 dark:bg-gray-700 rounded-full p-0.5"
+          >
+            <X className="h-3 w-3 text-gray-600 dark:text-gray-300" />
+          </button>
+        </div>
+      )}
+
+      {/* Upload button */}
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={uploadMutation.isPending}
+        className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+        title="Uploader un logo"
+      >
+        <ImagePlus className="h-3.5 w-3.5" />
+        {uploadMutation.isPending ? 'Upload...' : company.has_logo ? 'Remplacer' : 'Ajouter un logo'}
+      </button>
+
+      {/* View existing */}
+      {company.has_logo && !previewUrl && (
+        <button
+          onClick={handleViewLogo}
+          disabled={loadingUrl}
+          className="text-xs px-2.5 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+          {loadingUrl ? '...' : 'Voir le logo'}
+        </button>
+      )}
+
+      {/* Delete */}
+      {company.has_logo && (
+        <button
+          onClick={() => { if (confirm('Supprimer le logo ?')) deleteMutation.mutate(); }}
+          disabled={deleteMutation.isPending}
+          className="text-xs px-2.5 py-1.5 border border-red-200 dark:border-red-800 rounded text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/svg+xml,image/webp"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }}
+      />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function ContractCompaniesTab() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
@@ -350,6 +463,11 @@ export function ContractCompaniesTab() {
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
+              </div>
+
+              {/* Logo manager */}
+              <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700">
+                <LogoManager company={company} />
               </div>
 
               {/* Representative info */}

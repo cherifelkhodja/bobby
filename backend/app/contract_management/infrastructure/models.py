@@ -124,6 +124,7 @@ class ContractCompanyModel(Base):
     signatory_name: Mapped[str] = mapped_column(String(255), nullable=False)
     # Identité visuelle
     color_code: Mapped[str] = mapped_column(String(7), nullable=False, default="#4BBEA8")
+    logo_s3_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

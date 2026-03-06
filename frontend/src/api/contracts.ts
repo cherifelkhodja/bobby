@@ -184,6 +184,7 @@ export interface ContractCompany {
   representative_sub_quality?: string | null;
   signatory_name: string;
   color_code: string;
+  has_logo: boolean;
   is_default: boolean;
   is_active: boolean;
   created_at: string;
@@ -210,6 +211,28 @@ export const contractCompaniesApi = {
 
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/admin/contract-companies/${id}`);
+  },
+
+  uploadLogo: async (id: string, file: File): Promise<{ logo_s3_key: string }> => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await apiClient.post<{ logo_s3_key: string }>(
+      `/admin/contract-companies/${id}/logo`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  },
+
+  getLogoUrl: async (id: string): Promise<string> => {
+    const response = await apiClient.get<{ url: string }>(
+      `/admin/contract-companies/${id}/logo`,
+    );
+    return response.data.url;
+  },
+
+  deleteLogo: async (id: string): Promise<void> => {
+    await apiClient.delete(`/admin/contract-companies/${id}/logo`);
   },
 };
 
