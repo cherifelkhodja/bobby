@@ -63,7 +63,7 @@ RUN pip install --no-cache-dir \
     "jinja2>=3.1.0"
 
 # Force fresh copy - change this value to bust Docker cache
-RUN echo "build-20260305-weasyprint"
+RUN echo "build-20260306-logo-fix"
 
 # Copy application code
 COPY . .
