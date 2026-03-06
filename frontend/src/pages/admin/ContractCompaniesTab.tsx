@@ -207,7 +207,7 @@ function CompanyForm({ initial, onSubmit, onCancel, isLoading }: FormProps) {
           type="button"
           onClick={() => onSubmit(form)}
           disabled={isLoading}
-          className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary-dark disabled:opacity-50"
+          className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50"
         >
           {isLoading ? 'Enregistrement...' : 'Enregistrer'}
         </button>
@@ -387,7 +387,7 @@ export function ContractCompaniesTab() {
         {!showForm && !editing && (
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary-dark"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
           >
             <Plus className="h-4 w-4" />
             Ajouter
