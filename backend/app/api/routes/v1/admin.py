@@ -1081,6 +1081,26 @@ async def reorder_contract_articles(
     await db.commit()
 
 
+@router.delete(
+    "/contract-articles/{article_key}",
+    status_code=204,
+    summary="Delete a contract article template",
+)
+async def delete_contract_article(
+    article_key: str,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Permanently delete a contract article template. Admin only."""
+    from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
+        ArticleTemplateRepository,
+    )
+    deleted = await ArticleTemplateRepository(db).delete(article_key)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Article '{article_key}' introuvable")
+    await db.commit()
+
+
 @router.patch(
     "/contract-articles/{article_key}",
     response_model=ArticleTemplateResponse,
@@ -1161,6 +1181,44 @@ async def list_contract_annexes(
         )
         for a in annexes
     ]
+
+
+@router.post(
+    "/contract-annexes/reorder",
+    status_code=204,
+    summary="Reorder contract annex templates",
+)
+async def reorder_contract_annexes(
+    body: ArticleReorderRequest,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Update annexe_number for all annexes according to the provided order. Admin only."""
+    from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
+        AnnexTemplateRepository,
+    )
+    await AnnexTemplateRepository(db).reorder(body.ordered_keys)
+    await db.commit()
+
+
+@router.delete(
+    "/contract-annexes/{annexe_key}",
+    status_code=204,
+    summary="Delete a contract annex template",
+)
+async def delete_contract_annex(
+    annexe_key: str,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Permanently delete a contract annex template. Admin only."""
+    from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
+        AnnexTemplateRepository,
+    )
+    deleted = await AnnexTemplateRepository(db).delete(annexe_key)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Annexe '{annexe_key}' introuvable")
+    await db.commit()
 
 
 @router.patch(

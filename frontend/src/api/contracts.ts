@@ -270,6 +270,14 @@ export const contractAnnexesApi = {
     );
     return response.data;
   },
+
+  reorder: async (orderedKeys: string[]): Promise<void> => {
+    await apiClient.post('/admin/contract-annexes/reorder', { ordered_keys: orderedKeys });
+  },
+
+  delete: async (annexeKey: string): Promise<void> => {
+    await apiClient.delete(`/admin/contract-annexes/${annexeKey}`);
+  },
 };
 
 export const contractArticlesApi = {
@@ -291,5 +299,9 @@ export const contractArticlesApi = {
 
   reorder: async (orderedKeys: string[]): Promise<void> => {
     await apiClient.post('/admin/contract-articles/reorder', { ordered_keys: orderedKeys });
+  },
+
+  delete: async (articleKey: string): Promise<void> => {
+    await apiClient.delete(`/admin/contract-articles/${articleKey}`);
   },
 };

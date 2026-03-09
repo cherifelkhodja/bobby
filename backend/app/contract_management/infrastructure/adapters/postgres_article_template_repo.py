@@ -68,6 +68,17 @@ class ArticleTemplateRepository:
                 models_by_key[key].article_number = idx
         await self._db.flush()
 
+    async def delete(self, article_key: str) -> bool:
+        """Delete an article template. Returns True if deleted, False if not found."""
+        from sqlalchemy import delete as _delete
+        result = await self._db.execute(
+            _delete(ContractArticleTemplateModel).where(
+                ContractArticleTemplateModel.article_key == article_key
+            )
+        )
+        await self._db.flush()
+        return result.rowcount > 0
+
     async def update(
         self,
         article_key: str,

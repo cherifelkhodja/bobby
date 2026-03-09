@@ -60,6 +60,26 @@ class AnnexTemplateRepository:
         model = result.scalar_one_or_none()
         return self._to_domain(model) if model else None
 
+    async def reorder(self, ordered_keys: list[str]) -> None:
+        """Update annexe_number for each key based on the provided order."""
+        result = await self._db.execute(select(ContractAnnexTemplateModel))
+        models_by_key = {m.annexe_key: m for m in result.scalars().all()}
+        for idx, key in enumerate(ordered_keys, start=1):
+            if key in models_by_key:
+                models_by_key[key].annexe_number = idx
+        await self._db.flush()
+
+    async def delete(self, annexe_key: str) -> bool:
+        """Delete an annexe template. Returns True if deleted, False if not found."""
+        from sqlalchemy import delete as _delete
+        result = await self._db.execute(
+            _delete(ContractAnnexTemplateModel).where(
+                ContractAnnexTemplateModel.annexe_key == annexe_key
+            )
+        )
+        await self._db.flush()
+        return result.rowcount > 0
+
     async def update(
         self,
         annexe_key: str,
