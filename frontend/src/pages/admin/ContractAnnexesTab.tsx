@@ -101,6 +101,19 @@ const TAG_CATEGORIES: TagCategory[] = [
       { tag: '{{ payment_terms_display }}', label: 'Délai de paiement' },
     ],
   },
+  {
+    category: 'Correspondants',
+    tags: [
+      { tag: '{{ main_manager_first_name }}', label: 'Commercial — Prénom' },
+      { tag: '{{ main_manager_last_name }}', label: 'Commercial — Nom' },
+      { tag: '{{ main_manager_email }}', label: 'Commercial — Email' },
+      { tag: '{{ agency_name }}', label: 'Nom agence émettrice' },
+      { tag: '{{ adv_email }}', label: 'ADV — Email émetteur' },
+      { tag: '{{ contact_first_name }}', label: 'Contact tiers — Prénom' },
+      { tag: '{{ contact_last_name }}', label: 'Contact tiers — Nom' },
+      { tag: '{{ contact_email }}', label: 'Contact tiers — Email' },
+    ],
+  },
 ];
 
 // ─── Tag panel ────────────────────────────────────────────────────────────────

@@ -247,8 +247,29 @@ class GenerateDraftUseCase:
                     "partner_representative_title": tp.representative_title,
                     "partner_siren": tp.siren,
                     "partner_siret": tp.siret,
+                    # Correspondant partenaire (contact ADV du tiers)
+                    "contact_first_name": getattr(tp, "adv_contact_first_name", None) or "",
+                    "contact_last_name": getattr(tp, "adv_contact_last_name", None) or "",
+                    "contact_email": (
+                        getattr(tp, "adv_contact_email", None)
+                        or getattr(tp, "contact_email", None)
+                        or ""
+                    ),
                 }
             )
+
+        # Correspondant commercial (main manager côté émetteur)
+        context.update(
+            {
+                "main_manager_first_name": "",  # surchargé via contract_config si disponible
+                "main_manager_last_name": "",
+                "main_manager_email": cr.commercial_email or "",
+                # agency_name = nom de la société émettrice (ou override via contract_config)
+                "agency_name": issuer_company_name,
+                # adv_email : email ADV émetteur (override via contract_config)
+                "adv_email": "",
+            }
+        )
 
         # Contract config (clauses, including tacit_renewal_months).
         # Merge config first, then re-apply the authoritative cr fields so that
