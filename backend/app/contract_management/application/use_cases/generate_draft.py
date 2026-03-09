@@ -74,10 +74,12 @@ class GenerateDraftUseCase:
         tp = await self._tp_repo.get_by_id(cr.third_party_id) if cr.third_party_id else None
         articles = await self._article_repo.get_active()
         company = await self._load_company(cr)
-        logo_b64 = await self._load_company_logo(company)
+        logo_result = await self._load_company_logo(company)
         template_context = self._build_context(cr, tp, articles, company)
-        if logo_b64:
+        if logo_result:
+            logo_b64, logo_mime = logo_result
             template_context["logo_b64"] = logo_b64
+            template_context["logo_mime"] = logo_mime
 
         # Generate PDF
         pdf_content = await self._generator.generate_draft(template_context)
@@ -141,14 +143,17 @@ class GenerateDraftUseCase:
         )
         return result.scalar_one_or_none()
 
-    async def _load_company_logo(self, company) -> str | None:
-        """Download company logo from S3 and return it as base64, or None."""
+    async def _load_company_logo(self, company) -> tuple[str, str] | None:
+        """Download company logo from S3 and return (base64, mime_type), or None."""
         if not company or not getattr(company, "logo_s3_key", None):
             return None
         try:
             import base64 as _b64
             content = await self._s3.download_file(company.logo_s3_key)
-            return _b64.b64encode(content).decode()
+            ext = company.logo_s3_key.rsplit(".", 1)[-1].lower() if "." in company.logo_s3_key else "png"
+            mime_map = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "svg": "image/svg+xml", "webp": "image/webp"}
+            mime = mime_map.get(ext, "image/png")
+            return _b64.b64encode(content).decode(), mime
         except Exception:
             logger.warning("company_logo_load_failed", s3_key=company.logo_s3_key)
             return None

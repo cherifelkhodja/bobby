@@ -1032,6 +1032,10 @@ class ArticleTemplateUpdateRequest(_PydanticBase):
     is_active: bool | None = None
 
 
+class ArticleReorderRequest(_PydanticBase):
+    ordered_keys: list[str]
+
+
 @router.get(
     "/contract-articles",
     response_model=list[ArticleTemplateResponse],
@@ -1057,6 +1061,24 @@ async def list_contract_articles(
         )
         for a in articles
     ]
+
+
+@router.post(
+    "/contract-articles/reorder",
+    status_code=204,
+    summary="Reorder contract article templates",
+)
+async def reorder_contract_articles(
+    body: ArticleReorderRequest,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Update article_number for all articles according to the provided order. Admin only."""
+    from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
+        ArticleTemplateRepository,
+    )
+    await ArticleTemplateRepository(db).reorder(body.ordered_keys)
+    await db.commit()
 
 
 @router.patch(

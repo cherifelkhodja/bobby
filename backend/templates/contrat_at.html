@@ -199,7 +199,7 @@
 <div class="cover-page">
   <div class="cover-title">CONTRAT {{ reference }}</div>
   <hr class="cover-separator">
-  <img class="cover-logo" src="data:image/png;base64,{{ logo_b64 }}" alt="Logo Gemini">
+  <img class="cover-logo" src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="Logo société">
 </div>
 
 <!-- ===== PAGE 2+: CONTRACT BODY ===== -->

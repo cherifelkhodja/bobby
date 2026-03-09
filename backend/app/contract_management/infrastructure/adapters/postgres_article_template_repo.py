@@ -59,6 +59,15 @@ class ArticleTemplateRepository:
         model = result.scalar_one_or_none()
         return self._to_domain(model) if model else None
 
+    async def reorder(self, ordered_keys: list[str]) -> None:
+        """Update article_number for each key based on the provided order."""
+        result = await self._db.execute(select(ContractArticleTemplateModel))
+        models_by_key = {m.article_key: m for m in result.scalars().all()}
+        for idx, key in enumerate(ordered_keys, start=1):
+            if key in models_by_key:
+                models_by_key[key].article_number = idx
+        await self._db.flush()
+
     async def update(
         self,
         article_key: str,

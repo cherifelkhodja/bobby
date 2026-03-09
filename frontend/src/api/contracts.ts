@@ -260,4 +260,8 @@ export const contractArticlesApi = {
     );
     return response.data;
   },
+
+  reorder: async (orderedKeys: string[]): Promise<void> => {
+    await apiClient.post('/admin/contract-articles/reorder', { ordered_keys: orderedKeys });
+  },
 };
