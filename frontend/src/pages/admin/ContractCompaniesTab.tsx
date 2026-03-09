@@ -17,6 +17,7 @@ const EMPTY_FORM: ContractCompanyRequest = {
   representative_sub_name: '',
   representative_sub_quality: '',
   signatory_name: '',
+  invoices_company_mail: '',
   color_code: '#4BBEA8',
   is_default: false,
   is_active: true,
@@ -145,6 +146,26 @@ function CompanyForm({ initial, onSubmit, onCancel, isLoading }: FormProps) {
               placeholder="Mme Selma HIZEM"
             />
           </div>
+        </div>
+      </div>
+
+      {/* Facturation */}
+      <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">
+          Facturation
+        </p>
+        <div>
+          <label className={LABEL_CLS}>Email de réception des factures</label>
+          <input
+            className={INPUT_CLS}
+            type="email"
+            value={form.invoices_company_mail ?? ''}
+            onChange={(e) => set('invoices_company_mail', e.target.value || null)}
+            placeholder="factures@exemple.fr"
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Utilisé dans le contrat pour la clause de facturation par email (variable <code>{'{{ invoices_company_mail }}'}</code>).
+          </p>
         </div>
       </div>
 
@@ -485,6 +506,9 @@ export function ContractCompaniesTab() {
                   </span>
                 )}
                 <span className="ml-3">· Signataire : {company.signatory_name}</span>
+                {company.invoices_company_mail && (
+                  <span className="ml-3">· Factures : {company.invoices_company_mail}</span>
+                )}
                 <span className="ml-3 flex items-center gap-1 inline-flex">
                   · Couleur :
                   <span
@@ -512,6 +536,7 @@ export function ContractCompaniesTab() {
                       representative_sub_name: company.representative_sub_name ?? '',
                       representative_sub_quality: company.representative_sub_quality ?? '',
                       signatory_name: company.signatory_name,
+                      invoices_company_mail: company.invoices_company_mail ?? '',
                       color_code: company.color_code,
                       is_default: company.is_default,
                       is_active: company.is_active,

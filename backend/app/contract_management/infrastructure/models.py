@@ -122,6 +122,8 @@ class ContractCompanyModel(Base):
     representative_sub_quality: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Bloc signature
     signatory_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Facturation
+    invoices_company_mail: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Identité visuelle
     color_code: Mapped[str] = mapped_column(String(7), nullable=False, default="#4BBEA8")
     logo_s3_key: Mapped[str | None] = mapped_column(String(500), nullable=True)

@@ -107,6 +107,7 @@ class ContractCompanyRequest(BaseModel):
     representative_sub_name: str | None = Field(None, max_length=255)
     representative_sub_quality: str | None = Field(None, max_length=255)
     signatory_name: str = Field(..., max_length=255)
+    invoices_company_mail: str | None = Field(None, max_length=255)
     color_code: str = Field("#4BBEA8", pattern=r"^#[0-9A-Fa-f]{6}$")
     is_default: bool = False
     is_active: bool = True
@@ -128,6 +129,7 @@ class ContractCompanyResponse(BaseModel):
     representative_sub_name: str | None = None
     representative_sub_quality: str | None = None
     signatory_name: str
+    invoices_company_mail: str | None = None
     color_code: str
     has_logo: bool
     is_default: bool

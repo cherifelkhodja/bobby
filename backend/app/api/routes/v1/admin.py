@@ -1365,6 +1365,7 @@ def _company_to_response(m: ContractCompanyModel) -> ContractCompanyResponse:
         representative_sub_name=m.representative_sub_name,
         representative_sub_quality=m.representative_sub_quality,
         signatory_name=m.signatory_name,
+        invoices_company_mail=m.invoices_company_mail,
         color_code=m.color_code,
         has_logo=bool(m.logo_s3_key),
         is_default=m.is_default,
@@ -1422,6 +1423,7 @@ async def create_contract_company(
         representative_sub_name=body.representative_sub_name,
         representative_sub_quality=body.representative_sub_quality,
         signatory_name=body.signatory_name,
+        invoices_company_mail=body.invoices_company_mail,
         color_code=body.color_code,
         is_default=body.is_default,
         is_active=body.is_active,
@@ -1468,6 +1470,7 @@ async def update_contract_company(
     m.representative_sub_name = body.representative_sub_name
     m.representative_sub_quality = body.representative_sub_quality
     m.signatory_name = body.signatory_name
+    m.invoices_company_mail = body.invoices_company_mail
     m.color_code = body.color_code
     m.is_default = body.is_default
     m.is_active = body.is_active

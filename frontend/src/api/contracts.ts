@@ -183,6 +183,7 @@ export interface ContractCompany {
   representative_sub_name?: string | null;
   representative_sub_quality?: string | null;
   signatory_name: string;
+  invoices_company_mail?: string | null;
   color_code: string;
   has_logo: boolean;
   is_default: boolean;
