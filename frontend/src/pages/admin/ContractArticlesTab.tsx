@@ -33,6 +33,7 @@ import {
   GripVertical,
   Tag,
   X,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -182,6 +183,7 @@ function SortableArticleRow({
   onToggleEditable,
   onContentChange,
   onSaveContent,
+  onDelete,
   isDirty,
   isPending,
 }: {
@@ -194,6 +196,7 @@ function SortableArticleRow({
   onToggleEditable: () => void;
   onContentChange: (value: string) => void;
   onSaveContent: () => void;
+  onDelete: () => void;
   isDirty: boolean;
   isPending: boolean;
 }) {
@@ -299,6 +302,19 @@ function SortableArticleRow({
           >
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
+
+          <button
+            onClick={() => {
+              if (confirm(`Supprimer définitivement l'article "${article.title}" ?`)) {
+                onDelete();
+              }
+            }}
+            disabled={isPending}
+            title="Supprimer définitivement"
+            className="p-1.5 rounded text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -309,7 +325,7 @@ function SortableArticleRow({
             <>
               <div className="flex items-center justify-between mb-1">
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Ligne vide = nouveau paragraphe · «&nbsp;-&nbsp;» en début de ligne = puce.
+                  Ligne vide = nouveau paragraphe · «&nbsp;-&nbsp;» puce · «&nbsp;##&nbsp;Titre» sous-section numérotée.
                   Utilisez les balises ci-dessous pour insérer des données dynamiques.
                 </p>
                 <button
@@ -404,6 +420,17 @@ export function ContractArticlesTab() {
       toast.success('Article mis à jour');
     },
     onError: () => toast.error('Erreur lors de la mise à jour'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (key: string) => contractArticlesApi.delete(key),
+    onSuccess: (_data, key) => {
+      queryClient.setQueryData<ArticleTemplate[]>(['contract-articles'], (old) =>
+        old ? old.filter((a) => a.article_key !== key) : old,
+      );
+      toast.success('Article supprimé');
+    },
+    onError: () => toast.error('Erreur lors de la suppression'),
   });
 
   const reorderMutation = useMutation({
@@ -543,11 +570,12 @@ export function ContractArticlesTab() {
                         if (newContent === undefined || newContent === article.content) return;
                         updateMutation.mutate({ key: article.article_key, data: { content: newContent } });
                       }}
+                      onDelete={() => deleteMutation.mutate(article.article_key)}
                       isDirty={
                         editingContent[article.article_key] !== undefined &&
                         editingContent[article.article_key] !== article.content
                       }
-                      isPending={updateMutation.isPending || reorderMutation.isPending}
+                      isPending={updateMutation.isPending || reorderMutation.isPending || deleteMutation.isPending}
                     />
                   ));
                 })()}

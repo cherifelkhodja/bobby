@@ -130,6 +130,12 @@
     margin-bottom: 0.15cm;
     list-style-type: "- ";
   }
+  .sub-section-title {
+    font-weight: bold;
+    font-size: 10.5pt;
+    margin-top: 0.35cm;
+    margin-bottom: 0.15cm;
+  }
 
   /* ===== SIGNATURE BLOCK ===== */
   .signature-section {
@@ -238,11 +244,20 @@
 <p class="decision-header">Il a été décidé ce qui suit :</p>
 
 <!-- ===== ARTICLES ===== -->
-{% macro render_paragraphs(content) %}
+{% macro render_paragraphs(content, article_num=0) %}
+  {% set sub_ns = namespace(sub_counter=0) %}
   {% for paragraph in content.split('\n\n') %}
     {% set stripped = paragraph.strip() %}
     {% if stripped %}
-      {% if stripped.startswith('- ') %}
+      {% if stripped.startswith('## ') %}
+        {# Sub-section heading: auto-numbered as N.X when article_num > 0 #}
+        {% set sub_ns.sub_counter = sub_ns.sub_counter + 1 %}
+        {% if article_num > 0 %}
+          <div class="sub-section-title">{{ article_num }}.{{ sub_ns.sub_counter }} — {{ stripped[3:].strip() }}</div>
+        {% else %}
+          <div class="sub-section-title">{{ stripped[3:].strip() }}</div>
+        {% endif %}
+      {% elif stripped.startswith('- ') %}
         {# Dash-prefixed lines → <ul> #}
         <ul>
           {% for line in stripped.split('\n') %}
@@ -294,7 +309,7 @@
   <div class="article-title">{{ ns.counter }} – {{ article.title }}</div>
   <hr class="article-separator">
   <div class="article-body">
-    {{ render_paragraphs(article.content) }}
+    {{ render_paragraphs(article.content, ns.counter) }}
   </div>
 </div>
   {% endif %}

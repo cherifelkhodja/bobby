@@ -1,11 +1,28 @@
 /**
  * Admin tab for managing contract annex templates (AT contract).
- * Features: editable content with tag insertion, active/inactive toggle.
- * Annexes order is fixed (defined by annexe_number in DB).
+ * Features: drag-and-drop reordering, editable content, tag insertion,
+ *           active/inactive toggle, delete.
  */
 
 import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   Save,
   Eye,
@@ -14,6 +31,8 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  GripVertical,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -145,9 +164,9 @@ function TagPanel({
   );
 }
 
-// ─── Annex row ────────────────────────────────────────────────────────────────
+// ─── Sortable annex row ───────────────────────────────────────────────────────
 
-function AnnexRow({
+function SortableAnnexRow({
   annexe,
   index,
   expanded,
@@ -156,6 +175,7 @@ function AnnexRow({
   onToggleActive,
   onContentChange,
   onSaveContent,
+  onDelete,
   isDirty,
   isPending,
 }: {
@@ -167,24 +187,47 @@ function AnnexRow({
   onToggleActive: () => void;
   onContentChange: (value: string) => void;
   onSaveContent: () => void;
+  onDelete: () => void;
   isDirty: boolean;
   isPending: boolean;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: annexe.annexe_key,
+  });
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showTags, setShowTags] = useState(false);
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
 
   const currentContent = editingContent !== undefined ? editingContent : annexe.content;
 
   return (
     <div
+      ref={setNodeRef}
+      style={style}
       className={`border rounded-lg overflow-hidden transition-colors ${
         annexe.is_active
           ? 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
           : 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 opacity-60'
-      }`}
+      } ${isDragging ? 'shadow-lg z-10 relative' : ''}`}
     >
       {/* Header row */}
       <div className="flex items-center gap-2 px-3 py-3">
+        {/* Drag handle */}
+        <button
+          {...attributes}
+          {...listeners}
+          className="flex-shrink-0 p-1 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing touch-none"
+          title="Réordonner"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+
         {/* Number badge */}
         <span
           className={`flex-shrink-0 w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${
@@ -212,9 +255,7 @@ function AnnexRow({
         {/* Badges */}
         <div className="flex items-center gap-2 flex-shrink-0">
           {annexe.is_conditional && (
-            <Badge variant="warning">
-              Conditionnelle
-            </Badge>
+            <Badge variant="warning">Conditionnelle</Badge>
           )}
           {annexe.is_conditional && annexe.condition_field && (
             <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
@@ -240,6 +281,19 @@ function AnnexRow({
           >
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
+
+          <button
+            onClick={() => {
+              if (confirm(`Supprimer définitivement l'annexe "${annexe.title}" ?`)) {
+                onDelete();
+              }
+            }}
+            disabled={isPending}
+            title="Supprimer définitivement"
+            className="p-1.5 rounded text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -248,8 +302,9 @@ function AnnexRow({
         <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-3 bg-gray-50 dark:bg-gray-900/50">
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Ligne vide = nouveau paragraphe · «&nbsp;-&nbsp;» en début de ligne = puce ·
-              {' '}«&nbsp;|&nbsp;» = tableau. Utilisez les balises pour les données dynamiques.
+              Ligne vide = nouveau paragraphe · «&nbsp;-&nbsp;» puce ·
+              {' '}«&nbsp;|&nbsp;» tableau · «&nbsp;##&nbsp;Titre» sous-section.
+              Utilisez les balises pour les données dynamiques.
             </p>
             <button
               type="button"
@@ -302,11 +357,17 @@ export function ContractAnnexesTab({ hideHeader = false }: { hideHeader?: boolea
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState<Record<string, string>>({});
+  const [localOrder, setLocalOrder] = useState<string[] | null>(null);
 
   const { data: annexes, isLoading } = useQuery({
     queryKey: ['contract-annexes'],
     queryFn: contractAnnexesApi.list,
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const updateMutation = useMutation({
     mutationFn: ({
@@ -328,11 +389,61 @@ export function ContractAnnexesTab({ hideHeader = false }: { hideHeader?: boolea
     onError: () => toast.error('Erreur lors de la mise à jour'),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (key: string) => contractAnnexesApi.delete(key),
+    onSuccess: (_data, key) => {
+      queryClient.setQueryData<AnnexTemplate[]>(['contract-annexes'], (old) =>
+        old ? old.filter((a) => a.annexe_key !== key) : old,
+      );
+      toast.success('Annexe supprimée');
+    },
+    onError: () => toast.error('Erreur lors de la suppression'),
+  });
+
+  const reorderMutation = useMutation({
+    mutationFn: (orderedKeys: string[]) => contractAnnexesApi.reorder(orderedKeys),
+    onSuccess: (_data, orderedKeys) => {
+      queryClient.setQueryData<AnnexTemplate[]>(['contract-annexes'], (old) => {
+        if (!old) return old;
+        const byKey = new Map(old.map((a) => [a.annexe_key, a]));
+        return orderedKeys
+          .map((key, idx) => {
+            const a = byKey.get(key);
+            return a ? { ...a, annexe_number: idx + 1 } : null;
+          })
+          .filter((a): a is AnnexTemplate => a !== null);
+      });
+      setLocalOrder(null);
+    },
+    onError: () => {
+      toast.error('Erreur lors de la réorganisation');
+      setLocalOrder(null);
+      queryClient.invalidateQueries({ queryKey: ['contract-annexes'] });
+    },
+  });
+
   if (isLoading) return <PageSpinner />;
 
-  const displayedAnnexes = annexes ?? [];
+  const serverAnnexes = annexes ?? [];
+  const displayedAnnexes = localOrder
+    ? localOrder
+        .map((key) => serverAnnexes.find((a) => a.annexe_key === key))
+        .filter(Boolean as unknown as <T>(x: T | undefined) => x is T)
+    : serverAnnexes;
 
-  // Sequential numbering for active annexes only
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const keys = displayedAnnexes.map((a) => a.annexe_key);
+    const oldIndex = keys.indexOf(active.id as string);
+    const newIndex = keys.indexOf(over.id as string);
+    const newOrder = arrayMove(keys, oldIndex, newIndex);
+
+    setLocalOrder(newOrder);
+    reorderMutation.mutate(newOrder);
+  };
+
   let counter = 0;
   const activeNumbers = new Map<string, number>();
   displayedAnnexes.forEach((a) => {
@@ -350,41 +461,53 @@ export function ContractAnnexesTab({ hideHeader = false }: { hideHeader?: boolea
         </Card>
       )}
 
-      <div className="space-y-2">
-        {displayedAnnexes.map((annexe) => (
-          <AnnexRow
-            key={annexe.annexe_key}
-            annexe={annexe}
-            index={activeNumbers.get(annexe.annexe_key) ?? annexe.annexe_number}
-            expanded={expanded === annexe.annexe_key}
-            editingContent={editingContent[annexe.annexe_key]}
-            onToggleExpand={() =>
-              setExpanded((prev) =>
-                prev === annexe.annexe_key ? null : annexe.annexe_key,
-              )
-            }
-            onToggleActive={() =>
-              updateMutation.mutate({
-                key: annexe.annexe_key,
-                data: { is_active: !annexe.is_active },
-              })
-            }
-            onContentChange={(value) =>
-              setEditingContent((prev) => ({ ...prev, [annexe.annexe_key]: value }))
-            }
-            onSaveContent={() => {
-              const newContent = editingContent[annexe.annexe_key];
-              if (newContent === undefined || newContent === annexe.content) return;
-              updateMutation.mutate({ key: annexe.annexe_key, data: { content: newContent } });
-            }}
-            isDirty={
-              editingContent[annexe.annexe_key] !== undefined &&
-              editingContent[annexe.annexe_key] !== annexe.content
-            }
-            isPending={updateMutation.isPending}
-          />
-        ))}
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext
+          items={displayedAnnexes.map((a) => a.annexe_key)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-2">
+            {displayedAnnexes.map((annexe) => (
+              <SortableAnnexRow
+                key={annexe.annexe_key}
+                annexe={annexe}
+                index={activeNumbers.get(annexe.annexe_key) ?? annexe.annexe_number}
+                expanded={expanded === annexe.annexe_key}
+                editingContent={editingContent[annexe.annexe_key]}
+                onToggleExpand={() =>
+                  setExpanded((prev) =>
+                    prev === annexe.annexe_key ? null : annexe.annexe_key,
+                  )
+                }
+                onToggleActive={() =>
+                  updateMutation.mutate({
+                    key: annexe.annexe_key,
+                    data: { is_active: !annexe.is_active },
+                  })
+                }
+                onContentChange={(value) =>
+                  setEditingContent((prev) => ({ ...prev, [annexe.annexe_key]: value }))
+                }
+                onSaveContent={() => {
+                  const newContent = editingContent[annexe.annexe_key];
+                  if (newContent === undefined || newContent === annexe.content) return;
+                  updateMutation.mutate({ key: annexe.annexe_key, data: { content: newContent } });
+                }}
+                onDelete={() => deleteMutation.mutate(annexe.annexe_key)}
+                isDirty={
+                  editingContent[annexe.annexe_key] !== undefined &&
+                  editingContent[annexe.annexe_key] !== annexe.content
+                }
+                isPending={
+                  updateMutation.isPending ||
+                  reorderMutation.isPending ||
+                  deleteMutation.isPending
+                }
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
         Les annexes conditionnelles apparaissent uniquement si leur champ de condition est renseigné
