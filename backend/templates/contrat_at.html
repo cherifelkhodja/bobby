@@ -238,32 +238,52 @@
 <p class="decision-header">Il a été décidé ce qui suit :</p>
 
 <!-- ===== ARTICLES ===== -->
+{% macro render_paragraphs(content) %}
+  {% for paragraph in content.split('\n\n') %}
+    {% set stripped = paragraph.strip() %}
+    {% if stripped %}
+      {% if stripped.startswith('- ') %}
+        {# Dash-prefixed lines → <ul> #}
+        <ul>
+          {% for line in stripped.split('\n') %}
+            {% set l = line.strip() %}
+            {% if l.startswith('- ') %}
+              <li>{{ l[2:] | safe }}</li>
+            {% elif l %}
+              <li>{{ l | safe }}</li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+      {% elif stripped.startswith('|') %}
+        {# Markdown table → <table> #}
+        <table class="content-table">
+          {% for row in stripped.split('\n') %}
+            {% set r = row.strip() %}
+            {% if r and not r.replace('|','').replace('-','').replace(' ','') == '' %}
+              {% set cells = r.strip('|').split('|') %}
+              {% if loop.first %}
+                <thead><tr>{% for cell in cells %}<th>{{ cell.strip() | safe }}</th>{% endfor %}</tr></thead>
+                <tbody>
+              {% else %}
+                <tr>{% for cell in cells %}<td>{{ cell.strip() | safe }}</td>{% endfor %}</tr>
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p>{{ stripped | replace('\n', '<br>') | safe }}</p>
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+{% endmacro %}
+
 {% for article in articles %}
 <div class="article">
   <div class="article-title">{{ loop.index }} – {{ article.title }}</div>
   <hr class="article-separator">
   <div class="article-body">
-    {% for paragraph in article.content.split('\n\n') %}
-      {% set stripped = paragraph.strip() %}
-      {% if stripped %}
-        {% if stripped.startswith('- ') %}
-          {# Convert dash-prefixed lines to list #}
-          <ul>
-            {% for line in stripped.split('\n') %}
-              {% set l = line.strip() %}
-              {% if l.startswith('- ') %}
-                <li>{{ l[2:] }}</li>
-              {% elif l %}
-                <li>{{ l }}</li>
-              {% endif %}
-            {% endfor %}
-          </ul>
-        {% else %}
-          {# Handle inline line breaks within paragraph #}
-          <p>{{ stripped | replace('\n', '<br>') | safe }}</p>
-        {% endif %}
-      {% endif %}
-    {% endfor %}
+    {{ render_paragraphs(article.content) }}
   </div>
 </div>
 {% endfor %}
@@ -285,9 +305,9 @@
   </table>
 </div>
 
-<!-- ===== ANNEXE ===== -->
+<!-- ===== BON DE COMMANDE (Conditions Particulières) ===== -->
 <div class="annexe-page">
-  <div class="annexe-title">ANNEXE N° 1 AU CONTRAT</div>
+  <div class="annexe-title">BON DE COMMANDE N° {{ reference }}</div>
 
   <table class="annexe-table">
     <tr>
@@ -315,16 +335,11 @@
     </tr>
     <tr>
       <td class="annexe-label">Date de fin de la prestation :</td>
-      <td class="annexe-value">
-        {{ end_date }}
-        {% if tacit_renewal_months %}
-        <div class="annexe-value-sub">Tacite reconduction par période de {{ tacit_renewal_months }} mois ensuite</div>
-        {% endif %}
-      </td>
+      <td class="annexe-value">{{ end_date }}</td>
     </tr>
     <tr>
-      <td class="annexe-label">Tarif de la prestation :</td>
-      <td class="annexe-value">{% if daily_rate %}{{ daily_rate }} Euros Hors Taxe / Jour{% endif %}</td>
+      <td class="annexe-label">Tarif journalier :</td>
+      <td class="annexe-value">{% if daily_rate %}{{ daily_rate }} € HT / jour{% endif %}</td>
     </tr>
   </table>
 
@@ -341,6 +356,16 @@
     </tr>
   </table>
 </div>
+
+<!-- ===== ANNEXES ===== -->
+{% for annexe in annexes %}
+<div class="annexe-page">
+  <div class="annexe-title">ANNEXE N° {{ loop.index }} — {{ annexe.title }}</div>
+  <div class="article-body">
+    {{ render_paragraphs(annexe.content) }}
+  </div>
+</div>
+{% endfor %}
 
 </body>
 </html>

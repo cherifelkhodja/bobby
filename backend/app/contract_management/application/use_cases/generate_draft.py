@@ -34,12 +34,14 @@ class GenerateDraftUseCase:
         s3_service,
         settings,
         db=None,
+        annex_template_repository=None,
     ) -> None:
         self._cr_repo = contract_request_repository
         self._contract_repo = contract_repository
         self._tp_repo = third_party_repository
         self._generator = contract_generator
         self._article_repo = article_template_repository
+        self._annex_repo = annex_template_repository
         self._s3 = s3_service
         self._settings = settings
         self._db = db  # AsyncSession for loading company
@@ -73,9 +75,10 @@ class GenerateDraftUseCase:
         # Build template context
         tp = await self._tp_repo.get_by_id(cr.third_party_id) if cr.third_party_id else None
         articles = await self._article_repo.get_active()
+        annexes = await self._annex_repo.get_active() if self._annex_repo else []
         company = await self._load_company(cr)
         logo_result = await self._load_company_logo(company)
-        template_context = self._build_context(cr, tp, articles, company)
+        template_context = self._build_context(cr, tp, articles, company, annexes)
         if logo_result:
             logo_b64, logo_mime = logo_result
             template_context["logo_b64"] = logo_b64
@@ -158,7 +161,7 @@ class GenerateDraftUseCase:
             logger.warning("company_logo_load_failed", s3_key=company.logo_s3_key)
             return None
 
-    def _build_context(self, cr, tp, articles: list, company=None) -> dict:
+    def _build_context(self, cr, tp, articles: list, company=None, annexes: list | None = None) -> dict:
         """Build template context from contract request and third party."""
         # ── Issuing company info (from DB or settings fallback) ──
         if company:
@@ -308,5 +311,21 @@ class GenerateDraftUseCase:
             rendered_articles.append(dc_replace(article, content=rendered_content))
 
         context["articles"] = rendered_articles
+
+        # Pre-render active annexes, filtering conditionals based on contract config
+        rendered_annexes = []
+        for annexe in (annexes or []):
+            if annexe.is_conditional and annexe.condition_field:
+                field_value = context.get(annexe.condition_field, "")
+                if not field_value:
+                    continue
+            try:
+                rendered_content = jinja_env.from_string(annexe.content).render(**context)
+            except Exception:
+                rendered_content = annexe.content
+            from dataclasses import replace as _dc_replace
+            rendered_annexes.append(_dc_replace(annexe, content=rendered_content))
+
+        context["annexes"] = rendered_annexes
 
         return context
