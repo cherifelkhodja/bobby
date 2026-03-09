@@ -8,8 +8,8 @@ Create Date: 2026-03-09
 from alembic import op
 from sqlalchemy import text
 
-revision = "044_replace_gemini_with_issuer_tag"
-down_revision = "043_add_logo_to_contract_companies"
+revision = "044"
+down_revision = "043"
 branch_labels = None
 depends_on = None
 
