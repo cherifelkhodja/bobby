@@ -37,10 +37,11 @@ import {
 import { toast } from 'sonner';
 
 import { contractArticlesApi, type ArticleTemplate } from '../../api/contracts';
-import { Card, CardHeader } from '../../components/ui/Card';
+import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { PageSpinner } from '../../components/ui/Spinner';
+import { ContractAnnexesTab } from './ContractAnnexesTab';
 
 // ─── Available template tags ──────────────────────────────────────────────────
 
@@ -368,6 +369,7 @@ function SortableArticleRow({
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
 export function ContractArticlesTab() {
+  const [subTab, setSubTab] = useState<'articles' | 'annexes'>('articles');
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState<Record<string, string>>({});
@@ -452,78 +454,115 @@ export function ContractArticlesTab() {
 
   return (
     <div className="space-y-4">
+      {/* Sub-tab selector */}
       <Card>
-        <CardHeader
-          title="Articles du contrat AT"
-          subtitle="Gérez les articles du contrat d'assistance technique. Glissez pour réordonner. Les articles actifs apparaissent dans le PDF, numérotés séquentiellement."
-        />
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+              Contrat AT
+            </h2>
+            <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <button
+                onClick={() => setSubTab('articles')}
+                className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                  subTab === 'articles'
+                    ? 'bg-teal-600 text-white'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                Articles
+              </button>
+              <button
+                onClick={() => setSubTab('annexes')}
+                className={`px-4 py-1.5 text-sm font-medium transition-colors border-l border-gray-200 dark:border-gray-700 ${
+                  subTab === 'annexes'
+                    ? 'bg-teal-600 text-white'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                Annexes
+              </button>
+            </div>
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {subTab === 'articles'
+              ? 'Gérez les articles du contrat. Glissez pour réordonner. Les articles actifs apparaissent dans le PDF, numérotés séquentiellement.'
+              : 'Gérez le contenu des annexes. Les annexes conditionnelles ne sont incluses que si leur condition est remplie lors de la génération.'}
+          </p>
+        </div>
       </Card>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext
-          items={displayedArticles.map((a) => a.article_key)}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className="space-y-2">
-            {(() => {
-              // Numérotation séquentielle sur les articles actifs, le préambule est exclu
-              let counter = 0;
-              const activeNumbers = new Map<string, number | 'preambule'>();
-              displayedArticles.forEach((a) => {
-                if (a.article_key === 'preambule') {
-                  activeNumbers.set(a.article_key, 'preambule');
-                } else if (a.is_active) {
-                  activeNumbers.set(a.article_key, ++counter);
-                }
-              });
-              return displayedArticles.map((article) => (
-              <SortableArticleRow
-                key={article.article_key}
-                article={article}
-                index={activeNumbers.get(article.article_key) ?? null}
-                expanded={expanded === article.article_key}
-                editingContent={editingContent[article.article_key]}
-                onToggleExpand={() =>
-                  setExpanded((prev) =>
-                    prev === article.article_key ? null : article.article_key,
-                  )
-                }
-                onToggleActive={() =>
-                  updateMutation.mutate({
-                    key: article.article_key,
-                    data: { is_active: !article.is_active },
-                  })
-                }
-                onToggleEditable={() =>
-                  updateMutation.mutate({
-                    key: article.article_key,
-                    data: { is_editable: !article.is_editable },
-                  })
-                }
-                onContentChange={(value) =>
-                  setEditingContent((prev) => ({ ...prev, [article.article_key]: value }))
-                }
-                onSaveContent={() => {
-                  const newContent = editingContent[article.article_key];
-                  if (newContent === undefined || newContent === article.content) return;
-                  updateMutation.mutate({ key: article.article_key, data: { content: newContent } });
-                }}
-                isDirty={
-                  editingContent[article.article_key] !== undefined &&
-                  editingContent[article.article_key] !== article.content
-                }
-                isPending={updateMutation.isPending || reorderMutation.isPending}
-              />
-              ));
-            })()}
-          </div>
-        </SortableContext>
-      </DndContext>
+      {subTab === 'articles' && (
+        <>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext
+              items={displayedArticles.map((a) => a.article_key)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-2">
+                {(() => {
+                  // Numérotation séquentielle sur les articles actifs, le préambule est exclu
+                  let counter = 0;
+                  const activeNumbers = new Map<string, number | 'preambule'>();
+                  displayedArticles.forEach((a) => {
+                    if (a.article_key === 'preambule') {
+                      activeNumbers.set(a.article_key, 'preambule');
+                    } else if (a.is_active) {
+                      activeNumbers.set(a.article_key, ++counter);
+                    }
+                  });
+                  return displayedArticles.map((article) => (
+                    <SortableArticleRow
+                      key={article.article_key}
+                      article={article}
+                      index={activeNumbers.get(article.article_key) ?? null}
+                      expanded={expanded === article.article_key}
+                      editingContent={editingContent[article.article_key]}
+                      onToggleExpand={() =>
+                        setExpanded((prev) =>
+                          prev === article.article_key ? null : article.article_key,
+                        )
+                      }
+                      onToggleActive={() =>
+                        updateMutation.mutate({
+                          key: article.article_key,
+                          data: { is_active: !article.is_active },
+                        })
+                      }
+                      onToggleEditable={() =>
+                        updateMutation.mutate({
+                          key: article.article_key,
+                          data: { is_editable: !article.is_editable },
+                        })
+                      }
+                      onContentChange={(value) =>
+                        setEditingContent((prev) => ({ ...prev, [article.article_key]: value }))
+                      }
+                      onSaveContent={() => {
+                        const newContent = editingContent[article.article_key];
+                        if (newContent === undefined || newContent === article.content) return;
+                        updateMutation.mutate({ key: article.article_key, data: { content: newContent } });
+                      }}
+                      isDirty={
+                        editingContent[article.article_key] !== undefined &&
+                        editingContent[article.article_key] !== article.content
+                      }
+                      isPending={updateMutation.isPending || reorderMutation.isPending}
+                    />
+                  ));
+                })()}
+              </div>
+            </SortableContext>
+          </DndContext>
 
-      <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
-        Les articles sont numérotés séquentiellement dans le PDF selon leur ordre et leur statut
-        actif.
-      </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
+            Les articles sont numérotés séquentiellement dans le PDF selon leur ordre et leur statut
+            actif.
+          </p>
+        </>
+      )}
+
+      {subTab === 'annexes' && <ContractAnnexesTab hideHeader />}
     </div>
   );
 }

@@ -298,7 +298,7 @@ function AnnexRow({
 
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
-export function ContractAnnexesTab() {
+export function ContractAnnexesTab({ hideHeader = false }: { hideHeader?: boolean }) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState<Record<string, string>>({});
@@ -341,12 +341,14 @@ export function ContractAnnexesTab() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader
-          title="Annexes du contrat AT"
-          subtitle="Gérez le contenu des annexes du contrat d'assistance technique. Les annexes conditionnelles ne sont incluses que si leur condition est remplie lors de la génération."
-        />
-      </Card>
+      {!hideHeader && (
+        <Card>
+          <CardHeader
+            title="Annexes du contrat AT"
+            subtitle="Gérez le contenu des annexes du contrat d'assistance technique. Les annexes conditionnelles ne sont incluses que si leur condition est remplie lors de la génération."
+          />
+        </Card>
+      )}
 
       <div className="space-y-2">
         {displayedAnnexes.map((annexe) => (
