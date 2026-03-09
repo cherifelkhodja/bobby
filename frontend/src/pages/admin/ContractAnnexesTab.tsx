@@ -192,7 +192,7 @@ function SortableAnnexRow({
   onSaveContent,
   onRenameTitle,
   onDelete,
-  isDirty,
+  isDirty: _isDirty,
   isPending,
 }: {
   annexe: AnnexTemplate;
