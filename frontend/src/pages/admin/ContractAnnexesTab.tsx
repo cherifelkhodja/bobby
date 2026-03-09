@@ -33,6 +33,7 @@ import {
   ChevronUp,
   GripVertical,
   Trash2,
+  Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -351,6 +352,98 @@ function SortableAnnexRow({
   );
 }
 
+// ─── Create annex modal ────────────────────────────────────────────────────────
+
+function generateKey(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 50);
+}
+
+function CreateAnnexModal({
+  onClose,
+  onCreate,
+  isPending,
+}: {
+  onClose: () => void;
+  onCreate: (data: { annexe_key: string; title: string; content: string }) => void;
+  isPending: boolean;
+}) {
+  const [title, setTitle] = useState('');
+  const [key, setKey] = useState('');
+  const [keyTouched, setKeyTouched] = useState(false);
+  const [content, setContent] = useState('');
+
+  const handleTitleChange = (v: string) => {
+    setTitle(v);
+    if (!keyTouched) setKey(generateKey(v));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Nouvelle annexe</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Titre</label>
+            <input
+              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+              value={title}
+              onChange={(e) => handleTitleChange(e.target.value)}
+              placeholder="Ex : Conditions spéciales"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Clé unique <span className="text-gray-400 font-normal">(identifiant technique)</span>
+            </label>
+            <input
+              className="w-full px-3 py-2 text-sm font-mono border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+              value={key}
+              onChange={(e) => { setKey(e.target.value); setKeyTouched(true); }}
+              placeholder="Ex : conditions_speciales"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Contenu <span className="text-gray-400 font-normal">(optionnel, modifiable ensuite)</span>
+            </label>
+            <textarea
+              className="w-full h-28 px-3 py-2 text-sm font-mono border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-y focus:outline-none focus:ring-2 focus:ring-teal-500"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Rédigez le contenu de l'annexe..."
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" size="sm" onClick={onClose}>Annuler</Button>
+          <Button
+            size="sm"
+            onClick={() => onCreate({ annexe_key: key, title, content })}
+            disabled={!title.trim() || !key.trim() || isPending}
+          >
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            Créer
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
 export function ContractAnnexesTab({ hideHeader = false }: { hideHeader?: boolean }) {
@@ -358,6 +451,7 @@ export function ContractAnnexesTab({ hideHeader = false }: { hideHeader?: boolea
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState<Record<string, string>>({});
   const [localOrder, setLocalOrder] = useState<string[] | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const { data: annexes, isLoading } = useQuery({
     queryKey: ['contract-annexes'],
@@ -398,6 +492,20 @@ export function ContractAnnexesTab({ hideHeader = false }: { hideHeader?: boolea
       toast.success('Annexe supprimée');
     },
     onError: () => toast.error('Erreur lors de la suppression'),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: { annexe_key: string; title: string; content: string }) =>
+      contractAnnexesApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contract-annexes'] });
+      setShowCreateModal(false);
+      toast.success('Annexe créée');
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(msg ?? 'Erreur lors de la création');
+    },
   });
 
   const reorderMutation = useMutation({
@@ -452,6 +560,14 @@ export function ContractAnnexesTab({ hideHeader = false }: { hideHeader?: boolea
 
   return (
     <div className="space-y-4">
+      {showCreateModal && (
+        <CreateAnnexModal
+          onClose={() => setShowCreateModal(false)}
+          onCreate={(data) => createMutation.mutate(data)}
+          isPending={createMutation.isPending}
+        />
+      )}
+
       {!hideHeader && (
         <Card>
           <CardHeader
@@ -460,6 +576,13 @@ export function ContractAnnexesTab({ hideHeader = false }: { hideHeader?: boolea
           />
         </Card>
       )}
+
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setShowCreateModal(true)}>
+          <Plus className="w-3.5 h-3.5 mr-1.5" />
+          Nouvelle annexe
+        </Button>
+      </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext

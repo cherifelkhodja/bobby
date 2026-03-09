@@ -255,6 +255,16 @@ export interface AnnexTemplate {
 }
 
 export const contractAnnexesApi = {
+  create: async (data: {
+    annexe_key: string;
+    title: string;
+    content?: string;
+    is_active?: boolean;
+  }): Promise<AnnexTemplate> => {
+    const response = await apiClient.post<AnnexTemplate>('/admin/contract-annexes', data);
+    return response.data;
+  },
+
   list: async (): Promise<AnnexTemplate[]> => {
     const response = await apiClient.get<AnnexTemplate[]>('/admin/contract-annexes');
     return response.data;
@@ -281,6 +291,17 @@ export const contractAnnexesApi = {
 };
 
 export const contractArticlesApi = {
+  create: async (data: {
+    article_key: string;
+    title: string;
+    content?: string;
+    is_editable?: boolean;
+    is_active?: boolean;
+  }): Promise<ArticleTemplate> => {
+    const response = await apiClient.post<ArticleTemplate>('/admin/contract-articles', data);
+    return response.data;
+  },
+
   list: async (): Promise<ArticleTemplate[]> => {
     const response = await apiClient.get<ArticleTemplate[]>('/admin/contract-articles');
     return response.data;

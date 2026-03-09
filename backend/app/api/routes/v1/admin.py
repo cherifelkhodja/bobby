@@ -1025,6 +1025,14 @@ class ArticleTemplateResponse(_PydanticBase):
     is_active: bool
 
 
+class ArticleTemplateCreateRequest(_PydanticBase):
+    article_key: str
+    title: str
+    content: str = ""
+    is_editable: bool = True
+    is_active: bool = True
+
+
 class ArticleTemplateUpdateRequest(_PydanticBase):
     content: str | None = None
     title: str | None = None
@@ -1034,6 +1042,44 @@ class ArticleTemplateUpdateRequest(_PydanticBase):
 
 class ArticleReorderRequest(_PydanticBase):
     ordered_keys: list[str]
+
+
+@router.post(
+    "/contract-articles",
+    response_model=ArticleTemplateResponse,
+    status_code=201,
+    summary="Create a contract article template",
+)
+async def create_contract_article(
+    body: ArticleTemplateCreateRequest,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Create a new contract article template. Admin only."""
+    from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
+        ArticleTemplateRepository,
+    )
+    repo = ArticleTemplateRepository(db)
+    existing = await repo.get_by_key(body.article_key)
+    if existing:
+        raise HTTPException(status_code=409, detail=f"La clé '{body.article_key}' est déjà utilisée")
+    created = await repo.create(
+        article_key=body.article_key,
+        title=body.title,
+        content=body.content,
+        is_editable=body.is_editable,
+        is_active=body.is_active,
+        created_by=admin_id,
+    )
+    await db.commit()
+    return ArticleTemplateResponse(
+        article_key=created.article_key,
+        article_number=created.article_number,
+        title=created.title,
+        content=created.content,
+        is_editable=created.is_editable,
+        is_active=created.is_active,
+    )
 
 
 @router.get(
@@ -1149,10 +1195,55 @@ class AnnexTemplateResponse(_PydanticBase):
     is_active: bool
 
 
+class AnnexTemplateCreateRequest(_PydanticBase):
+    annexe_key: str
+    title: str
+    content: str = ""
+    is_active: bool = True
+
+
 class AnnexTemplateUpdateRequest(_PydanticBase):
     content: str | None = None
     title: str | None = None
     is_active: bool | None = None
+
+
+@router.post(
+    "/contract-annexes",
+    response_model=AnnexTemplateResponse,
+    status_code=201,
+    summary="Create a contract annex template",
+)
+async def create_contract_annex(
+    body: AnnexTemplateCreateRequest,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Create a new contract annex template. Admin only."""
+    from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
+        AnnexTemplateRepository,
+    )
+    repo = AnnexTemplateRepository(db)
+    existing = await repo.get_by_key(body.annexe_key)
+    if existing:
+        raise HTTPException(status_code=409, detail=f"La clé '{body.annexe_key}' est déjà utilisée")
+    created = await repo.create(
+        annexe_key=body.annexe_key,
+        title=body.title,
+        content=body.content,
+        is_active=body.is_active,
+        created_by=admin_id,
+    )
+    await db.commit()
+    return AnnexTemplateResponse(
+        annexe_key=created.annexe_key,
+        annexe_number=created.annexe_number,
+        title=created.title,
+        content=created.content,
+        is_conditional=created.is_conditional,
+        condition_field=created.condition_field,
+        is_active=created.is_active,
+    )
 
 
 @router.get(

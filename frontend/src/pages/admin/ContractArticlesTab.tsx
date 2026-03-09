@@ -34,6 +34,7 @@ import {
   Tag,
   X,
   Trash2,
+  Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -382,6 +383,98 @@ function SortableArticleRow({
   );
 }
 
+// ─── Create article modal ──────────────────────────────────────────────────────
+
+function generateKey(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 50);
+}
+
+function CreateArticleModal({
+  onClose,
+  onCreate,
+  isPending,
+}: {
+  onClose: () => void;
+  onCreate: (data: { article_key: string; title: string; content: string }) => void;
+  isPending: boolean;
+}) {
+  const [title, setTitle] = useState('');
+  const [key, setKey] = useState('');
+  const [keyTouched, setKeyTouched] = useState(false);
+  const [content, setContent] = useState('');
+
+  const handleTitleChange = (v: string) => {
+    setTitle(v);
+    if (!keyTouched) setKey(generateKey(v));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Nouvel article</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Titre</label>
+            <input
+              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+              value={title}
+              onChange={(e) => handleTitleChange(e.target.value)}
+              placeholder="Ex : Responsabilité"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Clé unique <span className="text-gray-400 font-normal">(identifiant technique)</span>
+            </label>
+            <input
+              className="w-full px-3 py-2 text-sm font-mono border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+              value={key}
+              onChange={(e) => { setKey(e.target.value); setKeyTouched(true); }}
+              placeholder="Ex : responsabilite"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Contenu <span className="text-gray-400 font-normal">(optionnel, modifiable ensuite)</span>
+            </label>
+            <textarea
+              className="w-full h-28 px-3 py-2 text-sm font-mono border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-y focus:outline-none focus:ring-2 focus:ring-teal-500"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Rédigez le contenu de l'article..."
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" size="sm" onClick={onClose}>Annuler</Button>
+          <Button
+            size="sm"
+            onClick={() => onCreate({ article_key: key, title, content })}
+            disabled={!title.trim() || !key.trim() || isPending}
+          >
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            Créer
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
 export function ContractArticlesTab() {
@@ -389,8 +482,8 @@ export function ContractArticlesTab() {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState<Record<string, string>>({});
-  // Local order (article_keys) for optimistic DnD
   const [localOrder, setLocalOrder] = useState<string[] | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const { data: articles, isLoading } = useQuery({
     queryKey: ['contract-articles'],
@@ -431,6 +524,20 @@ export function ContractArticlesTab() {
       toast.success('Article supprimé');
     },
     onError: () => toast.error('Erreur lors de la suppression'),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: { article_key: string; title: string; content: string }) =>
+      contractArticlesApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contract-articles'] });
+      setShowCreateModal(false);
+      toast.success('Article créé');
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(msg ?? 'Erreur lors de la création');
+    },
   });
 
   const reorderMutation = useMutation({
@@ -481,6 +588,14 @@ export function ContractArticlesTab() {
 
   return (
     <div className="space-y-4">
+      {showCreateModal && (
+        <CreateArticleModal
+          onClose={() => setShowCreateModal(false)}
+          onCreate={(data) => createMutation.mutate(data)}
+          isPending={createMutation.isPending}
+        />
+      )}
+
       {/* Sub-tab selector */}
       <Card>
         <div className="px-6 py-4">
@@ -488,27 +603,35 @@ export function ContractArticlesTab() {
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
               Contrat AT
             </h2>
-            <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <button
-                onClick={() => setSubTab('articles')}
-                className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-                  subTab === 'articles'
-                    ? 'bg-teal-600 text-white'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-              >
-                Articles
-              </button>
-              <button
-                onClick={() => setSubTab('annexes')}
-                className={`px-4 py-1.5 text-sm font-medium transition-colors border-l border-gray-200 dark:border-gray-700 ${
-                  subTab === 'annexes'
-                    ? 'bg-teal-600 text-white'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-              >
-                Annexes
-              </button>
+            <div className="flex items-center gap-3">
+              {subTab === 'articles' && (
+                <Button size="sm" onClick={() => setShowCreateModal(true)}>
+                  <Plus className="w-3.5 h-3.5 mr-1.5" />
+                  Nouvel article
+                </Button>
+              )}
+              <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <button
+                  onClick={() => setSubTab('articles')}
+                  className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                    subTab === 'articles'
+                      ? 'bg-teal-600 text-white'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  Articles
+                </button>
+                <button
+                  onClick={() => setSubTab('annexes')}
+                  className={`px-4 py-1.5 text-sm font-medium transition-colors border-l border-gray-200 dark:border-gray-700 ${
+                    subTab === 'annexes'
+                      ? 'bg-teal-600 text-white'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  Annexes
+                </button>
+              </div>
             </div>
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">

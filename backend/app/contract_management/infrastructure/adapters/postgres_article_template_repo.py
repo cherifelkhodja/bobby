@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.contract_management.infrastructure.models import ContractArticleTemplateModel
@@ -30,6 +30,34 @@ class ArticleTemplateRepository:
 
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
+
+    async def create(
+        self,
+        article_key: str,
+        title: str,
+        content: str = "",
+        is_editable: bool = True,
+        is_active: bool = True,
+        created_by: UUID | None = None,
+    ) -> ArticleTemplate:
+        """Create a new article template at the end of the list."""
+        result = await self._db.execute(
+            select(func.max(ContractArticleTemplateModel.article_number))
+        )
+        max_num = result.scalar() or 0
+        model = ContractArticleTemplateModel(
+            article_key=article_key,
+            article_number=max_num + 1,
+            title=title,
+            content=content,
+            is_editable=is_editable,
+            is_active=is_active,
+            updated_by=created_by,
+        )
+        self._db.add(model)
+        await self._db.flush()
+        await self._db.refresh(model)
+        return self._to_domain(model)
 
     async def get_all(self) -> list[ArticleTemplate]:
         """Return all articles ordered by article_number."""
