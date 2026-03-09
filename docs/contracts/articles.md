@@ -16,10 +16,10 @@
 
 - **Client Final** : Client de {{ issuer_company_name }} bénéficiaire de la Prestation.
 - **Collaborateur** : Personne mise à disposition par le PARTENAIRE.
-- **Conditions Particulières** : Bon de Commande précisant chaque mission (collaborateur, client, durée, tarif).
+- **Bon de Commande (BDC)** : Document signé par les Parties précisant chaque mission (collaborateur, client final, durée, tarif, lieu).
 - **Contrat** : Le présent document, ses annexes et avenants.
 - **Informations Confidentielles** : Toute information technique, commerciale, financière ou stratégique communiquée entre les Parties.
-- **Prestations** : Services d'assistance technique décrits dans les Conditions Particulières.
+- **Prestations** : Services d'assistance technique décrits dans le Bon de Commande.
 - **Réalisations** : Tous résultats des Prestations : code, docs, specs, livrables.
 
 ---
@@ -29,9 +29,9 @@
 **Éditable**: non
 **Actif**: oui
 
-Le Contrat référencé {{ reference }} définit les conditions générales de mise à disposition de Collaborateurs par le PARTENAIRE pour des Prestations d'assistance technique auprès de la clientèle de {{ issuer_company_name }}. Chaque mission fait l'objet de Conditions Particulières.
+Le Contrat référencé {{ reference }} définit les conditions générales de mise à disposition de Collaborateurs par le PARTENAIRE pour des Prestations d'assistance technique auprès de la clientèle de {{ issuer_company_name }}. Chaque mission fait l'objet d'un Bon de Commande distinct.
 
-Le Contrat comprend : Annexe 1 (Correspondants), Annexe 2 (Conformité sociale), Annexe 3 (DPA), Annexe 4 (Engagement de confidentialité). Les conditions spécifiques de chaque mission font l'objet d'un Bon de Commande distinct, numéroté séquentiellement, signé par les Parties et faisant expressément référence au présent Contrat.
+Le Contrat comprend : Annexe 1 (Correspondants), Annexe 2 (Conformité sociale), Annexe 3 (DPA), Annexe 4 (Engagement de confidentialité). Les conditions spécifiques de chaque mission font l'objet d'un Bon de Commande numéroté séquentiellement, signé par les Parties et faisant expressément référence au présent Contrat.
 
 En cas de contradiction, le présent document prévaut sur les annexes. Les CGV du PARTENAIRE ne s'appliquent pas. Le Contrat ne peut être modifié que par avenant écrit.
 
@@ -42,7 +42,7 @@ En cas de contradiction, le présent document prévaut sur les annexes. Les CGV 
 **Éditable**: oui
 **Actif**: oui
 
-Le Contrat est conclu pour une durée indéterminée à compter de sa signature. La durée de chaque mission est fixée dans les Conditions Particulières. Le renouvellement de mission nécessite un accord écrit au moins 15 jours avant l'échéance. Toute tacite reconduction est exclue.
+Le Contrat est conclu pour une durée indéterminée à compter de sa signature. La durée de chaque mission est fixée dans le Bon de Commande correspondant. Le renouvellement de mission nécessite un accord écrit au moins 15 jours avant l'échéance. Toute tacite reconduction est exclue.
 
 ---
 
@@ -53,7 +53,7 @@ Le Contrat est conclu pour une durée indéterminée à compter de sa signature.
 
 **Indépendance** — Le Collaborateur reste sous la seule autorité hiérarchique du PARTENAIRE. Il se conformera au règlement intérieur et à la charte informatique du Client Final.
 
-**Compétences et validation** — Le PARTENAIRE fournit un Collaborateur conforme au profil décrit dans les Conditions Particulières. Un entretien préalable pourra être réalisé. En cas d'inadéquation constatée dans les 10 premiers jours ouvrés, {{ issuer_company_name }} pourra exiger un remplacement sous 10 jours ouvrés, sans facturation de la période.
+**Compétences et validation** — Le PARTENAIRE fournit un Collaborateur conforme au profil décrit dans le Bon de Commande. Un entretien préalable pourra être réalisé. En cas d'inadéquation constatée dans les 10 premiers jours ouvrés, {{ issuer_company_name }} pourra exiger un remplacement sous 10 jours ouvrés, sans facturation de la période.
 
 **Remplacement** — En cas de départ du Collaborateur, le PARTENAIRE informe {{ issuer_company_name }} sans délai et propose un remplaçant de compétences équivalentes sous 15 jours ouvrés, soumis à validation. Le PARTENAIRE ne peut sous-traiter sans accord écrit préalable de {{ issuer_company_name }}.
 
@@ -66,7 +66,7 @@ Le Contrat est conclu pour une durée indéterminée à compter de sa signature.
 **Éditable**: oui
 **Actif**: oui
 
-Le TJM est défini dans les Conditions Particulières, exprimé en euros HT, incluant tous les frais (déplacements IDF compris). Il est ferme et non révisable pendant chaque mission. Toute révision nécessite un avenant.
+Le TJM est défini dans le Bon de Commande, exprimé en euros HT, incluant tous les frais (déplacements IDF compris). Il est ferme et non révisable pendant chaque mission. Toute révision nécessite un avenant.
 
 Les factures sont établies mensuellement sur base des CRA validés par {{ issuer_company_name }}, envoyées à {{ invoice_email }} avant le 5 du mois suivant. Paiement : {{ payment_terms_display }}, {{ invoice_submission_method_display }}. En cas de retard : intérêts à 3× le taux légal. Conformément à l'article D.441-5 du Code de commerce, une indemnité forfaitaire de 40 euros pour frais de recouvrement sera due de plein droit. Contestation sous 15 jours ; la partie non contestée est réglée normalement.
 
