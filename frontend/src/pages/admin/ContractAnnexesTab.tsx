@@ -390,12 +390,10 @@ function SortableAnnexRow({
           )}
 
           <div className="flex justify-end mt-2">
-            {isDirty && (
-              <Button size="sm" onClick={onSaveContent} disabled={isPending}>
-                <Save className="w-3.5 h-3.5 mr-1.5" />
-                Enregistrer
-              </Button>
-            )}
+            <Button size="sm" onClick={onSaveContent} disabled={!isDirty || isPending}>
+              <Save className="w-3.5 h-3.5 mr-1.5" />
+              Enregistrer
+            </Button>
           </div>
         </div>
       )}
