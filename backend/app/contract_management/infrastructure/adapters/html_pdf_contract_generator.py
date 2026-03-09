@@ -75,8 +75,11 @@ class HtmlPdfContractGenerator:
         from jinja2 import Environment, FileSystemLoader, select_autoescape
         from weasyprint import HTML
 
-        # Inject logo
-        template_context.setdefault("logo_b64", _get_logo_b64())
+        # Inject logo (only if a valid base64 string is available)
+        if "logo_b64" not in template_context:
+            fallback = _get_logo_b64()
+            if fallback:
+                template_context["logo_b64"] = fallback
 
         # Render HTML
         env = Environment(
