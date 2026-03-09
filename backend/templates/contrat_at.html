@@ -7,19 +7,36 @@
   @page {
     size: A4;
     margin: 2.5cm 2.2cm 2.8cm 2.2cm;
-  }
-  @page :first {
-    margin-bottom: 2.8cm;
-  }
 
-  /* Footer on every page */
-  @page {
+    /* Header: société | Contrat : ref (toutes les pages sauf 1ère) */
+    @top-right {
+      content: element(page-running-header);
+      font-family: Arial, sans-serif;
+    }
+
+    /* Footer centre : Confidentiel */
     @bottom-center {
-      content: "Référence du contrat N° " string(contract-ref);
+      content: "Confidentiel";
       font-family: Arial, sans-serif;
       font-size: 9pt;
       font-style: italic;
+      color: #555;
+    }
+
+    /* Footer droite : numéro de page */
+    @bottom-right {
+      content: counter(page);
+      font-family: Arial, sans-serif;
+      font-size: 9pt;
       color: #333;
+    }
+  }
+
+  /* Première page : pas de header */
+  @page :first {
+    margin-bottom: 2.8cm;
+    @top-right {
+      content: none;
     }
   }
 
@@ -32,12 +49,16 @@
     line-height: 1.5;
   }
 
-  /* Store reference for footer */
-  .contract-ref-store {
-    string-set: contract-ref content();
-    height: 0;
-    overflow: hidden;
-    font-size: 0;
+  /* Running header (toutes les pages sauf 1ère via @page :first) */
+  .page-running-header {
+    position: running(page-running-header);
+    font-size: 9pt;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .page-running-header .company-name {
+    font-weight: bold;
+    color: {{ issuer_color_code }};
   }
 
   /* ===== COVER PAGE ===== */
@@ -198,14 +219,20 @@
 </head>
 <body>
 
-<!-- Store contract reference for footer -->
-<div class="contract-ref-store">{{ reference }}</div>
+<!-- Running header (affiché sur toutes les pages sauf la 1ère via @page :first) -->
+<div class="page-running-header">
+  <span class="company-name">{{ issuer_company_name }}</span>&nbsp;|&nbsp;Contrat : {{ reference }}
+</div>
 
 <!-- ===== PAGE 1: COVER ===== -->
 <div class="cover-page">
   <div class="cover-title">CONTRAT {{ reference }}</div>
   <hr class="cover-separator">
-  {% if logo_b64 %}<img class="cover-logo" src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="Logo société">{% endif %}
+  {% if logo_b64 %}
+    <img class="cover-logo" src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="Logo société">
+  {% elif logo_filename %}
+    <img class="cover-logo" src="{{ logo_filename }}" alt="Logo société">
+  {% endif %}
 </div>
 
 <!-- ===== PAGE 2+: CONTRACT BODY ===== -->

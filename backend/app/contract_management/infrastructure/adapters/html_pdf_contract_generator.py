@@ -1,8 +1,5 @@
 """HTML → PDF contract generator using WeasyPrint + Jinja2."""
 
-import base64
-import io
-import os
 from pathlib import Path
 from typing import Any
 
@@ -14,40 +11,26 @@ logger = structlog.get_logger()
 TEMPLATE_DIR = Path(__file__).parent.parent.parent.parent.parent / "templates"
 TEMPLATE_NAME = "contrat_at.html"
 
-# Path to the Gemini logo (resolved at import time)
-_LOGO_PATH = Path(__file__).parent.parent.parent.parent.parent.parent / "frontend" / "public" / "logo-gemini.png"
+# Logos available in the templates directory (used as file references via base_url)
+_KNOWN_LOGOS = {
+    "craftmania": "logo-craftmania.png",
+    "gemini": "logo-gemini.png",
+}
 
 
-def _load_logo_b64() -> str:
-    """Load the Gemini logo as a base64-encoded string."""
-    # Try the frontend public directory first (local dev)
-    if _LOGO_PATH.exists():
-        with open(_LOGO_PATH, "rb") as f:
-            return base64.b64encode(f.read()).decode()
-
-    # Fallback: look for it relative to the app directory (Docker)
-    app_dir = Path(__file__).parent.parent.parent.parent.parent
-    for candidate in [
-        app_dir / "static" / "logo-gemini.png",
-        app_dir / "logo-gemini.png",
-    ]:
-        if candidate.exists():
-            with open(candidate, "rb") as f:
-                return base64.b64encode(f.read()).decode()
-
-    logger.warning("gemini_logo_not_found", searched=str(_LOGO_PATH))
+def _get_logo_filename(company_name: str) -> str:
+    """Return the logo filename (relative to TEMPLATE_DIR) for the given company name."""
+    lower = company_name.lower() if company_name else ""
+    for keyword, filename in _KNOWN_LOGOS.items():
+        if keyword in lower:
+            logo_path = TEMPLATE_DIR / filename
+            if logo_path.exists():
+                return filename
+    # Fallback: first logo found in templates dir
+    for filename in _KNOWN_LOGOS.values():
+        if (TEMPLATE_DIR / filename).exists():
+            return filename
     return ""
-
-
-# Cache logo at module level (loaded once)
-_LOGO_B64: str | None = None
-
-
-def _get_logo_b64() -> str:
-    global _LOGO_B64
-    if _LOGO_B64 is None:
-        _LOGO_B64 = _load_logo_b64()
-    return _LOGO_B64
 
 
 class HtmlPdfContractGenerator:
@@ -75,11 +58,12 @@ class HtmlPdfContractGenerator:
         from jinja2 import Environment, FileSystemLoader, select_autoescape
         from weasyprint import HTML
 
-        # Inject logo (only if a valid base64 string is available)
-        if "logo_b64" not in template_context:
-            fallback = _get_logo_b64()
-            if fallback:
-                template_context["logo_b64"] = fallback
+        # Inject logo fallback via file reference if no base64 logo provided
+        if "logo_b64" not in template_context and "logo_filename" not in template_context:
+            company_name = template_context.get("issuer_company_name", "")
+            filename = _get_logo_filename(company_name)
+            if filename:
+                template_context["logo_filename"] = filename
 
         # Render HTML
         env = Environment(
