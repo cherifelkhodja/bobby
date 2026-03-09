@@ -535,12 +535,20 @@ class ServiceFactory:
         from app.contract_management.infrastructure.adapters.docx_contract_generator import (
             DocxContractGenerator,
         )
+        from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
+            AnnexTemplateRepository,
+        )
+        from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
+            ArticleTemplateRepository,
+        )
 
         return GenerateDraftUseCase(
             contract_request_repository=self.contract_request_repository,
             contract_repository=self.contract_repository,
             third_party_repository=self.third_party_repository,
             contract_generator=DocxContractGenerator(),
+            article_template_repository=ArticleTemplateRepository(self._db),
+            annex_template_repository=AnnexTemplateRepository(self._db),
             s3_service=self.s3_service,
             settings=self._settings,
         )

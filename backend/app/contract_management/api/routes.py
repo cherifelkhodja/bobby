@@ -779,6 +779,9 @@ async def generate_draft(
     from app.contract_management.infrastructure.adapters.html_pdf_contract_generator import (
         HtmlPdfContractGenerator,
     )
+    from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
+        AnnexTemplateRepository,
+    )
     from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
         ArticleTemplateRepository,
     )
@@ -792,6 +795,7 @@ async def generate_draft(
     contract_repo = ContractRepository(db)
     tp_repo = ThirdPartyRepository(db)
     article_repo = ArticleTemplateRepository(db)
+    annex_repo = AnnexTemplateRepository(db)
     s3_service = S3StorageClient(settings)
 
     use_case = GenerateDraftUseCase(
@@ -800,6 +804,7 @@ async def generate_draft(
         third_party_repository=tp_repo,
         contract_generator=HtmlPdfContractGenerator(),
         article_template_repository=article_repo,
+        annex_template_repository=annex_repo,
         s3_service=s3_service,
         settings=settings,
         db=db,
