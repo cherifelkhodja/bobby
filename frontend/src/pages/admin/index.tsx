@@ -20,7 +20,6 @@ import { TemplatesTab } from './TemplatesTab';
 import { StatsTab } from './StatsTab';
 import { ApiTab } from './ApiTab';
 import { ContractArticlesTab } from './ContractArticlesTab';
-import { ContractAnnexesTab } from './ContractAnnexesTab';
 import { ContractCompaniesTab } from './ContractCompaniesTab';
 
 type TabType = 'users' | 'invitations' | 'boond' | 'templates' | 'stats' | 'api' | 'contract-articles' | 'contract-companies';
