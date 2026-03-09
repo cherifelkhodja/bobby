@@ -161,6 +161,35 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-09 (gestion avancée articles contrat AT)
+
+#### Drag & drop, balises dynamiques, logo MIME
+
+- **feat(admin)**: Réorganisation des articles par drag & drop (`@dnd-kit/core`, `@dnd-kit/sortable`)
+  - Poignée `GripVertical` sur chaque article
+  - Numérotation auto-mise à jour dans le badge en temps réel (ordre visuel)
+  - `POST /admin/contract-articles/reorder` — sauvegarde l'ordre en base
+  - `ArticleTemplateRepository.reorder(ordered_keys)` — met à jour `article_number`
+
+- **feat(admin)**: Panneau de balises dynamiques dans l'éditeur d'article
+  - Bouton "Insérer une balise" visible uniquement pour les articles `is_editable`
+  - 27 balises en 4 catégories : Société émettrice, Partenaire/Tiers, Consultant, Contrat
+  - Insertion précise à la position du curseur dans le textarea
+  - Variables : `{{ issuer_company_name }}`, `{{ partner_company_name }}`, `{{ payment_terms_display }}`, etc.
+
+- **fix(pdf)**: Correction MIME type du logo société dans `contrat_at.html`
+  - `data:image/png` hardcodé → `data:{{ logo_mime | default('image/png') }}`
+  - `_load_company_logo()` retourne maintenant `(base64, mime_type)` au lieu de `str`
+  - Support PNG, JPEG, SVG, WebP
+
+- **fix(docker)**: Ajout `.dockerignore` dans `backend/`
+  - Exclut `.venv/`, `__pycache__/`, `*.pyc` du `COPY . .`
+  - Évite les conflits de packages Python dans le conteneur Railway
+
+- **fix(api)**: Routes logo société extraites de `admin.py` vers `admin_company_logo.py`
+  - Router dédié enregistré directement dans `main.py`
+  - Correction bug Axios : suppression du `Content-Type` manuel qui cassait le boundary multipart
+
 ### 2026-03-05 (machine à états contractualisation — ajout reviewing_compliance)
 
 #### Nouvel état `reviewing_compliance` dans le workflow contrat
