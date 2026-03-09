@@ -185,7 +185,7 @@ function SortableArticleRow({
   isPending,
 }: {
   article: ArticleTemplate;
-  index: number;
+  index: number | null;
   expanded: boolean;
   editingContent: string | undefined;
   onToggleExpand: () => void;
@@ -233,9 +233,15 @@ function SortableArticleRow({
           <GripVertical className="w-4 h-4" />
         </button>
 
-        {/* Article number badge */}
-        <span className="flex-shrink-0 w-7 h-7 rounded-full bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300 text-xs font-bold flex items-center justify-center">
-          {index}
+        {/* Article number badge — null = article inactif (exclu du PDF) */}
+        <span
+          className={`flex-shrink-0 w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${
+            index !== null
+              ? 'bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300'
+              : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600'
+          }`}
+        >
+          {index ?? '—'}
         </span>
 
         {/* Title */}
@@ -453,11 +459,18 @@ export function ContractArticlesTab() {
           strategy={verticalListSortingStrategy}
         >
           <div className="space-y-2">
-            {displayedArticles.map((article, idx) => (
+            {(() => {
+              // Numérotation séquentielle uniquement sur les articles actifs
+              let counter = 0;
+              const activeNumbers = new Map<string, number>();
+              displayedArticles.forEach((a) => {
+                if (a.is_active) activeNumbers.set(a.article_key, ++counter);
+              });
+              return displayedArticles.map((article) => (
               <SortableArticleRow
                 key={article.article_key}
                 article={article}
-                index={idx + 1}
+                index={activeNumbers.get(article.article_key) ?? null}
                 expanded={expanded === article.article_key}
                 editingContent={editingContent[article.article_key]}
                 onToggleExpand={() =>
@@ -491,7 +504,8 @@ export function ContractArticlesTab() {
                 }
                 isPending={updateMutation.isPending || reorderMutation.isPending}
               />
-            ))}
+              ));
+            })()}
           </div>
         </SortableContext>
       </DndContext>
