@@ -278,14 +278,26 @@
   {% endfor %}
 {% endmacro %}
 
+{% set ns = namespace(counter=0) %}
 {% for article in articles %}
-<div class="article">
-  <div class="article-title">{{ loop.index }} – {{ article.title }}</div>
+  {% if article.article_key == 'preambule' %}
+<div class="article preambule">
+  <div class="article-title">{{ article.title }}</div>
   <hr class="article-separator">
   <div class="article-body">
     {{ render_paragraphs(article.content) }}
   </div>
 </div>
+  {% else %}
+    {% set ns.counter = ns.counter + 1 %}
+<div class="article">
+  <div class="article-title">{{ ns.counter }} – {{ article.title }}</div>
+  <hr class="article-separator">
+  <div class="article-body">
+    {{ render_paragraphs(article.content) }}
+  </div>
+</div>
+  {% endif %}
 {% endfor %}
 
 <!-- ===== SIGNATURE ===== -->

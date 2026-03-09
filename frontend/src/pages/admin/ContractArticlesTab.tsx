@@ -185,7 +185,7 @@ function SortableArticleRow({
   isPending,
 }: {
   article: ArticleTemplate;
-  index: number | null;
+  index: number | 'preambule' | null;
   expanded: boolean;
   editingContent: string | undefined;
   onToggleExpand: () => void;
@@ -233,16 +233,22 @@ function SortableArticleRow({
           <GripVertical className="w-4 h-4" />
         </button>
 
-        {/* Article number badge — null = article inactif (exclu du PDF) */}
-        <span
-          className={`flex-shrink-0 w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${
-            index !== null
-              ? 'bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300'
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600'
-          }`}
-        >
-          {index ?? '—'}
-        </span>
+        {/* Badge : numéro d'article, "P" pour le préambule, ou "—" si inactif */}
+        {index === 'preambule' ? (
+          <span className="flex-shrink-0 px-2 h-7 rounded-full text-xs font-bold flex items-center justify-center bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 whitespace-nowrap">
+            Préambule
+          </span>
+        ) : (
+          <span
+            className={`flex-shrink-0 w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${
+              index !== null
+                ? 'bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600'
+            }`}
+          >
+            {index ?? '—'}
+          </span>
+        )}
 
         {/* Title */}
         <div className="flex-1 min-w-0">
@@ -460,11 +466,15 @@ export function ContractArticlesTab() {
         >
           <div className="space-y-2">
             {(() => {
-              // Numérotation séquentielle uniquement sur les articles actifs
+              // Numérotation séquentielle sur les articles actifs, le préambule est exclu
               let counter = 0;
-              const activeNumbers = new Map<string, number>();
+              const activeNumbers = new Map<string, number | 'preambule'>();
               displayedArticles.forEach((a) => {
-                if (a.is_active) activeNumbers.set(a.article_key, ++counter);
+                if (a.article_key === 'preambule') {
+                  activeNumbers.set(a.article_key, 'preambule');
+                } else if (a.is_active) {
+                  activeNumbers.set(a.article_key, ++counter);
+                }
               });
               return displayedArticles.map((article) => (
               <SortableArticleRow
