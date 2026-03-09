@@ -8,9 +8,9 @@
     size: A4;
     margin: 2.5cm 2.2cm 2.8cm 2.2cm;
 
-    /* Header: société | Contrat : ref (toutes les pages sauf 1ère) */
-    @top-right {
-      content: element(page-running-header);
+    /* Footer gauche : société | Contrat : ref */
+    @bottom-left {
+      content: element(page-running-footer-left);
       font-family: Arial, sans-serif;
     }
 
@@ -32,12 +32,9 @@
     }
   }
 
-  /* Première page : pas de header */
+  /* Première page : pas de marges top (pas de header de toute façon) */
   @page :first {
     margin-bottom: 2.8cm;
-    @top-right {
-      content: none;
-    }
   }
 
   /* ===== BASE ===== */
@@ -49,14 +46,13 @@
     line-height: 1.5;
   }
 
-  /* Running header (toutes les pages sauf 1ère via @page :first) */
-  .page-running-header {
-    position: running(page-running-header);
+  /* Running footer gauche */
+  .page-running-footer-left {
+    position: running(page-running-footer-left);
     font-size: 9pt;
-    text-align: right;
     white-space: nowrap;
   }
-  .page-running-header .company-name {
+  .page-running-footer-left .company-name {
     font-weight: bold;
     color: {{ issuer_color_code }};
   }
@@ -219,8 +215,8 @@
 </head>
 <body>
 
-<!-- Running header (affiché sur toutes les pages sauf la 1ère via @page :first) -->
-<div class="page-running-header">
+<!-- Running footer gauche (société | Contrat : ref) -->
+<div class="page-running-footer-left">
   <span class="company-name">{{ issuer_company_name }}</span>&nbsp;|&nbsp;Contrat : {{ reference }}
 </div>
 
