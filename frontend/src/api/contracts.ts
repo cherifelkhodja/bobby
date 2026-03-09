@@ -244,6 +244,34 @@ export interface ArticleTemplate {
   is_active: boolean;
 }
 
+export interface AnnexTemplate {
+  annexe_key: string;
+  annexe_number: number;
+  title: string;
+  content: string;
+  is_conditional: boolean;
+  condition_field: string | null;
+  is_active: boolean;
+}
+
+export const contractAnnexesApi = {
+  list: async (): Promise<AnnexTemplate[]> => {
+    const response = await apiClient.get<AnnexTemplate[]>('/admin/contract-annexes');
+    return response.data;
+  },
+
+  update: async (
+    annexeKey: string,
+    data: Partial<Pick<AnnexTemplate, 'content' | 'title' | 'is_active'>>,
+  ): Promise<AnnexTemplate> => {
+    const response = await apiClient.patch<AnnexTemplate>(
+      `/admin/contract-annexes/${annexeKey}`,
+      data,
+    );
+    return response.data;
+  },
+};
+
 export const contractArticlesApi = {
   list: async (): Promise<ArticleTemplate[]> => {
     const response = await apiClient.get<ArticleTemplate[]>('/admin/contract-articles');

@@ -1116,6 +1116,89 @@ async def update_contract_article(
     )
 
 
+# ─── Contract Annex Templates ─────────────────────────────────────────────────
+
+
+class AnnexTemplateResponse(_PydanticBase):
+    annexe_key: str
+    annexe_number: int
+    title: str
+    content: str
+    is_conditional: bool
+    condition_field: str | None
+    is_active: bool
+
+
+class AnnexTemplateUpdateRequest(_PydanticBase):
+    content: str | None = None
+    title: str | None = None
+    is_active: bool | None = None
+
+
+@router.get(
+    "/contract-annexes",
+    response_model=list[AnnexTemplateResponse],
+    summary="List all contract annex templates",
+)
+async def list_contract_annexes(
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """List all contract annex templates ordered by annexe number. Admin only."""
+    from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
+        AnnexTemplateRepository,
+    )
+    annexes = await AnnexTemplateRepository(db).get_all()
+    return [
+        AnnexTemplateResponse(
+            annexe_key=a.annexe_key,
+            annexe_number=a.annexe_number,
+            title=a.title,
+            content=a.content,
+            is_conditional=a.is_conditional,
+            condition_field=a.condition_field,
+            is_active=a.is_active,
+        )
+        for a in annexes
+    ]
+
+
+@router.patch(
+    "/contract-annexes/{annexe_key}",
+    response_model=AnnexTemplateResponse,
+    summary="Update a contract annex template",
+)
+async def update_contract_annex(
+    annexe_key: str,
+    body: AnnexTemplateUpdateRequest,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Update content, title or is_active of a contract annex. Admin only."""
+    from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
+        AnnexTemplateRepository,
+    )
+    updated = await AnnexTemplateRepository(db).update(
+        annexe_key,
+        content=body.content,
+        title=body.title,
+        is_active=body.is_active,
+        updated_by=admin_id,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Annexe '{annexe_key}' introuvable")
+    await db.commit()
+    return AnnexTemplateResponse(
+        annexe_key=updated.annexe_key,
+        annexe_number=updated.annexe_number,
+        title=updated.title,
+        content=updated.content,
+        is_conditional=updated.is_conditional,
+        condition_field=updated.condition_field,
+        is_active=updated.is_active,
+    )
+
+
 # ── Contract companies (sociétés émettrices) ──────────────────────────────────
 
 def _company_to_response(m: ContractCompanyModel) -> ContractCompanyResponse:

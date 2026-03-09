@@ -11,7 +11,7 @@
  */
 
 import { useState } from 'react';
-import { Users, Mail, Settings, FileText, Plug, BarChart3, ScrollText, Building2 } from 'lucide-react';
+import { Users, Mail, Settings, FileText, Plug, BarChart3, ScrollText, Building2, Paperclip } from 'lucide-react';
 
 import { UsersTab } from './UsersTab';
 import { InvitationsTab } from './InvitationsTab';
@@ -20,9 +20,10 @@ import { TemplatesTab } from './TemplatesTab';
 import { StatsTab } from './StatsTab';
 import { ApiTab } from './ApiTab';
 import { ContractArticlesTab } from './ContractArticlesTab';
+import { ContractAnnexesTab } from './ContractAnnexesTab';
 import { ContractCompaniesTab } from './ContractCompaniesTab';
 
-type TabType = 'users' | 'invitations' | 'boond' | 'templates' | 'stats' | 'api' | 'contract-articles' | 'contract-companies';
+type TabType = 'users' | 'invitations' | 'boond' | 'templates' | 'stats' | 'api' | 'contract-articles' | 'contract-annexes' | 'contract-companies';
 
 interface TabConfig {
   id: TabType;
@@ -36,6 +37,7 @@ const TABS: TabConfig[] = [
   { id: 'boond', label: 'BoondManager', icon: Settings },
   { id: 'templates', label: 'Templates', icon: FileText },
   { id: 'contract-articles', label: 'Contrat AT', icon: ScrollText },
+  { id: 'contract-annexes', label: 'Annexes AT', icon: Paperclip },
   { id: 'contract-companies', label: 'Sociétés', icon: Building2 },
   { id: 'stats', label: 'Stats', icon: BarChart3 },
   { id: 'api', label: 'API', icon: Plug },
@@ -79,6 +81,7 @@ export function Admin() {
       {activeTab === 'boond' && <BoondTab />}
       {activeTab === 'templates' && <TemplatesTab />}
       {activeTab === 'contract-articles' && <ContractArticlesTab />}
+      {activeTab === 'contract-annexes' && <ContractAnnexesTab />}
       {activeTab === 'contract-companies' && <ContractCompaniesTab />}
       {activeTab === 'stats' && <StatsTab />}
       {activeTab === 'api' && <ApiTab />}
@@ -92,5 +95,6 @@ export { InvitationsTab } from './InvitationsTab';
 export { BoondTab } from './BoondTab';
 export { TemplatesTab } from './TemplatesTab';
 export { ContractArticlesTab } from './ContractArticlesTab';
+export { ContractAnnexesTab } from './ContractAnnexesTab';
 export { StatsTab } from './StatsTab';
 export { ApiTab } from './ApiTab';
