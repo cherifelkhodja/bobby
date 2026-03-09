@@ -332,58 +332,6 @@
   </table>
 </div>
 
-<!-- ===== BON DE COMMANDE (Conditions Particulières) ===== -->
-<div class="annexe-page">
-  <div class="annexe-title">BON DE COMMANDE N° {{ reference }}</div>
-
-  <table class="annexe-table">
-    <tr>
-      <td class="annexe-label">Nom et Prénom du consultant :</td>
-      <td class="annexe-value">{{ consultant_civility }} {{ consultant_first_name }} {{ consultant_last_name }}</td>
-    </tr>
-    <tr>
-      <td class="annexe-label">Client Final :</td>
-      <td class="annexe-value">{{ client_name }}</td>
-    </tr>
-    <tr>
-      <td class="annexe-label">Nature de la prestation :</td>
-      <td class="annexe-value">{{ mission_title }}</td>
-    </tr>
-    <tr>
-      <td class="annexe-label">Lieu de la prestation :</td>
-      <td class="annexe-value">
-        {% if mission_site_name %}{{ mission_site_name }}<br>{% endif %}
-        {{ mission_address }}{% if mission_postal_code or mission_city %}, {% endif %}{{ mission_postal_code }} {{ mission_city }}
-      </td>
-    </tr>
-    <tr>
-      <td class="annexe-label">Date de début de la prestation :</td>
-      <td class="annexe-value">{{ start_date }}</td>
-    </tr>
-    <tr>
-      <td class="annexe-label">Date de fin de la prestation :</td>
-      <td class="annexe-value">{{ end_date }}</td>
-    </tr>
-    <tr>
-      <td class="annexe-label">Tarif journalier :</td>
-      <td class="annexe-value">{% if daily_rate %}{{ daily_rate }} € HT / jour{% endif %}</td>
-    </tr>
-  </table>
-
-  <table class="signature-table">
-    <tr>
-      <td class="signature-col">
-        <p class="signer-company">{{ issuer_legal_form }} {{ issuer_company_name }}</p>
-        <p class="signer-name">{{ issuer_signatory_name }}</p>
-      </td>
-      <td class="signature-col">
-        <p class="signer-company">{{ partner_legal_form }} {{ partner_company_name }}</p>
-        <p class="signer-name">{{ partner_representative_name }}</p>
-      </td>
-    </tr>
-  </table>
-</div>
-
 <!-- ===== ANNEXES ===== -->
 {% for annexe in annexes %}
 <div class="annexe-page">
