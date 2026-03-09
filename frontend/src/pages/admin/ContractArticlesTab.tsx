@@ -35,6 +35,7 @@ import {
   X,
   Trash2,
   Plus,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -197,6 +198,7 @@ function SortableArticleRow({
   onToggleEditable,
   onContentChange,
   onSaveContent,
+  onRenameTitle,
   onDelete,
   isDirty,
   isPending,
@@ -210,6 +212,7 @@ function SortableArticleRow({
   onToggleEditable: () => void;
   onContentChange: (value: string) => void;
   onSaveContent: () => void;
+  onRenameTitle: (title: string) => void;
   onDelete: () => void;
   isDirty: boolean;
   isPending: boolean;
@@ -219,7 +222,10 @@ function SortableArticleRow({
   });
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const [showTags, setShowTags] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(article.title);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -228,6 +234,16 @@ function SortableArticleRow({
   };
 
   const currentContent = editingContent !== undefined ? editingContent : article.content;
+
+  const commitRename = () => {
+    const trimmed = titleDraft.trim();
+    if (trimmed && trimmed !== article.title) {
+      onRenameTitle(trimmed);
+    } else {
+      setTitleDraft(article.title);
+    }
+    setEditingTitle(false);
+  };
 
   return (
     <div
@@ -269,16 +285,40 @@ function SortableArticleRow({
         )}
 
         {/* Title */}
-        <div className="flex-1 min-w-0">
-          <span
-            className={`font-semibold text-sm ${
-              article.is_active
-                ? 'text-gray-900 dark:text-white'
-                : 'text-gray-400 dark:text-gray-500'
-            }`}
-          >
-            {article.title}
-          </span>
+        <div className="flex-1 min-w-0 flex items-center gap-1">
+          {editingTitle ? (
+            <input
+              ref={titleInputRef}
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+                if (e.key === 'Escape') { setTitleDraft(article.title); setEditingTitle(false); }
+              }}
+              autoFocus
+              className="flex-1 min-w-0 px-2 py-0.5 text-sm font-semibold border border-blue-400 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          ) : (
+            <>
+              <span
+                className={`font-semibold text-sm truncate ${
+                  article.is_active
+                    ? 'text-gray-900 dark:text-white'
+                    : 'text-gray-400 dark:text-gray-500'
+                }`}
+              >
+                {article.title}
+              </span>
+              <button
+                onClick={() => { setTitleDraft(article.title); setEditingTitle(true); }}
+                title="Renommer"
+                className="flex-shrink-0 p-0.5 text-gray-300 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            </>
+          )}
         </div>
 
         {/* Badges */}
@@ -707,6 +747,9 @@ export function ContractArticlesTab() {
                         if (newContent === undefined || newContent === article.content) return;
                         updateMutation.mutate({ key: article.article_key, data: { content: newContent } });
                       }}
+                      onRenameTitle={(title) =>
+                        updateMutation.mutate({ key: article.article_key, data: { title } })
+                      }
                       onDelete={() => deleteMutation.mutate(article.article_key)}
                       isDirty={
                         editingContent[article.article_key] !== undefined &&

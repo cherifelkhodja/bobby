@@ -34,6 +34,7 @@ import {
   GripVertical,
   Trash2,
   Plus,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -189,6 +190,7 @@ function SortableAnnexRow({
   onToggleActive,
   onContentChange,
   onSaveContent,
+  onRenameTitle,
   onDelete,
   isDirty,
   isPending,
@@ -201,6 +203,7 @@ function SortableAnnexRow({
   onToggleActive: () => void;
   onContentChange: (value: string) => void;
   onSaveContent: () => void;
+  onRenameTitle: (title: string) => void;
   onDelete: () => void;
   isDirty: boolean;
   isPending: boolean;
@@ -211,6 +214,8 @@ function SortableAnnexRow({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showTags, setShowTags] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(annexe.title);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -219,6 +224,16 @@ function SortableAnnexRow({
   };
 
   const currentContent = editingContent !== undefined ? editingContent : annexe.content;
+
+  const commitRename = () => {
+    const trimmed = titleDraft.trim();
+    if (trimmed && trimmed !== annexe.title) {
+      onRenameTitle(trimmed);
+    } else {
+      setTitleDraft(annexe.title);
+    }
+    setEditingTitle(false);
+  };
 
   return (
     <div
@@ -254,16 +269,39 @@ function SortableAnnexRow({
         </span>
 
         {/* Title */}
-        <div className="flex-1 min-w-0">
-          <span
-            className={`font-semibold text-sm ${
-              annexe.is_active
-                ? 'text-gray-900 dark:text-white'
-                : 'text-gray-400 dark:text-gray-500'
-            }`}
-          >
-            {annexe.title}
-          </span>
+        <div className="flex-1 min-w-0 flex items-center gap-1">
+          {editingTitle ? (
+            <input
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+                if (e.key === 'Escape') { setTitleDraft(annexe.title); setEditingTitle(false); }
+              }}
+              autoFocus
+              className="flex-1 min-w-0 px-2 py-0.5 text-sm font-semibold border border-blue-400 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          ) : (
+            <>
+              <span
+                className={`font-semibold text-sm truncate ${
+                  annexe.is_active
+                    ? 'text-gray-900 dark:text-white'
+                    : 'text-gray-400 dark:text-gray-500'
+                }`}
+              >
+                {annexe.title}
+              </span>
+              <button
+                onClick={() => { setTitleDraft(annexe.title); setEditingTitle(true); }}
+                title="Renommer"
+                className="flex-shrink-0 p-0.5 text-gray-300 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            </>
+          )}
         </div>
 
         {/* Badges */}
@@ -629,6 +667,9 @@ export function ContractAnnexesTab({ hideHeader = false }: { hideHeader?: boolea
                   if (newContent === undefined || newContent === annexe.content) return;
                   updateMutation.mutate({ key: annexe.annexe_key, data: { content: newContent } });
                 }}
+                onRenameTitle={(title) =>
+                  updateMutation.mutate({ key: annexe.annexe_key, data: { title } })
+                }
                 onDelete={() => deleteMutation.mutate(annexe.annexe_key)}
                 isDirty={
                   editingContent[annexe.annexe_key] !== undefined &&
