@@ -1,5 +1,6 @@
 """HTML → PDF contract generator using WeasyPrint + Jinja2."""
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,11 @@ _KNOWN_LOGOS = {
     "craftmania": "logo-craftmania.png",
     "gemini": "logo-gemini.png",
 }
+
+
+def _md_inline(text: str) -> str:
+    """Convert inline markdown to HTML (bold only)."""
+    return re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text, flags=re.DOTALL)
 
 
 def _get_logo_filename(company_name: str) -> str:
@@ -72,6 +78,7 @@ class HtmlPdfContractGenerator:
         )
         # Disable autoescape for the template since we use | safe manually
         env.autoescape = False
+        env.filters["md"] = _md_inline
         template = env.get_template(TEMPLATE_NAME)
         html_content = template.render(**template_context)
 

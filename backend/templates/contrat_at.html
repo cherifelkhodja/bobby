@@ -276,9 +276,9 @@
         {# Sub-section heading: auto-numbered as N.X when article_num > 0 #}
         {% set sub_ns.sub_counter = sub_ns.sub_counter + 1 %}
         {% if article_num > 0 %}
-          <div class="sub-section-title">{{ article_num }}.{{ sub_ns.sub_counter }} — {{ stripped[3:].strip() }}</div>
+          <div class="sub-section-title">{{ article_num }}.{{ sub_ns.sub_counter }} — {{ stripped[3:].strip() | md | safe }}</div>
         {% else %}
-          <div class="sub-section-title">{{ stripped[3:].strip() }}</div>
+          <div class="sub-section-title">{{ stripped[3:].strip() | md | safe }}</div>
         {% endif %}
       {% elif stripped.startswith('- ') %}
         {# Dash-prefixed lines → <ul> #}
@@ -286,9 +286,9 @@
           {% for line in stripped.split('\n') %}
             {% set l = line.strip() %}
             {% if l.startswith('- ') %}
-              <li>{{ l[2:] | safe }}</li>
+              <li>{{ l[2:] | md | safe }}</li>
             {% elif l %}
-              <li>{{ l | safe }}</li>
+              <li>{{ l | md | safe }}</li>
             {% endif %}
           {% endfor %}
         </ul>
@@ -300,17 +300,17 @@
             {% if r and not r.replace('|','').replace('-','').replace(' ','') == '' %}
               {% set cells = r.strip('|').split('|') %}
               {% if loop.first %}
-                <thead><tr>{% for cell in cells %}<th>{{ cell.strip() | safe }}</th>{% endfor %}</tr></thead>
+                <thead><tr>{% for cell in cells %}<th>{{ cell.strip() | md | safe }}</th>{% endfor %}</tr></thead>
                 <tbody>
               {% else %}
-                <tr>{% for cell in cells %}<td>{{ cell.strip() | safe }}</td>{% endfor %}</tr>
+                <tr>{% for cell in cells %}<td>{{ cell.strip() | md | safe }}</td>{% endfor %}</tr>
               {% endif %}
             {% endif %}
           {% endfor %}
           </tbody>
         </table>
       {% else %}
-        <p>{{ stripped | replace('\n', '<br>') | safe }}</p>
+        <p>{{ stripped | md | replace('\n', '<br>') | safe }}</p>
       {% endif %}
     {% endif %}
   {% endfor %}
