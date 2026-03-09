@@ -394,13 +394,24 @@ export function ContractArticlesTab() {
 
   const reorderMutation = useMutation({
     mutationFn: (orderedKeys: string[]) => contractArticlesApi.reorder(orderedKeys),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract-articles'] });
+    onSuccess: (_data, orderedKeys) => {
+      // Mise à jour directe du cache sans refetch pour éviter le flash de numéros
+      queryClient.setQueryData<ArticleTemplate[]>(['contract-articles'], (old) => {
+        if (!old) return old;
+        const byKey = new Map(old.map((a) => [a.article_key, a]));
+        return orderedKeys
+          .map((key, idx) => {
+            const a = byKey.get(key);
+            return a ? { ...a, article_number: idx + 1 } : null;
+          })
+          .filter((a): a is ArticleTemplate => a !== null);
+      });
       setLocalOrder(null);
     },
     onError: () => {
       toast.error('Erreur lors de la réorganisation');
       setLocalOrder(null);
+      queryClient.invalidateQueries({ queryKey: ['contract-articles'] });
     },
   });
 
