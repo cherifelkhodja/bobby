@@ -81,6 +81,7 @@ class ContractRequestRepository:
             model.contractualization_contact_email = request.contractualization_contact_email
             model.contract_config = request.contract_config
             flag_modified(model, "contract_config")
+            model.company_id = request.company_id
             model.commercial_validated_at = request.commercial_validated_at
             model.compliance_override = request.compliance_override
             model.compliance_override_reason = request.compliance_override_reason
@@ -215,6 +216,7 @@ class ContractRequestRepository:
             mission_city=model.mission_city,
             contractualization_contact_email=model.contractualization_contact_email,
             contract_config=model.contract_config,
+            company_id=model.company_id,
             commercial_email=model.commercial_email,
             commercial_validated_at=model.commercial_validated_at,
             compliance_override=model.compliance_override,
@@ -252,6 +254,7 @@ class ContractRequestRepository:
             mission_city=entity.mission_city,
             contractualization_contact_email=entity.contractualization_contact_email,
             contract_config=entity.contract_config,
+            company_id=entity.company_id,
             commercial_email=entity.commercial_email,
             commercial_validated_at=entity.commercial_validated_at,
             compliance_override=entity.compliance_override,

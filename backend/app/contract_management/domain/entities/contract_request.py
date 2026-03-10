@@ -46,6 +46,7 @@ class ContractRequest:
     mission_city: str | None = None
     contractualization_contact_email: str | None = None
     contract_config: dict[str, Any] | None = None
+    company_id: UUID | None = None
     commercial_validated_at: datetime | None = None
     compliance_override: bool = False
     compliance_override_reason: str | None = None

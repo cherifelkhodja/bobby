@@ -33,6 +33,16 @@ class ConfigureContractUseCase:
         if not cr:
             raise ContractRequestNotFoundError(str(contract_request_id))
 
+        # Extract company_id from config and set it as a direct field
+        raw_company_id = config.get("company_id")
+        if raw_company_id:
+            try:
+                cr.company_id = UUID(str(raw_company_id))
+            except (ValueError, AttributeError):
+                cr.company_id = None
+        else:
+            cr.company_id = None
+
         cr.set_contract_config(config)
         saved = await self._cr_repo.save(cr)
 
