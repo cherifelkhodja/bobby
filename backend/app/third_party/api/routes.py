@@ -611,23 +611,30 @@ async def submit_contract_review(
             detail="Aucune demande de contrat associée.",
         )
 
+    from app.config import get_settings
     from app.contract_management.application.use_cases.process_partner_review import (
-        PartnerReviewCommand,
         ProcessPartnerReviewUseCase,
     )
     from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        ContractRepository,
         ContractRequestRepository,
     )
+    from app.infrastructure.email.sender import EmailService
 
+    settings = get_settings()
     cr_repo = ContractRequestRepository(db)
-    use_case = ProcessPartnerReviewUseCase(contract_request_repository=cr_repo)
+    contract_repo = ContractRepository(db)
+    email_service = EmailService(settings)
+    use_case = ProcessPartnerReviewUseCase(
+        contract_request_repository=cr_repo,
+        contract_repository=contract_repo,
+        email_service=email_service,
+    )
 
     updated = await use_case.execute(
-        PartnerReviewCommand(
-            contract_request_id=result.contract_request_id,
-            decision=body.decision,
-            comments=body.comments,
-        )
+        contract_request_id=result.contract_request_id,
+        approved=body.decision == "approved",
+        comments=body.comments,
     )
 
     audit_logger.log(
