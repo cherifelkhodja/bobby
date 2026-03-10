@@ -1145,6 +1145,66 @@ async def push_to_crm(
     return _cr_to_response(cr, commercial_name=name)
 
 
+@router.post(
+    "/{contract_request_id}/retry-boond-sync",
+    response_model=ContractRequestResponse,
+    summary="Retry Boond synchronisation after signing",
+)
+async def retry_boond_sync(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Re-run all Boond sync operations (company, contacts, contract, purchase order).
+
+    Usable when status is SIGNED or ARCHIVED.
+    ADV/admin only.
+    """
+    from app.contract_management.application.use_cases.sync_to_boond_after_signing import (
+        SyncToBoondAfterSigningUseCase,
+    )
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        ContractRepository,
+    )
+    from app.infrastructure.boond.client import BoondClient
+
+    settings = get_settings()
+    cr_repo = ContractRequestRepository(db)
+    contract_repo = ContractRepository(db)
+    tp_repo = ThirdPartyRepository(db)
+    crm_service = BoondCrmAdapter(BoondClient(settings))
+
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
+    if cr.status not in ("signed", "archived"):
+        raise HTTPException(
+            status_code=400,
+            detail="La synchronisation Boond n'est disponible que pour les contrats signés ou archivés.",
+        )
+
+    use_case = SyncToBoondAfterSigningUseCase(
+        db=db,
+        contract_request_repository=cr_repo,
+        contract_repository=contract_repo,
+        third_party_repository=tp_repo,
+        crm_service=crm_service,
+    )
+
+    try:
+        saved = await use_case.execute(contract_request_id)
+    except Exception as exc:
+        logger.error("retry_boond_sync_failed", cr_id=str(contract_request_id), error=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    logger.info("retry_boond_sync_complete", cr_id=str(saved.id))
+    name = await _resolve_commercial_name(db, saved.commercial_email)
+    return _cr_to_response(saved, commercial_name=name)
+
+
 @router.get(
     "/{contract_request_id}/contracts",
     response_model=list[ContractResponse],

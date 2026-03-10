@@ -145,6 +145,13 @@ export const contractsApi = {
     return response.data;
   },
 
+  retryBoondSync: async (id: string): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      `/contract-requests/${id}/retry-boond-sync`,
+    );
+    return response.data;
+  },
+
   syncFromBoond: async (id: string): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
       `/contract-requests/${id}/sync-from-boond`,

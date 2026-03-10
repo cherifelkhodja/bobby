@@ -229,6 +229,18 @@ export default function ContractDetail() {
     },
   });
 
+  const retryBoondSyncMutation = useMutation({
+    mutationFn: () => contractsApi.retryBoondSync(id!),
+    onSuccess: () => {
+      toast.success('Synchronisation Boond relancée.');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['contracts', id] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
   const overrideMutation = useMutation({
     mutationFn: () => contractsApi.complianceOverride(id!, overrideReason),
     onSuccess: () => {
@@ -927,6 +939,35 @@ export default function ContractDetail() {
                 </div>
               )}
             </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Boond sync retry — visible when signed or archived */}
+      {isAdv && (cr.status === 'signed' || cr.status === 'archived') && (
+        <Card className="mb-6 border-emerald-200 dark:border-emerald-800">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <RotateCcw className="h-5 w-5 text-emerald-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                  Synchronisation BoondManager
+                </h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Relancer la création de la société, des contacts, du contrat et du bon de commande dans Boond.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={retryBoondSyncMutation.isPending}
+              onClick={() => retryBoondSyncMutation.mutate()}
+              className="whitespace-nowrap"
+            >
+              <RotateCcw className={`h-4 w-4 mr-1 ${retryBoondSyncMutation.isPending ? 'animate-spin' : ''}`} />
+              {retryBoondSyncMutation.isPending ? 'En cours…' : 'Relancer la sync Boond'}
+            </Button>
           </div>
         </Card>
       )}

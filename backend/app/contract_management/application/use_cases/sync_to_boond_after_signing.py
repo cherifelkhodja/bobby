@@ -243,8 +243,9 @@ class SyncToBoondAfterSigningUseCase:
                     error=str(exc),
                 )
 
-        # ── Étape 7 : Transition → ARCHIVED ───────────────────────────────
-        cr.transition_to(ContractRequestStatus.ARCHIVED)
+        # ── Étape 7 : Transition → ARCHIVED (si pas déjà) ────────────────
+        if cr.status != ContractRequestStatus.ARCHIVED:
+            cr.transition_to(ContractRequestStatus.ARCHIVED)
         saved = await self._cr_repo.save(cr)
 
         logger.info(
