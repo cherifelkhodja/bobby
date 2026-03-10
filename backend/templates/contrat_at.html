@@ -63,23 +63,24 @@
      vertical (page A4 utile ≈ 24.4cm, contenu ≈ 7cm → padding ≈ 8.5cm). */
   .cover-page {
     page-break-after: always;
-    padding-top: 8.5cm;
+    padding-top: 1.5cm;
     text-align: center;
-  }
-  .cover-logo-wrapper {
-    margin-bottom: 1cm;
   }
   .cover-title {
     font-size: 18pt;
     font-weight: bold;
     letter-spacing: 0.05em;
-    margin-top: 1cm;
+    margin-bottom: 0.5cm;
   }
   .cover-separator {
     border: none;
     border-top: 2px solid {{ issuer_color_code }};
     width: 100%;
     display: block;
+    margin-bottom: 0;
+  }
+  .cover-logo-wrapper {
+    margin-top: 7cm;
   }
   .cover-logo {
     display: block;
@@ -225,6 +226,8 @@
 
 <!-- ===== PAGE 1: COVER ===== -->
 <div class="cover-page">
+  <div class="cover-title">CONTRAT {{ reference }}</div>
+  <hr class="cover-separator">
   <div class="cover-logo-wrapper">
     {% if logo_b64 %}
       <img class="cover-logo" src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="Logo société">
@@ -232,8 +235,6 @@
       <img class="cover-logo" src="{{ logo_filename }}" alt="Logo société">
     {% endif %}
   </div>
-  <hr class="cover-separator">
-  <div class="cover-title">CONTRAT {{ reference }}</div>
 </div>
 
 <!-- ===== PAGE 2+: CONTRACT BODY ===== -->
