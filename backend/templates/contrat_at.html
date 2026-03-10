@@ -60,13 +60,14 @@
   /* ===== COVER PAGE ===== */
   .cover-page {
     page-break-after: always;
-    height: 24cm;
+    height: 27cm;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    gap: 1cm;
   }
   .cover-logo-wrapper {
-    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -77,14 +78,11 @@
     font-weight: bold;
     letter-spacing: 0.05em;
     text-align: center;
-    margin-top: 0.5cm;
-    margin-bottom: 0.4cm;
   }
   .cover-separator {
     border: none;
     border-top: 2px solid {{ issuer_color_code }};
     width: 100%;
-    margin-bottom: 4cm;
   }
   .cover-logo {
     display: block;
@@ -230,8 +228,6 @@
 
 <!-- ===== PAGE 1: COVER ===== -->
 <div class="cover-page">
-  <div class="cover-title">CONTRAT {{ reference }}</div>
-  <hr class="cover-separator">
   <div class="cover-logo-wrapper">
     {% if logo_b64 %}
       <img class="cover-logo" src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="Logo société">
@@ -239,6 +235,8 @@
       <img class="cover-logo" src="{{ logo_filename }}" alt="Logo société">
     {% endif %}
   </div>
+  <hr class="cover-separator">
+  <div class="cover-title">CONTRAT {{ reference }}</div>
 </div>
 
 <!-- ===== PAGE 2+: CONTRACT BODY ===== -->
