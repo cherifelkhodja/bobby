@@ -1464,16 +1464,28 @@ function ContractReviewSection({
           </div>
         </div>
 
-        {contractDraft?.download_url && (
-          <a
-            href={contractDraft.download_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 mb-4"
-          >
-            <FileText className="h-4 w-4" />
-            Télécharger le brouillon du contrat
-          </a>
+        {contractDraft?.download_url ? (
+          <div className="mt-2">
+            <iframe
+              src={contractDraft.download_url}
+              title="Brouillon du contrat"
+              className="w-full rounded-lg border border-gray-200 dark:border-gray-700"
+              style={{ height: '75vh', minHeight: '500px' }}
+            />
+            <a
+              href={contractDraft.download_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-xs text-gray-500 hover:text-primary-600 mt-2"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Ouvrir dans un nouvel onglet
+            </a>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 dark:text-gray-500 italic mt-2">
+            Le document n'est pas encore disponible.
+          </p>
         )}
       </Card>
 
