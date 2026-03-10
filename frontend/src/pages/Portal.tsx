@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PhoneInput from 'react-phone-number-input';
@@ -1437,13 +1437,16 @@ function ContractReviewSection({
   const [decision, setDecision] = useState<'approved' | 'changes_requested' | null>(null);
   const [comments, setComments] = useState('');
 
-  // Restore decision from server-side contract request status so refresh/re-visit works
-  const initialSubmitted = (): 'approved' | 'changes_requested' | null => {
-    if (contractDraft?.contract_request_status === 'partner_approved') return 'approved';
-    if (contractDraft?.contract_request_status === 'partner_requested_changes') return 'changes_requested';
-    return null;
-  };
-  const [submitted, setSubmitted] = useState<'approved' | 'changes_requested' | null>(initialSubmitted);
+  const [submitted, setSubmitted] = useState<'approved' | 'changes_requested' | null>(null);
+
+  // Sync submitted state from server once contractDraft loads (handles refresh)
+  useEffect(() => {
+    if (contractDraft?.contract_request_status === 'partner_approved') {
+      setSubmitted('approved');
+    } else if (contractDraft?.contract_request_status === 'partner_requested_changes') {
+      setSubmitted('changes_requested');
+    }
+  }, [contractDraft]);
 
   const reviewMutation = useMutation({
     mutationFn: () => portalApi.submitContractReview(token, decision!, comments || undefined),
