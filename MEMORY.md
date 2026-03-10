@@ -161,6 +161,18 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-10 (signature manuelle sans YouSign)
+
+#### Suppression de l'intégration YouSign — signature manuelle
+
+- **refactor(contract-management)**: `send_for_signature` use case simplifié : ne fait plus appel à YouSign, convertit PDF via LibreOffice, ni n'upload sur YouSign. Passe simplement le CR en statut `SENT_FOR_SIGNATURE`.
+- **feat(contract-management)**: Nouveau endpoint `POST /{id}/mark-as-signed` : accepte un fichier uploadé (contrat signé), l'envoie sur S3 et passe le CR en `SIGNED`. ADV/admin uniquement.
+- **feat(contracts.ts)**: Nouvelle méthode `markAsSigned(id, file)` dans l'API frontend.
+- **feat(ContractDetail.tsx)**: Bannière `sent_for_signature` mise à jour : suppression de la mention YouSign, ajout d'un sélecteur de fichier + bouton "Valider la signature" (visible ADV/admin) pour uploader le contrat signé.
+- **chore**: État `signedFile` ajouté dans le composant pour gérer la sélection de fichier.
+
+---
+
 ### 2026-03-10 (masquage configuration contrat après envoi au partenaire)
 
 #### Formulaire de configuration masqué une fois le brouillon envoyé

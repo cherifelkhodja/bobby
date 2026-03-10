@@ -3,7 +3,7 @@
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import AdvOrAdminUser, ContractAccessUser
@@ -962,42 +962,22 @@ async def send_draft_to_partner(
 @router.post(
     "/{contract_request_id}/send-for-signature",
     response_model=ContractRequestResponse,
-    summary="Send contract for electronic signature",
+    summary="Mark contract as sent for signature",
 )
 async def send_for_signature(
     contract_request_id: UUID,
     user_id: AdvOrAdminUser,
     db: AsyncSession = Depends(get_db),
 ):
-    """Send the contract to YouSign for signature. ADV/admin only."""
+    """Transition CR to SENT_FOR_SIGNATURE status. ADV/admin only."""
     from app.contract_management.application.use_cases.send_for_signature import (
         SendForSignatureUseCase,
     )
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-        ContractRepository,
-    )
-    from app.contract_management.infrastructure.adapters.yousign_client import YouSignClient
-    from app.infrastructure.email.sender import EmailService
-    from app.infrastructure.storage.s3_client import S3StorageClient
 
-    settings = get_settings()
     cr_repo = ContractRequestRepository(db)
-    contract_repo = ContractRepository(db)
-    tp_repo = ThirdPartyRepository(db)
-    s3_service = S3StorageClient(settings)
-    email_service = EmailService(settings)
-    yousign = YouSignClient(
-        api_key=settings.YOUSIGN_API_KEY,
-        base_url=settings.YOUSIGN_API_BASE_URL,
-    )
 
     use_case = SendForSignatureUseCase(
         contract_request_repository=cr_repo,
-        contract_repository=contract_repo,
-        third_party_repository=tp_repo,
-        s3_service=s3_service,
-        signature_service=yousign,
-        settings=settings,
     )
 
     try:
@@ -1006,18 +986,73 @@ async def send_for_signature(
         logger.error("send_for_signature_failed", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
 
-    client_label = f" pour <strong>{cr.client_name}</strong>" if cr.client_name else ""
-    await _notify_commercial(
-        email_service,
-        to=cr.commercial_email,
-        ref=cr.reference,
-        title="Contrat envoyé en signature électronique",
-        msg=f"Le contrat{client_label} a été transmis aux signataires via YouSign. Vous serez notifié dès qu'il sera signé.",
-        color="#8b5cf6",
-    )
-
     name = await _resolve_commercial_name(db, cr.commercial_email)
     return _cr_to_response(cr, commercial_name=name)
+
+
+@router.post(
+    "/{contract_request_id}/mark-as-signed",
+    response_model=ContractRequestResponse,
+    summary="Mark contract as signed and upload signed document",
+)
+async def mark_as_signed(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+    file: UploadFile = File(...),
+):
+    """Upload the signed contract document and transition CR to SIGNED. ADV/admin only."""
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        ContractRepository,
+    )
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+    cr_repo = ContractRequestRepository(db)
+    contract_repo = ContractRepository(db)
+    s3_service = S3StorageClient(settings)
+
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
+
+    contracts = await contract_repo.list_by_contract_request(cr.id)
+    if not contracts:
+        raise HTTPException(status_code=400, detail="Aucun contrat généré pour cette demande.")
+
+    contract = contracts[-1]
+
+    # Upload signed document to S3
+    content = await file.read()
+    extension = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "pdf"
+    s3_key_signed = f"contracts/{contract.reference}/signed_v{contract.version}.{extension}"
+    await s3_service.upload_file(
+        key=s3_key_signed,
+        content=content,
+        content_type=file.content_type or "application/octet-stream",
+    )
+
+    # Mark contract as signed
+    contract.mark_signed(s3_key_signed)
+    await contract_repo.save(contract)
+
+    # Transition CR to SIGNED
+    try:
+        cr.transition_to(ContractRequestStatus.SIGNED)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    saved = await cr_repo.save(cr)
+
+    logger.info(
+        "contract_marked_as_signed",
+        cr_id=str(saved.id),
+        contract_id=str(contract.id),
+        s3_key=s3_key_signed,
+    )
+
+    name = await _resolve_commercial_name(db, saved.commercial_email)
+    return _cr_to_response(saved, commercial_name=name)
 
 
 @router.post(

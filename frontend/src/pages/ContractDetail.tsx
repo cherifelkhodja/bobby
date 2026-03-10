@@ -278,6 +278,20 @@ export default function ContractDetail() {
     },
   });
 
+  const [signedFile, setSignedFile] = useState<File | null>(null);
+  const markAsSignedMutation = useMutation({
+    mutationFn: (file: File) => contractsApi.markAsSigned(id!, file),
+    onSuccess: () => {
+      toast.success('Contrat marqué comme signé.');
+      setSignedFile(null);
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['contracts', id] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
   const configureMutation = useMutation({
     mutationFn: async () => {
       await contractsApi.configure(id!, {
@@ -882,13 +896,36 @@ export default function ContractDetail() {
         <Card className="mb-6 border-violet-200 dark:border-violet-800">
           <div className="flex items-start gap-3">
             <PenTool className="h-5 w-5 text-violet-500 mt-0.5 flex-shrink-0" />
-            <div>
+            <div className="flex-1">
               <h3 className="text-sm font-semibold text-violet-800 dark:text-violet-300">
-                Contrat envoyé pour signature électronique
+                Contrat envoyé pour signature
               </h3>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                En attente de la signature via YouSign. Cette page se mettra à jour automatiquement.
+                En attente de la signature de toutes les parties. Une fois signé, uploadez le contrat signé ci-dessous.
               </p>
+              {isAdv && (
+                <div className="mt-3 flex items-center gap-3 flex-wrap">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <Upload className="h-4 w-4" />
+                    {signedFile ? signedFile.name : 'Choisir le contrat signé…'}
+                    <input
+                      type="file"
+                      accept=".pdf,.docx"
+                      className="hidden"
+                      onChange={(e) => setSignedFile(e.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={!signedFile || markAsSignedMutation.isPending}
+                    onClick={() => signedFile && markAsSignedMutation.mutate(signedFile)}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Valider la signature
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </Card>

@@ -127,6 +127,16 @@ export const contractsApi = {
     return response.data;
   },
 
+  markAsSigned: async (id: string, file: File): Promise<ContractRequest> => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await apiClient.post<ContractRequest>(
+      `/contract-requests/${id}/mark-as-signed`,
+      form,
+    );
+    return response.data;
+  },
+
   pushToCrm: async (id: string): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
       `/contract-requests/${id}/push-to-crm`,
