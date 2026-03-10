@@ -91,6 +91,8 @@ export default function ContractDetail() {
     consultant_civility: '',
     consultant_first_name: '',
     consultant_last_name: '',
+    consultant_email: '',
+    consultant_phone: '',
     mission_site_name: '',
     mission_address: '',
     mission_postal_code: '',
@@ -155,6 +157,8 @@ export default function ContractDetail() {
         consultant_civility: cr.consultant_civility ?? '',
         consultant_first_name: cr.consultant_first_name ?? '',
         consultant_last_name: cr.consultant_last_name ?? '',
+        consultant_email: cr.consultant_email ?? '',
+        consultant_phone: cr.consultant_phone ?? '',
         mission_site_name: cr.mission_site_name ?? '',
         mission_address: cr.mission_address ?? '',
         mission_postal_code: cr.mission_postal_code ?? '',
@@ -290,6 +294,8 @@ export default function ContractDetail() {
         consultant_civility: validationForm.consultant_civility || undefined,
         consultant_first_name: validationForm.consultant_first_name || undefined,
         consultant_last_name: validationForm.consultant_last_name || undefined,
+        consultant_email: validationForm.consultant_email || undefined,
+        consultant_phone: validationForm.consultant_phone || undefined,
         mission_site_name: validationForm.mission_site_name || undefined,
         mission_address: validationForm.mission_address || undefined,
         mission_postal_code: validationForm.mission_postal_code || undefined,
@@ -553,6 +559,36 @@ export default function ContractDetail() {
                   />
                 </div>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Email professionnel
+                  </label>
+                  <input
+                    type="email"
+                    value={validationForm.consultant_email}
+                    onChange={(e) =>
+                      setValidationForm((f) => ({ ...f, consultant_email: e.target.value }))
+                    }
+                    placeholder="prenom.nom@societe.fr"
+                    className={INPUT_CLS}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Téléphone
+                  </label>
+                  <input
+                    type="tel"
+                    value={validationForm.consultant_phone}
+                    onChange={(e) =>
+                      setValidationForm((f) => ({ ...f, consultant_phone: e.target.value }))
+                    }
+                    placeholder="+33 6 00 00 00 00"
+                    className={INPUT_CLS}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Adresse de la mission */}
@@ -681,6 +717,12 @@ export default function ContractDetail() {
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
                       {[cr.consultant_civility, cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ')}
                     </p>
+                    {cr.consultant_email && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{cr.consultant_email}</p>
+                    )}
+                    {cr.consultant_phone && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{cr.consultant_phone}</p>
+                    )}
                   </div>
                 )}
                 {cr.contractualization_contact_email && (

@@ -35,6 +35,8 @@ class ValidateCommercialCommand:
         consultant_civility: str | None = None,
         consultant_first_name: str | None = None,
         consultant_last_name: str | None = None,
+        consultant_email: str | None = None,
+        consultant_phone: str | None = None,
         mission_site_name: str | None = None,
         mission_address: str | None = None,
         mission_postal_code: str | None = None,
@@ -52,6 +54,8 @@ class ValidateCommercialCommand:
         self.consultant_civility = consultant_civility
         self.consultant_first_name = consultant_first_name
         self.consultant_last_name = consultant_last_name
+        self.consultant_email = consultant_email
+        self.consultant_phone = consultant_phone
         self.mission_site_name = mission_site_name
         self.mission_address = mission_address
         self.mission_postal_code = mission_postal_code
@@ -127,6 +131,10 @@ class ValidateCommercialUseCase:
             cr.consultant_first_name = command.consultant_first_name
         if command.consultant_last_name is not None:
             cr.consultant_last_name = command.consultant_last_name
+        if command.consultant_email is not None:
+            cr.consultant_email = command.consultant_email
+        if command.consultant_phone is not None:
+            cr.consultant_phone = command.consultant_phone
         if command.mission_site_name is not None:
             cr.mission_site_name = command.mission_site_name
         if command.mission_address is not None:

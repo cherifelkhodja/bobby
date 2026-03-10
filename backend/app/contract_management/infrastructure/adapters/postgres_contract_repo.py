@@ -71,6 +71,8 @@ class ContractRequestRepository:
             model.consultant_civility = request.consultant_civility
             model.consultant_first_name = request.consultant_first_name
             model.consultant_last_name = request.consultant_last_name
+            model.consultant_email = request.consultant_email
+            model.consultant_phone = request.consultant_phone
             model.mission_site_name = request.mission_site_name
             model.mission_address = request.mission_address
             model.mission_postal_code = request.mission_postal_code
@@ -202,6 +204,8 @@ class ContractRequestRepository:
             consultant_civility=model.consultant_civility,
             consultant_first_name=model.consultant_first_name,
             consultant_last_name=model.consultant_last_name,
+            consultant_email=model.consultant_email,
+            consultant_phone=model.consultant_phone,
             mission_site_name=model.mission_site_name,
             mission_address=model.mission_address,
             mission_postal_code=model.mission_postal_code,
@@ -237,6 +241,8 @@ class ContractRequestRepository:
             consultant_civility=entity.consultant_civility,
             consultant_first_name=entity.consultant_first_name,
             consultant_last_name=entity.consultant_last_name,
+            consultant_email=entity.consultant_email,
+            consultant_phone=entity.consultant_phone,
             mission_site_name=entity.mission_site_name,
             mission_address=entity.mission_address,
             mission_postal_code=entity.mission_postal_code,

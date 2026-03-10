@@ -38,6 +38,8 @@ class ContractRequest:
     consultant_civility: str | None = None
     consultant_first_name: str | None = None
     consultant_last_name: str | None = None
+    consultant_email: str | None = None
+    consultant_phone: str | None = None
     mission_site_name: str | None = None
     mission_address: str | None = None
     mission_postal_code: str | None = None

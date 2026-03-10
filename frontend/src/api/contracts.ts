@@ -40,6 +40,8 @@ export const contractsApi = {
       consultant_civility?: string;
       consultant_first_name?: string;
       consultant_last_name?: string;
+      consultant_email?: string;
+      consultant_phone?: string;
       mission_site_name?: string;
       mission_address?: string;
       mission_postal_code?: string;

@@ -37,6 +37,8 @@ class ContractRequestModel(Base):
     consultant_civility: Mapped[str | None] = mapped_column(String(10), nullable=True)
     consultant_first_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     consultant_last_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    consultant_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    consultant_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     mission_site_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mission_address: Mapped[str | None] = mapped_column(String(500), nullable=True)
     mission_postal_code: Mapped[str | None] = mapped_column(String(10), nullable=True)

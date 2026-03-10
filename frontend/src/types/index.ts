@@ -758,6 +758,8 @@ export interface ContractRequest {
   consultant_civility: string | null;
   consultant_first_name: string | null;
   consultant_last_name: string | null;
+  consultant_email: string | null;
+  consultant_phone: string | null;
   mission_site_name: string | null;
   mission_address: string | null;
   mission_postal_code: string | null;

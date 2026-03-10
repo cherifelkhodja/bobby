@@ -124,6 +124,8 @@ def _cr_to_response(
         consultant_civility=cr.consultant_civility,
         consultant_first_name=cr.consultant_first_name,
         consultant_last_name=cr.consultant_last_name,
+        consultant_email=cr.consultant_email,
+        consultant_phone=cr.consultant_phone,
         mission_site_name=cr.mission_site_name,
         mission_address=cr.mission_address,
         mission_postal_code=cr.mission_postal_code,
@@ -331,6 +333,7 @@ async def sync_from_boond(
             cr.consultant_civility = candidate_info.get("civility") or None
             cr.consultant_first_name = candidate_info.get("first_name") or None
             cr.consultant_last_name = candidate_info.get("last_name") or None
+            cr.consultant_email = candidate_info.get("email") or None
 
     saved = await cr_repo.save(cr)
     await db.commit()
@@ -401,6 +404,8 @@ async def validate_commercial(
                 consultant_civility=body.consultant_civility,
                 consultant_first_name=body.consultant_first_name,
                 consultant_last_name=body.consultant_last_name,
+                consultant_email=body.consultant_email,
+                consultant_phone=body.consultant_phone,
                 mission_site_name=body.mission_site_name,
                 mission_address=body.mission_address,
                 mission_postal_code=body.mission_postal_code,

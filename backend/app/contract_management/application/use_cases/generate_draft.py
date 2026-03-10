@@ -234,6 +234,8 @@ class GenerateDraftUseCase:
             "consultant_civility": cr.consultant_civility or "",
             "consultant_first_name": cr.consultant_first_name or "",
             "consultant_last_name": cr.consultant_last_name or "",
+            "consultant_email": cr.consultant_email or "",
+            "consultant_phone": cr.consultant_phone or "",
         }
 
         # Partner info

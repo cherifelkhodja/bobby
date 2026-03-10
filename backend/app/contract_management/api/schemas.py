@@ -25,6 +25,8 @@ class ContractRequestResponse(BaseModel):
     consultant_civility: str | None = None
     consultant_first_name: str | None = None
     consultant_last_name: str | None = None
+    consultant_email: str | None = None
+    consultant_phone: str | None = None
     mission_site_name: str | None = None
     mission_address: str | None = None
     mission_postal_code: str | None = None
@@ -64,6 +66,8 @@ class CommercialValidationRequest(BaseModel):
     consultant_civility: str | None = Field(None, max_length=10)
     consultant_first_name: str | None = Field(None, max_length=255)
     consultant_last_name: str | None = Field(None, max_length=255)
+    consultant_email: str | None = Field(None, max_length=255)
+    consultant_phone: str | None = Field(None, max_length=50)
     mission_site_name: str | None = Field(None, max_length=255)
     mission_address: str | None = Field(None, max_length=500)
     mission_postal_code: str | None = Field(None, max_length=10)
