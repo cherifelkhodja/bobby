@@ -91,6 +91,7 @@ class ContractRequestStatus(str, Enum):
             ContractRequestStatus.PARTNER_REQUESTED_CHANGES: frozenset(
                 {
                     ContractRequestStatus.CONFIGURING_CONTRACT,
+                    ContractRequestStatus.DRAFT_GENERATED,
                     ContractRequestStatus.CANCELLED,
                 }
             ),

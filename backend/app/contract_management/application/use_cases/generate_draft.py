@@ -87,27 +87,27 @@ class GenerateDraftUseCase:
         # Generate PDF
         pdf_content = await self._generator.generate_draft(template_context)
 
-        # Upload to S3
-        s3_key = f"contracts/{cr.reference}/draft_v1.pdf"
+        # Determine version number (increment if regenerating)
+        existing_contract = await self._contract_repo.get_by_request_id(cr.id)
+        new_version = (existing_contract.version + 1) if existing_contract else 1
+
+        # Upload to S3 with versioned key
+        s3_key = f"contracts/{cr.reference}/draft_v{new_version}.pdf"
         await self._s3.upload_file(
             key=s3_key,
             content=pdf_content,
             content_type="application/pdf",
         )
 
-        # Update existing contract or create new one
-        existing_contract = await self._contract_repo.get_by_request_id(cr.id)
-        if existing_contract:
-            existing_contract.s3_key_draft = s3_key
-            saved_contract = await self._contract_repo.save(existing_contract)
-        else:
-            contract = Contract(
-                contract_request_id=cr.id,
-                third_party_id=cr.third_party_id or cr.id,
-                reference=cr.reference,
-                s3_key_draft=s3_key,
-            )
-            saved_contract = await self._contract_repo.save(contract)
+        # Always create a new contract record for the new version
+        contract = Contract(
+            contract_request_id=cr.id,
+            third_party_id=cr.third_party_id or cr.id,
+            reference=cr.reference,
+            s3_key_draft=s3_key,
+            version=new_version,
+        )
+        saved_contract = await self._contract_repo.save(contract)
 
         # Transition CR status (self-transition allowed when already draft_generated)
         cr.transition_to(ContractRequestStatus.DRAFT_GENERATED)

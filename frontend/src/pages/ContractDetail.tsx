@@ -43,6 +43,12 @@ const ACTION_CONFIG: Partial<
     icon: FileSignature,
     variant: 'primary',
   },
+  partner_requested_changes: {
+    label: 'Générer la nouvelle version',
+    action: 'generate-draft',
+    icon: RotateCcw,
+    variant: 'primary',
+  },
   draft_generated: {
     label: 'Envoyer au partenaire',
     action: 'send-draft-to-partner',
