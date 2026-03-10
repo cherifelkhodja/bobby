@@ -178,6 +178,7 @@ class GenerateDraftUseCase:
             issuer_representative_sub_quality = company.representative_sub_quality or ""
             issuer_signatory_name = company.signatory_name
             issuer_color_code = company.color_code
+            invoices_company_mail = company.invoices_company_mail or ""
         else:
             # Legacy fallback: use settings
             issuer_company_name = self._settings.GEMINI_COMPANY_NAME_CONTRACT
@@ -194,6 +195,7 @@ class GenerateDraftUseCase:
             issuer_representative_sub_quality = ""
             issuer_signatory_name = self._settings.GEMINI_SIGNATORY_NAME
             issuer_color_code = "#4BBEA8"
+            invoices_company_mail = ""
 
         context = {
             # Issuing company (new unified variables)
@@ -210,6 +212,7 @@ class GenerateDraftUseCase:
             "issuer_representative_sub_quality": issuer_representative_sub_quality,
             "issuer_signatory_name": issuer_signatory_name,
             "issuer_color_code": issuer_color_code,
+            "invoices_company_mail": invoices_company_mail,
             # Keep legacy aliases so existing article templates still work
             "gemini_company_name": issuer_company_name,
             "gemini_legal_form": issuer_legal_form,
@@ -310,10 +313,15 @@ class GenerateDraftUseCase:
             context["payment_terms_display"] = payment_terms_raw
 
         invoice_method_raw = context.get("invoice_submission_method", "email")
-        try:
-            context["invoice_submission_method_display"] = InvoiceSubmissionMethod(invoice_method_raw).display_text
-        except ValueError:
-            context["invoice_submission_method_display"] = invoice_method_raw
+        _issuer = context.get("issuer_company_name", "")
+        _mail = context.get("invoices_company_mail", "")
+        _invoice_display_map = {
+            "boondmanager": f"Les factures seront à déposer sur la plateforme Boondmanager de la société {_issuer}",
+            "email": f"Les factures seront à envoyer exclusivement à l'adresse suivante {_mail}",
+        }
+        context["invoice_submission_method_display"] = _invoice_display_map.get(
+            invoice_method_raw, invoice_method_raw
+        )
 
         # Pre-render each article's content as a Jinja2 template so that
         # article authors can embed variables (e.g. {{ payment_terms_display }})
