@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Plus, Pencil, Trash2, Star, ImagePlus, X } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, Star, ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { contractCompaniesApi, ContractCompany, ContractCompanyRequest } from '../../api/contracts';
 
@@ -257,7 +257,16 @@ function LogoManager({ company }: { company: ContractCompany }) {
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [loadingUrl, setLoadingUrl] = useState(false);
+
+  // Auto-load logo URL when logo is configured
+  useEffect(() => {
+    if (!company.has_logo) { setPreviewUrl(null); return; }
+    let cancelled = false;
+    contractCompaniesApi.getLogoUrl(company.id).then((url) => {
+      if (!cancelled) setPreviewUrl(url);
+    }).catch(() => {/* silently ignore */});
+    return () => { cancelled = true; };
+  }, [company.id, company.has_logo]);
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => contractCompaniesApi.uploadLogo(company.id, file),
@@ -286,36 +295,15 @@ function LogoManager({ company }: { company: ContractCompany }) {
     uploadMutation.mutate(file);
   };
 
-  const handleViewLogo = async () => {
-    if (previewUrl) { setPreviewUrl(null); return; }
-    setLoadingUrl(true);
-    try {
-      const url = await contractCompaniesApi.getLogoUrl(company.id);
-      setPreviewUrl(url);
-    } catch {
-      toast.error('Impossible de charger le logo.');
-    } finally {
-      setLoadingUrl(false);
-    }
-  };
-
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      {/* Preview */}
+      {/* Logo preview (auto-shown if configured) */}
       {previewUrl && (
-        <div className="relative inline-block">
-          <img
-            src={previewUrl}
-            alt="Logo"
-            className="h-10 max-w-[120px] object-contain border border-gray-200 dark:border-gray-600 rounded p-1 bg-white"
-          />
-          <button
-            onClick={() => setPreviewUrl(null)}
-            className="absolute -top-1.5 -right-1.5 bg-gray-200 dark:bg-gray-700 rounded-full p-0.5"
-          >
-            <X className="h-3 w-3 text-gray-600 dark:text-gray-300" />
-          </button>
-        </div>
+        <img
+          src={previewUrl}
+          alt="Logo"
+          className="h-10 max-w-[120px] object-contain border border-gray-200 dark:border-gray-600 rounded p-1 bg-white"
+        />
       )}
 
       {/* Upload button */}
@@ -328,17 +316,6 @@ function LogoManager({ company }: { company: ContractCompany }) {
         <ImagePlus className="h-3.5 w-3.5" />
         {uploadMutation.isPending ? 'Upload...' : company.has_logo ? 'Remplacer' : 'Ajouter un logo'}
       </button>
-
-      {/* View existing */}
-      {company.has_logo && !previewUrl && (
-        <button
-          onClick={handleViewLogo}
-          disabled={loadingUrl}
-          className="text-xs px-2.5 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-        >
-          {loadingUrl ? '...' : 'Voir le logo'}
-        </button>
-      )}
 
       {/* Delete */}
       {company.has_logo && (
