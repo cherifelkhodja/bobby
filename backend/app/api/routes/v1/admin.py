@@ -1376,6 +1376,7 @@ def _company_to_response(m: ContractCompanyModel) -> ContractCompanyResponse:
         signatory_name=m.signatory_name,
         invoices_company_mail=m.invoices_company_mail,
         color_code=m.color_code,
+        boond_agency_id=m.boond_agency_id,
         has_logo=bool(m.logo_s3_key),
         is_default=m.is_default,
         is_active=m.is_active,
@@ -1435,6 +1436,7 @@ async def create_contract_company(
         signatory_name=body.signatory_name,
         invoices_company_mail=body.invoices_company_mail,
         color_code=body.color_code,
+        boond_agency_id=body.boond_agency_id,
         is_default=body.is_default,
         is_active=body.is_active,
         created_at=_dt.utcnow(),
@@ -1483,6 +1485,7 @@ async def update_contract_company(
     m.signatory_name = body.signatory_name
     m.invoices_company_mail = body.invoices_company_mail
     m.color_code = body.color_code
+    m.boond_agency_id = body.boond_agency_id
     m.is_default = body.is_default
     m.is_active = body.is_active
     m.updated_at = _dt.utcnow()

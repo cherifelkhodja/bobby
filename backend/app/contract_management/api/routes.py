@@ -1051,6 +1051,41 @@ async def mark_as_signed(
         s3_key=s3_key_signed,
     )
 
+    # ── Synchronisation BoondManager (best-effort) ────────────────────────
+    try:
+        from app.contract_management.application.use_cases.sync_to_boond_after_signing import (
+            SyncToBoondAfterSigningUseCase,
+        )
+        from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+            BoondCrmAdapter,
+        )
+        from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+            ContractRepository as _ContractRepo,
+        )
+        from app.infrastructure.boond.client import BoondClient
+
+        _settings = get_settings()
+        _cr_repo2 = ContractRequestRepository(db)
+        _contract_repo2 = _ContractRepo(db)
+        _tp_repo = ThirdPartyRepository(db)
+        _crm = BoondCrmAdapter(BoondClient(_settings))
+
+        sync_use_case = SyncToBoondAfterSigningUseCase(
+            db=db,
+            contract_request_repository=_cr_repo2,
+            contract_repository=_contract_repo2,
+            third_party_repository=_tp_repo,
+            crm_service=_crm,
+        )
+        saved = await sync_use_case.execute(contract_request_id)
+        logger.info("boond_sync_after_signing_complete", cr_id=str(saved.id))
+    except Exception as exc:
+        logger.error(
+            "boond_sync_after_signing_failed",
+            cr_id=str(contract_request_id),
+            error=str(exc),
+        )
+
     name = await _resolve_commercial_name(db, saved.commercial_email)
     return _cr_to_response(saved, commercial_name=name)
 

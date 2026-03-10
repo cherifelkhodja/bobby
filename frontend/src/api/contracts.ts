@@ -216,6 +216,7 @@ export interface ContractCompany {
   signatory_name: string;
   invoices_company_mail?: string | null;
   color_code: string;
+  boond_agency_id?: number | null;
   has_logo: boolean;
   is_default: boolean;
   is_active: boolean;

@@ -115,6 +115,7 @@ class ContractCompanyRequest(BaseModel):
     signatory_name: str = Field(..., max_length=255)
     invoices_company_mail: str | None = Field(None, max_length=255)
     color_code: str = Field("#4BBEA8", pattern=r"^#[0-9A-Fa-f]{6}$")
+    boond_agency_id: int | None = Field(None, description="ID de l'agence Boond associée à cette société émettrice")
     is_default: bool = False
     is_active: bool = True
 
@@ -138,6 +139,7 @@ class ContractCompanyResponse(BaseModel):
     signatory_name: str
     invoices_company_mail: str | None = None
     color_code: str
+    boond_agency_id: int | None = None
     has_logo: bool
     is_default: bool
     is_active: bool

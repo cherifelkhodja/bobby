@@ -122,6 +122,7 @@ async def get_portal_info(
             legal_form=tp.legal_form,
             capital=tp.capital,
             siret=tp.siret,
+            vat_number=tp.vat_number,
             rcs_city=tp.rcs_city,
             head_office_street=tp.head_office_street,
             head_office_postal_code=tp.head_office_postal_code,
@@ -701,6 +702,7 @@ async def submit_company_info(
     tp.capital = body.capital
     tp.siren = siren
     tp.siret = body.siret
+    tp.vat_number = body.vat_number
     tp.rcs_city = body.rcs_city or body.head_office_city
     tp.rcs_number = siren  # In France, RCS registration number = SIREN
     tp.head_office_street = body.head_office_street
@@ -818,6 +820,7 @@ async def save_company_info_draft(
         "legal_form": body.legal_form,
         "capital": body.capital,
         "siret": body.siret,
+        "vat_number": body.vat_number,
         "head_office_street": body.head_office_street,
         "head_office_postal_code": body.head_office_postal_code,
         "head_office_city": body.head_office_city,

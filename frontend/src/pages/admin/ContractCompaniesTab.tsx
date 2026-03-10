@@ -20,6 +20,7 @@ const EMPTY_FORM: ContractCompanyRequest = {
   signatory_name: '',
   invoices_company_mail: '',
   color_code: '#4BBEA8',
+  boond_agency_id: null,
   is_default: false,
   is_active: true,
 };
@@ -179,6 +180,26 @@ function CompanyForm({ initial, onSubmit, onCancel, isLoading }: FormProps) {
           />
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             Utilisé dans le contrat pour la clause de facturation par email (variable <code>{'{{ invoices_company_mail }}'}</code>).
+          </p>
+        </div>
+      </div>
+
+      {/* Intégration BoondManager */}
+      <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">
+          Intégration BoondManager
+        </p>
+        <div>
+          <label className={LABEL_CLS}>ID Agence Boond</label>
+          <input
+            className={INPUT_CLS}
+            type="number"
+            value={form.boond_agency_id ?? ''}
+            onChange={(e) => set('boond_agency_id', e.target.value ? parseInt(e.target.value) : null)}
+            placeholder="Ex : 1 (Gemini), 5 (Craftmania)"
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            ID de l'agence dans BoondManager — utilisé lors de la création automatique du fournisseur après signature.
           </p>
         </div>
       </div>
@@ -533,6 +554,7 @@ export function ContractCompaniesTab() {
                       signatory_name: company.signatory_name,
                       invoices_company_mail: company.invoices_company_mail ?? '',
                       color_code: company.color_code,
+                      boond_agency_id: company.boond_agency_id ?? null,
                       is_default: company.is_default,
                       is_active: company.is_active,
                     }}

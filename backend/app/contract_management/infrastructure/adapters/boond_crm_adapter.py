@@ -289,6 +289,283 @@ class BoondCrmAdapter:
         )
         return int(result_id) if result_id else 0
 
+    async def convert_candidate_to_resource(
+        self,
+        candidate_id: int,
+        state: int = 3,
+    ) -> None:
+        """Convert a candidate to a resource in BoondManager by updating state.
+
+        Args:
+            candidate_id: Boond candidate/resource ID.
+            state: Target state (3 = Arrivée prochaine).
+        """
+        payload = {
+            "data": {
+                "type": "resource",
+                "id": str(candidate_id),
+                "attributes": {"state": state},
+            }
+        }
+        try:
+            await self._boond._make_request(
+                "PATCH", f"/candidates/{candidate_id}", json=payload
+            )
+            logger.info(
+                "boond_candidate_converted_to_resource",
+                candidate_id=candidate_id,
+                state=state,
+            )
+        except Exception as exc:
+            logger.error(
+                "boond_convert_candidate_failed",
+                candidate_id=candidate_id,
+                error=str(exc),
+            )
+            raise
+
+    async def create_company_full(
+        self,
+        company_name: str,
+        state: int,
+        postcode: str | None,
+        address: str | None,
+        town: str | None,
+        country: str,
+        vat_number: str | None,
+        siret: str | None,
+        legal_status: str | None,
+        registered_office: str | None,
+        ape_code: str,
+        agency_id: int | None,
+    ) -> int:
+        """Create a provider company in BoondManager with full details.
+
+        Args:
+            company_name: Company name.
+            state: Company state (9 = fournisseur actif).
+            postcode: Postal code.
+            address: Street address.
+            town: City.
+            country: Country name.
+            vat_number: VAT number (numéro TVA intracommunautaire).
+            siret: SIRET number (14 digits).
+            legal_status: Legal status string, e.g. "SAS au capital de 1000€".
+            registered_office: RCS string, e.g. "535 028 856 R.C.S. Rennes".
+            ape_code: APE/NAF code, e.g. "6202A".
+            agency_id: Boond agency ID to link the company to.
+
+        Returns:
+            Boond company ID.
+        """
+        attributes: dict[str, Any] = {
+            "name": company_name,
+            "state": state,
+            "typeOf": "provider",
+            "expertiseArea": "informatique",
+            "apeCode": ape_code,
+        }
+        if postcode:
+            attributes["postCode"] = postcode
+        if address:
+            attributes["address"] = address
+        if town:
+            attributes["town"] = town
+        if country:
+            attributes["country"] = country
+        if vat_number:
+            attributes["vatNumber"] = vat_number
+        if siret:
+            attributes["registrationNumber"] = siret
+        if legal_status:
+            attributes["legalStatus"] = legal_status
+        if registered_office:
+            attributes["registeredOffice"] = registered_office
+
+        payload: dict[str, Any] = {
+            "data": {
+                "type": "company",
+                "attributes": attributes,
+            }
+        }
+
+        if agency_id:
+            payload["data"]["relationships"] = {
+                "agency": {"data": {"type": "agency", "id": str(agency_id)}}
+            }
+
+        response = await self._boond._make_request("POST", "/companies", json=payload)
+        result_id = response.get("data", {}).get("id")
+        logger.info(
+            "boond_company_full_created",
+            company_id=result_id,
+            company_name=company_name,
+        )
+        return int(result_id) if result_id else 0
+
+    async def create_contact(
+        self,
+        company_id: int,
+        civility: str | None,
+        first_name: str | None,
+        last_name: str | None,
+        email: str | None,
+        phone: str | None,
+        job_title: str | None,
+        type_of: int,
+    ) -> int:
+        """Create a contact linked to a company in BoondManager.
+
+        Args:
+            company_id: Boond company ID.
+            civility: Civility string ("M." → 1, "Mme" → 2).
+            first_name: First name.
+            last_name: Last name.
+            email: Email address.
+            phone: Phone number.
+            job_title: Job title / fonction.
+            type_of: Contact type (7=dirigeant, 9=adv, 2=facturation).
+
+        Returns:
+            Boond contact ID.
+        """
+        civility_map = {"M.": 1, "Mme": 2, "M": 1}
+        civility_int = civility_map.get(civility or "", 1)
+
+        attributes: dict[str, Any] = {"typeOf": type_of, "civility": civility_int}
+        if first_name:
+            attributes["firstName"] = first_name
+        if last_name:
+            attributes["lastName"] = last_name
+        if email:
+            attributes["email1"] = email
+        if phone:
+            attributes["phone1"] = phone
+        if job_title:
+            attributes["jobTitle"] = job_title
+
+        payload = {
+            "data": {
+                "type": "contact",
+                "attributes": attributes,
+                "relationships": {
+                    "company": {"data": {"type": "company", "id": str(company_id)}}
+                },
+            }
+        }
+
+        response = await self._boond._make_request("POST", "/contacts", json=payload)
+        result_id = response.get("data", {}).get("id")
+        logger.info(
+            "boond_contact_created",
+            contact_id=result_id,
+            company_id=company_id,
+            type_of=type_of,
+        )
+        return int(result_id) if result_id else 0
+
+    async def get_resource_type_of(self, resource_id: int) -> int | None:
+        """Fetch the typeOf attribute of a resource.
+
+        Args:
+            resource_id: Boond resource ID.
+
+        Returns:
+            typeOf integer (0=salarié, 1=externe) or None on error.
+        """
+        try:
+            response = await self._boond._make_request("GET", f"/resources/{resource_id}")
+            type_of = response.get("data", {}).get("attributes", {}).get("typeOf")
+            return int(type_of) if type_of is not None else None
+        except Exception as exc:
+            logger.error(
+                "boond_get_resource_type_of_failed",
+                resource_id=resource_id,
+                error=str(exc),
+            )
+            return None
+
+    async def create_boond_contract(
+        self,
+        resource_id: int,
+        positioning_id: int,
+        daily_rate: float,
+        type_of: int,
+    ) -> int:
+        """Create a contract in BoondManager for an external consultant.
+
+        Args:
+            resource_id: Boond resource ID.
+            positioning_id: Boond positioning ID.
+            daily_rate: Average daily production cost (TJM).
+            type_of: Contract type (2=sous-traitant, 3=freelance,
+                     6=portage salarial, 7=portage commercial).
+
+        Returns:
+            Boond contract ID.
+        """
+        payload = {
+            "data": {
+                "type": "contract",
+                "attributes": {
+                    "typeOf": type_of,
+                    "contractAverageDailyProductionCost": daily_rate,
+                    "numberOfHoursPerWeek": 35,
+                },
+                "relationships": {
+                    "resource": {"data": {"type": "resource", "id": str(resource_id)}},
+                    "positioning": {
+                        "data": {"type": "positioning", "id": str(positioning_id)}
+                    },
+                },
+            }
+        }
+
+        response = await self._boond._make_request("POST", "/contracts", json=payload)
+        result_id = response.get("data", {}).get("id")
+        logger.info(
+            "boond_contract_created",
+            contract_id=result_id,
+            resource_id=resource_id,
+            positioning_id=positioning_id,
+        )
+        return int(result_id) if result_id else 0
+
+    async def update_resource_administrative(
+        self,
+        resource_id: int,
+        provider_company_id: int,
+        provider_contact_id: int | None,
+    ) -> None:
+        """Link a resource to its provider company and contact (administrative data).
+
+        Args:
+            resource_id: Boond resource ID.
+            provider_company_id: Boond company ID of the provider.
+            provider_contact_id: Boond contact ID of the main provider contact.
+        """
+        relationships: dict[str, Any] = {
+            "providerCompany": {
+                "data": {"type": "company", "id": str(provider_company_id)}
+            }
+        }
+        if provider_contact_id:
+            relationships["providerContact"] = {
+                "data": {"type": "contact", "id": str(provider_contact_id)}
+            }
+
+        payload = {"data": {"relationships": relationships}}
+
+        await self._boond._make_request(
+            "PUT", f"/resources/{resource_id}/administrative", json=payload
+        )
+        logger.info(
+            "boond_resource_administrative_updated",
+            resource_id=resource_id,
+            provider_company_id=provider_company_id,
+            provider_contact_id=provider_contact_id,
+        )
+
     @staticmethod
     def _extract_relationship_id(relationships: dict, key: str) -> int | None:
         """Extract a related entity ID from Boond relationships."""
