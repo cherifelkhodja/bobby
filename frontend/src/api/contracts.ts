@@ -84,6 +84,8 @@ export const contractsApi = {
     data: {
       article_overrides?: Record<string, string>;
       annex_overrides?: Record<string, string>;
+      deleted_article_keys?: string[];
+      deleted_annex_keys?: string[];
     },
   ): Promise<ContractRequest> => {
     const response = await apiClient.patch<ContractRequest>(

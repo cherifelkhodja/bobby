@@ -596,6 +596,12 @@ async def save_article_overrides(
             existing_annex.pop(key, None)
     cfg["annex_overrides"] = existing_annex
 
+    # Merge deleted keys — None means "no change", [] means "restore all"
+    if body.deleted_article_keys is not None:
+        cfg["deleted_article_keys"] = list(set(body.deleted_article_keys))
+    if body.deleted_annex_keys is not None:
+        cfg["deleted_annex_keys"] = list(set(body.deleted_annex_keys))
+
     cr.contract_config = cfg
     saved = await cr_repo.save(cr)
 

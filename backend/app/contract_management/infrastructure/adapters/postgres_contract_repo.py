@@ -5,6 +5,7 @@ from uuid import UUID
 
 import structlog
 from sqlalchemy import func, select
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.contract_management.domain.entities.contract import Contract
@@ -79,10 +80,12 @@ class ContractRequestRepository:
             model.mission_city = request.mission_city
             model.contractualization_contact_email = request.contractualization_contact_email
             model.contract_config = request.contract_config
+            flag_modified(model, "contract_config")
             model.commercial_validated_at = request.commercial_validated_at
             model.compliance_override = request.compliance_override
             model.compliance_override_reason = request.compliance_override_reason
             model.status_history = request.status_history
+            flag_modified(model, "status_history")
             model.updated_at = request.updated_at
         else:
             model = self._to_model(request)

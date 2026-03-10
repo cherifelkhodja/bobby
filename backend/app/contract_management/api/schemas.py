@@ -156,10 +156,14 @@ class ArticleOverridesRequest(BaseModel):
 
     Keys are article_key / annexe_key; values are the overridden HTML content.
     Pass an empty string to reset an override (restores template default).
+    deleted_article_keys / deleted_annex_keys: keys to exclude from the PDF.
+    Pass an empty list to clear all deletions for that type.
     """
 
     article_overrides: dict[str, str] = Field(default_factory=dict)
     annex_overrides: dict[str, str] = Field(default_factory=dict)
+    deleted_article_keys: list[str] | None = None
+    deleted_annex_keys: list[str] | None = None
 
 
 class PartnerReviewRequest(BaseModel):

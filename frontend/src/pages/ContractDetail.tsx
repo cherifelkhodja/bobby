@@ -1447,14 +1447,23 @@ function ArticleAnnexEditor({
 }) {
   const articleOverrides = (existingOverrides.article_overrides ?? {}) as Record<string, string>;
   const annexOverrides = (existingOverrides.annex_overrides ?? {}) as Record<string, string>;
+  const serverDeletedArticles = ((existingOverrides.deleted_article_keys ?? []) as string[]);
+  const serverDeletedAnnexes = ((existingOverrides.deleted_annex_keys ?? []) as string[]);
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
+  // Local deleted state mirrors server; updated optimistically on toggle
+  const [deletedArticles, setDeletedArticles] = useState<string[]>(serverDeletedArticles);
+  const [deletedAnnexes, setDeletedAnnexes] = useState<string[]>(serverDeletedAnnexes);
 
   const saveMutation = useMutation({
-    mutationFn: (data: { article_overrides?: Record<string, string>; annex_overrides?: Record<string, string> }) =>
-      contractsApi.saveArticleOverrides(contractRequestId, data),
+    mutationFn: (data: {
+      article_overrides?: Record<string, string>;
+      annex_overrides?: Record<string, string>;
+      deleted_article_keys?: string[];
+      deleted_annex_keys?: string[];
+    }) => contractsApi.saveArticleOverrides(contractRequestId, data),
     onSuccess: () => {
       toast.success('Modifications enregistrées.');
       setDirty({});
@@ -1478,7 +1487,6 @@ function ArticleAnnexEditor({
     const overrides = isAnnex ? annexOverrides : articleOverrides;
     const hasOverride = !!overrides[key];
     if (hasOverride) {
-      // Reset to template — save empty string (backend removes the override)
       const payload = isAnnex
         ? { annex_overrides: { [key]: '' } }
         : { article_overrides: { [key]: '' } };
@@ -1496,6 +1504,23 @@ function ArticleAnnexEditor({
     saveMutation.mutate(payload);
   };
 
+  const handleToggleDelete = (key: string, isAnnex: boolean, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isAnnex) {
+      const next = deletedAnnexes.includes(key)
+        ? deletedAnnexes.filter((k) => k !== key)
+        : [...deletedAnnexes, key];
+      setDeletedAnnexes(next);
+      saveMutation.mutate({ deleted_annex_keys: next });
+    } else {
+      const next = deletedArticles.includes(key)
+        ? deletedArticles.filter((k) => k !== key)
+        : [...deletedArticles, key];
+      setDeletedArticles(next);
+      saveMutation.mutate({ deleted_article_keys: next });
+    }
+  };
+
   const renderItem = (
     key: string,
     title: string,
@@ -1507,34 +1532,53 @@ function ArticleAnnexEditor({
     const value = getValue(key, defaultContent, isAnnex);
     const isDirty = !!dirty[key];
     const hasOverride = isAnnex ? !!annexOverrides[key] : !!articleOverrides[key];
+    const isDeleted = isAnnex ? deletedAnnexes.includes(key) : deletedArticles.includes(key);
 
     return (
-      <div key={key} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-        <button
-          type="button"
-          className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 text-left transition-colors"
-          onClick={() => setExpanded((e) => ({ ...e, [key]: !e[key] }))}
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-shrink-0">
-              {label}
-            </span>
-            <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{title}</span>
-            {hasOverride && !isDirty && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex-shrink-0">
-                <Pencil className="h-3 w-3 mr-1" />modifié
+      <div key={key} className={`border rounded-lg overflow-hidden ${isDeleted ? 'border-red-200 dark:border-red-800 opacity-60' : 'border-gray-200 dark:border-gray-700'}`}>
+        <div className="flex items-center">
+          <button
+            type="button"
+            className={`flex-1 flex items-center justify-between px-4 py-3 text-left transition-colors ${isDeleted ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+            onClick={() => !isDeleted && setExpanded((e) => ({ ...e, [key]: !e[key] }))}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-shrink-0">
+                {label}
               </span>
-            )}
-            {isDirty && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-700 flex-shrink-0">
-                non sauvegardé
+              <span className={`text-sm font-medium truncate ${isDeleted ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-200'}`}>
+                {title}
               </span>
-            )}
-          </div>
-          {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />}
-        </button>
+              {isDeleted && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-700 flex-shrink-0">
+                  supprimé
+                </span>
+              )}
+              {!isDeleted && hasOverride && !isDirty && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex-shrink-0">
+                  <Pencil className="h-3 w-3 mr-1" />modifié
+                </span>
+              )}
+              {!isDeleted && isDirty && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-700 flex-shrink-0">
+                  non sauvegardé
+                </span>
+              )}
+            </div>
+            {!isDeleted && (isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />)}
+          </button>
+          <button
+            type="button"
+            title={isDeleted ? 'Restaurer cet article' : 'Supprimer cet article du PDF'}
+            onClick={(e) => handleToggleDelete(key, isAnnex, e)}
+            disabled={saveMutation.isPending}
+            className={`px-3 py-3 flex-shrink-0 transition-colors ${isDeleted ? 'text-green-500 hover:text-green-700 dark:hover:text-green-400 bg-red-50 dark:bg-red-900/20' : 'text-gray-300 hover:text-red-500 dark:hover:text-red-400 bg-gray-50 dark:bg-gray-800/60'}`}
+          >
+            {isDeleted ? <RotateCcw className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+          </button>
+        </div>
 
-        {isExpanded && (
+        {isExpanded && !isDeleted && (
           <div className="p-4 bg-white dark:bg-gray-900">
             <textarea
               value={value}

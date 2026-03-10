@@ -335,16 +335,21 @@ class GenerateDraftUseCase:
 
         # Filter out optional articles that were excluded for this contract
         excluded_keys: list[str] = []
+        deleted_article_keys: list[str] = []
+        deleted_annex_keys: list[str] = []
         article_overrides: dict[str, str] = {}
         annex_overrides: dict[str, str] = {}
         if cr.contract_config and isinstance(cr.contract_config, dict):
             excluded_keys = cr.contract_config.get("excluded_optional_article_keys", []) or []
+            deleted_article_keys = cr.contract_config.get("deleted_article_keys", []) or []
+            deleted_annex_keys = cr.contract_config.get("deleted_annex_keys", []) or []
             article_overrides = cr.contract_config.get("article_overrides") or {}
             annex_overrides = cr.contract_config.get("annex_overrides") or {}
 
         selected_articles = [
             a for a in articles
             if not (a.is_optional and a.article_key in excluded_keys)
+            and a.article_key not in deleted_article_keys
         ]
 
         # Re-number sequentially after filtering
@@ -367,6 +372,8 @@ class GenerateDraftUseCase:
         # Pre-render active annexes, filtering conditionals based on contract config
         rendered_annexes = []
         for annexe in (annexes or []):
+            if annexe.annexe_key in deleted_annex_keys:
+                continue
             if annexe.is_conditional and annexe.condition_field:
                 field_value = context.get(annexe.condition_field, "")
                 if not field_value:
