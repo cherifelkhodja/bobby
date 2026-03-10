@@ -241,6 +241,43 @@ export default function ContractDetail() {
     },
   });
 
+  const boondConvertMutation = useMutation({
+    mutationFn: () => contractsApi.boondConvertCandidate(id!),
+    onSuccess: (data) => {
+      toast.success(`Candidat ${data.boond_candidate_id} converti en ressource.`);
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const boondCompanyMutation = useMutation({
+    mutationFn: () => contractsApi.boondCreateCompany(id!),
+    onSuccess: (data) => {
+      const msg = data.created_company
+        ? `Société créée (ID ${data.boond_provider_id}), ${data.contacts_created.length} contact(s).`
+        : `Société déjà existante (ID ${data.boond_provider_id}), ${data.contacts_created.length} contact(s) ajouté(s).`;
+      toast.success(msg);
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const boondContractMutation = useMutation({
+    mutationFn: () => contractsApi.boondCreateContract(id!),
+    onSuccess: (data) => {
+      toast.success(`Contrat Boond créé pour ressource ${data.resource_id}.`);
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const boondPOMutation = useMutation({
+    mutationFn: () => contractsApi.boondCreatePurchaseOrder(id!),
+    onSuccess: (data) => {
+      toast.success(`Bon de commande créé (ID ${data.boond_purchase_order_id}).`);
+      queryClient.invalidateQueries({ queryKey: ['contracts', id] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
   const overrideMutation = useMutation({
     mutationFn: () => contractsApi.complianceOverride(id!, overrideReason),
     onSuccess: () => {
@@ -943,30 +980,116 @@ export default function ContractDetail() {
         </Card>
       )}
 
-      {/* Boond sync retry — visible when signed or archived */}
+      {/* Boond sync actions — visible when signed or archived */}
       {isAdv && (cr.status === 'signed' || cr.status === 'archived') && (
         <Card className="mb-6 border-emerald-200 dark:border-emerald-800">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <RotateCcw className="h-5 w-5 text-emerald-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <h3 className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-                  Synchronisation BoondManager
-                </h3>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                  Relancer la création de la société, des contacts, du contrat et du bon de commande dans Boond.
-                </p>
-              </div>
+          <div className="flex items-start gap-3 mb-4">
+            <RotateCcw className="h-5 w-5 text-emerald-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                Actions BoondManager
+              </h3>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                Exécuter chaque action Boond séparément, ou tout relancer en une fois.
+              </p>
             </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {/* Action 1 — candidat → ressource */}
+            {cr.boond_candidate_id && (
+              <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  1 · Candidat → Ressource
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Convertit le candidat #{cr.boond_candidate_id} en ressource (state 3).
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 self-start"
+                  disabled={boondConvertMutation.isPending}
+                  onClick={() => boondConvertMutation.mutate()}
+                >
+                  <RotateCcw className={`h-3.5 w-3.5 mr-1 ${boondConvertMutation.isPending ? 'animate-spin' : ''}`} />
+                  {boondConvertMutation.isPending ? 'En cours…' : 'Exécuter'}
+                </Button>
+              </div>
+            )}
+
+            {/* Action 2 — société + contacts */}
+            <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                2 · Société + Contacts
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Crée la société fournisseur et les 3 contacts (dirigeant, ADV, facturation).
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-1 self-start"
+                disabled={boondCompanyMutation.isPending}
+                onClick={() => boondCompanyMutation.mutate()}
+              >
+                <RotateCcw className={`h-3.5 w-3.5 mr-1 ${boondCompanyMutation.isPending ? 'animate-spin' : ''}`} />
+                {boondCompanyMutation.isPending ? 'En cours…' : 'Exécuter'}
+              </Button>
+            </div>
+
+            {/* Action 3 — contrat ressource */}
+            {cr.boond_candidate_id && (
+              <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  3 · Contrat ressource (externe uniquement)
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Crée le contrat Boond et lie la société fournisseur à la ressource.
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 self-start"
+                  disabled={boondContractMutation.isPending}
+                  onClick={() => boondContractMutation.mutate()}
+                >
+                  <RotateCcw className={`h-3.5 w-3.5 mr-1 ${boondContractMutation.isPending ? 'animate-spin' : ''}`} />
+                  {boondContractMutation.isPending ? 'En cours…' : 'Exécuter'}
+                </Button>
+              </div>
+            )}
+
+            {/* Action 4 — bon de commande */}
+            <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                4 · Bon de commande
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Crée le BDC dans Boond et enregistre son ID sur le contrat signé.
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-1 self-start"
+                disabled={boondPOMutation.isPending}
+                onClick={() => boondPOMutation.mutate()}
+              >
+                <RotateCcw className={`h-3.5 w-3.5 mr-1 ${boondPOMutation.isPending ? 'animate-spin' : ''}`} />
+                {boondPOMutation.isPending ? 'En cours…' : 'Exécuter'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Tout relancer */}
+          <div className="mt-3 pt-3 border-t border-emerald-100 dark:border-emerald-900 flex justify-end">
             <Button
               variant="outline"
               size="sm"
               disabled={retryBoondSyncMutation.isPending}
               onClick={() => retryBoondSyncMutation.mutate()}
-              className="whitespace-nowrap"
             >
               <RotateCcw className={`h-4 w-4 mr-1 ${retryBoondSyncMutation.isPending ? 'animate-spin' : ''}`} />
-              {retryBoondSyncMutation.isPending ? 'En cours…' : 'Relancer la sync Boond'}
+              {retryBoondSyncMutation.isPending ? 'En cours…' : 'Tout relancer (sync complète)'}
             </Button>
           </div>
         </Card>

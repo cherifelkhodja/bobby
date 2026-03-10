@@ -113,6 +113,7 @@ def _cr_to_response(
         id=cr.id,
         reference=cr.reference,
         boond_positioning_id=cr.boond_positioning_id,
+        boond_candidate_id=cr.boond_candidate_id,
         status=cr.status.value,
         status_display=cr.status.display_name,
         third_party_type=cr.third_party_type,
@@ -1203,6 +1204,258 @@ async def retry_boond_sync(
     logger.info("retry_boond_sync_complete", cr_id=str(saved.id))
     name = await _resolve_commercial_name(db, saved.commercial_email)
     return _cr_to_response(saved, commercial_name=name)
+
+
+# ── Actions Boond individuelles ────────────────────────────────────────────────
+
+def _boond_deps(db: AsyncSession, settings):
+    """Build shared adapters for individual Boond action routes."""
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import BoondCrmAdapter
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import ContractRepository
+    from app.infrastructure.boond.client import BoondClient
+
+    cr_repo = ContractRequestRepository(db)
+    contract_repo = ContractRepository(db)
+    tp_repo = ThirdPartyRepository(db)
+    crm = BoondCrmAdapter(BoondClient(settings))
+    return cr_repo, contract_repo, tp_repo, crm
+
+
+def _require_signed_or_archived(cr, contract_request_id: UUID):
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
+    if cr.status not in ("signed", "archived"):
+        raise HTTPException(
+            status_code=400,
+            detail="Action disponible uniquement pour les contrats signés ou archivés.",
+        )
+
+
+@router.post(
+    "/{contract_request_id}/boond/convert-candidate",
+    summary="[Boond] Convertir le candidat en ressource",
+)
+async def boond_convert_candidate(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Convertit le candidat Boond en ressource (state=3). ADV/admin only."""
+    settings = get_settings()
+    cr_repo, _cr2, _tp, crm = _boond_deps(db, settings)
+
+    cr = await cr_repo.get_by_id(contract_request_id)
+    _require_signed_or_archived(cr, contract_request_id)
+
+    if not cr.boond_candidate_id:
+        raise HTTPException(status_code=400, detail="Pas de boond_candidate_id sur cette demande.")
+
+    await crm.convert_candidate_to_resource(cr.boond_candidate_id, state=3)
+    logger.info("boond_convert_candidate_ok", cr_id=str(cr.id), candidate_id=cr.boond_candidate_id)
+    return {"ok": True, "boond_candidate_id": cr.boond_candidate_id}
+
+
+@router.post(
+    "/{contract_request_id}/boond/create-company",
+    summary="[Boond] Créer la société fournisseur + contacts",
+)
+async def boond_create_company(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Crée la société et les 3 contacts (dirigeant, ADV, facturation) dans Boond. ADV/admin only."""
+    from app.contract_management.infrastructure.models import ContractCompanyModel
+    settings = get_settings()
+    cr_repo, _cr2, tp_repo, crm = _boond_deps(db, settings)
+
+    cr = await cr_repo.get_by_id(contract_request_id)
+    _require_signed_or_archived(cr, contract_request_id)
+
+    if not cr.third_party_id:
+        raise HTTPException(status_code=400, detail="Pas de tiers associé à cette demande.")
+
+    tp = await tp_repo.get_by_id(cr.third_party_id)
+    if not tp:
+        raise HTTPException(status_code=404, detail="Tiers introuvable.")
+
+    # Fetch issuing company for agency_id
+    from sqlalchemy import select as _select
+    company = None
+    if cr.company_id:
+        result = await db.execute(
+            _select(ContractCompanyModel).where(ContractCompanyModel.id == cr.company_id)
+        )
+        company = result.scalar_one_or_none()
+    if not company:
+        result = await db.execute(
+            _select(ContractCompanyModel)
+            .where(ContractCompanyModel.is_default.is_(True))
+            .where(ContractCompanyModel.is_active.is_(True))
+            .limit(1)
+        )
+        company = result.scalar_one_or_none()
+
+    provider_id = tp.boond_provider_id
+    created_company = False
+    if not provider_id:
+        legal_status = None
+        if tp.legal_form and tp.capital:
+            legal_status = f"{tp.legal_form} au capital de {tp.capital}"
+        registered_office = None
+        if tp.rcs_number and tp.rcs_city:
+            registered_office = f"{tp.rcs_number} R.C.S. {tp.rcs_city}"
+
+        provider_id = await crm.create_company_full(
+            company_name=tp.company_name or "",
+            state=9,
+            postcode=tp.head_office_postal_code,
+            address=tp.head_office_street or tp.head_office_address,
+            town=tp.head_office_city,
+            country="France",
+            vat_number=tp.vat_number,
+            siret=tp.siret,
+            legal_status=legal_status,
+            registered_office=registered_office,
+            ape_code="6202A",
+            agency_id=company.boond_agency_id if company else None,
+        )
+        tp.boond_provider_id = provider_id
+        await tp_repo.save(tp)
+        created_company = True
+        logger.info("boond_create_company_ok", cr_id=str(cr.id), provider_id=provider_id)
+
+    # Create contacts
+    contacts_created = []
+    contacts_to_create = [
+        (tp.representative_civility, tp.representative_first_name, tp.representative_last_name,
+         tp.representative_email, tp.representative_phone, tp.representative_title, 7, "dirigeant"),
+        (tp.adv_contact_civility, tp.adv_contact_first_name, tp.adv_contact_last_name,
+         tp.adv_contact_email, tp.adv_contact_phone, "ADV", 9, "adv"),
+        (tp.billing_contact_civility, tp.billing_contact_first_name, tp.billing_contact_last_name,
+         tp.billing_contact_email, tp.billing_contact_phone, "Facturation", 2, "facturation"),
+    ]
+    for civ, fn, ln, email, phone, job_title, type_of, label in contacts_to_create:
+        if fn or email:
+            contact_id = await crm.create_contact(
+                company_id=provider_id,
+                civility=civ, first_name=fn, last_name=ln,
+                email=email, phone=phone, job_title=job_title, type_of=type_of,
+            )
+            contacts_created.append({"label": label, "boond_contact_id": contact_id})
+
+    return {
+        "ok": True,
+        "created_company": created_company,
+        "boond_provider_id": provider_id,
+        "contacts_created": contacts_created,
+    }
+
+
+@router.post(
+    "/{contract_request_id}/boond/create-contract",
+    summary="[Boond] Créer le contrat ressource dans Boond",
+)
+async def boond_create_contract(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Crée le contrat Boond pour la ressource (externe uniquement) et lie la société fournisseur. ADV/admin only."""
+    from app.contract_management.application.use_cases.sync_to_boond_after_signing import (
+        _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE,
+    )
+    settings = get_settings()
+    cr_repo, _cr2, tp_repo, crm = _boond_deps(db, settings)
+
+    cr = await cr_repo.get_by_id(contract_request_id)
+    _require_signed_or_archived(cr, contract_request_id)
+
+    if not cr.boond_candidate_id:
+        raise HTTPException(status_code=400, detail="Pas de boond_candidate_id sur cette demande.")
+    if not cr.daily_rate:
+        raise HTTPException(status_code=400, detail="TJM manquant sur la demande.")
+
+    resource_type_of = await crm.get_resource_type_of(cr.boond_candidate_id)
+    if resource_type_of != 1:
+        raise HTTPException(
+            status_code=400,
+            detail=f"La ressource est de typeOf={resource_type_of} (attendu 1=externe). Contrat Boond non applicable.",
+        )
+
+    contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(cr.third_party_type or "", 3)
+    await crm.create_boond_contract(
+        resource_id=cr.boond_candidate_id,
+        positioning_id=cr.boond_positioning_id,
+        daily_rate=float(cr.daily_rate),
+        type_of=contract_type_of,
+    )
+
+    # Update resource administrative link if provider exists
+    provider_linked = False
+    if cr.third_party_id:
+        tp = await tp_repo.get_by_id(cr.third_party_id)
+        if tp and tp.boond_provider_id:
+            await crm.update_resource_administrative(
+                resource_id=cr.boond_candidate_id,
+                provider_company_id=tp.boond_provider_id,
+                provider_contact_id=None,
+            )
+            provider_linked = True
+
+    logger.info("boond_create_contract_ok", cr_id=str(cr.id), resource_id=cr.boond_candidate_id)
+    return {
+        "ok": True,
+        "resource_id": cr.boond_candidate_id,
+        "contract_type_of": contract_type_of,
+        "provider_linked": provider_linked,
+    }
+
+
+@router.post(
+    "/{contract_request_id}/boond/create-purchase-order",
+    summary="[Boond] Créer le bon de commande",
+)
+async def boond_create_purchase_order(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Crée le bon de commande dans Boond et enregistre l'ID sur le contrat. ADV/admin only."""
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import ContractRepository
+    settings = get_settings()
+    cr_repo, contract_repo, tp_repo, crm = _boond_deps(db, settings)
+
+    cr = await cr_repo.get_by_id(contract_request_id)
+    _require_signed_or_archived(cr, contract_request_id)
+
+    if not cr.daily_rate:
+        raise HTTPException(status_code=400, detail="TJM manquant sur la demande.")
+    if not cr.third_party_id:
+        raise HTTPException(status_code=400, detail="Pas de tiers associé.")
+
+    tp = await tp_repo.get_by_id(cr.third_party_id)
+    if not tp or not tp.boond_provider_id:
+        raise HTTPException(
+            status_code=400,
+            detail="La société fournisseur n'a pas encore été créée dans Boond (boond_provider_id manquant).",
+        )
+
+    contract = await contract_repo.get_by_request_id(cr.id)
+    if not contract:
+        raise HTTPException(status_code=400, detail="Aucun contrat signé trouvé.")
+
+    po_id = await crm.create_purchase_order(
+        provider_id=tp.boond_provider_id,
+        positioning_id=cr.boond_positioning_id,
+        reference=cr.reference,
+        amount=float(cr.daily_rate),
+    )
+    contract.boond_purchase_order_id = po_id
+    await contract_repo.save(contract)
+
+    logger.info("boond_create_po_ok", cr_id=str(cr.id), po_id=po_id)
+    return {"ok": True, "boond_purchase_order_id": po_id}
 
 
 @router.get(

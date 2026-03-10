@@ -746,6 +746,7 @@ export interface ContractRequest {
   id: string;
   reference: string;
   boond_positioning_id: number;
+  boond_candidate_id: number | null;
   status: ContractRequestStatus;
   status_display: string;
   third_party_type: string | null;

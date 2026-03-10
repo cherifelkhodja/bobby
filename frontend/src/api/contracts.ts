@@ -152,6 +152,36 @@ export const contractsApi = {
     return response.data;
   },
 
+  boondConvertCandidate: async (id: string): Promise<{ ok: boolean; boond_candidate_id: number }> => {
+    const response = await apiClient.post(`/contract-requests/${id}/boond/convert-candidate`);
+    return response.data;
+  },
+
+  boondCreateCompany: async (id: string): Promise<{
+    ok: boolean;
+    created_company: boolean;
+    boond_provider_id: number;
+    contacts_created: { label: string; boond_contact_id: number }[];
+  }> => {
+    const response = await apiClient.post(`/contract-requests/${id}/boond/create-company`);
+    return response.data;
+  },
+
+  boondCreateContract: async (id: string): Promise<{
+    ok: boolean;
+    resource_id: number;
+    contract_type_of: number;
+    provider_linked: boolean;
+  }> => {
+    const response = await apiClient.post(`/contract-requests/${id}/boond/create-contract`);
+    return response.data;
+  },
+
+  boondCreatePurchaseOrder: async (id: string): Promise<{ ok: boolean; boond_purchase_order_id: number }> => {
+    const response = await apiClient.post(`/contract-requests/${id}/boond/create-purchase-order`);
+    return response.data;
+  },
+
   syncFromBoond: async (id: string): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
       `/contract-requests/${id}/sync-from-boond`,

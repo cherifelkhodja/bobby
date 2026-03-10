@@ -13,6 +13,7 @@ class ContractRequestResponse(BaseModel):
     id: UUID
     reference: str
     boond_positioning_id: int
+    boond_candidate_id: int | None = None
     status: str
     status_display: str
     third_party_type: str | None = None
