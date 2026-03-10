@@ -928,44 +928,21 @@ export default function ContractDetail() {
                   onChange={(e) => setConfigForm((f) => ({ ...f, invoice_submission_method: e.target.value }))}
                   className={INPUT_CLS}
                 >
-                  <option value="email">Email — factures@geminiconsulting.fr</option>
-                  <option value="boondmanager">BoondManager</option>
+                  {(() => {
+                    const selectedCompany = companies.find((c) => c.id === configForm.company_id)
+                      ?? companies.find((c) => c.is_default);
+                    const mail = selectedCompany?.invoices_company_mail;
+                    return (
+                      <>
+                        <option value="email">
+                          Email{mail ? ` — ${mail}` : ' — (email non configuré)'}
+                        </option>
+                        <option value="boondmanager">BoondManager</option>
+                      </>
+                    );
+                  })()}
                 </select>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Nombre de jours estimés
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={configForm.estimated_days}
-                  onChange={(e) => setConfigForm((f) => ({ ...f, estimated_days: e.target.value }))}
-                  placeholder="Ex: 20"
-                  className={INPUT_CLS}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2 — Annexe */}
-          <div className="mb-5 border-t border-gray-200 dark:border-gray-700 pt-4">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
-              Annexe
-            </p>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tacite reconduction (mois)
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="24"
-                value={configForm.tacit_renewal_months}
-                onChange={(e) => setConfigForm((f) => ({ ...f, tacit_renewal_months: e.target.value }))}
-                placeholder="Ex: 3 (laisser vide si pas de tacite reconduction)"
-                className={INPUT_CLS}
-              />
             </div>
           </div>
 
