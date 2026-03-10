@@ -16,10 +16,14 @@ import {
   Settings,
   Clock,
   Download,
+  ChevronDown,
+  ChevronUp,
+  Pencil,
+  RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { contractsApi, contractCompaniesApi, contractArticlesApi } from '../api/contracts';
+import { contractsApi, contractCompaniesApi, contractArticlesApi, contractAnnexesApi } from '../api/contracts';
 import { vigilanceApi } from '../api/vigilance';
 import { useAuthStore } from '../stores/authStore';
 import { Card } from '../components/ui/Card';
@@ -136,6 +140,14 @@ export default function ContractDetail() {
     enabled: isAdv,
   });
   const optionalArticles = allArticles.filter((a) => a.is_optional && a.is_active);
+  const activeArticles = allArticles.filter((a) => a.is_active);
+
+  const { data: allAnnexes = [] } = useQuery({
+    queryKey: ['contract-annexes'],
+    queryFn: contractAnnexesApi.list,
+    enabled: isAdv && cr?.status === 'partner_requested_changes',
+  });
+  const activeAnnexes = allAnnexes.filter((a) => a.is_active);
 
   const { data: complianceDocs } = useQuery({
     queryKey: ['compliance-docs', cr?.third_party_id],
@@ -747,30 +759,39 @@ export default function ContractDetail() {
         </Card>
       )}
 
-      {/* Partner requested changes — banner with comments */}
+      {/* Partner requested changes — banner + article/annex editor */}
       {isAdv && cr.status === 'partner_requested_changes' && (
-        <Card className="mb-6 border-orange-200 dark:border-orange-800">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-orange-500 mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="text-sm font-semibold text-orange-800 dark:text-orange-300">
-                Le partenaire demande des modifications
-              </h3>
-              {latestContract?.partner_comments ? (
-                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                  {latestContract.partner_comments}
+        <>
+          <Card className="mb-4 border-orange-200 dark:border-orange-800">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-orange-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="text-sm font-semibold text-orange-800 dark:text-orange-300">
+                  Le partenaire demande des modifications
+                </h3>
+                {latestContract?.partner_comments ? (
+                  <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                    {latestContract.partner_comments}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Aucun commentaire fourni.
+                  </p>
+                )}
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Modifiez les articles/annexes ci-dessous ou la configuration, puis re-générez le brouillon.
                 </p>
-              ) : (
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Aucun commentaire fourni.
-                </p>
-              )}
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                Modifiez la configuration ci-dessous puis re-générez le brouillon.
-              </p>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+          <ArticleAnnexEditor
+            contractRequestId={id!}
+            articles={activeArticles}
+            annexes={activeAnnexes}
+            existingOverrides={(cr.contract_config as Record<string, unknown> | null) ?? {}}
+            onSaved={() => queryClient.invalidateQueries({ queryKey: ['contract-request', id] })}
+          />
+        </>
       )}
 
       {/* Collecting documents — info banner + resend button */}
@@ -1404,5 +1425,169 @@ export default function ContractDetail() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+// ─── Article / Annex per-contract editor ─────────────────────────────────────
+
+import type { ArticleTemplate, AnnexTemplate } from '../api/contracts';
+
+function ArticleAnnexEditor({
+  contractRequestId,
+  articles,
+  annexes,
+  existingOverrides,
+  onSaved,
+}: {
+  contractRequestId: string;
+  articles: ArticleTemplate[];
+  annexes: AnnexTemplate[];
+  existingOverrides: Record<string, unknown>;
+  onSaved: () => void;
+}) {
+  const articleOverrides = (existingOverrides.article_overrides ?? {}) as Record<string, string>;
+  const annexOverrides = (existingOverrides.annex_overrides ?? {}) as Record<string, string>;
+
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [editing, setEditing] = useState<Record<string, string>>({});
+  const [dirty, setDirty] = useState<Record<string, boolean>>({});
+
+  const saveMutation = useMutation({
+    mutationFn: (data: { article_overrides?: Record<string, string>; annex_overrides?: Record<string, string> }) =>
+      contractsApi.saveArticleOverrides(contractRequestId, data),
+    onSuccess: () => {
+      toast.success('Modifications enregistrées.');
+      setDirty({});
+      onSaved();
+    },
+    onError: () => toast.error('Erreur lors de la sauvegarde.'),
+  });
+
+  const getValue = (key: string, defaultContent: string, isAnnex = false) => {
+    if (key in editing) return editing[key];
+    const overrides = isAnnex ? annexOverrides : articleOverrides;
+    return overrides[key] ?? defaultContent;
+  };
+
+  const handleChange = (key: string, value: string) => {
+    setEditing((e) => ({ ...e, [key]: value }));
+    setDirty((d) => ({ ...d, [key]: true }));
+  };
+
+  const handleReset = (key: string, defaultContent: string, isAnnex = false) => {
+    const overrides = isAnnex ? annexOverrides : articleOverrides;
+    const hasOverride = !!overrides[key];
+    if (hasOverride) {
+      // Reset to template — save empty string (backend removes the override)
+      const payload = isAnnex
+        ? { annex_overrides: { [key]: '' } }
+        : { article_overrides: { [key]: '' } };
+      saveMutation.mutate(payload);
+    }
+    setEditing((e) => ({ ...e, [key]: defaultContent }));
+    setDirty((d) => ({ ...d, [key]: false }));
+  };
+
+  const handleSave = (key: string, isAnnex = false) => {
+    const value = editing[key] ?? '';
+    const payload = isAnnex
+      ? { annex_overrides: { [key]: value } }
+      : { article_overrides: { [key]: value } };
+    saveMutation.mutate(payload);
+  };
+
+  const renderItem = (
+    key: string,
+    title: string,
+    defaultContent: string,
+    label: string,
+    isAnnex = false,
+  ) => {
+    const isExpanded = !!expanded[key];
+    const value = getValue(key, defaultContent, isAnnex);
+    const isDirty = !!dirty[key];
+    const hasOverride = isAnnex ? !!annexOverrides[key] : !!articleOverrides[key];
+
+    return (
+      <div key={key} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 text-left transition-colors"
+          onClick={() => setExpanded((e) => ({ ...e, [key]: !e[key] }))}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-shrink-0">
+              {label}
+            </span>
+            <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{title}</span>
+            {hasOverride && !isDirty && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex-shrink-0">
+                <Pencil className="h-3 w-3 mr-1" />modifié
+              </span>
+            )}
+            {isDirty && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-700 flex-shrink-0">
+                non sauvegardé
+              </span>
+            )}
+          </div>
+          {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />}
+        </button>
+
+        {isExpanded && (
+          <div className="p-4 bg-white dark:bg-gray-900">
+            <textarea
+              value={value}
+              onChange={(e) => handleChange(key, e.target.value)}
+              className="w-full text-sm font-mono border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y"
+              rows={10}
+            />
+            <div className="flex items-center justify-between mt-2">
+              <button
+                type="button"
+                onClick={() => handleReset(key, defaultContent, isAnnex)}
+                className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                disabled={saveMutation.isPending}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Restaurer le modèle
+              </button>
+              {isDirty && (
+                <Button
+                  size="sm"
+                  onClick={() => handleSave(key, isAnnex)}
+                  disabled={saveMutation.isPending}
+                  isLoading={saveMutation.isPending}
+                >
+                  Enregistrer
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (articles.length === 0 && annexes.length === 0) return null;
+
+  return (
+    <Card className="mb-6">
+      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">
+        Édition des articles et annexes
+      </h3>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+        Modifiez le contenu pour ce contrat uniquement. Les templates globaux ne sont pas affectés.
+      </p>
+
+      <div className="space-y-2">
+        {articles.map((a) =>
+          renderItem(a.article_key, a.title, a.content, `Art. ${a.article_number}`, false)
+        )}
+        {annexes.map((a) =>
+          renderItem(a.annexe_key, a.title, a.content, 'Annexe', true)
+        )}
+      </div>
+    </Card>
   );
 }

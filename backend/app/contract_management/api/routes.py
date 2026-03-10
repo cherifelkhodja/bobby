@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import AdvOrAdminUser, ContractAccessUser
 from app.config import get_settings
 from app.contract_management.api.schemas import (
+    ArticleOverridesRequest,
     CommercialValidationRequest,
     ComplianceOverrideRequest,
     ContractConfigRequest,
@@ -550,6 +551,56 @@ async def configure_contract(
 
     name = await _resolve_commercial_name(db, cr.commercial_email)
     return _cr_to_response(cr, commercial_name=name)
+
+
+@router.patch(
+    "/{contract_request_id}/article-overrides",
+    response_model=ContractRequestResponse,
+    summary="Save per-contract article/annex content overrides",
+)
+async def save_article_overrides(
+    contract_request_id: UUID,
+    body: ArticleOverridesRequest,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Persist per-contract article and annex overrides into contract_config.
+
+    Merges the provided overrides dict into the existing contract_config so
+    other config fields (payment_terms, etc.) are preserved.
+    Empty string values remove the override (restores template default).
+    ADV/admin only.
+    """
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+
+    cfg = dict(cr.contract_config or {})
+
+    # Merge article overrides — remove keys with empty values (reset to template)
+    existing_article = dict(cfg.get("article_overrides") or {})
+    for key, value in body.article_overrides.items():
+        if value.strip():
+            existing_article[key] = value
+        else:
+            existing_article.pop(key, None)
+    cfg["article_overrides"] = existing_article
+
+    # Merge annex overrides — same logic
+    existing_annex = dict(cfg.get("annex_overrides") or {})
+    for key, value in body.annex_overrides.items():
+        if value.strip():
+            existing_annex[key] = value
+        else:
+            existing_annex.pop(key, None)
+    cfg["annex_overrides"] = existing_annex
+
+    cr.contract_config = cfg
+    saved = await cr_repo.save(cr)
+
+    name = await _resolve_commercial_name(db, saved.commercial_email)
+    return _cr_to_response(saved, commercial_name=name)
 
 
 @router.post(

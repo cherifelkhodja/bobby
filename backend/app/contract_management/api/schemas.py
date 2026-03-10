@@ -151,6 +151,17 @@ class ComplianceOverrideRequest(BaseModel):
     reason: str = Field(..., min_length=10, max_length=500)
 
 
+class ArticleOverridesRequest(BaseModel):
+    """Per-contract article/annex content overrides.
+
+    Keys are article_key / annexe_key; values are the overridden HTML content.
+    Pass an empty string to reset an override (restores template default).
+    """
+
+    article_overrides: dict[str, str] = Field(default_factory=dict)
+    annex_overrides: dict[str, str] = Field(default_factory=dict)
+
+
 class PartnerReviewRequest(BaseModel):
     """Request from partner reviewing a contract draft."""
 

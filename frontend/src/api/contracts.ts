@@ -79,6 +79,20 @@ export const contractsApi = {
     return response.data;
   },
 
+  saveArticleOverrides: async (
+    id: string,
+    data: {
+      article_overrides?: Record<string, string>;
+      annex_overrides?: Record<string, string>;
+    },
+  ): Promise<ContractRequest> => {
+    const response = await apiClient.patch<ContractRequest>(
+      `/contract-requests/${id}/article-overrides`,
+      data,
+    );
+    return response.data;
+  },
+
   complianceOverride: async (
     id: string,
     reason: string,

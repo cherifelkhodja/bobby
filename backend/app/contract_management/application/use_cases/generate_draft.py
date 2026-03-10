@@ -335,8 +335,12 @@ class GenerateDraftUseCase:
 
         # Filter out optional articles that were excluded for this contract
         excluded_keys: list[str] = []
+        article_overrides: dict[str, str] = {}
+        annex_overrides: dict[str, str] = {}
         if cr.contract_config and isinstance(cr.contract_config, dict):
             excluded_keys = cr.contract_config.get("excluded_optional_article_keys", []) or []
+            article_overrides = cr.contract_config.get("article_overrides") or {}
+            annex_overrides = cr.contract_config.get("annex_overrides") or {}
 
         selected_articles = [
             a for a in articles
@@ -350,10 +354,12 @@ class GenerateDraftUseCase:
             if article.article_key != "preambule":
                 counter += 1
                 article = dc_replace(article, article_number=counter)
+            # Per-contract override takes priority over template content
+            raw_content = article_overrides.get(article.article_key, article.content)
             try:
-                rendered_content = jinja_env.from_string(article.content).render(**context)
+                rendered_content = jinja_env.from_string(raw_content).render(**context)
             except Exception:
-                rendered_content = article.content
+                rendered_content = raw_content
             rendered_articles.append(dc_replace(article, content=rendered_content))
 
         context["articles"] = rendered_articles
@@ -365,10 +371,12 @@ class GenerateDraftUseCase:
                 field_value = context.get(annexe.condition_field, "")
                 if not field_value:
                     continue
+            # Per-contract override takes priority over template content
+            raw_content = annex_overrides.get(annexe.annexe_key, annexe.content)
             try:
-                rendered_content = jinja_env.from_string(annexe.content).render(**context)
+                rendered_content = jinja_env.from_string(raw_content).render(**context)
             except Exception:
-                rendered_content = annexe.content
+                rendered_content = raw_content
             from dataclasses import replace as _dc_replace
             rendered_annexes.append(_dc_replace(annexe, content=rendered_content))
 
