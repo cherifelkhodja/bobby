@@ -102,7 +102,7 @@ class HandleSignatureCompletedUseCase:
             # Send notification
             await self._email_service.send_contract_signed_notification(
                 to=cr.commercial_email,
-                contract_ref=cr.reference,
+                contract_ref=cr.display_reference,
                 third_party_name="",
             )
 

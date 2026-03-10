@@ -92,7 +92,7 @@ class GenerateDraftUseCase:
         new_version = (existing_contract.version + 1) if existing_contract else 1
 
         # Upload to S3 with versioned key
-        s3_key = f"contracts/{cr.reference}/draft_v{new_version}.pdf"
+        s3_key = f"contracts/{cr.display_reference}/draft_v{new_version}.pdf"
         await self._s3.upload_file(
             key=s3_key,
             content=pdf_content,
@@ -103,7 +103,7 @@ class GenerateDraftUseCase:
         contract = Contract(
             contract_request_id=cr.id,
             third_party_id=cr.third_party_id or cr.id,
-            reference=cr.reference,
+            reference=cr.display_reference,
             s3_key_draft=s3_key,
             version=new_version,
         )
@@ -227,7 +227,7 @@ class GenerateDraftUseCase:
             "gemini_rcs_number": issuer_rcs_number,
             "gemini_signatory_name": issuer_signatory_name,
             # Contract details
-            "reference": cr.reference,
+            "reference": cr.display_reference,
             "daily_rate": str(cr.daily_rate) if cr.daily_rate else "",
             "start_date": cr.start_date.strftime("%d/%m/%Y") if cr.start_date else "",
             "client_name": cr.client_name or "",

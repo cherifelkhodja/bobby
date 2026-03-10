@@ -61,6 +61,7 @@ class ContractRequestRepository:
 
         if model:
             model.status = request.status.value
+            model.reference = request.reference
             model.third_party_id = request.third_party_id
             model.third_party_type = request.third_party_type
             model.daily_rate = request.daily_rate
@@ -148,8 +149,31 @@ class ContractRequestRepository:
         result = await self.session.execute(query)
         return result.scalar_one()
 
+    async def get_next_provisional_reference(self) -> str:
+        """Generate the next provisional reference in format PROV-YYYY-NNNN."""
+        year = datetime.utcnow().year
+        prefix = f"PROV-{year}-"
+
+        result = await self.session.execute(
+            select(func.max(ContractRequestModel.provisional_reference)).where(
+                ContractRequestModel.provisional_reference.like(f"{prefix}%")
+            )
+        )
+        max_ref = result.scalar_one_or_none()
+
+        if max_ref:
+            try:
+                last_num = int(max_ref.rsplit("-", 1)[-1])
+                next_num = last_num + 1
+            except (ValueError, IndexError):
+                next_num = 1
+        else:
+            next_num = 1
+
+        return f"{prefix}{next_num:04d}"
+
     async def get_next_reference(self, company_code: str | None = None) -> str:
-        """Generate the next contract request reference in format XXX-YYYY-NNN.
+        """Generate the next final contract reference in format XXX-YYYY-NNNN.
 
         The sequence counter is independent per company code.
         If company_code is not provided, the default company's code is used.
@@ -192,6 +216,7 @@ class ContractRequestRepository:
         """Convert SQLAlchemy model to domain entity."""
         return ContractRequest(
             id=model.id,
+            provisional_reference=model.provisional_reference,
             reference=model.reference,
             boond_positioning_id=model.boond_positioning_id,
             boond_candidate_id=model.boond_candidate_id,
@@ -231,6 +256,7 @@ class ContractRequestRepository:
         """Convert domain entity to SQLAlchemy model."""
         return ContractRequestModel(
             id=entity.id,
+            provisional_reference=entity.provisional_reference,
             reference=entity.reference,
             boond_positioning_id=entity.boond_positioning_id,
             boond_candidate_id=entity.boond_candidate_id,

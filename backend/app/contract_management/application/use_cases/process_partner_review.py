@@ -54,11 +54,17 @@ class ProcessPartnerReviewUseCase:
 
         if approved:
             cr.transition_to(ContractRequestStatus.PARTNER_APPROVED)
-            logger.info("partner_approved_contract", cr_id=str(cr.id))
+            # Assigner la référence définitive (format XXX-YYYY-NNNN)
+            cr.reference = await self._cr_repo.get_next_reference()
+            logger.info(
+                "partner_approved_contract",
+                cr_id=str(cr.id),
+                final_reference=cr.reference,
+            )
             client_label = f" pour <strong>{cr.client_name}</strong>" if cr.client_name else ""
             await self._email_service.send_contract_progress_to_commercial(
                 to=cr.commercial_email,
-                contract_ref=cr.reference,
+                contract_ref=cr.display_reference,
                 step_title="Partenaire a approuvé le contrat",
                 step_message=f"Le partenaire a validé le projet de contrat{client_label}. Le contrat peut maintenant être envoyé en signature.",
                 step_color="#10b981",
@@ -79,7 +85,7 @@ class ProcessPartnerReviewUseCase:
             # Notify commercial
             await self._email_service.send_contract_progress_to_commercial(
                 to=cr.commercial_email,
-                contract_ref=cr.reference,
+                contract_ref=cr.display_reference,
                 step_title="Partenaire demande des modifications",
                 step_message=f"Le partenaire a demandé des modifications sur le contrat"
                 f"{' pour <strong>' + cr.client_name + '</strong>' if cr.client_name else ''}."

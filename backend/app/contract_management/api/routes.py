@@ -111,7 +111,9 @@ def _cr_to_response(
     """Convert a ContractRequest entity to response."""
     return ContractRequestResponse(
         id=cr.id,
+        provisional_reference=cr.provisional_reference,
         reference=cr.reference,
+        display_reference=cr.display_reference,
         boond_positioning_id=cr.boond_positioning_id,
         boond_candidate_id=cr.boond_candidate_id,
         boond_consultant_type=cr.boond_consultant_type,
@@ -430,7 +432,7 @@ async def validate_commercial(
         await _notify_commercial(
             email_service,
             to=cr.commercial_email,
-            ref=cr.reference,
+            ref=cr.display_reference,
             title="Collecte de documents lancée",
             msg=f"Votre validation commerciale a été enregistrée{client_label}. Le tiers a été contacté pour fournir ses documents légaux.",
         )
@@ -438,7 +440,7 @@ async def validate_commercial(
         await _notify_commercial(
             email_service,
             to=cr.commercial_email,
-            ref=cr.reference,
+            ref=cr.display_reference,
             title="Dossier redirigé vers PayFit",
             msg=f"Ce consultant étant salarié{client_label}, la contractualisation sera gérée via PayFit.",
             color="#f59e0b",
@@ -952,7 +954,7 @@ async def send_draft_to_partner(
     await _notify_commercial(
         email_service,
         to=cr.commercial_email,
-        ref=cr.reference,
+        ref=cr.display_reference,
         title="Projet de contrat envoyé au partenaire",
         msg=f"Le projet de contrat{client_label} a été transmis au partenaire pour relecture et validation.",
     )
@@ -1137,7 +1139,7 @@ async def push_to_crm(
     await _notify_commercial(
         email_service,
         to=cr.commercial_email,
-        ref=cr.reference,
+        ref=cr.display_reference,
         title="Contrat versé dans BoondManager",
         msg=f"Le contrat{client_label} a été archivé et le bon de commande créé dans BoondManager.",
         color="#10b981",
@@ -1455,7 +1457,7 @@ async def boond_create_purchase_order(
     po_id = await crm.create_purchase_order(
         provider_id=tp.boond_provider_id,
         positioning_id=cr.boond_positioning_id,
-        reference=cr.reference,
+        reference=cr.display_reference,
         amount=float(cr.daily_rate),
     )
     contract.boond_purchase_order_id = po_id

@@ -161,6 +161,25 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-10 (numérotation provisoire des contrats)
+
+#### Séparation référence provisoire / référence définitive
+
+**Principe** : La numérotation définitive du contrat (`XXX-YYYY-NNNN`, ex : `GEM-2026-0001`) est assignée uniquement à l'état `PARTNER_APPROVED`. Avant cela, une référence provisoire (`PROV-YYYY-NNNN`) est générée à la création.
+
+- **migration 055** : Ajout colonne `provisional_reference VARCHAR(20) NOT NULL UNIQUE` sur `cm_contract_requests` ; `reference` devient nullable (NULL jusqu'à `PARTNER_APPROVED`)
+- **ContractRequest entity** :
+  - Nouveau champ `provisional_reference: str`
+  - `reference: str | None = None`
+  - Propriété `display_reference` : retourne `reference` si définie, sinon `provisional_reference`
+- **ContractRequestRepository** : Nouvelle méthode `get_next_provisional_reference()` (format `PROV-YYYY-NNNN`)
+- **CreateContractRequestUseCase** : Génère `provisional_reference` (au lieu de `reference`)
+- **ProcessPartnerReviewUseCase** : À `PARTNER_APPROVED`, génère et assigne la référence définitive via `get_next_reference()`
+- **ContractRequestResponse** : Expose `provisional_reference`, `reference` (nullable), `display_reference`
+- **Tous les use cases / routes** : Utilisent `cr.display_reference` (transparent pour l'affichage et les emails)
+
+---
+
 ### 2026-03-10 (distinction candidate vs resource Boond)
 
 #### Différenciation boond_consultant_type dans cm_contract_requests

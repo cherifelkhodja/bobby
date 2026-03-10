@@ -180,7 +180,7 @@ async def debug_contract_requests(
         "contract_requests": [
             {
                 "id": str(cr.id),
-                "reference": cr.reference,
+                "reference": cr.display_reference,
                 "status": cr.status.value,
                 "boond_positioning_id": cr.boond_positioning_id,
                 "commercial_email": cr.commercial_email,

@@ -18,12 +18,22 @@ class ContractRequest:
 
     Follows a state machine with 14 statuses from webhook reception
     through to archival.
+
+    Numérotation :
+    - `provisional_reference` (PROV-YYYY-NNNN) : assignée à la création, sert
+      d'identifiant interne tout au long du processus.
+    - `reference` (XXX-YYYY-NNNN) : référence définitive assignée uniquement
+      lorsque le partenaire approuve le contrat (état PARTNER_APPROVED).
+      NULL jusqu'à ce stade.
+    - `display_reference` : propriété calculée — retourne `reference` si définie,
+      sinon `provisional_reference`. À utiliser pour l'affichage et les emails.
     """
 
-    reference: str
+    provisional_reference: str
     boond_positioning_id: int
     commercial_email: str
     id: UUID = field(default_factory=uuid4)
+    reference: str | None = None
     boond_candidate_id: int | None = None
     boond_consultant_type: str | None = None  # "candidate" ou "resource"
     boond_need_id: int | None = None
@@ -54,6 +64,11 @@ class ContractRequest:
     status_history: list[dict[str, Any]] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+
+    @property
+    def display_reference(self) -> str:
+        """Référence à afficher : définitive si assignée, provisoire sinon."""
+        return self.reference or self.provisional_reference
 
     def can_transition_to(self, target: ContractRequestStatus) -> bool:
         """Check if the transition to target status is allowed."""

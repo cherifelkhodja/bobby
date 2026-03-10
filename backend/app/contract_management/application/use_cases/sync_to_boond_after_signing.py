@@ -244,7 +244,7 @@ class SyncToBoondAfterSigningUseCase:
                 po_id = await self._crm.create_purchase_order(
                     provider_id=tp.boond_provider_id,
                     positioning_id=cr.boond_positioning_id,
-                    reference=cr.reference,
+                    reference=cr.display_reference,
                     amount=float(cr.daily_rate),
                 )
                 contract.boond_purchase_order_id = po_id
@@ -264,7 +264,7 @@ class SyncToBoondAfterSigningUseCase:
         logger.info(
             "sync_boond_after_signing_complete",
             cr_id=str(saved.id),
-            reference=cr.reference,
+            reference=cr.display_reference,
         )
         return saved
 

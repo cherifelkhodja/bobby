@@ -17,7 +17,14 @@ class ContractRequestModel(Base):
     __tablename__ = "cm_contract_requests"
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
-    reference: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    provisional_reference: Mapped[str] = mapped_column(
+        String(20), nullable=False, unique=True,
+        comment="Référence provisoire (PROV-YYYY-NNNN), générée à la création",
+    )
+    reference: Mapped[str | None] = mapped_column(
+        String(20), nullable=True, unique=True,
+        comment="Référence définitive (XXX-YYYY-NNNN), assignée à l'état PARTNER_APPROVED",
+    )
     boond_positioning_id: Mapped[int] = mapped_column(Integer, nullable=False)
     boond_candidate_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     boond_consultant_type: Mapped[str | None] = mapped_column(String(20), nullable=True)

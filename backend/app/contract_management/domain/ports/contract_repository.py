@@ -38,8 +38,17 @@ class ContractRequestRepositoryPort(Protocol):
         """Count contract requests with optional status filter."""
         ...
 
+    async def get_next_provisional_reference(self) -> str:
+        """Generate the next provisional reference (e.g. PROV-2026-0042).
+
+        Assigned at creation. Independent counter from the final reference.
+        """
+        ...
+
     async def get_next_reference(self, company_code: str | None = None) -> str:
-        """Generate the next contract request reference (e.g. GEM-2026-0042).
+        """Generate the next final contract reference (e.g. GEM-2026-0042).
+
+        Assigned at PARTNER_APPROVED. Starts with the 3-letter company code.
 
         Args:
             company_code: 2-3 letter company prefix. If None, the default

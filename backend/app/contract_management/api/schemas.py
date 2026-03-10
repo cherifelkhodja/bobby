@@ -11,7 +11,9 @@ class ContractRequestResponse(BaseModel):
     """Contract request response."""
 
     id: UUID
-    reference: str
+    provisional_reference: str
+    reference: str | None = None
+    display_reference: str
     boond_positioning_id: int
     boond_candidate_id: int | None = None
     boond_consultant_type: str | None = None

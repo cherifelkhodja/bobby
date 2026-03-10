@@ -71,7 +71,7 @@ class PushToCrmUseCase:
             po_id = await self._crm.create_purchase_order(
                 provider_id=tp.boond_provider_id,
                 positioning_id=cr.boond_positioning_id,
-                reference=cr.reference,
+                reference=cr.display_reference,
                 amount=amount,
             )
             contract.boond_purchase_order_id = po_id
@@ -84,6 +84,6 @@ class PushToCrmUseCase:
         logger.info(
             "contract_pushed_to_crm",
             cr_id=str(saved.id),
-            reference=cr.reference,
+            reference=cr.display_reference,
         )
         return saved

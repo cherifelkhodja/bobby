@@ -197,8 +197,8 @@ class CreateContractRequestUseCase:
                                 email=commercial_email,
                             )
 
-            # Generate reference
-            reference = await self._cr_repo.get_next_reference()
+            # Generate provisional reference (définitive assignée à PARTNER_APPROVED)
+            reference = await self._cr_repo.get_next_provisional_reference()
 
             # Sanitize Boond data — empty strings must be None for DB types
             raw_daily_rate = positioning_data.get("daily_rate")
@@ -241,7 +241,7 @@ class CreateContractRequestUseCase:
 
             # Create contract request
             cr = ContractRequest(
-                reference=reference,
+                provisional_reference=reference,
                 boond_positioning_id=positioning_id,
                 boond_candidate_id=candidate_id,
                 boond_consultant_type=consultant_type,
