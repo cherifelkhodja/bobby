@@ -13,6 +13,7 @@ from app.contract_management.domain.value_objects.contract_request_status import
     ContractRequestStatus,
 )
 from app.contract_management.infrastructure.models import (
+    ContractCompanyModel,
     ContractModel,
     ContractRequestModel,
     WebhookEventModel,
@@ -141,10 +142,27 @@ class ContractRequestRepository:
         result = await self.session.execute(query)
         return result.scalar_one()
 
-    async def get_next_reference(self) -> str:
-        """Generate the next contract request reference."""
+    async def get_next_reference(self, company_code: str | None = None) -> str:
+        """Generate the next contract request reference in format XXX-YYYY-NNN.
+
+        The sequence counter is independent per company code.
+        If company_code is not provided, the default company's code is used.
+        Falls back to "GEN" if no default company exists.
+        """
+        if company_code is None:
+            # Fetch the default company's code
+            result = await self.session.execute(
+                select(ContractCompanyModel.code).where(
+                    ContractCompanyModel.is_default.is_(True),
+                    ContractCompanyModel.is_active.is_(True),
+                ).limit(1)
+            )
+            code = result.scalar_one_or_none() or "GEN"
+        else:
+            code = company_code.upper()
+
         year = datetime.utcnow().year
-        prefix = f"CR-{year}-"
+        prefix = f"{code}-{year}-"
 
         result = await self.session.execute(
             select(func.max(ContractRequestModel.reference)).where(
@@ -155,9 +173,9 @@ class ContractRequestRepository:
 
         if max_ref:
             try:
-                last_num = int(max_ref.replace(prefix, ""))
+                last_num = int(max_ref.rsplit("-", 1)[-1])
                 next_num = last_num + 1
-            except ValueError:
+            except (ValueError, IndexError):
                 next_num = 1
         else:
             next_num = 1

@@ -384,6 +384,16 @@ INPI_PASSWORD = <mot de passe>
   - Bouton "Sync Boond" dans le header de la page détail avec icône de rotation
   - Résout le problème des CR créées avant l'ajout des nouveaux champs (le webhook ne re-crée pas si CR active)
 
+### 2026-03-10 (référence contrat par société)
+- **feat(contract-management)**: Format de référence contrat `XXX-YYYY-NNN` par société
+  - **Format** : `XXX-YYYY-NNN` — `XXX` = code 2-3 lettres de la société, `YYYY` = année, `NNN` = numéro séquentiel indépendant par société
+  - **Migration** : `051_add_code_to_contract_companies.py` — ajout colonne `code VARCHAR(3)` sur `cm_contract_companies` (default `GEN` pour les lignes existantes)
+  - **Backend** : `ContractCompanyModel.code`, `ContractCompanyRequest.code` (validation `[A-Z0-9]{2,3}`), `ContractCompanyResponse.code`
+  - **`get_next_reference(company_code=None)`** : si `company_code` non fourni, fetch la société par défaut (`is_default=True, is_active=True`) pour son code ; fallback `GEN`
+  - **Admin routes** : `_company_to_response`, `create_contract_company`, `update_contract_company` mis à jour avec le champ `code`
+  - **Frontend** : interface `ContractCompany` + `EMPTY_FORM` + formulaire (champ code avec preview de référence) + affichage du code dans les cartes société
+  - Fichiers modifiés : `051_add_code_to_contract_companies.py`, `models.py` (contract_management), `schemas.py` (contract_management), `contract_repository.py` (port), `postgres_contract_repo.py`, `admin.py`, `contracts.ts`, `ContractCompaniesTab.tsx`
+
 ### 2026-03-03 (consultant + adresse mission sur demande de contrat)
 - **feat(contract-management)**: Ajout champs consultant et adresse de mission
   - **7 nouveaux champs** : `consultant_civility`, `consultant_first_name`, `consultant_last_name`, `mission_site_name`, `mission_address`, `mission_postal_code`, `mission_city`

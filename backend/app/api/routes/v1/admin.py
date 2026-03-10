@@ -1362,6 +1362,7 @@ def _company_to_response(m: ContractCompanyModel) -> ContractCompanyResponse:
     return ContractCompanyResponse(
         id=m.id,
         name=m.name,
+        code=m.code,
         legal_form=m.legal_form,
         capital=m.capital,
         head_office=m.head_office,
@@ -1420,6 +1421,7 @@ async def create_contract_company(
     m = ContractCompanyModel(
         id=_uuid4(),
         name=body.name,
+        code=body.code.upper(),
         legal_form=body.legal_form,
         capital=body.capital,
         head_office=body.head_office,
@@ -1467,6 +1469,7 @@ async def update_contract_company(
             ContractCompanyModel.__table__.update().values(is_default=False)
         )
     m.name = body.name
+    m.code = body.code.upper()
     m.legal_form = body.legal_form
     m.capital = body.capital
     m.head_office = body.head_office

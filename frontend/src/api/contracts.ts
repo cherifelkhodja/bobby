@@ -173,6 +173,7 @@ export const contractsApi = {
 export interface ContractCompany {
   id: string;
   name: string;
+  code: string;
   legal_form: string;
   capital: string;
   head_office: string;

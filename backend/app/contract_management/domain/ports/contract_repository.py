@@ -38,8 +38,13 @@ class ContractRequestRepositoryPort(Protocol):
         """Count contract requests with optional status filter."""
         ...
 
-    async def get_next_reference(self) -> str:
-        """Generate the next contract request reference (e.g. CR-2026-0042)."""
+    async def get_next_reference(self, company_code: str | None = None) -> str:
+        """Generate the next contract request reference (e.g. GEM-2026-0042).
+
+        Args:
+            company_code: 2-3 letter company prefix. If None, the default
+                          company's code is used (falls back to "GEN").
+        """
         ...
 
 

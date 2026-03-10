@@ -6,6 +6,7 @@ import { contractCompaniesApi, ContractCompany, ContractCompanyRequest } from '.
 
 const EMPTY_FORM: ContractCompanyRequest = {
   name: '',
+  code: '',
   legal_form: '',
   capital: '',
   head_office: '',
@@ -50,6 +51,19 @@ function CompanyForm({ initial, onSubmit, onCancel, isLoading }: FormProps) {
           <div>
             <label className={LABEL_CLS}>Nom de la société *</label>
             <input className={INPUT_CLS} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="GEMINI" />
+          </div>
+          <div>
+            <label className={LABEL_CLS}>Code (2-3 lettres) *</label>
+            <input
+              className={INPUT_CLS}
+              value={form.code}
+              onChange={(e) => set('code', e.target.value.toUpperCase().slice(0, 3))}
+              placeholder="GEM"
+              maxLength={3}
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Préfixe utilisé dans les références contrat : <span className="font-mono">{form.code || 'XXX'}-2026-0001</span>
+            </p>
           </div>
           <div>
             <label className={LABEL_CLS}>Forme juridique *</label>
@@ -464,7 +478,8 @@ export function ContractCompaniesTab() {
                       )}
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      RCS {company.rcs_city} — {company.rcs_number} · {company.head_office}
+                      <span className="font-mono font-semibold text-primary">{company.code}</span>
+                      {' · '}RCS {company.rcs_city} — {company.rcs_number} · {company.head_office}
                     </p>
                   </div>
                 </div>
@@ -525,6 +540,7 @@ export function ContractCompaniesTab() {
                   <CompanyForm
                     initial={{
                       name: company.name,
+                      code: company.code,
                       legal_form: company.legal_form,
                       capital: company.capital,
                       head_office: company.head_office,

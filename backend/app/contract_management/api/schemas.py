@@ -97,6 +97,7 @@ class ContractCompanyRequest(BaseModel):
     """Create or update an issuing company."""
 
     name: str = Field(..., max_length=255)
+    code: str = Field(..., min_length=2, max_length=3, pattern=r"^[A-Z0-9]{2,3}$", description="2-3 letter prefix used in contract references (e.g. GEM, GC)")
     legal_form: str = Field(..., max_length=50)
     capital: str = Field(..., max_length=100)
     head_office: str = Field(..., max_length=500)
@@ -119,6 +120,7 @@ class ContractCompanyResponse(BaseModel):
 
     id: UUID
     name: str
+    code: str
     legal_form: str
     capital: str
     head_office: str
