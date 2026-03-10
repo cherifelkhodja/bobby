@@ -71,6 +71,7 @@ class ContractRequestStatus(str, Enum):
                 {
                     ContractRequestStatus.DRAFT_SENT_TO_PARTNER,
                     ContractRequestStatus.CONFIGURING_CONTRACT,
+                    ContractRequestStatus.DRAFT_GENERATED,  # Allow re-generation
                     ContractRequestStatus.CANCELLED,
                 }
             ),

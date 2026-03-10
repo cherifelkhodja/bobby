@@ -95,16 +95,21 @@ class GenerateDraftUseCase:
             content_type="application/pdf",
         )
 
-        # Create Contract entity
-        contract = Contract(
-            contract_request_id=cr.id,
-            third_party_id=cr.third_party_id or cr.id,
-            reference=cr.reference,
-            s3_key_draft=s3_key,
-        )
-        saved_contract = await self._contract_repo.save(contract)
+        # Update existing contract or create new one
+        existing_contract = await self._contract_repo.get_by_request_id(cr.id)
+        if existing_contract:
+            existing_contract.s3_key_draft = s3_key
+            saved_contract = await self._contract_repo.save(existing_contract)
+        else:
+            contract = Contract(
+                contract_request_id=cr.id,
+                third_party_id=cr.third_party_id or cr.id,
+                reference=cr.reference,
+                s3_key_draft=s3_key,
+            )
+            saved_contract = await self._contract_repo.save(contract)
 
-        # Transition CR status
+        # Transition CR status (self-transition allowed when already draft_generated)
         cr.transition_to(ContractRequestStatus.DRAFT_GENERATED)
         await self._cr_repo.save(cr)
 

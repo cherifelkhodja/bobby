@@ -272,8 +272,8 @@ export default function ContractDetail() {
   });
 
   const configureMutation = useMutation({
-    mutationFn: () => {
-      return contractsApi.configure(id!, {
+    mutationFn: async () => {
+      await contractsApi.configure(id!, {
         company_id: configForm.company_id || null,
         payment_terms: configForm.payment_terms,
         invoice_submission_method: configForm.invoice_submission_method,
@@ -282,10 +282,18 @@ export default function ContractDetail() {
         excluded_optional_article_keys: configForm.excluded_optional_article_keys,
         special_conditions: configForm.special_conditions || undefined,
       });
+      if (cr?.status === 'draft_generated') {
+        await contractsApi.generateDraft(id!);
+      }
     },
     onSuccess: () => {
-      toast.success('Contrat configuré. Vous pouvez maintenant générer le brouillon.');
+      if (cr?.status === 'draft_generated') {
+        toast.success('Contrat reconfiguré et brouillon régénéré avec succès.');
+      } else {
+        toast.success('Contrat configuré. Vous pouvez maintenant générer le brouillon.');
+      }
       queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['contracts', id] });
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -1095,7 +1103,7 @@ export default function ContractDetail() {
               isLoading={configureMutation.isPending}
             >
               <Settings className="h-4 w-4 mr-2" />
-              Configurer le contrat
+              {cr?.status === 'draft_generated' ? 'Reconfigurer et régénérer le brouillon' : 'Configurer le contrat'}
             </Button>
           </div>
         </Card>
