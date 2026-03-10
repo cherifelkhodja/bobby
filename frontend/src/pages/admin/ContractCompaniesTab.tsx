@@ -257,23 +257,25 @@ function LogoManager({ company }: { company: ContractCompany }) {
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [logoVersion, setLogoVersion] = useState(0);
 
-  // Auto-load logo URL when logo is configured
+  // Auto-load logo URL when logo is configured or after a new upload
   useEffect(() => {
-    if (!company.has_logo) { setPreviewUrl(null); return; }
+    if (!company.has_logo && logoVersion === 0) { setPreviewUrl(null); return; }
+    if (!company.has_logo) return;
     let cancelled = false;
     contractCompaniesApi.getLogoUrl(company.id).then((url) => {
       if (!cancelled) setPreviewUrl(url);
     }).catch(() => {/* silently ignore */});
     return () => { cancelled = true; };
-  }, [company.id, company.has_logo]);
+  }, [company.id, company.has_logo, logoVersion]);
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => contractCompaniesApi.uploadLogo(company.id, file),
     onSuccess: () => {
       toast.success('Logo mis à jour.');
       queryClient.invalidateQueries({ queryKey: ['contract-companies'] });
-      setPreviewUrl(null);
+      setLogoVersion(v => v + 1);
     },
     onError: () => toast.error('Erreur lors de l\'upload du logo.'),
   });
