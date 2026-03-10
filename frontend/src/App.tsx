@@ -26,6 +26,7 @@ import ProposeCandidate from './pages/ProposeCandidate';
 import { ContractManagement } from './pages/ContractManagement';
 import ContractDetail from './pages/ContractDetail';
 import ComplianceDashboard from './pages/ComplianceDashboard';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import Portal from './pages/Portal';
 import type { UserRole } from './types';
 
@@ -117,7 +118,9 @@ function App() {
           path="contracts/:id"
           element={
             <ProtectedRoute allowedRoles={['admin', 'adv', 'commercial']}>
-              <ContractDetail />
+              <ErrorBoundary level="page">
+                <ContractDetail />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />

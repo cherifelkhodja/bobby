@@ -84,8 +84,14 @@ export interface ApiError {
 
 export function getErrorMessage(error: unknown, fallback = 'Une erreur est survenue'): string {
   if (axios.isAxiosError(error)) {
-    const apiError = error.response?.data as ApiError | undefined;
-    return apiError?.detail || error.message || fallback;
+    const apiError = error.response?.data as { detail?: unknown } | undefined;
+    const detail = apiError?.detail;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail) && detail.length > 0) {
+      const first = detail[0] as { msg?: string } | undefined;
+      return first?.msg || error.message || fallback;
+    }
+    return error.message || fallback;
   }
   return fallback;
 }

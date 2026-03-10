@@ -133,6 +133,7 @@ export const contractsApi = {
     const response = await apiClient.post<ContractRequest>(
       `/contract-requests/${id}/mark-as-signed`,
       form,
+      { headers: { 'Content-Type': undefined } },
     );
     return response.data;
   },
