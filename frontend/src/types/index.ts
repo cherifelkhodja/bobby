@@ -771,7 +771,7 @@ export interface ContractRequest {
   portal_url: string | null;
   compliance_override: boolean;
   contract_config: Record<string, unknown> | null;
-  status_history: Array<{ status: ContractRequestStatus; entered_at: string }>;
+  status_history: Array<{ status: ContractRequestStatus; entered_at: string; comment?: string }>;
   created_at: string;
   updated_at: string;
 }

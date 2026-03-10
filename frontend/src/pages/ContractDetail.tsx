@@ -20,6 +20,7 @@ import {
   ChevronUp,
   Pencil,
   RotateCcw,
+  MessageSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -1373,36 +1374,7 @@ export default function ContractDetail() {
 
       {/* Metadata */}
       <Card>
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-          Historique du contrat
-        </h3>
-
-        {cr.status_history.length > 0 ? (
-          <ol className="relative border-l border-gray-200 dark:border-gray-700 space-y-3 ml-2">
-            {cr.status_history.map((entry, index) => {
-              const cfg = CONTRACT_STATUS_CONFIG[entry.status as ContractRequestStatus];
-              const label = entry.status === 'commercial_validated' ? 'Création' : (cfg?.label ?? entry.status);
-              return (
-                <li key={index} className="ml-4">
-                  <span className="absolute -left-1.5 mt-1 h-3 w-3 rounded-full border-2 border-white dark:border-gray-800 bg-gray-400 dark:bg-gray-500" />
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cfg?.color ?? 'bg-gray-100 text-gray-700'}`}>
-                      {label}
-                    </span>
-                    <time className="text-xs text-gray-400 dark:text-gray-500">
-                      {new Date(entry.entered_at).toLocaleString('fr-FR', {
-                        day: 'numeric', month: 'short', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit',
-                      })}
-                    </time>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        ) : (
-          <p className="text-sm text-gray-400 dark:text-gray-500">Aucun historique disponible.</p>
-        )}
+        <HistoryTimeline statusHistory={cr.status_history} />
       </Card>
 
       {/* Cancel confirmation modal */}
@@ -1646,5 +1618,102 @@ function ArticleAnnexEditor({
         )}
       </div>
     </Card>
+  );
+}
+
+// ─── History Timeline ────────────────────────────────────────────────────────
+
+const NOISE_STATUSES = new Set(['configuring_contract', 'draft_generated']);
+
+function HistoryTimeline({
+  statusHistory,
+}: {
+  statusHistory: Array<{ status: ContractRequestStatus; entered_at: string; comment?: string }>;
+}) {
+  const [showFull, setShowFull] = useState(false);
+  const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set());
+
+  const toggleComment = (idx: number) => {
+    setExpandedComments((prev) => {
+      const next = new Set(prev);
+      next.has(idx) ? next.delete(idx) : next.add(idx);
+      return next;
+    });
+  };
+
+  const hiddenCount = statusHistory.filter((e) => NOISE_STATUSES.has(e.status)).length;
+  const visibleEntries = showFull
+    ? statusHistory.map((e, i) => ({ ...e, originalIndex: i }))
+    : statusHistory
+        .map((e, i) => ({ ...e, originalIndex: i }))
+        .filter((e) => !NOISE_STATUSES.has(e.status));
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+          Historique du contrat
+        </h3>
+        {hiddenCount > 0 && (
+          <button
+            onClick={() => setShowFull((v) => !v)}
+            className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+          >
+            {showFull ? 'Vue résumée' : `Voir tout (${statusHistory.length} étapes)`}
+          </button>
+        )}
+      </div>
+
+      {visibleEntries.length > 0 ? (
+        <ol className="relative border-l border-gray-200 dark:border-gray-700 space-y-3 ml-2">
+          {visibleEntries.map((entry) => {
+            const cfg = CONTRACT_STATUS_CONFIG[entry.status as ContractRequestStatus];
+            const label =
+              entry.status === 'commercial_validated' ? 'Création' : (cfg?.label ?? entry.status);
+            const isChanges = entry.status === 'partner_requested_changes';
+            const isExpanded = expandedComments.has(entry.originalIndex);
+
+            return (
+              <li key={entry.originalIndex} className="ml-4">
+                <span className="absolute -left-1.5 mt-1 h-3 w-3 rounded-full border-2 border-white dark:border-gray-800 bg-gray-400 dark:bg-gray-500" />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cfg?.color ?? 'bg-gray-100 text-gray-700'}`}
+                  >
+                    {label}
+                  </span>
+                  <time className="text-xs text-gray-400 dark:text-gray-500">
+                    {new Date(entry.entered_at).toLocaleString('fr-FR', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </time>
+                  {isChanges && entry.comment && (
+                    <button
+                      onClick={() => toggleComment(entry.originalIndex)}
+                      title="Voir le commentaire du partenaire"
+                      className="inline-flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-200"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      {isExpanded ? 'Masquer' : 'Commentaire'}
+                    </button>
+                  )}
+                </div>
+                {isChanges && entry.comment && isExpanded && (
+                  <div className="mt-1.5 ml-1 border-l-2 border-orange-300 dark:border-orange-700 pl-3 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+                    {entry.comment}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <p className="text-sm text-gray-400 dark:text-gray-500">Aucun historique disponible.</p>
+      )}
+    </>
   );
 }

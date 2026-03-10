@@ -66,6 +66,10 @@ class ProcessPartnerReviewUseCase:
         else:
             cr.transition_to(ContractRequestStatus.PARTNER_REQUESTED_CHANGES)
 
+            # Attach comment to the history entry so the timeline can display it
+            if comments and cr.status_history:
+                cr.status_history[-1]["comment"] = comments
+
             # Save partner comments on the contract
             contract = await self._contract_repo.get_by_request_id(cr.id)
             if contract:
