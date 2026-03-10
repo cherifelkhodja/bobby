@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { contractsApi, contractCompaniesApi } from '../api/contracts';
+import { contractsApi, contractCompaniesApi, contractArticlesApi } from '../api/contracts';
 import { vigilanceApi } from '../api/vigilance';
 import { useAuthStore } from '../stores/authStore';
 import { Card } from '../components/ui/Card';
@@ -105,6 +105,7 @@ export default function ContractDetail() {
     invoice_submission_method: 'email',
     estimated_days: '',
     tacit_renewal_months: '',
+    excluded_optional_article_keys: [] as string[],
     special_conditions: '',
   });
   const [configFormInitialized, setConfigFormInitialized] = useState(false);
@@ -126,6 +127,13 @@ export default function ContractDetail() {
     queryFn: contractCompaniesApi.list,
     enabled: isAdv,
   });
+
+  const { data: allArticles = [] } = useQuery({
+    queryKey: ['contract-articles'],
+    queryFn: contractArticlesApi.list,
+    enabled: isAdv,
+  });
+  const optionalArticles = allArticles.filter((a) => a.is_optional && a.is_active);
 
   const { data: complianceDocs } = useQuery({
     queryKey: ['compliance-docs', cr?.third_party_id],
@@ -166,6 +174,7 @@ export default function ContractDetail() {
         invoice_submission_method: (cfg.invoice_submission_method as string) ?? 'email',
         estimated_days: cfg.estimated_days != null ? String(cfg.estimated_days) : '',
         tacit_renewal_months: cfg.tacit_renewal_months != null ? String(cfg.tacit_renewal_months) : '',
+        excluded_optional_article_keys: (cfg.excluded_optional_article_keys as string[]) ?? [],
         special_conditions: (cfg.special_conditions as string) ?? '',
       });
       setConfigFormInitialized(true);
@@ -254,6 +263,7 @@ export default function ContractDetail() {
         invoice_submission_method: configForm.invoice_submission_method,
         estimated_days: configForm.estimated_days ? parseInt(configForm.estimated_days, 10) : undefined,
         tacit_renewal_months: configForm.tacit_renewal_months ? parseInt(configForm.tacit_renewal_months, 10) : undefined,
+        excluded_optional_article_keys: configForm.excluded_optional_article_keys,
         special_conditions: configForm.special_conditions || undefined,
       });
     },
@@ -945,6 +955,56 @@ export default function ContractDetail() {
               </div>
             </div>
           </div>
+
+          {/* Section 2 — Articles optionnels */}
+          {optionalArticles.length > 0 && (
+            <div className="mb-5 border-t border-gray-200 dark:border-gray-700 pt-4">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">
+                Articles optionnels
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+                Cochez les articles à inclure dans ce contrat. Les articles non cochés seront exclus du PDF.
+              </p>
+              <div className="space-y-2">
+                {optionalArticles.map((article) => {
+                  const isIncluded = !configForm.excluded_optional_article_keys.includes(article.article_key);
+                  return (
+                    <label
+                      key={article.article_key}
+                      className="flex items-center gap-3 cursor-pointer group"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isIncluded}
+                        onChange={(e) => {
+                          setConfigForm((f) => {
+                            const excluded = f.excluded_optional_article_keys;
+                            if (e.target.checked) {
+                              return {
+                                ...f,
+                                excluded_optional_article_keys: excluded.filter(
+                                  (k) => k !== article.article_key,
+                                ),
+                              };
+                            } else {
+                              return {
+                                ...f,
+                                excluded_optional_article_keys: [...excluded, article.article_key],
+                              };
+                            }
+                          });
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+                        {article.title}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Section 3 — Conditions particulières */}
           <div className="mb-5 border-t border-gray-200 dark:border-gray-700 pt-4">

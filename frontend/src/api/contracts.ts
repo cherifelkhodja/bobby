@@ -66,6 +66,7 @@ export const contractsApi = {
       invoice_submission_method?: string;
       invoice_email?: string;
       tacit_renewal_months?: number;
+      excluded_optional_article_keys?: string[];
       special_conditions?: string;
     },
   ): Promise<ContractRequest> => {
@@ -243,6 +244,7 @@ export interface ArticleTemplate {
   content: string;
   is_editable: boolean;
   is_active: boolean;
+  is_optional: boolean;
 }
 
 export interface AnnexTemplate {
@@ -310,7 +312,7 @@ export const contractArticlesApi = {
 
   update: async (
     articleKey: string,
-    data: Partial<Pick<ArticleTemplate, 'content' | 'title' | 'is_editable' | 'is_active'>>,
+    data: Partial<Pick<ArticleTemplate, 'content' | 'title' | 'is_editable' | 'is_active' | 'is_optional'>>,
   ): Promise<ArticleTemplate> => {
     const response = await apiClient.patch<ArticleTemplate>(
       `/admin/contract-articles/${articleKey}`,

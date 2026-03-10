@@ -25,13 +25,8 @@ class ContractConfig:
     invoice_submission_method: str = "email"
     invoice_email: str = ""
 
-    # Contract clauses (toggles)
-    include_confidentiality: bool = True
-    include_non_compete: bool = False
-    non_compete_duration_months: int = 0
-    non_compete_geographic_scope: str = ""
-    include_intellectual_property: bool = True
-    include_liability: bool = True
+    # Optional articles excluded for this contract (list of article_key strings)
+    excluded_optional_article_keys: list[str] = field(default_factory=list)
 
     # Additional
     special_conditions: str = ""
@@ -52,12 +47,7 @@ class ContractConfig:
             "payment_terms": self.payment_terms,
             "invoice_submission_method": self.invoice_submission_method,
             "invoice_email": self.invoice_email,
-            "include_confidentiality": self.include_confidentiality,
-            "include_non_compete": self.include_non_compete,
-            "non_compete_duration_months": self.non_compete_duration_months,
-            "non_compete_geographic_scope": self.non_compete_geographic_scope,
-            "include_intellectual_property": self.include_intellectual_property,
-            "include_liability": self.include_liability,
+            "excluded_optional_article_keys": self.excluded_optional_article_keys,
             "special_conditions": self.special_conditions,
             "annexes": self.annexes,
         }

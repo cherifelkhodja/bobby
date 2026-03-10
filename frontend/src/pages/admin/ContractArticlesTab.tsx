@@ -36,6 +36,8 @@ import {
   Trash2,
   Plus,
   Pencil,
+  ToggleLeft,
+  ToggleRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -196,6 +198,7 @@ function SortableArticleRow({
   onToggleExpand,
   onToggleActive,
   onToggleEditable,
+  onToggleOptional,
   onContentChange,
   onSaveContent,
   onRenameTitle,
@@ -210,6 +213,7 @@ function SortableArticleRow({
   onToggleExpand: () => void;
   onToggleActive: () => void;
   onToggleEditable: () => void;
+  onToggleOptional: () => void;
   onContentChange: (value: string) => void;
   onSaveContent: () => void;
   onRenameTitle: (title: string) => void;
@@ -323,6 +327,9 @@ function SortableArticleRow({
 
         {/* Badges */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          {article.is_optional && (
+            <Badge variant="warning">Optionnel</Badge>
+          )}
           {article.is_editable ? (
             <Badge variant="primary">Modifiable</Badge>
           ) : (
@@ -332,6 +339,15 @@ function SortableArticleRow({
 
         {/* Action buttons */}
         <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={onToggleOptional}
+            disabled={isPending}
+            title={article.is_optional ? 'Rendre obligatoire' : 'Rendre optionnel (choix à la génération)'}
+            className="p-1.5 rounded text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+          >
+            {article.is_optional ? <ToggleRight className="w-4 h-4 text-amber-500" /> : <ToggleLeft className="w-4 h-4" />}
+          </button>
+
           <button
             onClick={onToggleEditable}
             disabled={isPending}
@@ -554,7 +570,7 @@ export function ContractArticlesTab() {
       data,
     }: {
       key: string;
-      data: Partial<Pick<ArticleTemplate, 'content' | 'title' | 'is_editable' | 'is_active'>>;
+      data: Partial<Pick<ArticleTemplate, 'content' | 'title' | 'is_editable' | 'is_active' | 'is_optional'>>;
     }) => contractArticlesApi.update(key, data),
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ['contract-articles'] });
@@ -737,6 +753,12 @@ export function ContractArticlesTab() {
                         updateMutation.mutate({
                           key: article.article_key,
                           data: { is_editable: !article.is_editable },
+                        })
+                      }
+                      onToggleOptional={() =>
+                        updateMutation.mutate({
+                          key: article.article_key,
+                          data: { is_optional: !article.is_optional },
                         })
                       }
                       onContentChange={(value) =>

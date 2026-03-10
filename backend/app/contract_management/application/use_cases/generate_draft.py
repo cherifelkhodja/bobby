@@ -325,14 +325,29 @@ class GenerateDraftUseCase:
 
         # Pre-render each article's content as a Jinja2 template so that
         # article authors can embed variables (e.g. {{ payment_terms_display }})
-        from copy import copy
         from dataclasses import replace as dc_replace
 
         from jinja2 import BaseLoader, Environment
 
         jinja_env = Environment(loader=BaseLoader(), autoescape=False)
+
+        # Filter out optional articles that were excluded for this contract
+        excluded_keys: list[str] = []
+        if cr.contract_config and isinstance(cr.contract_config, dict):
+            excluded_keys = cr.contract_config.get("excluded_optional_article_keys", []) or []
+
+        selected_articles = [
+            a for a in articles
+            if not (a.is_optional and a.article_key in excluded_keys)
+        ]
+
+        # Re-number sequentially after filtering
         rendered_articles = []
-        for article in articles:
+        counter = 0
+        for article in selected_articles:
+            if article.article_key != "preambule":
+                counter += 1
+                article = dc_replace(article, article_number=counter)
             try:
                 rendered_content = jinja_env.from_string(article.content).render(**context)
             except Exception:

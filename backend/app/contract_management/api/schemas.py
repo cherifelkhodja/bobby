@@ -87,6 +87,7 @@ class ContractConfigRequest(BaseModel):
     invoice_submission_method: str = "email"
     invoice_email: str = ""
     tacit_renewal_months: int | None = Field(None, ge=1, le=24, description="Nombre de mois pour la tacite reconduction (annexe)")
+    excluded_optional_article_keys: list[str] = Field(default_factory=list, description="Clés des articles optionnels à exclure du contrat")
     special_conditions: str = ""
 
 

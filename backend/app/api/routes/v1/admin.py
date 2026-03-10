@@ -1023,6 +1023,7 @@ class ArticleTemplateResponse(_PydanticBase):
     content: str
     is_editable: bool
     is_active: bool
+    is_optional: bool
 
 
 class ArticleTemplateCreateRequest(_PydanticBase):
@@ -1031,6 +1032,7 @@ class ArticleTemplateCreateRequest(_PydanticBase):
     content: str = ""
     is_editable: bool = True
     is_active: bool = True
+    is_optional: bool = False
 
 
 class ArticleTemplateUpdateRequest(_PydanticBase):
@@ -1038,6 +1040,7 @@ class ArticleTemplateUpdateRequest(_PydanticBase):
     title: str | None = None
     is_editable: bool | None = None
     is_active: bool | None = None
+    is_optional: bool | None = None
 
 
 class ArticleReorderRequest(_PydanticBase):
@@ -1069,6 +1072,7 @@ async def create_contract_article(
         content=body.content,
         is_editable=body.is_editable,
         is_active=body.is_active,
+        is_optional=body.is_optional,
         created_by=admin_id,
     )
     await db.commit()
@@ -1079,6 +1083,7 @@ async def create_contract_article(
         content=created.content,
         is_editable=created.is_editable,
         is_active=created.is_active,
+        is_optional=created.is_optional,
     )
 
 
@@ -1104,6 +1109,7 @@ async def list_contract_articles(
             content=a.content,
             is_editable=a.is_editable,
             is_active=a.is_active,
+            is_optional=a.is_optional,
         )
         for a in articles
     ]
@@ -1168,6 +1174,7 @@ async def update_contract_article(
         title=body.title,
         is_editable=body.is_editable,
         is_active=body.is_active,
+        is_optional=body.is_optional,
         updated_by=admin_id,
     )
     if not updated:
@@ -1179,6 +1186,7 @@ async def update_contract_article(
         content=updated.content,
         is_editable=updated.is_editable,
         is_active=updated.is_active,
+        is_optional=updated.is_optional,
     )
 
 

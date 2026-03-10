@@ -21,6 +21,7 @@ class ArticleTemplate:
     content: str
     is_editable: bool
     is_active: bool
+    is_optional: bool
     updated_at: datetime
     updated_by: UUID | None = None
 
@@ -38,6 +39,7 @@ class ArticleTemplateRepository:
         content: str = "",
         is_editable: bool = True,
         is_active: bool = True,
+        is_optional: bool = False,
         created_by: UUID | None = None,
     ) -> ArticleTemplate:
         """Create a new article template at the end of the list."""
@@ -52,6 +54,7 @@ class ArticleTemplateRepository:
             content=content,
             is_editable=is_editable,
             is_active=is_active,
+            is_optional=is_optional,
             updated_by=created_by,
         )
         self._db.add(model)
@@ -115,6 +118,7 @@ class ArticleTemplateRepository:
         title: str | None = None,
         is_editable: bool | None = None,
         is_active: bool | None = None,
+        is_optional: bool | None = None,
         updated_by: UUID | None = None,
     ) -> ArticleTemplate | None:
         """Update an article template. Returns the updated article or None if not found."""
@@ -135,6 +139,8 @@ class ArticleTemplateRepository:
             model.is_editable = is_editable
         if is_active is not None:
             model.is_active = is_active
+        if is_optional is not None:
+            model.is_optional = is_optional
         if updated_by is not None:
             model.updated_by = updated_by
         model.updated_at = datetime.utcnow()
@@ -151,6 +157,7 @@ class ArticleTemplateRepository:
             content=model.content,
             is_editable=model.is_editable,
             is_active=model.is_active,
+            is_optional=model.is_optional,
             updated_at=model.updated_at,
             updated_by=model.updated_by,
         )

@@ -93,6 +93,7 @@ class ContractArticleTemplateModel(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     is_editable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_optional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
