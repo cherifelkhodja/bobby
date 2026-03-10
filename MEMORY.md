@@ -161,6 +161,17 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-10 (masquage configuration contrat après envoi au partenaire)
+
+#### Formulaire de configuration masqué une fois le brouillon envoyé
+
+- **fix(contracts)**: `ContractDetail.tsx` — suppression de `partner_requested_changes` de la condition `showConfigForm`
+  - Le formulaire de configuration n'est plus accessible une fois qu'un brouillon a été envoyé au partenaire
+  - Statuts couverts par `showConfigForm` : `commercial_validated`, `reviewing_compliance`, `compliance_blocked`, `configuring_contract`, `draft_generated`
+  - En cas de demande de modifications par le partenaire (`partner_requested_changes`), la configuration reste verrouillée
+
+---
+
 ### 2026-03-09 (gestion avancée articles contrat AT)
 
 #### Drag & drop, balises dynamiques, logo MIME

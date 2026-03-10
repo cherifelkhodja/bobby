@@ -345,8 +345,7 @@ export default function ContractDetail() {
     cr?.status === 'reviewing_compliance' ||
     cr?.status === 'compliance_blocked' ||
     cr?.status === 'configuring_contract' ||
-    cr?.status === 'draft_generated' ||
-    cr?.status === 'partner_requested_changes'
+    cr?.status === 'draft_generated'
   );
 
   // Articles are now managed globally from Admin > Contrat AT tab
