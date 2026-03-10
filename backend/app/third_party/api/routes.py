@@ -576,12 +576,19 @@ async def get_contract_draft(
         )
 
     contract = contracts[-1]
+
+    # Generate presigned S3 URL so the portal can display the PDF inline
+    download_url = None
+    if contract.s3_key_draft:
+        from app.infrastructure.storage.s3_client import S3StorageClient
+        from app.config import get_settings
+        s3 = S3StorageClient(get_settings())
+        download_url = await s3.get_presigned_url(contract.s3_key_draft, expires_in=1800)
+
     return {
-        "contract_id": str(contract.id),
-        "reference": contract.reference,
-        "version": contract.version,
-        "s3_key_draft": contract.s3_key_draft,
         "contract_request_id": str(result.contract_request_id),
+        "status": contract.yousign_status or "draft",
+        "download_url": download_url,
     }
 
 
