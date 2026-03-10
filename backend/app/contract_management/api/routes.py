@@ -1101,23 +1101,21 @@ async def list_contracts(
     if role == "commercial" and cr.commercial_email != email:
         raise HTTPException(status_code=403, detail="Accès non autorisé.")
 
-    contract = await contract_repo.get_by_request_id(contract_request_id)
-    if not contract:
-        return []
-
+    contracts = await contract_repo.list_by_contract_request(contract_request_id)
     return [
         ContractResponse(
-            id=contract.id,
-            contract_request_id=contract.contract_request_id,
-            reference=contract.reference,
-            version=contract.version,
-            s3_key_draft=contract.s3_key_draft,
-            s3_key_signed=contract.s3_key_signed,
-            yousign_status=contract.yousign_status,
-            partner_comments=contract.partner_comments,
-            created_at=contract.created_at,
-            signed_at=contract.signed_at,
+            id=c.id,
+            contract_request_id=c.contract_request_id,
+            reference=c.reference,
+            version=c.version,
+            s3_key_draft=c.s3_key_draft,
+            s3_key_signed=c.s3_key_signed,
+            yousign_status=c.yousign_status,
+            partner_comments=c.partner_comments,
+            created_at=c.created_at,
+            signed_at=c.signed_at,
         )
+        for c in contracts
     ]
 
 
