@@ -156,6 +156,7 @@ class CreateContractRequestUseCase:
             )
 
             candidate_id = positioning_data.get("candidate_id")
+            consultant_type = positioning_data.get("consultant_type")
             need_id = positioning_data.get("need_id")
 
             # Get commercial info: prefer Bobby DB, fallback to Boond API
@@ -232,7 +233,7 @@ class CreateContractRequestUseCase:
             consultant_first_name = positioning_data.get("consultant_first_name") or None
             consultant_last_name = positioning_data.get("consultant_last_name") or None
             if candidate_id:
-                candidate_info = await self._crm.get_candidate_info(candidate_id)
+                candidate_info = await self._crm.get_candidate_info(candidate_id, consultant_type)
                 if candidate_info:
                     consultant_civility = candidate_info.get("civility") or None
                     consultant_first_name = candidate_info.get("first_name") or consultant_first_name
@@ -243,6 +244,7 @@ class CreateContractRequestUseCase:
                 reference=reference,
                 boond_positioning_id=positioning_id,
                 boond_candidate_id=candidate_id,
+                boond_consultant_type=consultant_type,
                 boond_need_id=need_id,
                 commercial_email=commercial_email or "",
                 client_name=client_name,

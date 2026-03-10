@@ -25,6 +25,7 @@ class ContractRequest:
     commercial_email: str
     id: UUID = field(default_factory=uuid4)
     boond_candidate_id: int | None = None
+    boond_consultant_type: str | None = None  # "candidate" ou "resource"
     boond_need_id: int | None = None
     third_party_id: UUID | None = None
     status: ContractRequestStatus = ContractRequestStatus.PENDING_COMMERCIAL_VALIDATION

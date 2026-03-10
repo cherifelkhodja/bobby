@@ -20,6 +20,7 @@ class ContractRequestModel(Base):
     reference: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
     boond_positioning_id: Mapped[int] = mapped_column(Integer, nullable=False)
     boond_candidate_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    boond_consultant_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     boond_need_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     third_party_id: Mapped[UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("tp_third_parties.id"), nullable=True

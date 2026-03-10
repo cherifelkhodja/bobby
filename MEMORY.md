@@ -161,6 +161,24 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-10 (distinction candidate vs resource Boond)
+
+#### Différenciation boond_consultant_type dans cm_contract_requests
+
+**Problème** : Le webhook de positioning Boond peut référencer un consultant qui est soit un `candidate` (endpoint `/candidates/{id}`, nécessite conversion post-signature) soit une `resource` déjà existante (endpoint `/resources/{id}`, pas de conversion à faire). Sans distinction, on appelait toujours `/candidates/{id}` pour la conversion, ce qui échouait pour les ressources existantes.
+
+**Solution** : Ajout du champ `boond_consultant_type` (`"candidate"` | `"resource"` | `None`) tracé dès le webhook.
+
+- **migration 054**: Colonne `boond_consultant_type VARCHAR(20) NULLABLE` sur `cm_contract_requests`
+- **BoondCrmAdapter.get_positioning()**: Détecte le type depuis `included[].type` dans la réponse Boond ; fallback sur la clé de relation (`resource` vs `candidate`) ; retourne `consultant_type` dans le dict
+- **BoondCrmAdapter.get_candidate_info()**: Route vers `/candidates/{id}` ou `/resources/{id}` selon `consultant_type` ; si `None` (inconnu), essaie `/resources/` puis `/candidates/` en fallback
+- **CreateContractRequestUseCase**: Passe `consultant_type` à `get_candidate_info()` et stocke dans `ContractRequest.boond_consultant_type`
+- **SyncToBoondAfterSigningUseCase**: N'appelle `convert_candidate_to_resource()` que si `boond_consultant_type == "candidate"` (ou `None` pour rétro-compatibilité) ; log et skip si déjà `"resource"`
+- **Endpoint manuel convert-candidate**: Retourne 400 si `boond_consultant_type == "resource"`
+- **ContractRequestResponse**: Expose `boond_consultant_type` dans l'API
+
+---
+
 ### 2026-03-10 (signature manuelle sans YouSign)
 
 #### Suppression de l'intégration YouSign — signature manuelle

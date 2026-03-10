@@ -114,6 +114,7 @@ def _cr_to_response(
         reference=cr.reference,
         boond_positioning_id=cr.boond_positioning_id,
         boond_candidate_id=cr.boond_candidate_id,
+        boond_consultant_type=cr.boond_consultant_type,
         status=cr.status.value,
         status_display=cr.status.display_name,
         third_party_type=cr.third_party_type,
@@ -1249,6 +1250,12 @@ async def boond_convert_candidate(
 
     if not cr.boond_candidate_id:
         raise HTTPException(status_code=400, detail="Pas de boond_candidate_id sur cette demande.")
+
+    if cr.boond_consultant_type == "resource":
+        raise HTTPException(
+            status_code=400,
+            detail="Le consultant est déjà une ressource Boond (boond_consultant_type='resource'), pas besoin de conversion.",
+        )
 
     await crm.convert_candidate_to_resource(cr.boond_candidate_id, state=3)
     logger.info("boond_convert_candidate_ok", cr_id=str(cr.id), candidate_id=cr.boond_candidate_id)

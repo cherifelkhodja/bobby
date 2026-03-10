@@ -74,7 +74,13 @@ class SyncToBoondAfterSigningUseCase:
         resource_id: int | None = cr.boond_candidate_id
 
         # ── Étape 1 : Conversion candidat → ressource ──────────────────────
-        if resource_id:
+        # N'effectuer la conversion que si le consultant est un candidat Boond.
+        # Si c'est déjà une ressource (boond_consultant_type == "resource"),
+        # l'appel /candidates/{id} échouerait et la conversion est inutile.
+        # On reste permissif pour les anciennes demandes (type None) en tentant
+        # la conversion mais en absorbant silencieusement l'erreur.
+        is_candidate = cr.boond_consultant_type == "candidate" or cr.boond_consultant_type is None
+        if resource_id and is_candidate:
             try:
                 await self._crm.convert_candidate_to_resource(resource_id, state=3)
             except Exception as exc:
@@ -82,8 +88,15 @@ class SyncToBoondAfterSigningUseCase:
                     "sync_boond_convert_candidate_failed",
                     cr_id=str(cr.id),
                     resource_id=resource_id,
+                    consultant_type=cr.boond_consultant_type,
                     error=str(exc),
                 )
+        elif resource_id and cr.boond_consultant_type == "resource":
+            logger.info(
+                "sync_boond_skip_convert_already_resource",
+                cr_id=str(cr.id),
+                resource_id=resource_id,
+            )
 
         # ── Étape 2 : Création société fournisseur ─────────────────────────
         if tp and not tp.boond_provider_id:

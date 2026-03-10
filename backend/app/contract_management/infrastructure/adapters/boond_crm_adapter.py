@@ -49,24 +49,34 @@ class BoondCrmAdapter:
                 relationships, "opportunity"
             ) or self._extract_relationship_id(relationships, "delivery")
 
-            # Extract consultant name from included data
+            # Detect consultant type and extract name from included data.
+            # Boond can include the consultant as type "resource" (already a
+            # resource in the system) or type "candidate" (still in pipeline).
             consultant_first_name = ""
             consultant_last_name = ""
+            consultant_type: str | None = None
             candidate_id_str = str(candidate_id) if candidate_id else ""
             for included in response.get("included", []):
-                if (
-                    included.get("type") == "resource"
-                    and str(included.get("id", "")) == candidate_id_str
-                ):
+                inc_type = included.get("type", "")
+                if inc_type in ("resource", "candidate") and str(included.get("id", "")) == candidate_id_str:
+                    consultant_type = inc_type
                     inc_attrs = included.get("attributes", {})
                     consultant_first_name = inc_attrs.get("firstName", "")
                     consultant_last_name = inc_attrs.get("lastName", "")
                     break
 
+            # Fallback: infer type from relationship key used to find the ID
+            if consultant_type is None and candidate_id is not None:
+                if self._extract_relationship_id(relationships, "resource") == candidate_id:
+                    consultant_type = "resource"
+                elif self._extract_relationship_id(relationships, "candidate") == candidate_id:
+                    consultant_type = "candidate"
+
             logger.info(
                 "boond_positioning_parsed",
                 positioning_id=positioning_id,
                 candidate_id=candidate_id,
+                consultant_type=consultant_type,
                 need_id=need_id,
                 consultant_name=f"{consultant_first_name} {consultant_last_name}".strip(),
                 relationship_keys=list(relationships.keys()),
@@ -76,6 +86,7 @@ class BoondCrmAdapter:
                 "id": positioning_id,
                 "state": attributes.get("state"),
                 "candidate_id": candidate_id,
+                "consultant_type": consultant_type,
                 "need_id": need_id,
                 "daily_rate": attributes.get("averageDailyPriceExcludingTax"),
                 "start_date": attributes.get("startDate"),
@@ -174,42 +185,72 @@ class BoondCrmAdapter:
             logger.error("boond_get_need_failed", need_id=need_id, error=str(exc))
             return None
 
-    async def get_candidate_info(self, candidate_id: int) -> dict[str, Any] | None:
-        """Fetch candidate info from BoondManager.
+    async def get_candidate_info(
+        self,
+        candidate_id: int,
+        consultant_type: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Fetch consultant info from BoondManager.
+
+        Routes to /candidates/{id} for actual Boond candidates (type="candidate")
+        or to /resources/{id} for already-registered resources (type="resource").
+        When consultant_type is unknown (None), tries /resources/ first then
+        falls back to /candidates/.
 
         Args:
-            candidate_id: Boond candidate/resource ID.
+            candidate_id: Boond candidate or resource ID.
+            consultant_type: "candidate", "resource", or None (unknown).
 
         Returns:
-            Candidate data or None.
+            Consultant data or None.
         """
-        try:
-            response = await self._boond._make_request("GET", f"/resources/{candidate_id}")
-            data = response.get("data", {})
-            attributes = data.get("attributes", {})
+        endpoints: list[str]
+        if consultant_type == "candidate":
+            endpoints = [f"/candidates/{candidate_id}"]
+        elif consultant_type == "resource":
+            endpoints = [f"/resources/{candidate_id}"]
+        else:
+            # Unknown type: try resource first (most common), then candidate
+            endpoints = [f"/resources/{candidate_id}", f"/candidates/{candidate_id}"]
 
-            # civility: 1 = M., 2 = Mme
-            raw_civility = attributes.get("civility")
-            civility = None
-            if raw_civility == 1:
-                civility = "M."
-            elif raw_civility == 2:
-                civility = "Mme"
+        last_exc: Exception | None = None
+        for endpoint in endpoints:
+            try:
+                response = await self._boond._make_request("GET", endpoint)
+                data = response.get("data", {})
+                attributes = data.get("attributes", {})
 
-            return {
-                "id": candidate_id,
-                "civility": civility,
-                "first_name": attributes.get("firstName", ""),
-                "last_name": attributes.get("lastName", ""),
-                "email": attributes.get("email1", ""),
-            }
-        except Exception as exc:
-            logger.error(
-                "boond_get_candidate_failed",
-                candidate_id=candidate_id,
-                error=str(exc),
-            )
-            return None
+                # civility: 1 = M., 2 = Mme
+                raw_civility = attributes.get("civility")
+                civility = None
+                if raw_civility == 1:
+                    civility = "M."
+                elif raw_civility == 2:
+                    civility = "Mme"
+
+                return {
+                    "id": candidate_id,
+                    "civility": civility,
+                    "first_name": attributes.get("firstName", ""),
+                    "last_name": attributes.get("lastName", ""),
+                    "email": attributes.get("email1", ""),
+                }
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "boond_get_consultant_info_endpoint_failed",
+                    candidate_id=candidate_id,
+                    endpoint=endpoint,
+                    error=str(exc),
+                )
+
+        logger.error(
+            "boond_get_candidate_failed",
+            candidate_id=candidate_id,
+            consultant_type=consultant_type,
+            error=str(last_exc),
+        )
+        return None
 
     async def create_provider(
         self,
