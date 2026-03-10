@@ -662,7 +662,7 @@ export function ContractArticlesTab() {
                   onClick={() => setSubTab('articles')}
                   className={`px-4 py-1.5 text-sm font-medium transition-colors ${
                     subTab === 'articles'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-primary-600 text-white'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                   }`}
                 >
@@ -672,7 +672,7 @@ export function ContractArticlesTab() {
                   onClick={() => setSubTab('annexes')}
                   className={`px-4 py-1.5 text-sm font-medium transition-colors border-l border-gray-200 dark:border-gray-700 ${
                     subTab === 'annexes'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-primary-600 text-white'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                   }`}
                 >
