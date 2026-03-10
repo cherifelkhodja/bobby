@@ -43,7 +43,7 @@ export const portalApi = {
 
   getContractDraft: async (
     token: string,
-  ): Promise<{ contract_request_id: string; status: string; download_url: string | null }> => {
+  ): Promise<{ contract_request_id: string; status: string; contract_request_status: string | null; download_url: string | null }> => {
     const response = await portalClient.get(`/${token}/contract-draft`);
     return response.data;
   },

@@ -565,6 +565,7 @@ async def get_contract_draft(
 
     from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
         ContractRepository,
+        ContractRequestRepository,
     )
 
     contract_repo = ContractRepository(db)
@@ -577,6 +578,11 @@ async def get_contract_draft(
 
     contract = contracts[-1]
 
+    # Fetch contract request status so the portal can restore decision state
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(result.contract_request_id)
+    contract_request_status = cr.status.value if cr else None
+
     # Generate presigned S3 URL so the portal can display the PDF inline
     download_url = None
     if contract.s3_key_draft:
@@ -588,6 +594,7 @@ async def get_contract_draft(
     return {
         "contract_request_id": str(result.contract_request_id),
         "status": contract.yousign_status or "draft",
+        "contract_request_status": contract_request_status,
         "download_url": download_url,
     }
 

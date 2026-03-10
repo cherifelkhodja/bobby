@@ -1432,11 +1432,18 @@ function ContractReviewSection({
   contractDraft,
 }: {
   token: string;
-  contractDraft?: { contract_request_id: string; status: string; download_url: string | null } | null;
+  contractDraft?: { contract_request_id: string; status: string; contract_request_status?: string | null; download_url: string | null } | null;
 }) {
   const [decision, setDecision] = useState<'approved' | 'changes_requested' | null>(null);
   const [comments, setComments] = useState('');
-  const [submitted, setSubmitted] = useState<'approved' | 'changes_requested' | null>(null);
+
+  // Restore decision from server-side contract request status so refresh/re-visit works
+  const initialSubmitted = (): 'approved' | 'changes_requested' | null => {
+    if (contractDraft?.contract_request_status === 'partner_approved') return 'approved';
+    if (contractDraft?.contract_request_status === 'partner_requested_changes') return 'changes_requested';
+    return null;
+  };
+  const [submitted, setSubmitted] = useState<'approved' | 'changes_requested' | null>(initialSubmitted);
 
   const reviewMutation = useMutation({
     mutationFn: () => portalApi.submitContractReview(token, decision!, comments || undefined),
