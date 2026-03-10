@@ -1436,18 +1436,40 @@ function ContractReviewSection({
 }) {
   const [decision, setDecision] = useState<'approved' | 'changes_requested' | null>(null);
   const [comments, setComments] = useState('');
+  const [submitted, setSubmitted] = useState<'approved' | 'changes_requested' | null>(null);
 
   const reviewMutation = useMutation({
     mutationFn: () => portalApi.submitContractReview(token, decision!, comments || undefined),
-    onSuccess: (data) => {
-      toast.success(data.message);
-      setDecision(null);
-      setComments('');
+    onSuccess: () => {
+      setSubmitted(decision);
     },
     onError: () => {
       toast.error('Erreur lors de la soumission.');
     },
   });
+
+  if (submitted) {
+    const isApproved = submitted === 'approved';
+    return (
+      <Card className="text-center py-10">
+        <div className={`mx-auto mb-4 flex items-center justify-center h-16 w-16 rounded-full ${isApproved ? 'bg-green-100 dark:bg-green-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
+          {isApproved
+            ? <CheckCircle className="h-8 w-8 text-green-500" />
+            : <AlertTriangle className="h-8 w-8 text-orange-500" />
+          }
+        </div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          {isApproved ? 'Contrat approuvé' : 'Modifications demandées'}
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
+          {isApproved
+            ? 'Votre validation a bien été enregistrée. Nous allons procéder à l\'envoi du contrat en signature.'
+            : 'Vos commentaires ont bien été transmis à notre équipe. Nous reviendrons vers vous après correction du contrat.'
+          }
+        </p>
+      </Card>
+    );
+  }
 
   return (
     <div>
