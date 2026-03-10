@@ -65,6 +65,7 @@ class ContractRequestRepository:
             model.third_party_id = request.third_party_id
             model.third_party_type = request.third_party_type
             model.daily_rate = request.daily_rate
+            model.quantity_sold = request.quantity_sold
             model.start_date = request.start_date
             model.end_date = request.end_date
             model.client_name = request.client_name
@@ -226,6 +227,7 @@ class ContractRequestRepository:
             status=ContractRequestStatus(model.status),
             third_party_type=model.third_party_type,
             daily_rate=model.daily_rate,
+            quantity_sold=model.quantity_sold,
             start_date=model.start_date,
             end_date=model.end_date,
             client_name=model.client_name,
@@ -266,6 +268,7 @@ class ContractRequestRepository:
             status=entity.status.value,
             third_party_type=entity.third_party_type,
             daily_rate=entity.daily_rate,
+            quantity_sold=entity.quantity_sold,
             start_date=entity.start_date,
             end_date=entity.end_date,
             client_name=entity.client_name,

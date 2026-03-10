@@ -21,6 +21,7 @@ class ContractRequestResponse(BaseModel):
     status_display: str
     third_party_type: str | None = None
     daily_rate: float | None = None
+    quantity_sold: int | None = None
     start_date: date | None = None
     end_date: date | None = None
     client_name: str | None = None

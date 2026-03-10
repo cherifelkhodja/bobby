@@ -121,6 +121,7 @@ def _cr_to_response(
         status_display=cr.status.display_name,
         third_party_type=cr.third_party_type,
         daily_rate=float(cr.daily_rate) if cr.daily_rate else None,
+        quantity_sold=cr.quantity_sold,
         start_date=cr.start_date,
         end_date=cr.end_date,
         client_name=cr.client_name,

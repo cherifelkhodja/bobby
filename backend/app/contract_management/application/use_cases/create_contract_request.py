@@ -202,6 +202,7 @@ class CreateContractRequestUseCase:
 
             # Sanitize Boond data — empty strings must be None for DB types
             raw_daily_rate = positioning_data.get("daily_rate")
+            raw_quantity = positioning_data.get("quantity")
             raw_start_date = positioning_data.get("start_date")
             raw_end_date = positioning_data.get("end_date")
 
@@ -225,6 +226,13 @@ class CreateContractRequestUseCase:
                     return raw
                 return None
 
+            quantity_sold = None
+            if raw_quantity is not None:
+                try:
+                    quantity_sold = int(raw_quantity)
+                except (ValueError, TypeError):
+                    quantity_sold = None
+
             start_date = _parse_date(raw_start_date)
             end_date = _parse_date(raw_end_date)
 
@@ -232,12 +240,16 @@ class CreateContractRequestUseCase:
             consultant_civility = None
             consultant_first_name = positioning_data.get("consultant_first_name") or None
             consultant_last_name = positioning_data.get("consultant_last_name") or None
+            consultant_email = None
+            consultant_phone = None
             if candidate_id:
                 candidate_info = await self._crm.get_candidate_info(candidate_id, consultant_type)
                 if candidate_info:
                     consultant_civility = candidate_info.get("civility") or None
                     consultant_first_name = candidate_info.get("first_name") or consultant_first_name
                     consultant_last_name = candidate_info.get("last_name") or consultant_last_name
+                    consultant_email = candidate_info.get("email") or None
+                    consultant_phone = candidate_info.get("phone") or None
 
             # Create contract request
             cr = ContractRequest(
@@ -253,7 +265,10 @@ class CreateContractRequestUseCase:
                 consultant_civility=consultant_civility,
                 consultant_first_name=consultant_first_name,
                 consultant_last_name=consultant_last_name,
+                consultant_email=consultant_email,
+                consultant_phone=consultant_phone,
                 daily_rate=daily_rate,
+                quantity_sold=quantity_sold,
                 start_date=start_date,
                 end_date=end_date,
             )

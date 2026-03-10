@@ -37,6 +37,7 @@ class ContractRequestModel(Base):
     )
     third_party_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     daily_rate: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    quantity_sold: Mapped[int | None] = mapped_column(Integer, nullable=True)
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     client_name: Mapped[str | None] = mapped_column(String(255), nullable=True)

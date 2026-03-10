@@ -198,6 +198,19 @@ docker-compose up # Start all services
 
 ---
 
+### 2026-03-10 (UO vendu + infos consultant depuis Boond)
+
+#### quantity_sold + consultant email/téléphone pré-remplis depuis BoondManager
+
+- **migration 056** : Colonne `quantity_sold INTEGER NULLABLE` sur `cm_contract_requests`
+- **BoondCrmAdapter.get_positioning()** : Extrait `quantity` (→ `quantity_sold`) de l'attribut positioning
+- **BoondCrmAdapter.get_candidate_info()** : Ajoute `phone` (`phone1` → `mobilePhone` → `phone2`) et `email` (`email1` → `email2`)
+- **CreateContractRequestUseCase** : Passe `consultant_email`, `consultant_phone`, `quantity_sold` à la création
+- **ContractRequest entity** : Nouveau champ `quantity_sold: int | None`
+- **ContractRequestResponse** : Expose `quantity_sold`
+
+---
+
 ### 2026-03-10 (signature manuelle sans YouSign)
 
 #### Suppression de l'intégration YouSign — signature manuelle

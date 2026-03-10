@@ -41,6 +41,7 @@ class ContractRequest:
     status: ContractRequestStatus = ContractRequestStatus.PENDING_COMMERCIAL_VALIDATION
     third_party_type: str | None = None
     daily_rate: Decimal | None = None
+    quantity_sold: int | None = None
     start_date: date | None = None
     end_date: date | None = None
     client_name: str | None = None

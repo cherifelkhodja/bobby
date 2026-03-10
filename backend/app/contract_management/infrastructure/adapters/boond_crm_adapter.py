@@ -89,6 +89,7 @@ class BoondCrmAdapter:
                 "consultant_type": consultant_type,
                 "need_id": need_id,
                 "daily_rate": attributes.get("averageDailyPriceExcludingTax"),
+                "quantity": attributes.get("quantity"),
                 "start_date": attributes.get("startDate"),
                 "end_date": attributes.get("endDate"),
                 "consultant_first_name": consultant_first_name,
@@ -228,12 +229,19 @@ class BoondCrmAdapter:
                 elif raw_civility == 2:
                     civility = "Mme"
 
+                phone = (
+                    attributes.get("phone1")
+                    or attributes.get("mobilePhone")
+                    or attributes.get("phone2")
+                    or ""
+                )
                 return {
                     "id": candidate_id,
                     "civility": civility,
                     "first_name": attributes.get("firstName", ""),
                     "last_name": attributes.get("lastName", ""),
-                    "email": attributes.get("email1", ""),
+                    "email": attributes.get("email1", "") or attributes.get("email2", ""),
+                    "phone": phone,
                 }
             except Exception as exc:
                 last_exc = exc
