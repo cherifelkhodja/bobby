@@ -702,7 +702,7 @@ async def submit_company_info(
     tp.siren = siren
     tp.siret = body.siret
     tp.rcs_city = body.rcs_city or body.head_office_city
-    tp.rcs_number = None
+    tp.rcs_number = siren  # In France, RCS registration number = SIREN
     tp.head_office_street = body.head_office_street
     tp.head_office_postal_code = body.head_office_postal_code
     tp.head_office_city = body.head_office_city
