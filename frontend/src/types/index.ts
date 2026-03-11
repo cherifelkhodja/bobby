@@ -725,7 +725,7 @@ export type ContractRequestStatus =
   | 'cancelled';
 
 export const CONTRACT_STATUS_CONFIG: Record<ContractRequestStatus, { label: string; color: string; group: 'active' | 'done' | 'blocked' }> = {
-  pending_commercial_validation: { label: 'Attente validation', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300', group: 'active' },
+  pending_commercial_validation: { label: 'Saisie commerciale', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300', group: 'active' },
   commercial_validated: { label: 'Validé', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300', group: 'active' },
   collecting_documents: { label: 'Collecte documents', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300', group: 'active' },
   reviewing_compliance: { label: 'En vérification', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300', group: 'active' },
