@@ -175,11 +175,19 @@ docker-compose up # Start all services
 
 2. **Consultant (civilité, email, téléphone)** : `get_candidate_info()` appelait `/candidates/{id}` ou `/resources/{id}` (endpoint de base) qui ne retourne pas `civility`, `email1`, `phone1`
    - Fix : Endpoints changés vers `/candidates/{id}/information` et `/resources/{id}/information`
+   - Fix : Mapping civilité corrigé (Boond : 0=homme→M., 1=femme→Mme ; avant : 1→M., 2→Mme)
 
 3. **Société émettrice** : `get_need()` appelle `/opportunities/{id}/information` qui peut ne pas retourner la relation `agency`
    - Fix : Fallback sur `GET /opportunities/{id}` (endpoint de base) pour récupérer `agency_id` si absent de `/information`
 
-**Fichiers modifiés** : `boond_crm_adapter.py`, `routes.py` (sync-from-boond)
+4. **Société émettrice dans le formulaire de validation commerciale** :
+   - Ajout `company_id` à `CommercialValidationRequest`, `ValidateCommercialCommand`, `ValidateCommercialUseCase`
+   - Nouvel endpoint `GET /contract-requests/companies` (commercial/adv/admin) pour lister les sociétés actives
+   - Frontend : `contractCompaniesApi.listActive()` via l'endpoint non-admin
+   - Select "Société émettrice" ajouté au formulaire avec pré-remplissage depuis `cr.company_id` (auto-résolu depuis l'agence Boond)
+   - Affichage dans le résumé lecture seule après validation
+
+**Fichiers modifiés** : `boond_crm_adapter.py`, `routes.py`, `schemas.py`, `validate_commercial.py`, `contracts.ts`, `ContractDetail.tsx`
 
 ---
 
