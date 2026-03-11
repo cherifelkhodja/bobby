@@ -161,6 +161,28 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-11 (fix pré-remplissage UO, consultant, société émettrice)
+
+#### Correction du pré-remplissage automatique des données Boond lors de la création de contrat
+
+**Problème** : Lors de la saisie initiale par le commercial, les UO vendues, la civilité/email/téléphone du consultant et la société émettrice n'étaient pas pré-remplis depuis BoondManager.
+
+**Causes racines et corrections** :
+
+1. **UO vendues** : `get_positioning()` lisait `attributes.get("quantity")` mais le champ Boond est `numberOfDaysInvoicedOrQuantity`
+   - Fix : `"quantity": attributes.get("numberOfDaysInvoicedOrQuantity")`
+   - Ajout sync `quantity_sold` dans `sync-from-boond` (était absent)
+
+2. **Consultant (civilité, email, téléphone)** : `get_candidate_info()` appelait `/candidates/{id}` ou `/resources/{id}` (endpoint de base) qui ne retourne pas `civility`, `email1`, `phone1`
+   - Fix : Endpoints changés vers `/candidates/{id}/information` et `/resources/{id}/information`
+
+3. **Société émettrice** : `get_need()` appelle `/opportunities/{id}/information` qui peut ne pas retourner la relation `agency`
+   - Fix : Fallback sur `GET /opportunities/{id}` (endpoint de base) pour récupérer `agency_id` si absent de `/information`
+
+**Fichiers modifiés** : `boond_crm_adapter.py`, `routes.py` (sync-from-boond)
+
+---
+
 ### 2026-03-10 (numérotation provisoire des contrats)
 
 #### Séparation référence provisoire / référence définitive

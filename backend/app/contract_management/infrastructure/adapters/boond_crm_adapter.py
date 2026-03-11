@@ -89,7 +89,7 @@ class BoondCrmAdapter:
                 "consultant_type": consultant_type,
                 "need_id": need_id,
                 "daily_rate": attributes.get("averageDailyPriceExcludingTax"),
-                "quantity": attributes.get("quantity"),
+                "quantity": attributes.get("numberOfDaysInvoicedOrQuantity"),
                 "start_date": attributes.get("startDate"),
                 "end_date": attributes.get("endDate"),
                 "consultant_first_name": consultant_first_name,
@@ -174,6 +174,22 @@ class BoondCrmAdapter:
 
             agency_id = self._extract_relationship_id(relationships, "agency")
 
+            # Fallback: if /information didn't return the agency relationship,
+            # fetch the base opportunity endpoint which always includes it.
+            if agency_id is None:
+                try:
+                    base_response = await self._boond._make_request(
+                        "GET", f"/opportunities/{need_id}"
+                    )
+                    base_rels = base_response.get("data", {}).get("relationships", {})
+                    agency_id = self._extract_relationship_id(base_rels, "agency")
+                except Exception as exc:
+                    logger.warning(
+                        "boond_get_opportunity_base_failed",
+                        need_id=need_id,
+                        error=str(exc),
+                    )
+
             return {
                 "id": need_id,
                 "title": attributes.get("title", ""),
@@ -210,12 +226,15 @@ class BoondCrmAdapter:
         """
         endpoints: list[str]
         if consultant_type == "candidate":
-            endpoints = [f"/candidates/{candidate_id}"]
+            endpoints = [f"/candidates/{candidate_id}/information"]
         elif consultant_type == "resource":
-            endpoints = [f"/resources/{candidate_id}"]
+            endpoints = [f"/resources/{candidate_id}/information"]
         else:
             # Unknown type: try resource first (most common), then candidate
-            endpoints = [f"/resources/{candidate_id}", f"/candidates/{candidate_id}"]
+            endpoints = [
+                f"/resources/{candidate_id}/information",
+                f"/candidates/{candidate_id}/information",
+            ]
 
         last_exc: Exception | None = None
         for endpoint in endpoints:

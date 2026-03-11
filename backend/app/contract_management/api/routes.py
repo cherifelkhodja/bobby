@@ -297,6 +297,13 @@ async def sync_from_boond(
         except (InvalidOperation, ValueError, TypeError):
             pass
 
+    raw_quantity = positioning_data.get("quantity")
+    if raw_quantity is not None:
+        try:
+            cr.quantity_sold = int(raw_quantity)
+        except (ValueError, TypeError):
+            pass
+
     raw_start = positioning_data.get("start_date")
     parsed_start = _parse_date(raw_start)
     if parsed_start:
