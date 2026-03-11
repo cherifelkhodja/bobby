@@ -243,12 +243,12 @@ class BoondCrmAdapter:
                 data = response.get("data", {})
                 attributes = data.get("attributes", {})
 
-                # civility: 1 = M., 2 = Mme
+                # civility: 0 = homme (M.), 1 = femme (Mme)
                 raw_civility = attributes.get("civility")
                 civility = None
-                if raw_civility == 1:
+                if raw_civility == 0:
                     civility = "M."
-                elif raw_civility == 2:
+                elif raw_civility == 1:
                     civility = "Mme"
 
                 phone = (
