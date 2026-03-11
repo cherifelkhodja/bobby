@@ -142,6 +142,7 @@ def _cr_to_response(
         third_party_id=cr.third_party_id,
         portal_url=portal_url,
         compliance_override=cr.compliance_override,
+        company_id=cr.company_id,
         contract_config=cr.contract_config,
         status_history=cr.status_history or [],
         created_at=cr.created_at,
@@ -330,6 +331,19 @@ async def sync_from_boond(
                 cr.mission_description = description
             if not cr.boond_need_id and need_id:
                 cr.boond_need_id = need_id
+
+            # Resolve société émettrice from the need's agency (only if not already set)
+            agency_id = need_data.get("agency_id")
+            if agency_id and not cr.company_id:
+                resolved = await cr_repo.get_company_by_boond_agency_id(agency_id)
+                if resolved:
+                    cr.company_id = resolved
+                    logger.info(
+                        "company_resolved_from_agency_sync",
+                        agency_id=agency_id,
+                        company_id=str(resolved),
+                        cr_id=str(cr.id),
+                    )
 
     # Sync consultant info from positioning candidate
     candidate_id = positioning_data.get("candidate_id")

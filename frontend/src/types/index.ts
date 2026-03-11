@@ -773,6 +773,7 @@ export interface ContractRequest {
   third_party_id: string | null;
   portal_url: string | null;
   compliance_override: boolean;
+  company_id: string | null;
   contract_config: Record<string, unknown> | null;
   status_history: Array<{ status: ContractRequestStatus; entered_at: string; comment?: string }>;
   created_at: string;

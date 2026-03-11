@@ -56,6 +56,7 @@ class CreateContractRequestUseCase:
         email_service,
         user_repository=None,
         frontend_url: str = "",
+        company_repository=None,
     ) -> None:
         self._cr_repo = contract_request_repository
         self._webhook_repo = webhook_event_repository
@@ -63,6 +64,7 @@ class CreateContractRequestUseCase:
         self._email_service = email_service
         self._user_repo = user_repository
         self._frontend_url = frontend_url
+        self._company_repo = company_repository
 
     async def execute(self, payload: dict[str, Any] | list) -> ContractRequest | None:
         """Execute the use case.
@@ -165,6 +167,7 @@ class CreateContractRequestUseCase:
             client_name = None
             mission_title = None
             mission_description = None
+            company_id = None
             if need_id:
                 need_data = await self._crm.get_need(need_id)
                 if need_data:
@@ -172,6 +175,22 @@ class CreateContractRequestUseCase:
                     client_name = need_data.get("client_name")
                     mission_title = need_data.get("title") or None
                     mission_description = need_data.get("description") or None
+
+                    # Resolve société émettrice from the need's agency
+                    agency_id = need_data.get("agency_id")
+                    if agency_id and self._company_repo:
+                        company_id = await self._company_repo.get_company_by_boond_agency_id(agency_id)
+                        if company_id:
+                            logger.info(
+                                "company_resolved_from_agency",
+                                agency_id=agency_id,
+                                company_id=str(company_id),
+                            )
+                        else:
+                            logger.info(
+                                "no_company_for_agency",
+                                agency_id=agency_id,
+                            )
 
                     # Try Bobby DB first (commercial is a registered user)
                     if manager_id and self._user_repo:
@@ -271,6 +290,7 @@ class CreateContractRequestUseCase:
                 quantity_sold=quantity_sold,
                 start_date=start_date,
                 end_date=end_date,
+                company_id=company_id,
             )
 
             saved = await self._cr_repo.save(cr)

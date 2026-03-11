@@ -91,6 +91,7 @@ async def handle_boond_positioning_webhook(
         email_service=email_service,
         user_repository=user_repo,
         frontend_url=settings.frontend_url,
+        company_repository=cr_repo,
     )
 
     try:

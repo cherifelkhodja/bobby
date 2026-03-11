@@ -42,6 +42,7 @@ class ContractRequestResponse(BaseModel):
     third_party_id: UUID | None = None
     portal_url: str | None = None
     compliance_override: bool
+    company_id: UUID | None = None
     contract_config: dict | None = None
     status_history: list[dict] = []
     created_at: datetime

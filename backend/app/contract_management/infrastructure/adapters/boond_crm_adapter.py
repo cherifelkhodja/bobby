@@ -172,6 +172,8 @@ class BoondCrmAdapter:
                     client_name = included.get("attributes", {}).get("name", "")
                     break
 
+            agency_id = self._extract_relationship_id(relationships, "agency")
+
             return {
                 "id": need_id,
                 "title": attributes.get("title", ""),
@@ -181,6 +183,7 @@ class BoondCrmAdapter:
                 "commercial_email": commercial_email,
                 "commercial_name": commercial_name,
                 "manager_id": manager_id,
+                "agency_id": agency_id,
             }
         except Exception as exc:
             logger.error("boond_get_need_failed", need_id=need_id, error=str(exc))

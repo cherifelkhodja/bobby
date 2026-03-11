@@ -198,6 +198,22 @@ docker-compose up # Start all services
 
 ---
 
+### 2026-03-11 (société émettrice auto-assignée depuis l'agence du besoin)
+
+#### Auto-résolution de la société émettrice (company_id) lors de la création du contrat
+
+- **`BoondCrmAdapter.get_need()`** : Extrait maintenant `agency_id` depuis la relation `agency` du besoin Boond
+- **`ContractRequestRepository.get_company_by_boond_agency_id()`** : Nouvelle méthode pour trouver une `ContractCompanyModel` active par son `boond_agency_id`
+- **`CreateContractRequestUseCase`** : Accepte `company_repository` (optionnel). Après récupération du besoin, résout la société émettrice depuis l'agence du besoin et la passe à `company_id` du CR
+- **`webhook_routes.py`** : Passe `company_repository=cr_repo` au use case
+- **`sync-from-boond` route** : Si `cr.company_id` non défini, tente de le résoudre depuis l'agence du besoin
+- **`ContractRequestResponse`** : Expose `company_id: UUID | None`
+- **`_cr_to_response()`** : Inclut `company_id`
+- **Frontend `ContractRequest` type** : Ajout de `company_id: string | null`
+- **`ContractDetail.tsx`** : Le formulaire de configuration se pré-remplit avec `cr.company_id` en fallback si `contract_config.company_id` est absent (cas première configuration avec société auto-assignée)
+
+---
+
 ### 2026-03-11 (quantity_sold + consultant_phone dans le formulaire de validation)
 
 #### Exposer UO vendues et téléphone consultant dans le frontend

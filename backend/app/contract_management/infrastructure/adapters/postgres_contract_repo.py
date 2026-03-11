@@ -173,6 +173,16 @@ class ContractRequestRepository:
 
         return f"{prefix}{next_num:04d}"
 
+    async def get_company_by_boond_agency_id(self, agency_id: int) -> UUID | None:
+        """Return the company_id matching a Boond agency ID, or None."""
+        result = await self.session.execute(
+            select(ContractCompanyModel.id).where(
+                ContractCompanyModel.boond_agency_id == agency_id,
+                ContractCompanyModel.is_active.is_(True),
+            ).limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def get_next_reference(self, company_code: str | None = None) -> str:
         """Generate the next final contract reference in format XXX-YYYY-NNNN.
 

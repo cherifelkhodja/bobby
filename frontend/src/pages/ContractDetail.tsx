@@ -189,12 +189,12 @@ export default function ContractDetail() {
     }
   }, [cr, formInitialized]);
 
-  // Pre-fill config form from existing contract_config
+  // Pre-fill config form from existing contract_config (or auto-assigned company_id)
   useEffect(() => {
-    if (cr && !configFormInitialized && cr.contract_config) {
-      const cfg = cr.contract_config as Record<string, unknown>;
+    if (cr && !configFormInitialized) {
+      const cfg = (cr.contract_config as Record<string, unknown>) ?? {};
       setConfigForm({
-        company_id: (cfg.company_id as string) ?? '',
+        company_id: (cfg.company_id as string) || cr.company_id || '',
         payment_terms: (cfg.payment_terms as string) ?? 'net_30',
         invoice_submission_method: (cfg.invoice_submission_method as string) ?? 'email',
         estimated_days: cfg.estimated_days != null ? String(cfg.estimated_days) : '',
