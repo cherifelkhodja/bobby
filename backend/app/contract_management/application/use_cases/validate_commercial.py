@@ -33,6 +33,7 @@ class ValidateCommercialCommand:
         client_name: str | None = None,
         mission_title: str | None = None,
         mission_description: str | None = None,
+        company_id: UUID | None = None,
         consultant_civility: str | None = None,
         consultant_first_name: str | None = None,
         consultant_last_name: str | None = None,
@@ -53,6 +54,7 @@ class ValidateCommercialCommand:
         self.client_name = client_name
         self.mission_title = mission_title
         self.mission_description = mission_description
+        self.company_id = company_id
         self.consultant_civility = consultant_civility
         self.consultant_first_name = consultant_first_name
         self.consultant_last_name = consultant_last_name
@@ -129,6 +131,10 @@ class ValidateCommercialUseCase:
         # Apply quantity_sold if provided
         if command.quantity_sold is not None:
             cr.quantity_sold = command.quantity_sold
+
+        # Apply company_id if provided
+        if command.company_id is not None:
+            cr.company_id = command.company_id
 
         # Apply consultant and address fields
         if command.consultant_civility is not None:

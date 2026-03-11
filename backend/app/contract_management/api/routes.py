@@ -151,6 +151,34 @@ def _cr_to_response(
 
 
 @router.get(
+    "/companies",
+    summary="List contract companies (active)",
+)
+async def list_companies(
+    _auth: ContractAccessUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """List active contract companies. Accessible to commercial/adv/admin."""
+    from sqlalchemy import select
+
+    from app.contract_management.infrastructure.models import ContractCompanyModel
+
+    result = await db.execute(
+        select(ContractCompanyModel).where(ContractCompanyModel.is_active.is_(True))
+    )
+    companies = result.scalars().all()
+    return [
+        {
+            "id": str(c.id),
+            "name": c.name,
+            "code": c.code,
+            "is_active": c.is_active,
+        }
+        for c in companies
+    ]
+
+
+@router.get(
     "",
     response_model=ContractRequestListResponse,
     summary="List contract requests",
@@ -430,6 +458,7 @@ async def validate_commercial(
                 client_name=body.client_name,
                 mission_title=body.mission_title,
                 mission_description=body.mission_description,
+                company_id=body.company_id,
                 consultant_civility=body.consultant_civility,
                 consultant_first_name=body.consultant_first_name,
                 consultant_last_name=body.consultant_last_name,

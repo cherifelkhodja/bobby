@@ -70,6 +70,7 @@ class CommercialValidationRequest(BaseModel):
     client_name: str | None = Field(None, max_length=255)
     mission_title: str | None = Field(None, max_length=500)
     mission_description: str | None = None
+    company_id: UUID | None = None
     consultant_civility: str | None = Field(None, max_length=10)
     consultant_first_name: str | None = Field(None, max_length=255)
     consultant_last_name: str | None = Field(None, max_length=255)

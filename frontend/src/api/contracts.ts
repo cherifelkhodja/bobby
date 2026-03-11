@@ -38,6 +38,7 @@ export const contractsApi = {
       client_name?: string;
       mission_title?: string;
       mission_description?: string;
+      company_id?: string;
       consultant_civility?: string;
       consultant_first_name?: string;
       consultant_last_name?: string;
@@ -267,6 +268,10 @@ export type ContractCompanyRequest = Omit<ContractCompany, 'id' | 'created_at' |
 export const contractCompaniesApi = {
   list: async (): Promise<ContractCompany[]> => {
     const response = await apiClient.get<ContractCompany[]>('/admin/contract-companies');
+    return response.data;
+  },
+  listActive: async (): Promise<ContractCompany[]> => {
+    const response = await apiClient.get<ContractCompany[]>('/contract-requests/companies');
     return response.data;
   },
 

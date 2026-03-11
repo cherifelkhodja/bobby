@@ -105,6 +105,7 @@ export default function ContractDetail() {
     consultant_last_name: '',
     consultant_email: '',
     consultant_phone: '',
+    company_id: '',
     mission_site_name: '',
     mission_address: '',
     mission_postal_code: '',
@@ -137,9 +138,9 @@ export default function ContractDetail() {
   });
 
   const { data: companies = [] } = useQuery({
-    queryKey: ['contract-companies'],
-    queryFn: contractCompaniesApi.list,
-    enabled: isAdv,
+    queryKey: ['contract-companies-active'],
+    queryFn: contractCompaniesApi.listActive,
+    enabled: isCommercialOrAdmin,
   });
 
   const { data: allArticles = [] } = useQuery({
@@ -180,6 +181,7 @@ export default function ContractDetail() {
         consultant_last_name: cr.consultant_last_name ?? '',
         consultant_email: cr.consultant_email ?? '',
         consultant_phone: cr.consultant_phone ?? '',
+        company_id: cr.company_id ?? '',
         mission_site_name: cr.mission_site_name ?? '',
         mission_address: cr.mission_address ?? '',
         mission_postal_code: cr.mission_postal_code ?? '',
@@ -384,6 +386,7 @@ export default function ContractDetail() {
         client_name: validationForm.client_name || undefined,
         mission_title: validationForm.mission_title || undefined,
         mission_description: validationForm.mission_description || undefined,
+        company_id: validationForm.company_id || undefined,
         consultant_civility: validationForm.consultant_civility || undefined,
         consultant_first_name: validationForm.consultant_first_name || undefined,
         consultant_last_name: validationForm.consultant_last_name || undefined,
@@ -619,6 +622,26 @@ export default function ContractDetail() {
               />
             </div>
 
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Société émettrice
+              </label>
+              <select
+                value={validationForm.company_id}
+                onChange={(e) =>
+                  setValidationForm((f) => ({ ...f, company_id: e.target.value }))
+                }
+                className={INPUT_CLS}
+              >
+                <option value="">Sélectionner...</option>
+                {companies.filter((c) => c.is_active).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Consultant */}
             <div className="md:col-span-2 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
               <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">Consultant</p>
@@ -816,6 +839,16 @@ export default function ContractDetail() {
                 </div>
               )}
             </div>
+
+            {/* Société émettrice */}
+            {cr.company_id && companies.length > 0 && (
+              <div>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Société émettrice</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {companies.find((c) => c.id === cr.company_id)?.name ?? cr.company_id}
+                </p>
+              </div>
+            )}
 
             {/* Ligne 2 — mission + consultant + email */}
             {(cr.mission_title || cr.consultant_first_name || cr.contractualization_contact_email) && (
