@@ -765,6 +765,8 @@ export interface ContractRequest {
   mission_address: string | null;
   mission_postal_code: string | null;
   mission_city: string | null;
+  quantity_sold: number | null;
+  boond_consultant_type: string | null;
   commercial_email: string;
   commercial_name: string | null;
   contractualization_contact_email: string | null;

@@ -198,6 +198,18 @@ docker-compose up # Start all services
 
 ---
 
+### 2026-03-11 (quantity_sold + consultant_phone dans le formulaire de validation)
+
+#### Exposer UO vendues et téléphone consultant dans le frontend
+
+- **Frontend `ContractRequest` type** : Ajout de `quantity_sold: number | null` et `boond_consultant_type: string | null`
+- **Formulaire de validation commerciale** : Nouveau champ "UO vendues" (input number, pré-rempli depuis Boond)
+- **Résumé lecture seule** : Affichage de "UO vendues" après validation
+- **`contracts.ts`** : `validateCommercial()` accepte `quantity_sold?: number`
+- **`CommercialValidationRequest`** (backend) : Ajout `quantity_sold: int | None`
+- **`ValidateCommercialCommand`** + use case : Propagation de `quantity_sold` vers l'entité
+- **`sync-from-boond`** : Correction — `consultant_phone` était absent, maintenant synchronisé depuis Boond (comme `consultant_email`)
+
 ### 2026-03-10 (UO vendu + infos consultant depuis Boond)
 
 #### quantity_sold + consultant email/téléphone pré-remplis depuis BoondManager

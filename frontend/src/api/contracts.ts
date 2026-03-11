@@ -31,6 +31,7 @@ export const contractsApi = {
     data: {
       third_party_type: string;
       daily_rate: number;
+      quantity_sold?: number;
       start_date: string;
       end_date?: string;
       contact_email: string;

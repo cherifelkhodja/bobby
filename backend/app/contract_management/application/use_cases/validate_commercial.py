@@ -29,6 +29,7 @@ class ValidateCommercialCommand:
         start_date: date,
         contact_email: str,
         end_date: date | None = None,
+        quantity_sold: int | None = None,
         client_name: str | None = None,
         mission_title: str | None = None,
         mission_description: str | None = None,
@@ -47,6 +48,7 @@ class ValidateCommercialCommand:
         self.daily_rate = daily_rate
         self.start_date = start_date
         self.end_date = end_date
+        self.quantity_sold = quantity_sold
         self.contact_email = contact_email
         self.client_name = client_name
         self.mission_title = mission_title
@@ -123,6 +125,10 @@ class ValidateCommercialUseCase:
             mission_title=command.mission_title,
             mission_description=command.mission_description,
         )
+
+        # Apply quantity_sold if provided
+        if command.quantity_sold is not None:
+            cr.quantity_sold = command.quantity_sold
 
         # Apply consultant and address fields
         if command.consultant_civility is not None:

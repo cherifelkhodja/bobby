@@ -62,6 +62,7 @@ class CommercialValidationRequest(BaseModel):
 
     third_party_type: str = Field(..., pattern=r"^(freelance|sous_traitant|salarie|portage_salarial)$")
     daily_rate: Decimal = Field(..., gt=0)
+    quantity_sold: int | None = Field(None, ge=0)
     start_date: date
     end_date: date | None = None
     contact_email: EmailStr

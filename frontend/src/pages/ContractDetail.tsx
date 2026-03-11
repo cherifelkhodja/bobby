@@ -93,6 +93,7 @@ export default function ContractDetail() {
   const [validationForm, setValidationForm] = useState({
     third_party_type: '',
     daily_rate: '',
+    quantity_sold: '',
     start_date: '',
     end_date: '',
     contact_email: '',
@@ -168,6 +169,7 @@ export default function ContractDetail() {
       setValidationForm((f) => ({
         ...f,
         daily_rate: cr.daily_rate ? String(cr.daily_rate) : '',
+        quantity_sold: cr.quantity_sold ? String(cr.quantity_sold) : '',
         start_date: cr.start_date ?? '',
         end_date: cr.end_date ?? '',
         client_name: cr.client_name ?? '',
@@ -375,6 +377,7 @@ export default function ContractDetail() {
       contractsApi.validateCommercial(id!, {
         third_party_type: validationForm.third_party_type,
         daily_rate: parseFloat(validationForm.daily_rate),
+        quantity_sold: validationForm.quantity_sold ? parseInt(validationForm.quantity_sold) : undefined,
         start_date: validationForm.start_date,
         end_date: validationForm.end_date || undefined,
         contact_email: validationForm.contact_email,
@@ -530,6 +533,22 @@ export default function ContractDetail() {
                   setValidationForm((f) => ({ ...f, daily_rate: e.target.value }))
                 }
                 placeholder={cr.daily_rate ? String(cr.daily_rate) : ''}
+                className={INPUT_CLS}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                UO vendues
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={validationForm.quantity_sold}
+                onChange={(e) =>
+                  setValidationForm((f) => ({ ...f, quantity_sold: e.target.value }))
+                }
+                placeholder={cr.quantity_sold ? String(cr.quantity_sold) : ''}
                 className={INPUT_CLS}
               />
             </div>
@@ -773,6 +792,14 @@ export default function ContractDetail() {
                   <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">TJM</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
                     {cr.daily_rate.toLocaleString('fr-FR')} €/j
+                  </p>
+                </div>
+              )}
+              {cr.quantity_sold != null && (
+                <div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">UO vendues</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {cr.quantity_sold} j
                   </p>
                 </div>
               )}

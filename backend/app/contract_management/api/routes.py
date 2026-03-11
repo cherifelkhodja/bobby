@@ -340,6 +340,7 @@ async def sync_from_boond(
             cr.consultant_first_name = candidate_info.get("first_name") or None
             cr.consultant_last_name = candidate_info.get("last_name") or None
             cr.consultant_email = candidate_info.get("email") or None
+            cr.consultant_phone = candidate_info.get("phone") or None
 
     saved = await cr_repo.save(cr)
     await db.commit()
@@ -401,6 +402,7 @@ async def validate_commercial(
                 contract_request_id=contract_request_id,
                 third_party_type=body.third_party_type,
                 daily_rate=body.daily_rate,
+                quantity_sold=body.quantity_sold,
                 start_date=body.start_date,
                 end_date=body.end_date,
                 contact_email=body.contact_email,
