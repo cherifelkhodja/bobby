@@ -54,6 +54,7 @@ class ThirdParty:
     billing_contact_last_name: str | None = None
     billing_contact_email: str | None = None
     billing_contact_phone: str | None = None
+    vat_number: str | None = None
     id: UUID = field(default_factory=uuid4)
     boond_provider_id: int | None = None
     capital: str | None = None

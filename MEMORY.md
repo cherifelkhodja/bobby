@@ -161,6 +161,22 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-11 (fix portail tiers - lien invalide)
+
+#### Correction du portail de collecte de documents (lien "invalide ou expiré")
+
+**Problème** : Les liens magiques de collecte de documents affichaient systématiquement "Lien invalide ou expiré" lors de l'accès au portail tiers.
+
+**Cause racine** : Le champ `vat_number` (numéro de TVA) était présent sur le modèle SQLAlchemy `ThirdPartyModel` et utilisé dans la réponse API du portail (`tp.vat_number`), mais absent de l'entité domaine `ThirdParty` et des mappings du repository. Cela provoquait une `AttributeError` → erreur 500 → le frontend affichait le message d'erreur générique.
+
+**Corrections** :
+1. Ajout de `vat_number: str | None = None` dans l'entité `ThirdParty`
+2. Ajout du mapping `vat_number` dans `_to_entity()`, `_to_model()` et `save()` du `ThirdPartyRepository`
+
+**Fichiers modifiés** :
+- `backend/app/third_party/domain/entities/third_party.py`
+- `backend/app/third_party/infrastructure/adapters/postgres_third_party_repo.py`
+
 ### 2026-03-11 (fix pré-remplissage UO, consultant, société émettrice)
 
 #### Correction du pré-remplissage automatique des données Boond lors de la création de contrat
