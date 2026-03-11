@@ -505,6 +505,25 @@ export default function ContractDetail() {
             Validation commerciale
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Société émettrice
+              </label>
+              <select
+                value={validationForm.company_id}
+                onChange={(e) =>
+                  setValidationForm((f) => ({ ...f, company_id: e.target.value }))
+                }
+                className={INPUT_CLS}
+              >
+                <option value="">Sélectionner...</option>
+                {companies.filter((c) => c.is_active).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.code})
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Type de tiers *
@@ -620,26 +639,6 @@ export default function ContractDetail() {
                 }
                 className={INPUT_CLS}
               />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Société émettrice
-              </label>
-              <select
-                value={validationForm.company_id}
-                onChange={(e) =>
-                  setValidationForm((f) => ({ ...f, company_id: e.target.value }))
-                }
-                className={INPUT_CLS}
-              >
-                <option value="">Sélectionner...</option>
-                {companies.filter((c) => c.is_active).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.code})
-                  </option>
-                ))}
-              </select>
             </div>
 
             {/* Consultant */}
