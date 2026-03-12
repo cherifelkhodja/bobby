@@ -183,6 +183,15 @@ class ContractRequestRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_company_code(self, company_id: UUID) -> str | None:
+        """Return the code of a contract company by ID, or None."""
+        result = await self.session.execute(
+            select(ContractCompanyModel.code).where(
+                ContractCompanyModel.id == company_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def get_next_reference(self, company_code: str | None = None) -> str:
         """Generate the next final contract reference in format XXX-YYYY-NNNN.
 

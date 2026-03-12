@@ -55,7 +55,11 @@ class ProcessPartnerReviewUseCase:
         if approved:
             cr.transition_to(ContractRequestStatus.PARTNER_APPROVED)
             # Assigner la référence définitive (format XXX-YYYY-NNNN)
-            cr.reference = await self._cr_repo.get_next_reference()
+            # Résoudre le code de la société émettrice liée à cette demande
+            company_code = None
+            if cr.company_id:
+                company_code = await self._cr_repo.get_company_code(cr.company_id)
+            cr.reference = await self._cr_repo.get_next_reference(company_code)
             logger.info(
                 "partner_approved_contract",
                 cr_id=str(cr.id),

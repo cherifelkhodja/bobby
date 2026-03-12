@@ -321,6 +321,18 @@ export default function ContractDetail() {
     },
   });
 
+  const rollbackMutation = useMutation({
+    mutationFn: () => contractsApi.rollbackStatus(id!),
+    onSuccess: () => {
+      toast.success('Retour à l\'état précédent effectué.');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
   const resendCollectionEmailMutation = useMutation({
     mutationFn: () => contractsApi.resendCollectionEmail(id!),
     onSuccess: () => {
@@ -415,6 +427,7 @@ export default function ContractDetail() {
     validationForm.contact_email !== '';
 
   const canCancel = cr && isAdv && cr.status !== 'cancelled' && cr.status !== 'signed' && cr.status !== 'archived' && cr.status !== 'redirected_payfit';
+  const canRollback = cr && isAdv && cr.status !== 'pending_commercial_validation' && cr.status !== 'cancelled' && cr.status !== 'archived';
 
   const showConfigForm = isAdv && (
     cr?.status === 'commercial_validated' ||
@@ -483,6 +496,16 @@ export default function ContractDetail() {
               >
                 <actionConfig.icon className="h-4 w-4 mr-2" />
                 {actionMutation.isPending ? 'En cours...' : actionConfig.label}
+              </Button>
+            )}
+            {canRollback && (
+              <Button
+                variant="secondary"
+                onClick={() => rollbackMutation.mutate()}
+                disabled={rollbackMutation.isPending}
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                {rollbackMutation.isPending ? 'Retour...' : 'État précédent'}
               </Button>
             )}
             {canCancel && (

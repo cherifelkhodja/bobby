@@ -1600,3 +1600,41 @@ async def download_contract(
     s3 = S3StorageClient(settings)
     url = await s3.get_presigned_url(s3_key, expires_in=600)
     return {"url": url}
+
+
+@router.post(
+    "/{contract_request_id}/rollback",
+    response_model=ContractRequestResponse,
+    summary="Rollback to previous status (admin only, testing)",
+)
+async def rollback_status(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Rollback a contract request to its previous status.
+
+    Admin/ADV only — intended for testing purposes.
+    """
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+
+    try:
+        cr.rollback_to_previous_status()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    saved = await cr_repo.save(cr)
+
+    audit_logger.log(
+        AuditAction.COMMERCIAL_VALIDATED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(contract_request_id),
+        details={"action": "rollback", "new_status": saved.status.value},
+    )
+
+    name = await _resolve_commercial_name(db, saved.commercial_email)
+    return _cr_to_response(saved, commercial_name=name)

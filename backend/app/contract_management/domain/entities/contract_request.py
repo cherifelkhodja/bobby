@@ -160,3 +160,20 @@ class ContractRequest:
         self.compliance_override = True
         self.compliance_override_reason = reason
         self.updated_at = datetime.utcnow()
+
+    def rollback_to_previous_status(self) -> None:
+        """Rollback to the previous status in history (admin/testing only).
+
+        Raises:
+            InvalidContractStatusError: If there is no previous status.
+        """
+        if len(self.status_history) < 2:
+            raise InvalidContractStatusError(
+                self.status.value, "no previous status in history"
+            )
+        # Remove current status entry
+        self.status_history.pop()
+        # Restore the previous status
+        previous = self.status_history[-1]
+        self.status = ContractRequestStatus(previous["status"])
+        self.updated_at = datetime.utcnow()

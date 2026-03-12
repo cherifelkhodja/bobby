@@ -198,6 +198,13 @@ export const contractsApi = {
     return response.data;
   },
 
+  rollbackStatus: async (id: string): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      `/contract-requests/${id}/rollback`,
+    );
+    return response.data;
+  },
+
   resendCollectionEmail: async (id: string): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
       `/contract-requests/${id}/resend-collection-email`,

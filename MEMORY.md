@@ -161,6 +161,30 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-12 (fix référence contrat + bouton rollback)
+
+#### Fix préfixe de référence contrat
+
+**Problème** : La référence définitive (XXX-YYYY-NNNN) utilisait toujours le code de la société par défaut ("GEN") au lieu du code de la société émettrice liée au contrat (ex: CRAFTMANIA → "CRA").
+
+**Cause racine** : `ProcessPartnerReviewUseCase` appelait `get_next_reference()` sans passer le code de la société émettrice (`company_id`) du contract request.
+
+**Corrections** :
+1. Ajout de `get_company_code(company_id)` dans le repository
+2. Résolution du code société dans `ProcessPartnerReviewUseCase` avant de générer la référence
+
+#### Bouton retour état précédent (test)
+
+Ajout d'un bouton "État précédent" sur la page de détail contrat pour faciliter les tests en ramenant la demande au statut précédent dans l'historique. Admin/ADV uniquement.
+
+**Fichiers modifiés** :
+- `backend/app/contract_management/application/use_cases/process_partner_review.py`
+- `backend/app/contract_management/infrastructure/adapters/postgres_contract_repo.py`
+- `backend/app/contract_management/domain/entities/contract_request.py`
+- `backend/app/contract_management/api/routes.py`
+- `frontend/src/api/contracts.ts`
+- `frontend/src/pages/ContractDetail.tsx`
+
 ### 2026-03-11 (fix portail tiers - lien invalide)
 
 #### Correction du portail de collecte de documents (lien "invalide ou expiré")
