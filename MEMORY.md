@@ -170,12 +170,21 @@ docker-compose up # Start all services
 #### Formatage données légales pour Boond
 1. **Statut juridique** : ajout du symbole `€` au capital social (ex: "SAS au capital de 752 000 €")
 2. **RCS** : formatage du SIREN avec espaces tous les 3 chiffres (ex: "894 213 669 R.C.S. Paris")
-3. **Code postal** : déjà passé via `head_office_postal_code`, sera inclus à la prochaine création de société
+
+#### Fix attribut postcode Boond
+- `create_company_full()` envoyait `"postCode"` (camelCase) → corrigé en `"postcode"` (minuscules, format attendu par l'API Boond)
+- Ajout de `update_company_information()` : quand la société existe déjà dans Boond, on met à jour ses données (postcode, address, town, legalStatus, registeredOffice) via `PUT /companies/{id}/information`
+
+#### Fix création contrat Boond après conversion candidat
+**Problème** : Après conversion candidat → ressource, le `typeOf` de la ressource restait à `0` (salarié) par défaut. La condition `resource_type_of == 1` pour créer le contrat n'était jamais remplie pour les externes.
+**Cause** : `stateReason.typeOf` et `attributes.typeOf` sont deux champs distincts dans Boond. On ne passait que `stateReason.typeOf`.
+**Fix** : Ajout du paramètre `type_of` à `convert_candidate_to_resource()` pour setter explicitement `attributes.typeOf` (0=salarié, 1=externe) lors de la conversion.
 
 **Fichiers modifiés** :
-- `backend/app/contract_management/infrastructure/adapters/boond_crm_adapter.py` : `verify_company_exists()`
-- `backend/app/contract_management/api/routes.py` : `_format_siren()`, vérification provider_id, formatage €
+- `backend/app/contract_management/infrastructure/adapters/boond_crm_adapter.py` : `update_company_information()`, fix `postcode`, `type_of` param
+- `backend/app/contract_management/api/routes.py` : update company existante, `type_of` à la conversion
 - `backend/app/contract_management/application/use_cases/sync_to_boond_after_signing.py` : idem
+- `backend/app/contract_management/domain/ports/crm_service.py` : port mis à jour
 
 ### 2026-03-13 (contrat : persistance contact IDs Boond + refactoring sync)
 
