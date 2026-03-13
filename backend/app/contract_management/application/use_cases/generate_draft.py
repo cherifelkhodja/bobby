@@ -185,6 +185,7 @@ class GenerateDraftUseCase:
             issuer_signatory_name = company.signatory_name
             issuer_color_code = company.color_code
             issuer_code = company.code
+            issuer_tva_number = getattr(company, "tva_number", None) or ""
             invoices_company_mail = company.invoices_company_mail or ""
         else:
             # Legacy fallback: use settings
@@ -203,6 +204,7 @@ class GenerateDraftUseCase:
             issuer_signatory_name = self._settings.GEMINI_SIGNATORY_NAME
             issuer_color_code = "#4BBEA8"
             issuer_code = "GEN"
+            issuer_tva_number = ""
             invoices_company_mail = ""
 
         context = {
@@ -221,6 +223,7 @@ class GenerateDraftUseCase:
             "issuer_signatory_name": issuer_signatory_name,
             "issuer_color_code": issuer_color_code,
             "issuer_code": issuer_code,
+            "issuer_tva_number": issuer_tva_number,
             "invoices_company_mail": invoices_company_mail,
             # Keep legacy aliases so existing article templates still work
             "gemini_company_name": issuer_company_name,

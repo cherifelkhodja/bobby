@@ -65,12 +65,12 @@
   .cover-page {
     page-break-after: always;
     text-align: center;
-    padding-top: 1cm;
+    padding-top: 2.5cm;
     position: relative;
     height: 100%;
   }
   .cover-logo-wrapper {
-    margin-bottom: 1.8cm;
+    margin-bottom: 2.5cm;
   }
   .cover-logo {
     display: block;
@@ -120,19 +120,24 @@
     font-size: 11pt;
   }
   .cover-confidential {
-    margin-top: 2cm;
     font-style: italic;
     font-size: 10pt;
     color: #333;
+    position: absolute;
+    bottom: 5cm;
+    left: 0;
+    right: 0;
+    text-align: center;
   }
   .cover-footer {
     position: absolute;
-    bottom: 2cm;
+    bottom: 0;
     left: 0;
     right: 0;
     text-align: center;
     font-size: 9pt;
     color: #333;
+    line-height: 1.6;
   }
   .cover-footer .company-color {
     font-weight: bold;
@@ -299,7 +304,7 @@
   <div class="cover-info">
     <div class="cover-info-row">
       <span class="cover-info-label">Partenaire :</span>
-      <span class="cover-info-value">{{ partner_legal_form | default('') }} {{ partner_company_name | default('') }} {{ partner_representative_name | default('') }}</span>
+      <span class="cover-info-value">{{ partner_company_name | default('') }}</span>
     </div>
     <div class="cover-info-row">
       <span class="cover-info-label">Référence :</span>
@@ -325,8 +330,7 @@
   <div class="cover-footer">
     <span class="company-color">{{ issuer_company_name | upper }}</span><br>
     {{ issuer_head_office }}<br>
-    {{ issuer_legal_form }} au Capital de {{ issuer_capital }}<br>
-    {{ issuer_rcs_number }} R.C.S. {{ issuer_rcs_city }}
+    {{ issuer_legal_form }} au Capital de {{ issuer_capital }} - {{ issuer_rcs_number }} R.C.S. {{ issuer_rcs_city }}{% if issuer_tva_number %} - {{ issuer_tva_number }}{% endif %}
   </div>
 </div>
 

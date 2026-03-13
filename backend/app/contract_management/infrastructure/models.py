@@ -136,6 +136,7 @@ class ContractCompanyModel(Base):
     signatory_name: Mapped[str] = mapped_column(String(255), nullable=False)
     # Facturation
     invoices_company_mail: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    tva_number: Mapped[str | None] = mapped_column(String(30), nullable=True)
     # Préfixe de référence (3 lettres, ex: "GEM") utilisé dans les références XXX-CC-NNNN
     code: Mapped[str] = mapped_column(String(3), nullable=False, default="GEN")
     # Identité visuelle
