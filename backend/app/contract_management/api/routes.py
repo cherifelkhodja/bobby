@@ -1477,6 +1477,19 @@ async def boond_create_company(
     try:
         provider_id = tp.boond_provider_id
         created_company = False
+
+        # Verify the cached provider_id still exists in Boond (may have been deleted)
+        if provider_id:
+            exists = await crm.verify_company_exists(provider_id)
+            if not exists:
+                logger.warning(
+                    "boond_provider_id_stale",
+                    cr_id=str(cr.id),
+                    stale_id=provider_id,
+                )
+                provider_id = None
+                tp.boond_provider_id = None
+
         if not provider_id:
             legal_status = None
             if tp.legal_form and tp.capital:

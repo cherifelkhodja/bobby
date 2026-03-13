@@ -402,6 +402,25 @@ class BoondCrmAdapter:
             )
             raise
 
+    async def verify_company_exists(self, company_id: int) -> bool:
+        """Check if a company exists in BoondManager.
+
+        Args:
+            company_id: Boond company ID.
+
+        Returns:
+            True if the company exists, False otherwise.
+        """
+        try:
+            await self._boond._make_request("GET", f"/companies/{company_id}")
+            return True
+        except Exception:
+            logger.warning(
+                "boond_company_not_found",
+                company_id=company_id,
+            )
+            return False
+
     async def create_company_full(  # noqa: PLR0913
         self,
         company_name: str,

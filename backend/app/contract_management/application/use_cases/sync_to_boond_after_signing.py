@@ -74,6 +74,17 @@ class SyncToBoondAfterSigningUseCase:
         resource_id: int | None = cr.boond_candidate_id
 
         # ── Étape 1 : Création société fournisseur ─────────────────────────
+        # Verify cached provider_id still exists in Boond
+        if tp and tp.boond_provider_id:
+            exists = await self._crm.verify_company_exists(tp.boond_provider_id)
+            if not exists:
+                logger.warning(
+                    "sync_boond_provider_id_stale",
+                    cr_id=str(cr.id),
+                    stale_id=tp.boond_provider_id,
+                )
+                tp.boond_provider_id = None
+
         if tp and not tp.boond_provider_id:
             legal_status = None
             if tp.legal_form and tp.capital:
