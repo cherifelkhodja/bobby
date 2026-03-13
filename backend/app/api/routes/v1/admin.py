@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import delete, select
 
-from app.api.dependencies import AdminUser
+from app.api.dependencies import AdminUser, AdvOrAdminUser
 from app.api.schemas.admin import (
     ActivateResponse,
     BoondResourceResponse,
@@ -1093,10 +1093,10 @@ async def create_contract_article(
     summary="List all contract article templates",
 )
 async def list_contract_articles(
-    admin_id: AdminUser,
+    admin_id: AdvOrAdminUser,
     db: _AsyncSession = Depends(_get_db),
 ):
-    """List all contract article templates ordered by article number. Admin only."""
+    """List all contract article templates ordered by article number. Admin/ADV."""
     from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
         ArticleTemplateRepository,
     )
@@ -1260,10 +1260,10 @@ async def create_contract_annex(
     summary="List all contract annex templates",
 )
 async def list_contract_annexes(
-    admin_id: AdminUser,
+    admin_id: AdvOrAdminUser,
     db: _AsyncSession = Depends(_get_db),
 ):
-    """List all contract annex templates ordered by annexe number. Admin only."""
+    """List all contract annex templates ordered by annexe number. Admin/ADV."""
     from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
         AnnexTemplateRepository,
     )
