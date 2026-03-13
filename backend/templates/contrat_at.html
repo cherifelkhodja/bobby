@@ -36,12 +36,18 @@
       border-top: 1px solid #ccc;
       padding-top: 0.3cm;
     }
+
+    /* Header droite : logo */
+    @top-right {
+      content: element(page-running-header-right);
+    }
   }
 
   /* Première page : footer personnalisé via running element, même hauteur que les autres pages */
   @page :first {
     margin-top: 0;
     margin-bottom: 2.8cm;
+    @top-right { content: none; }
     @bottom-left { content: none; }
     @bottom-center {
       content: element(cover-bottom-content);
@@ -149,34 +155,66 @@
     font-size: 11pt;
   }
 
+  /* ===== RUNNING HEADER (logo pages 2+) ===== */
+  .page-running-header-right {
+    position: running(page-running-header-right);
+    text-align: right;
+  }
+  .page-running-header-right img {
+    height: 1.2cm;
+  }
+
   /* ===== CONTRACT BODY ===== */
   .section-header {
+    text-align: center;
+    font-size: 16pt;
     font-weight: bold;
-    margin-top: 0.6cm;
-    margin-bottom: 0.5cm;
+    font-variant: small-caps;
+    margin-top: 0.3cm;
+    margin-bottom: 0.8cm;
   }
 
   /* Parties block */
   .parties-block {
-    margin-bottom: 0.4cm;
+    margin-bottom: 0.2cm;
+    line-height: 1.6;
   }
-  .party-name {
+  .party-intro {
+    margin-bottom: 0.3cm;
+  }
+  .party-intro .company-color {
+    color: {{ issuer_color_code }};
     font-weight: bold;
-    margin-bottom: 0.25cm;
   }
   .party-detail {
     margin-bottom: 0.1cm;
     line-height: 1.6;
   }
 
-  .partner-label {
-    margin-top: 0.6cm;
+  .denomination {
+    text-align: right;
+    font-style: italic;
+    margin-top: 0.3cm;
+    margin-bottom: 0.3cm;
+  }
+  .denomination strong {
+    font-weight: bold;
+  }
+
+  .part-separator {
+    text-align: center;
+    font-style: italic;
+    margin-top: 0.4cm;
     margin-bottom: 0.6cm;
   }
+
   .decision-header {
+    text-align: center;
+    font-size: 16pt;
     font-weight: bold;
-    margin-top: 0.5cm;
-    margin-bottom: 0.7cm;
+    font-variant: small-caps;
+    margin-top: 0.8cm;
+    margin-bottom: 0.8cm;
   }
 
   /* ===== ARTICLES ===== */
@@ -279,6 +317,13 @@
 </head>
 <body>
 
+<!-- Running header droite (logo) — pages 2+ -->
+<div class="page-running-header-right">
+  {% if logo_b64 %}
+    <img src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="Logo">
+  {% endif %}
+</div>
+
 <!-- Running footer gauche (société | ref) — pages 2+ -->
 <div class="page-running-footer-left">
   <span class="company-name">{{ issuer_company_name }}</span>&nbsp;|&nbsp;{{ reference }}
@@ -340,10 +385,11 @@
 </div>
 
 <!-- ===== PAGE 2+: CONTRACT BODY ===== -->
-<p class="section-header">Entre les soussignés:</p>
+<p class="section-header">Entre les soussignés</p>
 
+<!-- Émetteur -->
 <div class="parties-block">
-  <p class="party-name">La société {{ issuer_company_name }}</p>
+  <p class="party-intro">La société <span class="company-color">{{ issuer_company_name }}</span></p>
   <p class="party-detail">
     <strong>{{ issuer_legal_form }}</strong> au capital de <strong>{{ issuer_capital }}</strong>,<br>
     Dont le siège social est situé <strong>{{ issuer_head_office }}</strong>,<br>
@@ -357,20 +403,24 @@
     Agissant en qualité de <strong>{{ issuer_representative_quality }}</strong>, Dûment habilité aux fins des présentes.
     {% endif %}
   </p>
+  <p class="denomination"><em>Ci-après dénommée</em>&nbsp; <strong>« {{ issuer_company_name }} »</strong></p>
 </div>
 
-<div class="parties-block" style="margin-top: 0.5cm;">
-  <p class="party-name">Et la société <strong>{{ partner_company_name }}</strong></p>
+<p class="part-separator">D'une part</p>
+
+<!-- Partenaire -->
+<div class="parties-block">
+  <p class="party-intro">Et {{ partner_legal_form }} <span class="company-color">{{ partner_company_name }}</span></p>
   <p class="party-detail">
-    <strong>{{ partner_legal_form }}</strong> au capital de <strong>{{ partner_capital }}</strong>,<br>
     Dont le siège social est situé <strong>{{ partner_head_office }}</strong>,<br>
-    Inscrite au <strong>RCS de {{ partner_rcs_city }}</strong> sous le n° <strong>{{ partner_rcs_number }}</strong>,<br>
+    Inscrite sous le n° <strong>{{ partner_rcs_number }}</strong>,<br>
     Représentée par <strong>{{ partner_representative_name }}</strong>,<br>
     Agissant en qualité de <strong>{{ partner_representative_title }}</strong>, Dûment habilité aux fins des présentes.
   </p>
+  <p class="denomination"><em>Ci-après dénommé(e)</em>&nbsp; <strong>« le Partenaire »</strong></p>
 </div>
 
-<p class="partner-label">Ci après désigné le « PARTENAIRE »</p>
+<p class="part-separator">D'autre part</p>
 
 <p class="decision-header">Il a été décidé ce qui suit :</p>
 
