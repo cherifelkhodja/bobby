@@ -1370,21 +1370,9 @@ export default function ContractDetail() {
           annexes={activeAnnexes}
           existingOverrides={(cr.contract_config as Record<string, unknown> | null) ?? {}}
           onSaved={() => queryClient.invalidateQueries({ queryKey: ['contract-request', id] })}
+          onRegenerateDraft={latestContract ? () => actionMutation.mutate('generate-draft') : undefined}
+          isRegenerating={actionMutation.isPending}
         />
-      )}
-
-      {/* Regenerate draft button — when a draft already exists and still in pre-partner phase */}
-      {showConfigForm && latestContract && (
-        <div className="flex justify-end mb-6">
-          <Button
-            variant="secondary"
-            onClick={() => actionMutation.mutate('generate-draft')}
-            disabled={actionMutation.isPending}
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            {actionMutation.isPending ? 'Régénération...' : 'Régénérer le brouillon'}
-          </Button>
-        </div>
       )}
 
       {/* Third-party company info */}
@@ -1859,12 +1847,16 @@ function ArticleAnnexEditor({
   annexes,
   existingOverrides,
   onSaved,
+  onRegenerateDraft,
+  isRegenerating,
 }: {
   contractRequestId: string;
   articles: ArticleTemplate[];
   annexes: AnnexTemplate[];
   existingOverrides: Record<string, unknown>;
   onSaved: () => void;
+  onRegenerateDraft?: () => void;
+  isRegenerating?: boolean;
 }) {
   const articleOverrides = (existingOverrides.article_overrides ?? {}) as Record<string, string>;
   const annexOverrides = (existingOverrides.annex_overrides ?? {}) as Record<string, string>;
@@ -2198,6 +2190,18 @@ function ArticleAnnexEditor({
         </DndContext>
         {renderAddForm(true, showAddAnnex, setShowAddAnnex)}
       </div>
+
+      {onRegenerateDraft && (
+        <div className="flex justify-end mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <Button
+            onClick={onRegenerateDraft}
+            disabled={isRegenerating}
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            {isRegenerating ? 'Régénération...' : 'Régénérer le brouillon'}
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }
