@@ -1364,6 +1364,7 @@ async def boond_convert_candidate(
                 cr.boond_candidate_id,
                 state=3,
                 state_reason_type_of=state_reason_type_of,
+                type_of=state_reason_type_of,  # 0=salarié, 1=externe
             )
             converted = True
             logger.info("boond_convert_candidate_ok", cr_id=str(cr.id), candidate_id=cr.boond_candidate_id)

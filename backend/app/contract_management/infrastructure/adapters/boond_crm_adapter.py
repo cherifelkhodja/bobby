@@ -365,6 +365,7 @@ class BoondCrmAdapter:
         candidate_id: int,
         state: int = 3,
         state_reason_type_of: int | None = None,
+        type_of: int | None = None,
     ) -> None:
         """Convert a candidate to a resource in BoondManager by updating state.
 
@@ -372,10 +373,13 @@ class BoondCrmAdapter:
             candidate_id: Boond candidate/resource ID.
             state: Target state (3 = Arrivée prochaine).
             state_reason_type_of: Reason type (0 = salarié, 1 = externe/sous-traitant).
+            type_of: Resource type (0 = salarié, 1 = externe).
         """
         attributes: dict[str, Any] = {"state": state}
         if state_reason_type_of is not None:
             attributes["stateReason"] = {"typeOf": state_reason_type_of}
+        if type_of is not None:
+            attributes["typeOf"] = type_of
 
         payload = {
             "data": {

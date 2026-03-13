@@ -240,6 +240,7 @@ class SyncToBoondAfterSigningUseCase:
                     resource_id,
                     state=3,
                     state_reason_type_of=state_reason_type_of,
+                    type_of=state_reason_type_of,  # 0=salarié, 1=externe
                 )
             except Exception as exc:
                 logger.warning(

@@ -41,8 +41,23 @@ class CrmServicePort(Protocol):
         self,
         candidate_id: int,
         state: int = 3,
+        state_reason_type_of: int | None = None,
+        type_of: int | None = None,
     ) -> None:
         """Convert a candidate to a resource by updating their state."""
+        ...
+
+    async def update_company_information(
+        self,
+        company_id: int,
+        postcode: str | None = None,
+        address: str | None = None,
+        town: str | None = None,
+        country: str | None = None,
+        legal_status: str | None = None,
+        registered_office: str | None = None,
+    ) -> None:
+        """Update company information in CRM."""
         ...
 
     async def create_company_full(
