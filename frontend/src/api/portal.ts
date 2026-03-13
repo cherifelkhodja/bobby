@@ -61,6 +61,7 @@ export const portalApi = {
     head_office_city: string | null;
     capital: string | null;
     rcs_city: string | null;
+    ape_code: string | null;
   }> => {
     const response = await portalClient.get(`/${token}/siret/${siret}`);
     return response.data;
@@ -74,6 +75,8 @@ export const portalApi = {
       legal_form: string;
       capital?: string;
       siret: string;
+      vat_number?: string;
+      ape_code?: string;
       head_office_street: string;
       head_office_postal_code: string;
       head_office_city: string;
@@ -139,6 +142,8 @@ export const portalApi = {
       legal_form: string;
       capital: string;
       siret: string;
+      vat_number: string;
+      ape_code: string;
       head_office_street: string;
       head_office_postal_code: string;
       head_office_city: string;

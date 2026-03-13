@@ -119,7 +119,7 @@ class SyncToBoondAfterSigningUseCase:
                     siret=tp.siret,
                     legal_status=legal_status,
                     registered_office=registered_office,
-                    ape_code="6202A",
+                    ape_code=tp.ape_code or "6202A",
                     agency_id=company.boond_agency_id if company else None,
                 )
                 tp.boond_provider_id = provider_id

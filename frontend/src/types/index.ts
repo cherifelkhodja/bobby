@@ -947,6 +947,8 @@ export interface PortalInfo {
     legal_form: string | null;
     capital: string | null;
     siret: string | null;
+    vat_number: string | null;
+    ape_code: string | null;
     rcs_city: string | null;
     head_office_street: string | null;
     head_office_postal_code: string | null;

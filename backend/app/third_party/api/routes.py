@@ -123,6 +123,7 @@ async def get_portal_info(
             capital=tp.capital,
             siret=tp.siret,
             vat_number=tp.vat_number,
+            ape_code=tp.ape_code,
             rcs_city=tp.rcs_city,
             head_office_street=tp.head_office_street,
             head_office_postal_code=tp.head_office_postal_code,
@@ -730,6 +731,7 @@ async def submit_company_info(
     tp.siren = siren
     tp.siret = body.siret
     tp.vat_number = body.vat_number
+    tp.ape_code = body.ape_code
     tp.rcs_city = body.rcs_city or body.head_office_city
     tp.rcs_number = siren  # In France, RCS registration number = SIREN
     tp.head_office_street = body.head_office_street
@@ -848,6 +850,7 @@ async def save_company_info_draft(
         "capital": body.capital,
         "siret": body.siret,
         "vat_number": body.vat_number,
+        "ape_code": body.ape_code,
         "head_office_street": body.head_office_street,
         "head_office_postal_code": body.head_office_postal_code,
         "head_office_city": body.head_office_city,
@@ -1037,6 +1040,11 @@ async def lookup_siret(
         except Exception as exc:
             logger.warning("inpi_enrich_failed", siren=siren, error=str(exc), error_type=type(exc).__name__)
 
+    # APE/NAF code from INSEE
+    ape_code = _clean(etab.get("periodesEtablissement", [{}])[0].get("activitePrincipaleEtablissement")) if etab.get("periodesEtablissement") else None
+    if not ape_code:
+        ape_code = _clean(unite.get("activitePrincipaleUniteLegale"))
+
     return SiretLookupResponse(
         siren=siren,
         company_name=company_name,
@@ -1047,4 +1055,5 @@ async def lookup_siret(
         head_office_city=city,
         capital=capital_str,
         rcs_city=rcs_city,
+        ape_code=ape_code,
     )

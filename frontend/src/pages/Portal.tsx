@@ -592,6 +592,8 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
     legal_form: initialData?.legal_form ?? '',
     capital: initialData?.capital ?? '',
     siret: initialData?.siret ?? '',
+    vat_number: initialData?.vat_number ?? '',
+    ape_code: initialData?.ape_code ?? '',
     head_office_street: initialData?.head_office_street ?? '',
     head_office_postal_code: initialData?.head_office_postal_code ?? '',
     head_office_city: initialData?.head_office_city ?? '',
@@ -641,6 +643,7 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
           head_office_city: data.head_office_city ?? f.head_office_city,
           capital: data.capital ? formatCapital(data.capital) : f.capital,
           rcs_city: data.rcs_city ?? f.rcs_city,
+          ape_code: data.ape_code ?? f.ape_code,
         }));
         if (!isPortageSalarial && (data.entity_category === 'ei' || data.entity_category === 'societe')) {
           setEntityCategory(data.entity_category);
@@ -678,6 +681,8 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
         ...(form.legal_form ? { legal_form: form.legal_form } : {}),
         ...(form.capital ? { capital: form.capital } : {}),
         ...(form.siret ? { siret: form.siret } : {}),
+        ...(form.vat_number ? { vat_number: form.vat_number } : {}),
+        ...(form.ape_code ? { ape_code: form.ape_code } : {}),
         ...(form.head_office_street ? { head_office_street: form.head_office_street } : {}),
         ...(form.head_office_postal_code ? { head_office_postal_code: form.head_office_postal_code } : {}),
         ...(form.head_office_city ? { head_office_city: form.head_office_city } : {}),
@@ -724,6 +729,8 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
         legal_form: form.legal_form,
         capital: form.capital || undefined,
         siret: form.siret,
+        vat_number: form.vat_number || undefined,
+        ape_code: form.ape_code || undefined,
         head_office_street: form.head_office_street,
         head_office_postal_code: form.head_office_postal_code,
         head_office_city: form.head_office_city,
@@ -922,6 +929,31 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
               </div>
             </div>
           )}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              N° TVA intracommunautaire
+            </label>
+            <input
+              type="text"
+              value={form.vat_number}
+              onChange={(e) => setForm((f) => ({ ...f, vat_number: e.target.value.toUpperCase() }))}
+              placeholder="Ex : FR12345678901"
+              className={INPUT_CLS}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Code APE / NAF
+            </label>
+            <input
+              type="text"
+              maxLength={6}
+              value={form.ape_code}
+              onChange={(e) => setForm((f) => ({ ...f, ape_code: e.target.value }))}
+              placeholder="Ex : 6202A"
+              className={INPUT_CLS}
+            />
+          </div>
           <div className="md:col-span-2">
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Numéro et voie *
