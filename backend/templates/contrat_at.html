@@ -409,13 +409,25 @@
 
 <!-- Partenaire -->
 <div class="parties-block">
-  <p class="party-intro">Et {{ partner_legal_form }} <span class="company-color">{{ partner_company_name }}</span></p>
+  {% set is_ei = partner_legal_form | default('') | upper in ['EI', 'ENTREPRISE INDIVIDUELLE'] %}
+  {% if is_ei %}
+  <p class="party-intro">Et l'Entreprise Individuelle <span class="company-color">{{ partner_company_name }}</span></p>
   <p class="party-detail">
     Dont le siège social est situé <strong>{{ partner_head_office }}</strong>,<br>
     Inscrite sous le n° <strong>{{ partner_rcs_number }}</strong>,<br>
     Représentée par <strong>{{ partner_representative_name }}</strong>,<br>
     Agissant en qualité de <strong>{{ partner_representative_title }}</strong>, Dûment habilité aux fins des présentes.
   </p>
+  {% else %}
+  <p class="party-intro">Et la société <span class="company-color">{{ partner_company_name }}</span></p>
+  <p class="party-detail">
+    <strong>{{ partner_legal_form }}</strong> au capital de <strong>{{ partner_capital }}</strong>,<br>
+    Dont le siège social est situé <strong>{{ partner_head_office }}</strong>,<br>
+    Inscrite au <strong>RCS de {{ partner_rcs_city }}</strong> sous le n° <strong>{{ partner_rcs_number }}</strong>,<br>
+    Représentée par <strong>{{ partner_representative_name }}</strong>,<br>
+    Agissant en qualité de <strong>{{ partner_representative_title }}</strong>, Dûment habilité aux fins des présentes.
+  </p>
+  {% endif %}
   <p class="denomination"><em>Ci-après dénommé(e)</em>&nbsp; <strong>« le Partenaire »</strong></p>
 </div>
 
