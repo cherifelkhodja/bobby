@@ -161,6 +161,20 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-13 (contrat : fix accès ADV aux templates + formulaire config post-brouillon)
+
+#### Fix accès ADV aux templates articles/annexes
+
+**Problème** : Les endpoints `GET /admin/contract-articles` et `GET /admin/contract-annexes` étaient restreints à `AdminUser`. Les utilisateurs ADV recevaient un 403, donc les annexes ne s'affichaient pas dans l'éditeur per-contrat.
+
+**Fix** : Changé les deux endpoints list pour utiliser `AdvOrAdminUser` au lieu de `AdminUser`.
+
+#### Fix formulaire de configuration invisible après génération du brouillon
+
+**Problème** : Le formulaire de configuration (conditions financières, articles optionnels, conditions particulières, société émettrice) disparaissait une fois le brouillon généré (`draft_generated`) ou lors de modifications demandées par le partenaire (`partner_requested_changes`).
+
+**Fix** : Ajout de `draft_generated` et `partner_requested_changes` dans la condition `showConfigForm`. Le bouton affiche "Reconfigurer et régénérer le brouillon" et déclenche automatiquement la régénération après configuration.
+
 ### 2026-03-13 (contrat : articles/annexes custom + réordonnancement)
 
 #### Ajout d'articles/annexes personnalisés et réordonnancement par contrat
