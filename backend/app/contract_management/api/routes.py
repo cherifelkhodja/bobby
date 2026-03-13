@@ -1,5 +1,6 @@
 """Contract management API routes."""
 
+import re
 from uuid import UUID
 
 import structlog
@@ -52,6 +53,12 @@ from app.vigilance.application.use_cases.request_documents import RequestDocumen
 from app.vigilance.infrastructure.adapters.postgres_document_repo import DocumentRepository
 
 logger = structlog.get_logger()
+
+def _format_siren(siren: str) -> str:
+    """Format a SIREN number with spaces every 3 digits (e.g. '894213669' → '894 213 669')."""
+    digits = re.sub(r"\D", "", siren)
+    return " ".join(digits[i : i + 3] for i in range(0, len(digits), 3))
+
 
 router = APIRouter(tags=["Contract Management"])
 
@@ -1493,10 +1500,11 @@ async def boond_create_company(
         if not provider_id:
             legal_status = None
             if tp.legal_form and tp.capital:
-                legal_status = f"{tp.legal_form} au capital de {tp.capital}"
+                legal_status = f"{tp.legal_form} au capital de {tp.capital} €"
             registered_office = None
             if tp.rcs_number and tp.rcs_city:
-                registered_office = f"{tp.rcs_number} R.C.S. {tp.rcs_city}"
+                formatted_siren = _format_siren(tp.rcs_number)
+                registered_office = f"{formatted_siren} R.C.S. {tp.rcs_city}"
 
             provider_id = await crm.create_company_full(
                 company_name=tp.company_name or "",

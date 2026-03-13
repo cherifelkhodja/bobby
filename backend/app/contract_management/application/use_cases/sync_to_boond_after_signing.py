@@ -1,5 +1,6 @@
 """Use case: Synchronise all data to BoondManager after contract signing."""
 
+import re
 from uuid import UUID
 
 import structlog
@@ -19,6 +20,12 @@ _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE: dict[str, int] = {
     "portage_salarial": 6,
     "portage_commercial": 7,
 }
+
+
+def _format_siren(siren: str) -> str:
+    """Format a SIREN number with spaces every 3 digits (e.g. '894213669' → '894 213 669')."""
+    digits = re.sub(r"\D", "", siren)
+    return " ".join(digits[i : i + 3] for i in range(0, len(digits), 3))
 
 
 class SyncToBoondAfterSigningUseCase:
@@ -88,10 +95,11 @@ class SyncToBoondAfterSigningUseCase:
         if tp and not tp.boond_provider_id:
             legal_status = None
             if tp.legal_form and tp.capital:
-                legal_status = f"{tp.legal_form} au capital de {tp.capital}"
+                legal_status = f"{tp.legal_form} au capital de {tp.capital} €"
             registered_office = None
             if tp.rcs_number and tp.rcs_city:
-                registered_office = f"{tp.rcs_number} R.C.S. {tp.rcs_city}"
+                formatted_siren = _format_siren(tp.rcs_number)
+                registered_office = f"{formatted_siren} R.C.S. {tp.rcs_city}"
 
             try:
                 provider_id = await self._crm.create_company_full(
