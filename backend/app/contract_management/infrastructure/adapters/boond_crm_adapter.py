@@ -380,7 +380,7 @@ class BoondCrmAdapter:
         }
         try:
             await self._boond._make_request(
-                "PATCH", f"/candidates/{candidate_id}", json=payload
+                "PUT", f"/candidates/{candidate_id}/information", json=payload
             )
             logger.info(
                 "boond_candidate_converted_to_resource",
