@@ -261,6 +261,7 @@ class GenerateDraftUseCase:
                     "partner_head_office": tp.head_office_address,
                     "partner_rcs_city": tp.rcs_city,
                     "partner_rcs_number": tp.rcs_number or tp.siren,
+                    "partner_representative_civility": tp.representative_civility or "",
                     "partner_representative_name": tp.representative_name,
                     "partner_representative_title": tp.representative_title,
                     "partner_siren": tp.siren,

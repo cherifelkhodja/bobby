@@ -419,7 +419,7 @@
   <p class="party-detail">
     Dont le siège social est situé <strong>{{ partner_head_office }}</strong>,<br>
     Inscrite sous le n° <strong>{{ partner_rcs_number | siren }}</strong>,<br>
-    Représentée par <strong>{{ partner_representative_name }}</strong>,<br>
+    Représentée par <strong>{% if partner_representative_civility %}{{ partner_representative_civility }} {% endif %}{{ partner_representative_name }}</strong>,<br>
     Agissant en qualité de <strong>{{ partner_representative_title }}</strong>, Dûment habilité aux fins des présentes.
   </p>
   {% else %}
@@ -428,7 +428,7 @@
     Au capital de <strong>{{ partner_capital | capital }}</strong>,<br>
     Dont le siège social est situé <strong>{{ partner_head_office }}</strong>,<br>
     Inscrite au <strong>RCS de {{ partner_rcs_city }}</strong> sous le n° <strong>{{ partner_rcs_number | siren }}</strong>,<br>
-    Représentée par <strong>{{ partner_representative_name }}</strong>,<br>
+    Représentée par <strong>{% if partner_representative_civility %}{{ partner_representative_civility }} {% endif %}{{ partner_representative_name }}</strong>,<br>
     Agissant en qualité de <strong>{{ partner_representative_title }}</strong>, Dûment habilité aux fins des présentes.
   </p>
   {% endif %}
@@ -522,7 +522,7 @@
       </td>
       <td class="signature-col">
         <p class="signer-company">{{ partner_legal_form }} {{ partner_company_name }}</p>
-        <p class="signer-name">{{ partner_representative_name }}</p>
+        <p class="signer-name">{% if partner_representative_civility %}{{ partner_representative_civility }} {% endif %}{{ partner_representative_name }}</p>
       </td>
     </tr>
   </table>
