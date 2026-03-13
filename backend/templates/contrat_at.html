@@ -32,12 +32,15 @@
     }
   }
 
-  /* Première page : pas de marge top, pas de footer standard (la couverture a son propre footer) */
+  /* Première page : footer personnalisé via running element */
   @page :first {
     margin-top: 0;
-    margin-bottom: 0;
+    margin-bottom: 6cm;
     @bottom-left { content: none; }
-    @bottom-center { content: none; }
+    @bottom-center {
+      content: element(cover-bottom-content);
+      vertical-align: bottom;
+    }
     @bottom-right { content: none; }
   }
 
@@ -50,7 +53,7 @@
     line-height: 1.5;
   }
 
-  /* Running footer gauche */
+  /* Running footer gauche (pages 2+) */
   .page-running-footer-left {
     position: running(page-running-footer-left);
     font-size: 9pt;
@@ -61,13 +64,33 @@
     color: {{ issuer_color_code }};
   }
 
+  /* Running cover bottom (page 1 margin box) */
+  .cover-bottom-content {
+    position: running(cover-bottom-content);
+    text-align: center;
+    font-family: Calibri, Carlito, Arial, sans-serif;
+  }
+  .cover-bottom-content .cover-confidential {
+    font-style: italic;
+    font-size: 10pt;
+    color: #333;
+    margin-bottom: 1.2cm;
+  }
+  .cover-bottom-content .cover-footer {
+    font-size: 9pt;
+    color: #333;
+    line-height: 1.6;
+  }
+  .cover-bottom-content .cover-footer .company-color {
+    font-weight: bold;
+    color: {{ issuer_color_code }};
+  }
+
   /* ===== COVER PAGE ===== */
   .cover-page {
     page-break-after: always;
     text-align: center;
     padding-top: 2.5cm;
-    position: relative;
-    height: 100%;
   }
   .cover-logo-wrapper {
     margin-bottom: 2.5cm;
@@ -101,7 +124,6 @@
   }
   .cover-info {
     margin-top: 1.5cm;
-    margin-bottom: 1.5cm;
     display: inline-block;
     text-align: left;
   }
@@ -118,30 +140,6 @@
   .cover-info-value {
     font-weight: bold;
     font-size: 11pt;
-  }
-  .cover-confidential {
-    font-style: italic;
-    font-size: 10pt;
-    color: #333;
-    position: absolute;
-    bottom: 5cm;
-    left: 0;
-    right: 0;
-    text-align: center;
-  }
-  .cover-footer {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-size: 9pt;
-    color: #333;
-    line-height: 1.6;
-  }
-  .cover-footer .company-color {
-    font-weight: bold;
-    color: {{ issuer_color_code }};
   }
 
   /* ===== CONTRACT BODY ===== */
@@ -274,9 +272,22 @@
 </head>
 <body>
 
-<!-- Running footer gauche (société | Contrat : ref) -->
+<!-- Running footer gauche (société | Contrat : ref) — pages 2+ -->
 <div class="page-running-footer-left">
   <span class="company-name">{{ issuer_company_name }}</span>&nbsp;|&nbsp;Contrat : {{ reference }}
+</div>
+
+<!-- Running cover bottom (confidentialité + footer société) — page 1 margin box -->
+<div class="cover-bottom-content">
+  <div class="cover-confidential">
+    Ce document est la propriété de {{ issuer_company_name | upper }}. Toute reproduction ou diffusion,<br>
+    même partielle, est interdite sans autorisation écrite préalable.
+  </div>
+  <div class="cover-footer">
+    <span class="company-color">{{ issuer_company_name | upper }}</span><br>
+    {{ issuer_head_office }}<br>
+    {{ issuer_legal_form }} au Capital de {{ issuer_capital }} - {{ issuer_rcs_number }} R.C.S. {{ issuer_rcs_city }}{% if issuer_tva_number %} - {{ issuer_tva_number }}{% endif %}
+  </div>
 </div>
 
 <!-- ===== PAGE 1: COVER ===== -->
@@ -318,19 +329,6 @@
       <span class="cover-info-label">Classification :</span>
       <span class="cover-info-value">Confidentiel</span>
     </div>
-  </div>
-
-  <!-- Mention de confidentialité -->
-  <div class="cover-confidential">
-    Ce document est la propriété de {{ issuer_company_name | upper }}. Toute reproduction ou diffusion,<br>
-    même partielle, est interdite sans autorisation écrite préalable.
-  </div>
-
-  <!-- Pied de page couverture -->
-  <div class="cover-footer">
-    <span class="company-color">{{ issuer_company_name | upper }}</span><br>
-    {{ issuer_head_office }}<br>
-    {{ issuer_legal_form }} au Capital de {{ issuer_capital }} - {{ issuer_rcs_number }} R.C.S. {{ issuer_rcs_city }}{% if issuer_tva_number %} - {{ issuer_tva_number }}{% endif %}
   </div>
 </div>
 
