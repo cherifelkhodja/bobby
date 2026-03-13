@@ -463,7 +463,7 @@ class BoondCrmAdapter:
             "apeCode": ape_code,
         }
         if postcode:
-            attributes["postCode"] = postcode
+            attributes["postcode"] = postcode
         if address:
             attributes["address"] = address
         if town:
