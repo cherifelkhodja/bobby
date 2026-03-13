@@ -22,7 +22,7 @@ class ContractRequest:
     Numérotation :
     - `provisional_reference` (PROV-YYYY-NNNN) : assignée à la création, sert
       d'identifiant interne tout au long du processus.
-    - `reference` (XXX-CC-NNN) : référence définitive assignée uniquement
+    - `reference` (XXX-CC-NNNN) : référence définitive assignée uniquement
       lorsque le partenaire approuve le contrat (état PARTNER_APPROVED).
       XXX = code société, CC = contrat cadre, NNN = numéro séquentiel.
       NULL jusqu'à ce stade.

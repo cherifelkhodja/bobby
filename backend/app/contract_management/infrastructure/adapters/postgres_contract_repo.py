@@ -193,7 +193,7 @@ class ContractRequestRepository:
         return result.scalar_one_or_none()
 
     async def get_next_reference(self, company_code: str | None = None) -> str:
-        """Generate the next final contract reference in format XXX-CC-NNN.
+        """Generate the next final contract reference in format XXX-CC-NNNN.
 
         The sequence counter is independent per company code.
         If company_code is not provided, the default company's code is used.
@@ -229,7 +229,7 @@ class ContractRequestRepository:
         else:
             next_num = 1
 
-        return f"{prefix}{next_num:03d}"
+        return f"{prefix}{next_num:04d}"
 
     def _to_entity(self, model: ContractRequestModel) -> ContractRequest:
         """Convert SQLAlchemy model to domain entity."""

@@ -46,7 +46,7 @@ class ContractRequestRepositoryPort(Protocol):
         ...
 
     async def get_next_reference(self, company_code: str | None = None) -> str:
-        """Generate the next final contract reference (e.g. GEM-CC-001).
+        """Generate the next final contract reference (e.g. GEM-CC-0001).
 
         Assigned at PARTNER_APPROVED. Starts with the 3-letter company code.
 

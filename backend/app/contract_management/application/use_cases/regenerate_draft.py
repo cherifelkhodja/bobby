@@ -1,7 +1,7 @@
 """Service: Regenerate a contract draft PDF with updated reference.
 
 Used after partner approval to regenerate the draft with the final reference
-(XXX-CC-NNN) replacing the provisional reference (PROV-YYYY-NNNN).
+(XXX-CC-NNNN) replacing the provisional reference (PROV-YYYY-NNNN).
 """
 
 import structlog
