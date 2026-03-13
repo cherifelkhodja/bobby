@@ -434,6 +434,7 @@ export default function ContractDetail() {
     'compliance_blocked',
     'configuring_contract',
     'draft_generated',
+    'partner_requested_changes',
   ]);
   const showConfigForm = isAdv && !!cr?.status && prePartnerStatuses.has(cr.status);
 
