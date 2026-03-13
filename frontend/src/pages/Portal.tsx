@@ -628,9 +628,23 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const computeVatNumber = (siret: string): string => {
+    const siren = siret.slice(0, 9);
+    const sirenNum = parseInt(siren, 10);
+    if (isNaN(sirenNum)) return '';
+    const key = (12 + 3 * (sirenNum % 97)) % 97;
+    return `FR${String(key).padStart(2, '0')}${siren}`;
+  };
+
   const handleSiretChange = async (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 14);
-    setForm((f) => ({ ...f, siret: digits }));
+    setForm((f) => {
+      const updated = { ...f, siret: digits };
+      if (digits.length === 14) {
+        updated.vat_number = computeVatNumber(digits);
+      }
+      return updated;
+    });
     if (digits.length === 14) {
       setSiretLoading(true);
       try {
@@ -939,9 +953,10 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
             <input
               type="text"
               value={form.vat_number}
-              onChange={(e) => setForm((f) => ({ ...f, vat_number: e.target.value.toUpperCase() }))}
-              placeholder="Ex : FR12345678901"
-              className={INPUT_CLS}
+              readOnly
+              tabIndex={-1}
+              placeholder="Calculé automatiquement à partir du SIRET"
+              className={`${INPUT_CLS} bg-gray-50 dark:bg-gray-700 cursor-not-allowed`}
             />
           </div>
           <div>

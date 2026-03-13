@@ -724,6 +724,13 @@ async def submit_company_info(
     # Derive SIREN from first 9 digits of SIRET
     siren = body.siret[:9]
 
+    # Auto-compute VAT number from SIREN if not provided
+    vat_number = body.vat_number
+    if not vat_number and siren.isdigit():
+        siren_int = int(siren)
+        key = (12 + 3 * (siren_int % 97)) % 97
+        vat_number = f"FR{key:02d}{siren}"
+
     tp.entity_category = body.entity_category
     tp.company_info_submitted = True
     tp.company_name = body.company_name
@@ -731,7 +738,7 @@ async def submit_company_info(
     tp.capital = body.capital
     tp.siren = siren
     tp.siret = body.siret
-    tp.vat_number = body.vat_number
+    tp.vat_number = vat_number
     tp.ape_code = body.ape_code
     tp.rcs_city = body.rcs_city or body.head_office_city
     tp.rcs_number = siren  # In France, RCS registration number = SIREN
@@ -885,9 +892,14 @@ async def save_company_info_draft(
         if val is not None:
             updates[col] = val
 
-    # Also derive siren from siret when provided
+    # Also derive siren and VAT from siret when provided
     if body.siret and len(body.siret) >= 9:
-        updates["siren"] = body.siret[:9]
+        siren_draft = body.siret[:9]
+        updates["siren"] = siren_draft
+        if "vat_number" not in updates and siren_draft.isdigit():
+            siren_int = int(siren_draft)
+            key = (12 + 3 * (siren_int % 97)) % 97
+            updates["vat_number"] = f"FR{key:02d}{siren_draft}"
 
     if not updates:
         return {"message": "Rien à enregistrer."}
