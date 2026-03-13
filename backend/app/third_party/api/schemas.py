@@ -39,6 +39,7 @@ class ThirdPartyPortalResponse(BaseModel):
     signatory_last_name: str | None = None
     signatory_email: str | None = None
     signatory_phone: str | None = None
+    signatory_is_director: bool = False
     adv_contact_civility: str | None = None
     adv_contact_first_name: str | None = None
     adv_contact_last_name: str | None = None
@@ -271,6 +272,7 @@ class CompanyInfoRequest(BaseModel):
     signatory_last_name: str | None = Field(None, max_length=100)
     signatory_email: EmailStr | None = None
     signatory_phone: str | None = Field(None, max_length=50)
+    signatory_is_director: bool = False
     # Contact ADV
     adv_contact_same_as_representative: bool = False
     adv_contact_civility: str | None = Field(None, pattern=r"^(M\.|Mme)$")
@@ -312,6 +314,7 @@ class CompanyInfoDraftRequest(BaseModel):
     signatory_last_name: str | None = Field(None, max_length=100)
     signatory_email: EmailStr | None = None
     signatory_phone: str | None = Field(None, max_length=50)
+    signatory_is_director: bool | None = None
     adv_contact_same_as_representative: bool | None = None
     adv_contact_civility: str | None = Field(None, pattern=r"^(M\.|Mme)$")
     adv_contact_first_name: str | None = Field(None, max_length=100)

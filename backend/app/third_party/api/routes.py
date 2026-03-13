@@ -139,6 +139,7 @@ async def get_portal_info(
             signatory_last_name=tp.signatory_last_name,
             signatory_email=tp.signatory_email,
             signatory_phone=tp.signatory_phone,
+            signatory_is_director=tp.signatory_is_director,
             adv_contact_civility=tp.adv_contact_civility,
             adv_contact_first_name=tp.adv_contact_first_name,
             adv_contact_last_name=tp.adv_contact_last_name,
@@ -761,6 +762,7 @@ async def submit_company_info(
         tp.signatory_last_name = body.signatory_last_name
         tp.signatory_email = body.signatory_email
         tp.signatory_phone = body.signatory_phone
+    tp.signatory_is_director = body.signatory_is_director
     # Contact ADV
     if body.adv_contact_same_as_representative:
         tp.adv_contact_civility = body.representative_civility
@@ -866,6 +868,7 @@ async def save_company_info_draft(
         "signatory_last_name": body.signatory_last_name,
         "signatory_email": str(body.signatory_email) if body.signatory_email else None,
         "signatory_phone": body.signatory_phone,
+        "signatory_is_director": body.signatory_is_director,
         "adv_contact_civility": body.adv_contact_civility,
         "adv_contact_first_name": body.adv_contact_first_name,
         "adv_contact_last_name": body.adv_contact_last_name,

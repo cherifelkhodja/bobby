@@ -964,6 +964,7 @@ export interface PortalInfo {
     signatory_last_name: string | null;
     signatory_email: string | null;
     signatory_phone: string | null;
+    signatory_is_director: boolean;
     adv_contact_civility: string | null;
     adv_contact_first_name: string | null;
     adv_contact_last_name: string | null;

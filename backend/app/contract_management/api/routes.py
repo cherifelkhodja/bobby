@@ -1433,33 +1433,41 @@ async def boond_create_company(
 
     # Build deduplicated contacts: if same person (first_name+last_name+email) has
     # multiple roles, merge typesOf into a single contact.
-    # Boond typesOf: 1=dirigeant, 2=facturation, 3=adv
-    role_entries = [
-        (tp.representative_civility, tp.representative_first_name, tp.representative_last_name,
-         tp.representative_email, tp.representative_phone, tp.representative_title, 1, "dirigeant"),
+    # Boond typesOf: 7=dirigeant, 8=commercial, 9=adv, 10=signataire
+    signatory_types = [10]  # signataire
+    if tp.signatory_is_director:
+        signatory_types.append(7)  # dirigeant
+
+    role_entries: list[tuple] = [
+        (tp.signatory_civility or tp.representative_civility,
+         tp.signatory_first_name or tp.representative_first_name,
+         tp.signatory_last_name or tp.representative_last_name,
+         tp.signatory_email or tp.representative_email,
+         tp.signatory_phone or tp.representative_phone,
+         tp.representative_title, signatory_types, "signataire"),
         (tp.adv_contact_civility, tp.adv_contact_first_name, tp.adv_contact_last_name,
-         tp.adv_contact_email, tp.adv_contact_phone, "ADV", 3, "adv"),
+         tp.adv_contact_email, tp.adv_contact_phone, "ADV", [9], "adv"),
         (tp.billing_contact_civility, tp.billing_contact_first_name, tp.billing_contact_last_name,
-         tp.billing_contact_email, tp.billing_contact_phone, "Facturation", 2, "facturation"),
+         tp.billing_contact_email, tp.billing_contact_phone, "Commercial", [8], "commercial"),
     ]
 
     # Group by identity key (normalized first_name + last_name + email)
     merged: dict[str, dict] = {}
-    for civ, fn, ln, email, phone, job_title, type_of, label in role_entries:
+    for civ, fn, ln, email, phone, job_title, types_of_list, label in role_entries:
         if not (fn or email):
             continue
         key = f"{(fn or '').strip().lower()}|{(ln or '').strip().lower()}|{(email or '').strip().lower()}"
         if key in merged:
-            merged[key]["types_of"].append(type_of)
+            merged[key]["types_of"].extend(types_of_list)
             merged[key]["labels"].append(label)
             # Keep the most descriptive job_title (representative_title over generic)
-            if job_title and job_title not in ("ADV", "Facturation"):
+            if job_title and job_title not in ("ADV", "Commercial"):
                 merged[key]["job_title"] = job_title
         else:
             merged[key] = {
                 "civility": civ, "first_name": fn, "last_name": ln,
                 "email": email, "phone": phone, "job_title": job_title,
-                "types_of": [type_of], "labels": [label],
+                "types_of": list(types_of_list), "labels": [label],
             }
 
     agency_id = company.boond_agency_id if company else None

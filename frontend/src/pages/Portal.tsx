@@ -624,6 +624,7 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
     phone: initialData?.billing_contact_phone ?? '',
   });
   const [billingIsSame, setBillingIsSame] = useState(false);
+  const [signatoryIsDirector, setSignatoryIsDirector] = useState(initialData?.signatory_is_director ?? false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -698,6 +699,7 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
         ...(signatory.last_name ? { signatory_last_name: signatory.last_name } : {}),
         ...(signatory.email ? { signatory_email: signatory.email } : {}),
         ...(signatory.phone ? { signatory_phone: signatory.phone } : {}),
+        signatory_is_director: signatoryIsDirector,
         adv_contact_same_as_representative: advIsSame,
         ...(!advIsSame && advContact.civility ? { adv_contact_civility: advContact.civility as 'M.' | 'Mme' } : {}),
         ...(!advIsSame && advContact.first_name ? { adv_contact_first_name: advContact.first_name } : {}),
@@ -747,6 +749,7 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
         signatory_last_name: signatory.last_name,
         signatory_email: signatory.email,
         signatory_phone: signatory.phone || undefined,
+        signatory_is_director: signatoryIsDirector,
         adv_contact_same_as_representative: advIsSame,
         ...(advIsSame ? {} : {
           adv_contact_civility: advContact.civility as 'M.' | 'Mme',
@@ -1048,6 +1051,19 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
                 className={INPUT_CLS}
               />
             </div>
+            <div className="md:col-span-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={signatoryIsDirector}
+                  onChange={() => setSignatoryIsDirector((v) => !v)}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-xs text-gray-700 dark:text-gray-300">
+                  Cette personne est le dirigeant de la société
+                </span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -1061,9 +1077,9 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
           onToggleSameAsRep={() => setAdvIsSame((v) => !v)}
         />
 
-        {/* Contact facturation */}
+        {/* Contact commercial */}
         <ContactSection
-          title="Contact facturation"
+          title="Contact commercial"
           contact={billingContact}
           onChange={setBillingContact}
           checkboxLabel="Même personne que le signataire du contrat"

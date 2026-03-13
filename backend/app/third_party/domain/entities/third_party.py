@@ -42,6 +42,7 @@ class ThirdParty:
     signatory_last_name: str | None = None
     signatory_email: str | None = None
     signatory_phone: str | None = None
+    signatory_is_director: bool = False
     # ADV contact
     adv_contact_civility: str | None = None
     adv_contact_first_name: str | None = None

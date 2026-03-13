@@ -93,6 +93,7 @@ export const portalApi = {
       signatory_last_name?: string;
       signatory_email?: string;
       signatory_phone?: string;
+      signatory_is_director: boolean;
       adv_contact_same_as_representative: boolean;
       adv_contact_civility?: 'M.' | 'Mme';
       adv_contact_first_name?: string;
@@ -159,6 +160,7 @@ export const portalApi = {
       signatory_last_name: string;
       signatory_email: string;
       signatory_phone: string;
+      signatory_is_director: boolean;
       adv_contact_same_as_representative: boolean;
       adv_contact_civility: 'M.' | 'Mme';
       adv_contact_first_name: string;

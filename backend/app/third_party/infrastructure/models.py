@@ -41,6 +41,7 @@ class ThirdPartyModel(Base):
     signatory_last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     signatory_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     signatory_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    signatory_is_director: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     adv_contact_civility: Mapped[str | None] = mapped_column(String(10), nullable=True)
     adv_contact_first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     adv_contact_last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)

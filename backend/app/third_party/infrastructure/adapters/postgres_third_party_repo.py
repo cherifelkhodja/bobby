@@ -69,6 +69,7 @@ class ThirdPartyRepository:
             model.signatory_last_name = third_party.signatory_last_name
             model.signatory_email = third_party.signatory_email
             model.signatory_phone = third_party.signatory_phone
+            model.signatory_is_director = third_party.signatory_is_director
             model.adv_contact_civility = third_party.adv_contact_civility
             model.adv_contact_first_name = third_party.adv_contact_first_name
             model.adv_contact_last_name = third_party.adv_contact_last_name
@@ -198,6 +199,7 @@ class ThirdPartyRepository:
             signatory_last_name=model.signatory_last_name,
             signatory_email=model.signatory_email,
             signatory_phone=model.signatory_phone,
+            signatory_is_director=model.signatory_is_director,
             adv_contact_civility=model.adv_contact_civility,
             adv_contact_first_name=model.adv_contact_first_name,
             adv_contact_last_name=model.adv_contact_last_name,
@@ -247,6 +249,7 @@ class ThirdPartyRepository:
             signatory_last_name=entity.signatory_last_name,
             signatory_email=entity.signatory_email,
             signatory_phone=entity.signatory_phone,
+            signatory_is_director=entity.signatory_is_director,
             adv_contact_civility=entity.adv_contact_civility,
             adv_contact_first_name=entity.adv_contact_first_name,
             adv_contact_last_name=entity.adv_contact_last_name,
