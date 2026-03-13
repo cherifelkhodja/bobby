@@ -173,6 +173,8 @@ async def list_companies(
             "name": c.name,
             "code": c.code,
             "is_active": c.is_active,
+            "is_default": c.is_default,
+            "invoices_company_mail": c.invoices_company_mail,
         }
         for c in companies
     ]
