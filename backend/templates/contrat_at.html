@@ -32,10 +32,13 @@
     }
   }
 
-  /* Première page : pas de marge top (pas de header), titre en haut */
+  /* Première page : pas de marge top, pas de footer standard (la couverture a son propre footer) */
   @page :first {
     margin-top: 0;
-    margin-bottom: 2.8cm;
+    margin-bottom: 0;
+    @bottom-left { content: none; }
+    @bottom-center { content: none; }
+    @bottom-right { content: none; }
   }
 
   /* ===== BASE ===== */
@@ -59,35 +62,81 @@
   }
 
   /* ===== COVER PAGE ===== */
-  /* WeasyPrint: justify-content sur flex-column avec hauteur fixe n'est pas
-     fiable. On utilise padding-top pour pousser le contenu vers le centre
-     vertical (page A4 utile ≈ 24.4cm, contenu ≈ 7cm → padding ≈ 8.5cm). */
   .cover-page {
     page-break-after: always;
-    padding-top: 1.5cm;
     text-align: center;
+    padding-top: 1cm;
+    position: relative;
+    height: 100%;
+  }
+  .cover-logo-wrapper {
+    margin-bottom: 1.8cm;
+  }
+  .cover-logo {
+    display: block;
+    max-height: 5cm;
+    max-width: 14cm;
+    margin: 0 auto;
   }
   .cover-title {
     font-size: 18pt;
     font-weight: bold;
     letter-spacing: 0.05em;
-    margin-bottom: 0.5cm;
+    margin-bottom: 0.6cm;
+    font-variant: small-caps;
   }
   .cover-separator {
     border: none;
     border-top: 2px solid {{ issuer_color_code }};
     width: 100%;
     display: block;
-    margin-bottom: 0;
   }
-  .cover-logo-wrapper {
-    margin-top: 11cm;
+  .cover-subtitle {
+    font-size: 13pt;
+    font-weight: bold;
+    padding: 0.4cm 0;
   }
-  .cover-logo {
-    display: block;
-    width: 14cm;
-    max-width: 100%;
-    margin: 0 auto;
+  .cover-subtitle .company-color {
+    color: {{ issuer_color_code }};
+  }
+  .cover-info {
+    margin-top: 1.5cm;
+    margin-bottom: 1.5cm;
+    display: inline-block;
+    text-align: left;
+  }
+  .cover-info-row {
+    margin-bottom: 0.15cm;
+  }
+  .cover-info-label {
+    display: inline-block;
+    width: 3.5cm;
+    text-align: right;
+    padding-right: 0.5cm;
+    font-size: 11pt;
+  }
+  .cover-info-value {
+    font-weight: bold;
+    font-size: 11pt;
+  }
+  .cover-confidential {
+    margin-top: 2cm;
+    font-style: italic;
+    font-size: 10pt;
+    color: #333;
+  }
+  .cover-footer {
+    position: absolute;
+    bottom: 2cm;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 9pt;
+    color: #333;
+  }
+  .cover-footer .company-color {
+    font-weight: bold;
+    color: {{ issuer_color_code }};
   }
 
   /* ===== CONTRACT BODY ===== */
@@ -227,14 +276,57 @@
 
 <!-- ===== PAGE 1: COVER ===== -->
 <div class="cover-page">
-  <div class="cover-title">CONTRAT {{ reference }}</div>
-  <hr class="cover-separator">
+  <!-- Logo -->
   <div class="cover-logo-wrapper">
     {% if logo_b64 %}
       <img class="cover-logo" src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="Logo société">
     {% elif logo_filename %}
       <img class="cover-logo" src="{{ logo_filename }}" alt="Logo société">
     {% endif %}
+  </div>
+
+  <!-- Titre -->
+  <div class="cover-title">CONTRAT CADRE DE SOUS-TRAITANCE</div>
+
+  <!-- Sous-titre entre deux lignes -->
+  <hr class="cover-separator">
+  <div class="cover-subtitle">
+    <span class="company-color">{{ issuer_company_name | upper }}</span> - {{ reference }}
+  </div>
+  <hr class="cover-separator">
+
+  <!-- Informations -->
+  <div class="cover-info">
+    <div class="cover-info-row">
+      <span class="cover-info-label">Partenaire :</span>
+      <span class="cover-info-value">{{ partner_legal_form | default('') }} {{ partner_company_name | default('') }} {{ partner_representative_name | default('') }}</span>
+    </div>
+    <div class="cover-info-row">
+      <span class="cover-info-label">Référence :</span>
+      <span class="cover-info-value">{{ reference }}</span>
+    </div>
+    <div class="cover-info-row">
+      <span class="cover-info-label">Date :</span>
+      <span class="cover-info-value">{{ contract_date }}</span>
+    </div>
+    <div class="cover-info-row">
+      <span class="cover-info-label">Classification :</span>
+      <span class="cover-info-value">Confidentiel</span>
+    </div>
+  </div>
+
+  <!-- Mention de confidentialité -->
+  <div class="cover-confidential">
+    Ce document est la propriété de {{ issuer_company_name | upper }}. Toute reproduction ou diffusion,<br>
+    même partielle, est interdite sans autorisation écrite préalable.
+  </div>
+
+  <!-- Pied de page couverture -->
+  <div class="cover-footer">
+    <span class="company-color">{{ issuer_company_name | upper }}</span><br>
+    {{ issuer_head_office }}<br>
+    {{ issuer_legal_form }} au Capital de {{ issuer_capital }}<br>
+    {{ issuer_rcs_number }} R.C.S. {{ issuer_rcs_city }}
   </div>
 </div>
 

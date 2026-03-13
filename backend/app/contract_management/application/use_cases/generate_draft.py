@@ -1,5 +1,6 @@
 """Use case: Generate a contract draft document."""
 
+from datetime import datetime
 from uuid import UUID
 
 import structlog
@@ -183,6 +184,7 @@ class GenerateDraftUseCase:
             issuer_representative_sub_quality = company.representative_sub_quality or ""
             issuer_signatory_name = company.signatory_name
             issuer_color_code = company.color_code
+            issuer_code = company.code
             invoices_company_mail = company.invoices_company_mail or ""
         else:
             # Legacy fallback: use settings
@@ -200,6 +202,7 @@ class GenerateDraftUseCase:
             issuer_representative_sub_quality = ""
             issuer_signatory_name = self._settings.GEMINI_SIGNATORY_NAME
             issuer_color_code = "#4BBEA8"
+            issuer_code = "GEN"
             invoices_company_mail = ""
 
         context = {
@@ -217,6 +220,7 @@ class GenerateDraftUseCase:
             "issuer_representative_sub_quality": issuer_representative_sub_quality,
             "issuer_signatory_name": issuer_signatory_name,
             "issuer_color_code": issuer_color_code,
+            "issuer_code": issuer_code,
             "invoices_company_mail": invoices_company_mail,
             # Keep legacy aliases so existing article templates still work
             "gemini_company_name": issuer_company_name,
@@ -228,6 +232,7 @@ class GenerateDraftUseCase:
             "gemini_signatory_name": issuer_signatory_name,
             # Contract details
             "reference": cr.display_reference,
+            "contract_date": datetime.utcnow().strftime("%d/%m/%Y"),
             "daily_rate": str(cr.daily_rate) if cr.daily_rate else "",
             "start_date": cr.start_date.strftime("%d/%m/%Y") if cr.start_date else "",
             "client_name": cr.client_name or "",
