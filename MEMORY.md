@@ -161,6 +161,23 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-13 (régénération brouillon avec référence définitive)
+
+#### Régénération automatique du PDF contrat à l'approbation partenaire
+
+**Contexte** : Quand le partenaire approuve le contrat, la référence définitive (XXX-YYYY-NNNN) remplace la provisoire (PROV-YYYY-NNNN). Le brouillon PDF doit être régénéré avec cette nouvelle référence.
+
+**Implémentation** :
+1. Créé `DraftRegenerator` dans `regenerate_draft.py` — réutilise la logique de `GenerateDraftUseCase._build_context()` pour reconstruire le PDF avec la référence finale
+2. Ajouté paramètre optionnel `draft_regenerator` dans `ProcessPartnerReviewUseCase` — si fourni et le partenaire approuve, régénère le brouillon
+3. Câblé le `DraftRegenerator` dans la route portail `submit_contract_review`
+4. Nouvelle version du Contract créée avec la référence définitive
+
+**Fichiers modifiés** :
+- `backend/app/contract_management/application/use_cases/regenerate_draft.py` (nouveau)
+- `backend/app/contract_management/application/use_cases/process_partner_review.py`
+- `backend/app/third_party/api/routes.py`
+
 ### 2026-03-12 (fix référence contrat + bouton rollback)
 
 #### Fix préfixe de référence contrat

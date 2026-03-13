@@ -623,20 +623,47 @@ async def submit_contract_review(
     from app.contract_management.application.use_cases.process_partner_review import (
         ProcessPartnerReviewUseCase,
     )
+    from app.contract_management.application.use_cases.regenerate_draft import (
+        DraftRegenerator,
+    )
+    from app.contract_management.infrastructure.adapters.html_pdf_contract_generator import (
+        HtmlPdfContractGenerator,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
+        AnnexTemplateRepository,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
+        ArticleTemplateRepository,
+    )
     from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
         ContractRepository,
         ContractRequestRepository,
     )
     from app.infrastructure.email.sender import EmailService
+    from app.infrastructure.storage.s3_client import S3StorageClient
 
     settings = get_settings()
     cr_repo = ContractRequestRepository(db)
     contract_repo = ContractRepository(db)
     email_service = EmailService(settings)
+
+    draft_regenerator = DraftRegenerator(
+        contract_request_repository=cr_repo,
+        contract_repository=contract_repo,
+        third_party_repository=ThirdPartyRepository(db),
+        contract_generator=HtmlPdfContractGenerator(),
+        article_template_repository=ArticleTemplateRepository(db),
+        annex_template_repository=AnnexTemplateRepository(db),
+        s3_service=S3StorageClient(settings),
+        settings=settings,
+        db=db,
+    )
+
     use_case = ProcessPartnerReviewUseCase(
         contract_request_repository=cr_repo,
         contract_repository=contract_repo,
         email_service=email_service,
+        draft_regenerator=draft_regenerator,
     )
 
     updated = await use_case.execute(

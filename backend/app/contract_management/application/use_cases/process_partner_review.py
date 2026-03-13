@@ -15,7 +15,8 @@ logger = structlog.get_logger()
 class ProcessPartnerReviewUseCase:
     """Process the partner's review decision on a contract draft.
 
-    If approved, transitions to PARTNER_APPROVED.
+    If approved, transitions to PARTNER_APPROVED and regenerates the draft
+    with the final reference.
     If changes requested, transitions to PARTNER_REQUESTED_CHANGES and notifies ADV.
     """
 
@@ -24,10 +25,12 @@ class ProcessPartnerReviewUseCase:
         contract_request_repository,
         contract_repository,
         email_service,
+        draft_regenerator=None,
     ) -> None:
         self._cr_repo = contract_request_repository
         self._contract_repo = contract_repository
         self._email_service = email_service
+        self._draft_regenerator = draft_regenerator
 
     async def execute(
         self,
@@ -73,6 +76,22 @@ class ProcessPartnerReviewUseCase:
                 step_message=f"Le partenaire a validé le projet de contrat{client_label}. Le contrat peut maintenant être envoyé en signature.",
                 step_color="#10b981",
             )
+
+            # Regenerate the draft PDF with the final reference
+            if self._draft_regenerator:
+                try:
+                    await self._draft_regenerator.regenerate(cr)
+                    logger.info(
+                        "draft_regenerated_with_final_reference",
+                        cr_id=str(cr.id),
+                        reference=cr.display_reference,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "draft_regeneration_failed",
+                        cr_id=str(cr.id),
+                        error=str(exc),
+                    )
         else:
             cr.transition_to(ContractRequestStatus.PARTNER_REQUESTED_CHANGES)
 
