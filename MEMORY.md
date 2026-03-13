@@ -161,6 +161,22 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-13 (fix: formatage données légales Boond + vérification société existante)
+
+#### Vérification société Boond avant création contacts
+**Problème** : Si une société était supprimée dans Boond mais que `tp.boond_provider_id` restait en base, la création de contacts échouait avec 422 "This entity doesn't exist".
+**Fix** : Ajout de `verify_company_exists()` dans `BoondCrmAdapter`. Avant d'utiliser un `boond_provider_id` en cache, on vérifie qu'il existe encore dans Boond. Sinon, on le remet à `None` et la société est recréée.
+
+#### Formatage données légales pour Boond
+1. **Statut juridique** : ajout du symbole `€` au capital social (ex: "SAS au capital de 752 000 €")
+2. **RCS** : formatage du SIREN avec espaces tous les 3 chiffres (ex: "894 213 669 R.C.S. Paris")
+3. **Code postal** : déjà passé via `head_office_postal_code`, sera inclus à la prochaine création de société
+
+**Fichiers modifiés** :
+- `backend/app/contract_management/infrastructure/adapters/boond_crm_adapter.py` : `verify_company_exists()`
+- `backend/app/contract_management/api/routes.py` : `_format_siren()`, vérification provider_id, formatage €
+- `backend/app/contract_management/application/use_cases/sync_to_boond_after_signing.py` : idem
+
 ### 2026-03-13 (contrat : persistance contact IDs Boond + refactoring sync)
 
 #### Persistance des Boond contact IDs sur ThirdParty
