@@ -2128,9 +2128,7 @@ function ArticleAnnexEditor({
                     key={key}
                     itemKey={key}
                     title={title}
-                    defaultContent={content}
                     label="Art."
-                    isAnnex={false}
                     isCustom={isCustom}
                     isExpanded={!!expanded[key]}
                     isDeleted={isDeleted}
@@ -2171,9 +2169,7 @@ function ArticleAnnexEditor({
                     key={key}
                     itemKey={key}
                     title={title}
-                    defaultContent={content}
                     label="Annexe"
-                    isAnnex={true}
                     isCustom={isCustom}
                     isExpanded={!!expanded[key]}
                     isDeleted={isDeleted}
