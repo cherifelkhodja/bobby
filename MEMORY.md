@@ -161,6 +161,24 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-13 (contrat : articles/annexes custom + réordonnancement)
+
+#### Ajout d'articles/annexes personnalisés et réordonnancement par contrat
+
+**Contexte** : Lors de la configuration ou modification d'un contrat, il fallait pouvoir ajouter des articles ou annexes spécifiques et modifier leur ordre d'affichage, sans toucher aux templates globaux.
+
+**Implémentation** :
+1. Backend : ajout des champs `custom_articles`, `custom_annexes`, `article_order`, `annex_order` dans le schéma `ArticleOverridesRequest`
+2. Backend : route `PATCH /{id}/article-overrides` persiste les nouveaux champs dans `contract_config` (JSON)
+3. Backend : `generate_draft.py` fusionne les articles/annexes custom avec les templates, applique l'ordre personnalisé, puis renumérrote séquentiellement
+4. Frontend : `ArticleAnnexEditor` supporte l'ajout d'articles/annexes custom (bouton "+"), le réordonnancement (flèches haut/bas), et la suppression permanente des custom items
+5. Frontend : l'éditeur est maintenant visible dans les états `configuring_contract` et `draft_generated` (plus seulement `partner_requested_changes`)
+6. Aucune migration nécessaire (tout stocké dans le champ JSON `contract_config`)
+
+**Fichiers modifiés** : schemas.py, routes.py, generate_draft.py, contracts.ts, ContractDetail.tsx
+
+---
+
 ### 2026-03-13 (portail tiers : checkbox dirigeant, renommage contact, typesOf Boond)
 
 #### Ajout checkbox "Dirigeant de la société" + renommage Contact facturation → Contact commercial + mapping typesOf Boond

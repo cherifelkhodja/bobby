@@ -661,6 +661,18 @@ async def save_article_overrides(
     if body.deleted_annex_keys is not None:
         cfg["deleted_annex_keys"] = list(set(body.deleted_annex_keys))
 
+    # Custom articles/annexes — None means "no change"
+    if body.custom_articles is not None:
+        cfg["custom_articles"] = [a.model_dump() for a in body.custom_articles]
+    if body.custom_annexes is not None:
+        cfg["custom_annexes"] = [a.model_dump() for a in body.custom_annexes]
+
+    # Ordering — None means "no change", [] means "reset to default"
+    if body.article_order is not None:
+        cfg["article_order"] = body.article_order if body.article_order else []
+    if body.annex_order is not None:
+        cfg["annex_order"] = body.annex_order if body.annex_order else []
+
     cr.contract_config = cfg
     saved = await cr_repo.save(cr)
 

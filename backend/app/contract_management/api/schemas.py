@@ -161,19 +161,41 @@ class ComplianceOverrideRequest(BaseModel):
     reason: str = Field(..., min_length=10, max_length=500)
 
 
+class CustomArticleItem(BaseModel):
+    """A custom article added to a specific contract."""
+
+    key: str = Field(..., max_length=50, pattern=r"^custom_[a-z0-9_]+$")
+    title: str = Field(..., max_length=200)
+    content: str = ""
+
+
+class CustomAnnexItem(BaseModel):
+    """A custom annex added to a specific contract."""
+
+    key: str = Field(..., max_length=50, pattern=r"^custom_[a-z0-9_]+$")
+    title: str = Field(..., max_length=200)
+    content: str = ""
+
+
 class ArticleOverridesRequest(BaseModel):
-    """Per-contract article/annex content overrides.
+    """Per-contract article/annex content overrides, custom items, and ordering.
 
     Keys are article_key / annexe_key; values are the overridden HTML content.
     Pass an empty string to reset an override (restores template default).
     deleted_article_keys / deleted_annex_keys: keys to exclude from the PDF.
     Pass an empty list to clear all deletions for that type.
+    custom_articles / custom_annexes: extra articles/annexes for this contract only.
+    article_order / annex_order: ordered list of keys defining display order.
     """
 
     article_overrides: dict[str, str] = Field(default_factory=dict)
     annex_overrides: dict[str, str] = Field(default_factory=dict)
     deleted_article_keys: list[str] | None = None
     deleted_annex_keys: list[str] | None = None
+    custom_articles: list[CustomArticleItem] | None = None
+    custom_annexes: list[CustomAnnexItem] | None = None
+    article_order: list[str] | None = None
+    annex_order: list[str] | None = None
 
 
 class PartnerReviewRequest(BaseModel):

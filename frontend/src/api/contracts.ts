@@ -88,6 +88,10 @@ export const contractsApi = {
       annex_overrides?: Record<string, string>;
       deleted_article_keys?: string[];
       deleted_annex_keys?: string[];
+      custom_articles?: CustomArticleItem[];
+      custom_annexes?: CustomAnnexItem[];
+      article_order?: string[];
+      annex_order?: string[];
     },
   ): Promise<ContractRequest> => {
     const response = await apiClient.patch<ContractRequest>(
@@ -315,6 +319,18 @@ export const contractCompaniesApi = {
     await apiClient.delete(`/admin/contract-companies/${id}/logo`);
   },
 };
+
+export interface CustomArticleItem {
+  key: string;
+  title: string;
+  content: string;
+}
+
+export interface CustomAnnexItem {
+  key: string;
+  title: string;
+  content: string;
+}
 
 export interface ArticleTemplate {
   article_key: string;

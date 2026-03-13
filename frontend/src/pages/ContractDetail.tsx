@@ -21,6 +21,9 @@ import {
   Pencil,
   RotateCcw,
   MessageSquare,
+  Plus,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -154,7 +157,7 @@ export default function ContractDetail() {
   const { data: allAnnexes = [] } = useQuery({
     queryKey: ['contract-annexes'],
     queryFn: contractAnnexesApi.list,
-    enabled: isAdv && cr?.status === 'partner_requested_changes',
+    enabled: isAdv && (cr?.status === 'partner_requested_changes' || cr?.status === 'configuring_contract' || cr?.status === 'draft_generated'),
   });
   const activeAnnexes = allAnnexes.filter((a) => a.is_active);
 
@@ -1353,11 +1356,6 @@ export default function ContractDetail() {
             />
           </div>
 
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-            Pour modifier le texte des articles, rendez-vous dans{' '}
-            <strong>Administration &gt; Contrat AT</strong>.
-          </p>
-
           <div className="flex justify-end">
             <Button
               onClick={() => configureMutation.mutate()}
@@ -1369,6 +1367,17 @@ export default function ContractDetail() {
             </Button>
           </div>
         </Card>
+      )}
+
+      {/* Article/annex editor — shown during configuration and when draft already generated */}
+      {isAdv && (cr.status === 'configuring_contract' || cr.status === 'draft_generated') && activeArticles.length > 0 && (
+        <ArticleAnnexEditor
+          contractRequestId={id!}
+          articles={activeArticles}
+          annexes={activeAnnexes}
+          existingOverrides={(cr.contract_config as Record<string, unknown> | null) ?? {}}
+          onSaved={() => queryClient.invalidateQueries({ queryKey: ['contract-request', id] })}
+        />
       )}
 
       {/* Third-party company info */}
@@ -1671,7 +1680,7 @@ export default function ContractDetail() {
 
 // ─── Article / Annex per-contract editor ─────────────────────────────────────
 
-import type { ArticleTemplate, AnnexTemplate } from '../api/contracts';
+import type { ArticleTemplate, AnnexTemplate, CustomArticleItem, CustomAnnexItem } from '../api/contracts';
 
 function ArticleAnnexEditor({
   contractRequestId,
@@ -1690,21 +1699,75 @@ function ArticleAnnexEditor({
   const annexOverrides = (existingOverrides.annex_overrides ?? {}) as Record<string, string>;
   const serverDeletedArticles = ((existingOverrides.deleted_article_keys ?? []) as string[]);
   const serverDeletedAnnexes = ((existingOverrides.deleted_annex_keys ?? []) as string[]);
+  const serverCustomArticles = ((existingOverrides.custom_articles ?? []) as CustomArticleItem[]);
+  const serverCustomAnnexes = ((existingOverrides.custom_annexes ?? []) as CustomAnnexItem[]);
+  const serverArticleOrder = ((existingOverrides.article_order ?? []) as string[]);
+  const serverAnnexOrder = ((existingOverrides.annex_order ?? []) as string[]);
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
-  // Local deleted state mirrors server; updated optimistically on toggle
   const [deletedArticles, setDeletedArticles] = useState<string[]>(serverDeletedArticles);
   const [deletedAnnexes, setDeletedAnnexes] = useState<string[]>(serverDeletedAnnexes);
+  const [customArticles, setCustomArticles] = useState<CustomArticleItem[]>(serverCustomArticles);
+  const [customAnnexes, setCustomAnnexes] = useState<CustomAnnexItem[]>(serverCustomAnnexes);
+  const [showAddArticle, setShowAddArticle] = useState(false);
+  const [showAddAnnex, setShowAddAnnex] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+
+  // Build ordered lists of keys for articles and annexes
+  const buildArticleKeys = () => {
+    const templateKeys = articles.map((a) => a.article_key);
+    const customKeys = customArticles.map((c) => c.key);
+    const allKeys = [...templateKeys, ...customKeys];
+    if (serverArticleOrder.length > 0) {
+      const ordered = [...serverArticleOrder];
+      // Add any new keys not in the saved order
+      for (const k of allKeys) {
+        if (!ordered.includes(k)) ordered.push(k);
+      }
+      return ordered.filter((k) => allKeys.includes(k));
+    }
+    return allKeys;
+  };
+
+  const buildAnnexKeys = () => {
+    const templateKeys = annexes.map((a) => a.annexe_key);
+    const customKeys = customAnnexes.map((c) => c.key);
+    const allKeys = [...templateKeys, ...customKeys];
+    if (serverAnnexOrder.length > 0) {
+      const ordered = [...serverAnnexOrder];
+      for (const k of allKeys) {
+        if (!ordered.includes(k)) ordered.push(k);
+      }
+      return ordered.filter((k) => allKeys.includes(k));
+    }
+    return allKeys;
+  };
+
+  const [articleKeys, setArticleKeys] = useState<string[]>(buildArticleKeys);
+  const [annexKeys, setAnnexKeys] = useState<string[]>(buildAnnexKeys);
+
+  // Rebuild keys when custom items change
+  useEffect(() => {
+    setArticleKeys(buildArticleKeys());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customArticles.length]);
+
+  useEffect(() => {
+    setAnnexKeys(buildAnnexKeys());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customAnnexes.length]);
+
+  // Lookup maps
+  const articleMap = new Map(articles.map((a) => [a.article_key, a]));
+  const annexMap = new Map(annexes.map((a) => [a.annexe_key, a]));
+  const customArticleMap = new Map(customArticles.map((c) => [c.key, c]));
+  const customAnnexMap = new Map(customAnnexes.map((c) => [c.key, c]));
 
   const saveMutation = useMutation({
-    mutationFn: (data: {
-      article_overrides?: Record<string, string>;
-      annex_overrides?: Record<string, string>;
-      deleted_article_keys?: string[];
-      deleted_annex_keys?: string[];
-    }) => contractsApi.saveArticleOverrides(contractRequestId, data),
+    mutationFn: (data: Parameters<typeof contractsApi.saveArticleOverrides>[1]) =>
+      contractsApi.saveArticleOverrides(contractRequestId, data),
     onSuccess: () => {
       toast.success('Modifications enregistrées.');
       setDirty({});
@@ -1739,6 +1802,23 @@ function ArticleAnnexEditor({
 
   const handleSave = (key: string, isAnnex = false) => {
     const value = editing[key] ?? '';
+    // For custom items, save the content in custom_articles/custom_annexes
+    if (isAnnex && customAnnexMap.has(key)) {
+      const updated = customAnnexes.map((c) =>
+        c.key === key ? { ...c, content: value } : c,
+      );
+      setCustomAnnexes(updated);
+      saveMutation.mutate({ custom_annexes: updated });
+      return;
+    }
+    if (!isAnnex && customArticleMap.has(key)) {
+      const updated = customArticles.map((c) =>
+        c.key === key ? { ...c, content: value } : c,
+      );
+      setCustomArticles(updated);
+      saveMutation.mutate({ custom_articles: updated });
+      return;
+    }
     const payload = isAnnex
       ? { annex_overrides: { [key]: value } }
       : { article_overrides: { [key]: value } };
@@ -1752,14 +1832,66 @@ function ArticleAnnexEditor({
         ? deletedAnnexes.filter((k) => k !== key)
         : [...deletedAnnexes, key];
       setDeletedAnnexes(next);
-      saveMutation.mutate({ deleted_annex_keys: next });
+      // For custom annexes, also remove from custom list when deleting permanently
+      if (customAnnexMap.has(key) && !deletedAnnexes.includes(key)) {
+        const updated = customAnnexes.filter((c) => c.key !== key);
+        setCustomAnnexes(updated);
+        setAnnexKeys((prev) => prev.filter((k) => k !== key));
+        saveMutation.mutate({ custom_annexes: updated, deleted_annex_keys: next.filter((k) => k !== key) });
+      } else {
+        saveMutation.mutate({ deleted_annex_keys: next });
+      }
     } else {
       const next = deletedArticles.includes(key)
         ? deletedArticles.filter((k) => k !== key)
         : [...deletedArticles, key];
       setDeletedArticles(next);
-      saveMutation.mutate({ deleted_article_keys: next });
+      if (customArticleMap.has(key) && !deletedArticles.includes(key)) {
+        const updated = customArticles.filter((c) => c.key !== key);
+        setCustomArticles(updated);
+        setArticleKeys((prev) => prev.filter((k) => k !== key));
+        saveMutation.mutate({ custom_articles: updated, deleted_article_keys: next.filter((k) => k !== key) });
+      } else {
+        saveMutation.mutate({ deleted_article_keys: next });
+      }
     }
+  };
+
+  const handleMove = (keys: string[], setKeys: (k: string[]) => void, index: number, direction: -1 | 1, isAnnex: boolean) => {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= keys.length) return;
+    const updated = [...keys];
+    [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
+    setKeys(updated);
+    const payload = isAnnex
+      ? { annex_order: updated }
+      : { article_order: updated };
+    saveMutation.mutate(payload);
+  };
+
+  const handleAddCustom = (isAnnex: boolean) => {
+    if (!newTitle.trim()) return;
+    const slug = newTitle
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_|_$/g, '');
+    const key = `custom_${slug}_${Date.now()}`;
+
+    if (isAnnex) {
+      const item: CustomAnnexItem = { key, title: newTitle.trim(), content: '' };
+      const updated = [...customAnnexes, item];
+      setCustomAnnexes(updated);
+      saveMutation.mutate({ custom_annexes: updated });
+    } else {
+      const item: CustomArticleItem = { key, title: newTitle.trim(), content: '' };
+      const updated = [...customArticles, item];
+      setCustomArticles(updated);
+      saveMutation.mutate({ custom_articles: updated });
+    }
+    setNewTitle('');
+    setShowAddArticle(false);
+    setShowAddAnnex(false);
   };
 
   const renderItem = (
@@ -1767,7 +1899,10 @@ function ArticleAnnexEditor({
     title: string,
     defaultContent: string,
     label: string,
-    isAnnex = false,
+    isAnnex: boolean,
+    index: number,
+    totalCount: number,
+    isCustom: boolean,
   ) => {
     const isExpanded = !!expanded[key];
     const value = getValue(key, defaultContent, isAnnex);
@@ -1778,6 +1913,35 @@ function ArticleAnnexEditor({
     return (
       <div key={key} className={`border rounded-lg overflow-hidden ${isDeleted ? 'border-red-200 dark:border-red-800 opacity-60' : 'border-gray-200 dark:border-gray-700'}`}>
         <div className="flex items-center">
+          {/* Move buttons */}
+          <div className="flex flex-col border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60">
+            <button
+              type="button"
+              title="Monter"
+              disabled={index === 0 || saveMutation.isPending}
+              onClick={() => {
+                const keys = isAnnex ? annexKeys : articleKeys;
+                const setter = isAnnex ? setAnnexKeys : setArticleKeys;
+                handleMove(keys, setter, index, -1, isAnnex);
+              }}
+              className="px-1.5 py-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ArrowUp className="h-3 w-3" />
+            </button>
+            <button
+              type="button"
+              title="Descendre"
+              disabled={index === totalCount - 1 || saveMutation.isPending}
+              onClick={() => {
+                const keys = isAnnex ? annexKeys : articleKeys;
+                const setter = isAnnex ? setAnnexKeys : setArticleKeys;
+                handleMove(keys, setter, index, 1, isAnnex);
+              }}
+              className="px-1.5 py-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ArrowDown className="h-3 w-3" />
+            </button>
+          </div>
           <button
             type="button"
             className={`flex-1 flex items-center justify-between px-4 py-3 text-left transition-colors ${isDeleted ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
@@ -1790,12 +1954,17 @@ function ArticleAnnexEditor({
               <span className={`text-sm font-medium truncate ${isDeleted ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-200'}`}>
                 {title}
               </span>
+              {isCustom && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-700 flex-shrink-0">
+                  ajouté
+                </span>
+              )}
               {isDeleted && (
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-700 flex-shrink-0">
                   supprimé
                 </span>
               )}
-              {!isDeleted && hasOverride && !isDirty && (
+              {!isDeleted && !isCustom && hasOverride && !isDirty && (
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex-shrink-0">
                   <Pencil className="h-3 w-3 mr-1" />modifié
                 </span>
@@ -1810,7 +1979,7 @@ function ArticleAnnexEditor({
           </button>
           <button
             type="button"
-            title={isDeleted ? 'Restaurer cet article' : 'Supprimer cet article du PDF'}
+            title={isDeleted ? 'Restaurer' : 'Supprimer du PDF'}
             onClick={(e) => handleToggleDelete(key, isAnnex, e)}
             disabled={saveMutation.isPending}
             className={`px-3 py-3 flex-shrink-0 transition-colors ${isDeleted ? 'text-green-500 hover:text-green-700 dark:hover:text-green-400 bg-red-50 dark:bg-red-900/20' : 'text-gray-300 hover:text-red-500 dark:hover:text-red-400 bg-gray-50 dark:bg-gray-800/60'}`}
@@ -1828,15 +1997,17 @@ function ArticleAnnexEditor({
               rows={10}
             />
             <div className="flex items-center justify-between mt-2">
-              <button
-                type="button"
-                onClick={() => handleReset(key, defaultContent, isAnnex)}
-                className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                disabled={saveMutation.isPending}
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Restaurer le modèle
-              </button>
+              {!isCustom ? (
+                <button
+                  type="button"
+                  onClick={() => handleReset(key, defaultContent, isAnnex)}
+                  className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  disabled={saveMutation.isPending}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Restaurer le modèle
+                </button>
+              ) : <span />}
               {isDirty && (
                 <Button
                   size="sm"
@@ -1854,7 +2025,40 @@ function ArticleAnnexEditor({
     );
   };
 
-  if (articles.length === 0 && annexes.length === 0) return null;
+  const renderAddForm = (isAnnex: boolean, show: boolean, setShow: (v: boolean) => void) => (
+    show ? (
+      <div className="flex items-center gap-2 mt-2">
+        <input
+          type="text"
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)}
+          placeholder={isAnnex ? 'Titre de la nouvelle annexe...' : 'Titre du nouvel article...'}
+          className="flex-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          onKeyDown={(e) => e.key === 'Enter' && handleAddCustom(isAnnex)}
+          autoFocus
+        />
+        <Button size="sm" onClick={() => handleAddCustom(isAnnex)} disabled={!newTitle.trim() || saveMutation.isPending}>
+          Ajouter
+        </Button>
+        <button
+          type="button"
+          onClick={() => { setShow(false); setNewTitle(''); }}
+          className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        >
+          Annuler
+        </button>
+      </div>
+    ) : (
+      <button
+        type="button"
+        onClick={() => { setShow(true); setNewTitle(''); }}
+        className="inline-flex items-center gap-1.5 mt-2 text-xs text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-200"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        {isAnnex ? 'Ajouter une annexe' : 'Ajouter un article'}
+      </button>
+    )
+  );
 
   return (
     <Card className="mb-6">
@@ -1862,16 +2066,41 @@ function ArticleAnnexEditor({
         Édition des articles et annexes
       </h3>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-        Modifiez le contenu pour ce contrat uniquement. Les templates globaux ne sont pas affectés.
+        Modifiez le contenu, ajoutez des articles/annexes ou réorganisez l'ordre pour ce contrat uniquement.
       </p>
 
-      <div className="space-y-2">
-        {articles.map((a) =>
-          renderItem(a.article_key, a.title, a.content, `Art. ${a.article_number}`, false)
-        )}
-        {annexes.map((a) =>
-          renderItem(a.annexe_key, a.title, a.content, 'Annexe', true)
-        )}
+      {/* Articles */}
+      <div className="mb-4">
+        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Articles</h4>
+        <div className="space-y-2">
+          {articleKeys.map((key, index) => {
+            const tpl = articleMap.get(key);
+            const custom = customArticleMap.get(key);
+            if (!tpl && !custom) return null;
+            const title = tpl?.title ?? custom?.title ?? '';
+            const content = tpl?.content ?? custom?.content ?? '';
+            const isCustom = !!custom;
+            return renderItem(key, title, content, `Art.`, false, index, articleKeys.length, isCustom);
+          })}
+        </div>
+        {renderAddForm(false, showAddArticle, setShowAddArticle)}
+      </div>
+
+      {/* Annexes */}
+      <div>
+        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Annexes</h4>
+        <div className="space-y-2">
+          {annexKeys.map((key, index) => {
+            const tpl = annexMap.get(key);
+            const custom = customAnnexMap.get(key);
+            if (!tpl && !custom) return null;
+            const title = tpl?.title ?? custom?.title ?? '';
+            const content = tpl?.content ?? custom?.content ?? '';
+            const isCustom = !!custom;
+            return renderItem(key, title, content, 'Annexe', true, index, annexKeys.length, isCustom);
+          })}
+        </div>
+        {renderAddForm(true, showAddAnnex, setShowAddAnnex)}
       </div>
     </Card>
   );

@@ -353,18 +353,49 @@ class GenerateDraftUseCase:
         deleted_annex_keys: list[str] = []
         article_overrides: dict[str, str] = {}
         annex_overrides: dict[str, str] = {}
+        custom_articles_data: list[dict] = []
+        custom_annexes_data: list[dict] = []
+        article_order: list[str] = []
+        annex_order: list[str] = []
         if cr.contract_config and isinstance(cr.contract_config, dict):
             excluded_keys = cr.contract_config.get("excluded_optional_article_keys", []) or []
             deleted_article_keys = cr.contract_config.get("deleted_article_keys", []) or []
             deleted_annex_keys = cr.contract_config.get("deleted_annex_keys", []) or []
             article_overrides = cr.contract_config.get("article_overrides") or {}
             annex_overrides = cr.contract_config.get("annex_overrides") or {}
+            custom_articles_data = cr.contract_config.get("custom_articles") or []
+            custom_annexes_data = cr.contract_config.get("custom_annexes") or []
+            article_order = cr.contract_config.get("article_order") or []
+            annex_order = cr.contract_config.get("annex_order") or []
 
         selected_articles = [
             a for a in articles
             if not (a.is_optional and a.article_key in excluded_keys)
             and a.article_key not in deleted_article_keys
         ]
+
+        # Merge custom articles (per-contract) into the list
+        from uuid import UUID as _UUID
+        for ca in custom_articles_data:
+            if ca.get("key") in deleted_article_keys:
+                continue
+            selected_articles.append(dc_replace(
+                selected_articles[0] if selected_articles else articles[0],
+                id=_UUID(int=0),
+                article_key=ca["key"],
+                article_number=9999,
+                title=ca.get("title", ""),
+                content=ca.get("content", ""),
+                is_editable=True,
+                is_optional=False,
+            ))
+
+        # Apply custom ordering if provided
+        if article_order:
+            order_map = {key: idx for idx, key in enumerate(article_order)}
+            selected_articles.sort(
+                key=lambda a: order_map.get(a.article_key, 9999)
+            )
 
         # Re-number sequentially after filtering
         rendered_articles = []
@@ -384,7 +415,7 @@ class GenerateDraftUseCase:
         context["articles"] = rendered_articles
 
         # Pre-render active annexes, filtering conditionals based on contract config
-        rendered_annexes = []
+        active_annexes = []
         for annexe in (annexes or []):
             if annexe.annexe_key in deleted_annex_keys:
                 continue
@@ -392,13 +423,41 @@ class GenerateDraftUseCase:
                 field_value = context.get(annexe.condition_field, "")
                 if not field_value:
                     continue
+            active_annexes.append(annexe)
+
+        # Merge custom annexes
+        from dataclasses import replace as _dc_replace
+        for ca in custom_annexes_data:
+            if ca.get("key") in deleted_annex_keys:
+                continue
+            base = active_annexes[0] if active_annexes else (annexes[0] if annexes else None)
+            if base:
+                active_annexes.append(_dc_replace(
+                    base,
+                    id=_UUID(int=0),
+                    annexe_key=ca["key"],
+                    annexe_number=9999,
+                    title=ca.get("title", ""),
+                    content=ca.get("content", ""),
+                    is_conditional=False,
+                    condition_field=None,
+                ))
+
+        # Apply custom annex ordering if provided
+        if annex_order:
+            order_map = {key: idx for idx, key in enumerate(annex_order)}
+            active_annexes.sort(
+                key=lambda a: order_map.get(a.annexe_key, 9999)
+            )
+
+        rendered_annexes = []
+        for annexe in active_annexes:
             # Per-contract override takes priority over template content
             raw_content = annex_overrides.get(annexe.annexe_key, annexe.content)
             try:
                 rendered_content = jinja_env.from_string(raw_content).render(**context)
             except Exception:
                 rendered_content = raw_content
-            from dataclasses import replace as _dc_replace
             rendered_annexes.append(_dc_replace(annexe, content=rendered_content))
 
         context["annexes"] = rendered_annexes
