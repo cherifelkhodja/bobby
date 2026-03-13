@@ -44,6 +44,14 @@ class BoondClient:
                 auth=self._auth,
                 **kwargs,
             )
+            if response.status_code >= 400:
+                logger.error(
+                    "boond_api_error",
+                    method=method,
+                    endpoint=endpoint,
+                    status=response.status_code,
+                    body=response.text[:1000],
+                )
             response.raise_for_status()
             return response.json()
 

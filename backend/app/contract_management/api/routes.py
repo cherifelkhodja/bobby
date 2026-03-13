@@ -1571,8 +1571,19 @@ async def boond_create_company(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("boond_create_company_failed", error=str(exc), cr_id=str(contract_request_id))
-        raise HTTPException(status_code=400, detail=f"Erreur Boond: {exc}")
+        # Extract the real Boond error from RetryError / HTTPStatusError chain
+        detail = str(exc)
+        cause = exc.__cause__ or (getattr(exc, '__context__', None))
+        if hasattr(cause, 'response'):
+            detail = f"Boond HTTP {cause.response.status_code}: {cause.response.text[:500]}"
+        elif hasattr(exc, 'last_attempt'):
+            inner = exc.last_attempt.exception()
+            if inner and hasattr(inner, 'response'):
+                detail = f"Boond HTTP {inner.response.status_code}: {inner.response.text[:500]}"
+            elif inner:
+                detail = str(inner)
+        logger.error("boond_create_company_failed", error=detail, cr_id=str(contract_request_id))
+        raise HTTPException(status_code=400, detail=f"Erreur Boond: {detail}")
 
 
 @router.post(

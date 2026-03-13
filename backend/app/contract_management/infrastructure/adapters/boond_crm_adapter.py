@@ -402,7 +402,7 @@ class BoondCrmAdapter:
             )
             raise
 
-    async def create_company_full(
+    async def create_company_full(  # noqa: PLR0913
         self,
         company_name: str,
         state: int,
