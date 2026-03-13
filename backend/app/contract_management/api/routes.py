@@ -1289,16 +1289,19 @@ def _require_signed_or_archived(cr, contract_request_id: UUID):
 
 @router.post(
     "/{contract_request_id}/boond/convert-candidate",
-    summary="[Boond] Convertir le candidat en ressource",
+    summary="[Boond] Convertir le candidat en ressource + créer contrat Boond",
 )
 async def boond_convert_candidate(
     contract_request_id: UUID,
     user_id: AdvOrAdminUser,
     db: AsyncSession = Depends(get_db),
 ):
-    """Convertit le candidat Boond en ressource (state=3). ADV/admin only."""
+    """Convertit le candidat en ressource (state=3) puis crée le contrat Boond (externe). ADV/admin only."""
+    from app.contract_management.application.use_cases.sync_to_boond_after_signing import (
+        _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE,
+    )
     settings = get_settings()
-    cr_repo, _cr2, _tp, crm = _boond_deps(db, settings)
+    cr_repo, _cr2, tp_repo, crm = _boond_deps(db, settings)
 
     cr = await cr_repo.get_by_id(contract_request_id)
     _require_signed_or_archived(cr, contract_request_id)
@@ -1306,15 +1309,56 @@ async def boond_convert_candidate(
     if not cr.boond_candidate_id:
         raise HTTPException(status_code=400, detail="Pas de boond_candidate_id sur cette demande.")
 
-    if cr.boond_consultant_type == "resource":
-        raise HTTPException(
-            status_code=400,
-            detail="Le consultant est déjà une ressource Boond (boond_consultant_type='resource'), pas besoin de conversion.",
-        )
+    # Step 1: Convert candidate → resource (skip if already a resource)
+    converted = False
+    if cr.boond_consultant_type != "resource":
+        await crm.convert_candidate_to_resource(cr.boond_candidate_id, state=3)
+        converted = True
+        logger.info("boond_convert_candidate_ok", cr_id=str(cr.id), candidate_id=cr.boond_candidate_id)
 
-    await crm.convert_candidate_to_resource(cr.boond_candidate_id, state=3)
-    logger.info("boond_convert_candidate_ok", cr_id=str(cr.id), candidate_id=cr.boond_candidate_id)
-    return {"ok": True, "boond_candidate_id": cr.boond_candidate_id}
+    # Step 2: Create Boond contract (external resources only)
+    contract_created = False
+    provider_linked = False
+    contract_type_of = None
+    resource_type_of = await crm.get_resource_type_of(cr.boond_candidate_id)
+    if resource_type_of == 1:  # externe
+        if not cr.daily_rate:
+            raise HTTPException(status_code=400, detail="TJM manquant sur la demande.")
+        contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(cr.third_party_type or "", 3)
+        await crm.create_boond_contract(
+            resource_id=cr.boond_candidate_id,
+            positioning_id=cr.boond_positioning_id,
+            daily_rate=float(cr.daily_rate),
+            type_of=contract_type_of,
+        )
+        contract_created = True
+
+        # Link provider if exists
+        if cr.third_party_id:
+            tp = await tp_repo.get_by_id(cr.third_party_id)
+            if tp and tp.boond_provider_id:
+                await crm.update_resource_administrative(
+                    resource_id=cr.boond_candidate_id,
+                    provider_company_id=tp.boond_provider_id,
+                    provider_contact_id=None,
+                )
+                provider_linked = True
+
+    logger.info(
+        "boond_convert_and_contract_ok",
+        cr_id=str(cr.id),
+        candidate_id=cr.boond_candidate_id,
+        converted=converted,
+        contract_created=contract_created,
+    )
+    return {
+        "ok": True,
+        "boond_candidate_id": cr.boond_candidate_id,
+        "converted": converted,
+        "contract_created": contract_created,
+        "contract_type_of": contract_type_of,
+        "provider_linked": provider_linked,
+    }
 
 
 @router.post(
@@ -1411,66 +1455,6 @@ async def boond_create_company(
         "created_company": created_company,
         "boond_provider_id": provider_id,
         "contacts_created": contacts_created,
-    }
-
-
-@router.post(
-    "/{contract_request_id}/boond/create-contract",
-    summary="[Boond] Créer le contrat ressource dans Boond",
-)
-async def boond_create_contract(
-    contract_request_id: UUID,
-    user_id: AdvOrAdminUser,
-    db: AsyncSession = Depends(get_db),
-):
-    """Crée le contrat Boond pour la ressource (externe uniquement) et lie la société fournisseur. ADV/admin only."""
-    from app.contract_management.application.use_cases.sync_to_boond_after_signing import (
-        _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE,
-    )
-    settings = get_settings()
-    cr_repo, _cr2, tp_repo, crm = _boond_deps(db, settings)
-
-    cr = await cr_repo.get_by_id(contract_request_id)
-    _require_signed_or_archived(cr, contract_request_id)
-
-    if not cr.boond_candidate_id:
-        raise HTTPException(status_code=400, detail="Pas de boond_candidate_id sur cette demande.")
-    if not cr.daily_rate:
-        raise HTTPException(status_code=400, detail="TJM manquant sur la demande.")
-
-    resource_type_of = await crm.get_resource_type_of(cr.boond_candidate_id)
-    if resource_type_of != 1:
-        raise HTTPException(
-            status_code=400,
-            detail=f"La ressource est de typeOf={resource_type_of} (attendu 1=externe). Contrat Boond non applicable.",
-        )
-
-    contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(cr.third_party_type or "", 3)
-    await crm.create_boond_contract(
-        resource_id=cr.boond_candidate_id,
-        positioning_id=cr.boond_positioning_id,
-        daily_rate=float(cr.daily_rate),
-        type_of=contract_type_of,
-    )
-
-    # Update resource administrative link if provider exists
-    provider_linked = False
-    if cr.third_party_id:
-        tp = await tp_repo.get_by_id(cr.third_party_id)
-        if tp and tp.boond_provider_id:
-            await crm.update_resource_administrative(
-                resource_id=cr.boond_candidate_id,
-                provider_company_id=tp.boond_provider_id,
-                provider_contact_id=None,
-            )
-            provider_linked = True
-
-    logger.info("boond_create_contract_ok", cr_id=str(cr.id), resource_id=cr.boond_candidate_id)
-    return {
-        "ok": True,
-        "resource_id": cr.boond_candidate_id,
-        "contract_type_of": contract_type_of,
-        "provider_linked": provider_linked,
     }
 
 
