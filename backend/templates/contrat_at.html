@@ -400,9 +400,9 @@
     {% if issuer_representative_is_entity %}
     Représentée par la société <strong>{{ issuer_representative_name }}</strong>,<br>
     Agissant en qualité de <strong>{{ issuer_representative_quality }}</strong>,<br>
-    Représentée par <strong>{{ issuer_representative_sub_name }}</strong>{% if issuer_representative_sub_quality %}, {{ issuer_representative_sub_quality }}{% endif %}, Dûment habilité aux fins des présentes.
+    Représentée par <strong>{{ issuer_representative_sub_name | expand_civility }}</strong>{% if issuer_representative_sub_quality %}, {{ issuer_representative_sub_quality }}{% endif %}, Dûment habilité aux fins des présentes.
     {% else %}
-    Représentée par <strong>{{ issuer_representative_name }}</strong>,<br>
+    Représentée par <strong>{{ issuer_representative_name | expand_civility }}</strong>,<br>
     Agissant en qualité de <strong>{{ issuer_representative_quality }}</strong>, Dûment habilité aux fins des présentes.
     {% endif %}
   </p>
@@ -518,11 +518,11 @@
     <tr>
       <td class="signature-col">
         <p class="signer-company">{{ issuer_legal_form }} {{ issuer_company_name }}</p>
-        <p class="signer-name">{{ issuer_signatory_name }}</p>
+        <p class="signer-name">{{ issuer_signatory_name | expand_civility }}</p>
       </td>
       <td class="signature-col">
         <p class="signer-company">{{ partner_legal_form }} {{ partner_company_name }}</p>
-        <p class="signer-name">{% if partner_representative_civility %}{{ partner_representative_civility }} {% endif %}{{ partner_representative_name }}</p>
+        <p class="signer-name">{% if partner_representative_civility %}{{ partner_representative_civility | civility }} {% endif %}{{ partner_representative_name }}</p>
       </td>
     </tr>
   </table>

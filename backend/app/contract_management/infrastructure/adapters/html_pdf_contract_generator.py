@@ -79,6 +79,21 @@ def _format_civility(value: str) -> str:
     return _CIVILITY_MAP.get(value.strip(), value)
 
 
+def _expand_civility_in_name(value: str) -> str:
+    """Expand abbreviated civility prefix in a full name.
+
+    'Mme Selma HIZEM' → 'Madame Selma HIZEM'
+    'M. Jean DUPONT' → 'Monsieur Jean DUPONT'
+    """
+    if not value:
+        return value
+    for abbr, full in _CIVILITY_MAP.items():
+        prefix = abbr + " "
+        if value.startswith(prefix):
+            return full + " " + value[len(prefix):]
+    return value
+
+
 def _get_logo_filename(company_name: str) -> str:
     """Return the logo filename (relative to TEMPLATE_DIR) for the given company name."""
     lower = company_name.lower() if company_name else ""
@@ -137,6 +152,7 @@ class HtmlPdfContractGenerator:
         env.filters["capital"] = _format_capital
         env.filters["siren"] = _format_siren
         env.filters["civility"] = _format_civility
+        env.filters["expand_civility"] = _expand_civility_in_name
         template = env.get_template(TEMPLATE_NAME)
         html_content = template.render(**template_context)
 
