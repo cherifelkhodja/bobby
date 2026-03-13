@@ -1070,11 +1070,31 @@ export default function ContractDetail() {
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {/* Action 1 — candidat → ressource + contrat Boond */}
+            {/* Action 1 — société + contacts */}
+            <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                1 · Société + Contacts
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Crée la société fournisseur et les 3 contacts (signataire, ADV, commercial).
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-1 self-start"
+                disabled={boondCompanyMutation.isPending}
+                onClick={() => boondCompanyMutation.mutate()}
+              >
+                <RotateCcw className={`h-3.5 w-3.5 mr-1 ${boondCompanyMutation.isPending ? 'animate-spin' : ''}`} />
+                {boondCompanyMutation.isPending ? 'En cours…' : 'Exécuter'}
+              </Button>
+            </div>
+
+            {/* Action 2 — candidat → ressource + contrat Boond */}
             {cr.boond_candidate_id && (
               <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                  1 · Candidat → Ressource + Contrat
+                  2 · Candidat → Ressource + Contrat
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   Convertit le candidat #{cr.boond_candidate_id} en ressource et crée le contrat Boond (externe).
@@ -1091,26 +1111,6 @@ export default function ContractDetail() {
                 </Button>
               </div>
             )}
-
-            {/* Action 2 — société + contacts */}
-            <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                2 · Société + Contacts
-              </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                Crée la société fournisseur et les 3 contacts (dirigeant, ADV, facturation).
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-1 self-start"
-                disabled={boondCompanyMutation.isPending}
-                onClick={() => boondCompanyMutation.mutate()}
-              >
-                <RotateCcw className={`h-3.5 w-3.5 mr-1 ${boondCompanyMutation.isPending ? 'animate-spin' : ''}`} />
-                {boondCompanyMutation.isPending ? 'En cours…' : 'Exécuter'}
-              </Button>
-            </div>
 
             {/* Action 3 — bon de commande */}
             <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
