@@ -366,12 +366,12 @@ export default function ContractDetail() {
         excluded_optional_article_keys: configForm.excluded_optional_article_keys,
         special_conditions: configForm.special_conditions || undefined,
       });
-      if (cr?.status === 'draft_generated' || cr?.status === 'partner_requested_changes') {
+      if (latestContract) {
         await contractsApi.generateDraft(id!);
       }
     },
     onSuccess: () => {
-      if (cr?.status === 'draft_generated' || cr?.status === 'partner_requested_changes') {
+      if (latestContract) {
         toast.success('Contrat reconfiguré et brouillon régénéré avec succès.');
       } else {
         toast.success('Contrat configuré. Vous pouvez maintenant générer le brouillon.');
@@ -427,14 +427,15 @@ export default function ContractDetail() {
   const canCancel = cr && isAdv && cr.status !== 'cancelled' && cr.status !== 'signed' && cr.status !== 'archived' && cr.status !== 'redirected_payfit';
   const canRollback = cr && isAdv && cr.status !== 'pending_commercial_validation' && cr.status !== 'cancelled' && cr.status !== 'archived';
 
-  const showConfigForm = isAdv && (
-    cr?.status === 'commercial_validated' ||
-    cr?.status === 'reviewing_compliance' ||
-    cr?.status === 'compliance_blocked' ||
-    cr?.status === 'configuring_contract' ||
-    cr?.status === 'draft_generated' ||
-    cr?.status === 'partner_requested_changes'
-  );
+  const postPartnerStatuses = new Set([
+    'draft_sent_to_partner',
+    'partner_approved',
+    'sent_for_signature',
+    'signed',
+    'archived',
+    'cancelled',
+  ]);
+  const showConfigForm = isAdv && !!cr?.status && !postPartnerStatuses.has(cr.status) && cr.status !== 'pending_commercial_validation';
 
   // Articles are now managed globally from Admin > Contrat AT tab
 
@@ -917,39 +918,30 @@ export default function ContractDetail() {
         </Card>
       )}
 
-      {/* Partner requested changes — banner + article/annex editor */}
+      {/* Partner requested changes — banner */}
       {isAdv && cr.status === 'partner_requested_changes' && (
-        <>
-          <Card className="mb-4 border-orange-200 dark:border-orange-800">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-orange-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <h3 className="text-sm font-semibold text-orange-800 dark:text-orange-300">
-                  Le partenaire demande des modifications
-                </h3>
-                {latestContract?.partner_comments ? (
-                  <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                    {latestContract.partner_comments}
-                  </p>
-                ) : (
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Aucun commentaire fourni.
-                  </p>
-                )}
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  Modifiez les articles/annexes ci-dessous ou la configuration, puis re-générez le brouillon.
+        <Card className="mb-4 border-orange-200 dark:border-orange-800">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-orange-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-semibold text-orange-800 dark:text-orange-300">
+                Le partenaire demande des modifications
+              </h3>
+              {latestContract?.partner_comments ? (
+                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                  {latestContract.partner_comments}
                 </p>
-              </div>
+              ) : (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Aucun commentaire fourni.
+                </p>
+              )}
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                Modifiez les articles/annexes ci-dessous ou la configuration, puis re-générez le brouillon.
+              </p>
             </div>
-          </Card>
-          <ArticleAnnexEditor
-            contractRequestId={id!}
-            articles={activeArticles}
-            annexes={activeAnnexes}
-            existingOverrides={(cr.contract_config as Record<string, unknown> | null) ?? {}}
-            onSaved={() => queryClient.invalidateQueries({ queryKey: ['contract-request', id] })}
-          />
-        </>
+          </div>
+        </Card>
       )}
 
       {/* Collecting documents — info banner + resend button */}
@@ -1364,14 +1356,14 @@ export default function ContractDetail() {
               isLoading={configureMutation.isPending}
             >
               <Settings className="h-4 w-4 mr-2" />
-              {cr?.status === 'draft_generated' || cr?.status === 'partner_requested_changes' ? 'Reconfigurer et régénérer le brouillon' : 'Configurer le contrat'}
+              {latestContract ? 'Reconfigurer et régénérer le brouillon' : 'Configurer le contrat'}
             </Button>
           </div>
         </Card>
       )}
 
-      {/* Article/annex editor — shown during configuration and when draft already generated */}
-      {isAdv && (cr.status === 'configuring_contract' || cr.status === 'draft_generated') && activeArticles.length > 0 && (
+      {/* Article/annex editor — shown as long as contract not sent to partner */}
+      {showConfigForm && activeArticles.length > 0 && (
         <ArticleAnnexEditor
           contractRequestId={id!}
           articles={activeArticles}
