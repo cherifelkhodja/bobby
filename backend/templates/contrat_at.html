@@ -419,16 +419,16 @@
   <p class="party-detail">
     Dont le siège social est situé <strong>{{ partner_head_office }}</strong>,<br>
     Inscrite sous le n° <strong>{{ partner_rcs_number | siren }}</strong>,<br>
-    Représentée par <strong>{% if partner_representative_civility %}{{ partner_representative_civility }} {% endif %}{{ partner_representative_name }}</strong>,<br>
+    Représentée par <strong>{% if partner_representative_civility %}{{ partner_representative_civility | civility }} {% endif %}{{ partner_representative_name }}</strong>,<br>
     Agissant en qualité de <strong>{{ partner_representative_title }}</strong>, Dûment habilité aux fins des présentes.
   </p>
   {% else %}
-  <p class="party-intro">Et {{ partner_legal_form }} <span class="company-color">{{ partner_company_name }}</span></p>
+  <p class="party-intro">Et la société <span class="company-color">{{ partner_company_name }}</span></p>
   <p class="party-detail">
-    Au capital de <strong>{{ partner_capital | capital }}</strong>,<br>
+    <strong>{{ partner_legal_form }}</strong> au capital de <strong>{{ partner_capital | capital }}</strong>,<br>
     Dont le siège social est situé <strong>{{ partner_head_office }}</strong>,<br>
     Inscrite au <strong>RCS de {{ partner_rcs_city }}</strong> sous le n° <strong>{{ partner_rcs_number | siren }}</strong>,<br>
-    Représentée par <strong>{% if partner_representative_civility %}{{ partner_representative_civility }} {% endif %}{{ partner_representative_name }}</strong>,<br>
+    Représentée par <strong>{% if partner_representative_civility %}{{ partner_representative_civility | civility }} {% endif %}{{ partner_representative_name }}</strong>,<br>
     Agissant en qualité de <strong>{{ partner_representative_title }}</strong>, Dûment habilité aux fins des présentes.
   </p>
   {% endif %}
