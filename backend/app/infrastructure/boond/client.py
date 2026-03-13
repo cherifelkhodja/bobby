@@ -46,11 +46,11 @@ class BoondClient:
             )
             if response.status_code >= 400:
                 logger.error(
-                    "boond_api_error",
-                    method=method,
-                    endpoint=endpoint,
-                    status=response.status_code,
-                    body=response.text[:1000],
+                    "boond_api_error %s %s → %s: %s",
+                    method,
+                    endpoint,
+                    response.status_code,
+                    response.text[:1000],
                 )
             response.raise_for_status()
             return response.json()
