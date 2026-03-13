@@ -1703,9 +1703,7 @@ import { CSS } from '@dnd-kit/utilities';
 function SortableEditorRow({
   itemKey,
   title,
-  defaultContent,
   label,
-  isAnnex,
   isCustom,
   isExpanded,
   isDeleted,
@@ -1721,9 +1719,7 @@ function SortableEditorRow({
 }: {
   itemKey: string;
   title: string;
-  defaultContent: string;
   label: string;
-  isAnnex: boolean;
   isCustom: boolean;
   isExpanded: boolean;
   isDeleted: boolean;
