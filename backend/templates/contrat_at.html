@@ -6,7 +6,7 @@
   /* ===== PAGE SETUP ===== */
   @page {
     size: A4;
-    margin: 2.5cm 2.2cm 2.55cm 2.2cm;
+    margin: 2.5cm 2.2cm 2.3cm 2.2cm;
 
     /* Footer gauche : société | ref */
     @bottom-left {
@@ -43,7 +43,7 @@
   /* Première page : footer personnalisé via running element, même hauteur que les autres pages */
   @page :first {
     margin-top: 0;
-    margin-bottom: 2.55cm;
+    margin-bottom: 2.3cm;
     @top-right { content: none; }
     @bottom-left { content: none; }
     @bottom-center {
@@ -332,7 +332,7 @@
 <div class="cover-bottom-content">
   <span class="company-color">{{ issuer_company_name | upper }}</span><br>
   {{ issuer_head_office }}<br>
-  {{ issuer_legal_form }} au Capital de {{ issuer_capital }} - {{ issuer_rcs_number }} R.C.S. {{ issuer_rcs_city }}{% if issuer_tva_number %} - {{ issuer_tva_number }}{% endif %}
+  {{ issuer_legal_form }} au Capital de {{ issuer_capital | capital }} - {{ issuer_rcs_number | siren }} R.C.S. {{ issuer_rcs_city }}{% if issuer_tva_number %} - {{ issuer_tva_number }}{% endif %}
 </div>
 
 <!-- ===== PAGE 1: COVER ===== -->
@@ -390,9 +390,9 @@
 <div class="parties-block">
   <p class="party-intro">La société <span class="company-color">{{ issuer_company_name }}</span></p>
   <p class="party-detail">
-    <strong>{{ issuer_legal_form }}</strong> au capital de <strong>{{ issuer_capital }}</strong>,<br>
+    <strong>{{ issuer_legal_form }}</strong> au capital de <strong>{{ issuer_capital | capital }}</strong>,<br>
     Dont le siège social est situé <strong>{{ issuer_head_office }}</strong>,<br>
-    Inscrite au <strong>RCS de {{ issuer_rcs_city }}</strong> sous le n° <strong>{{ issuer_rcs_number }}</strong>,<br>
+    Inscrite au <strong>RCS de {{ issuer_rcs_city }}</strong> sous le n° <strong>{{ issuer_rcs_number | siren }}</strong>,<br>
     {% if issuer_representative_is_entity %}
     Représentée par la société <strong>{{ issuer_representative_name }}</strong>,<br>
     Agissant en qualité de <strong>{{ issuer_representative_quality }}</strong>,<br>
@@ -414,16 +414,16 @@
   <p class="party-intro">Et l'Entreprise Individuelle <span class="company-color">{{ partner_company_name }}</span></p>
   <p class="party-detail">
     Dont le siège social est situé <strong>{{ partner_head_office }}</strong>,<br>
-    Inscrite sous le n° <strong>{{ partner_rcs_number }}</strong>,<br>
+    Inscrite sous le n° <strong>{{ partner_rcs_number | siren }}</strong>,<br>
     Représentée par <strong>{{ partner_representative_name }}</strong>,<br>
     Agissant en qualité de <strong>{{ partner_representative_title }}</strong>, Dûment habilité aux fins des présentes.
   </p>
   {% else %}
   <p class="party-intro">Et {{ partner_legal_form }} <span class="company-color">{{ partner_company_name }}</span></p>
   <p class="party-detail">
-    Au capital de <strong>{{ partner_capital }}</strong>,<br>
+    Au capital de <strong>{{ partner_capital | capital }}</strong>,<br>
     Dont le siège social est situé <strong>{{ partner_head_office }}</strong>,<br>
-    Inscrite au <strong>RCS de {{ partner_rcs_city }}</strong> sous le n° <strong>{{ partner_rcs_number }}</strong>,<br>
+    Inscrite au <strong>RCS de {{ partner_rcs_city }}</strong> sous le n° <strong>{{ partner_rcs_number | siren }}</strong>,<br>
     Représentée par <strong>{{ partner_representative_name }}</strong>,<br>
     Agissant en qualité de <strong>{{ partner_representative_title }}</strong>, Dûment habilité aux fins des présentes.
   </p>

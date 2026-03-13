@@ -24,6 +24,39 @@ def _md_inline(text: str) -> str:
     return re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text, flags=re.DOTALL)
 
 
+def _format_capital(value: str) -> str:
+    """Format capital with thousand separators and € symbol.
+
+    '10000' → '10 000 €', '752000' → '752 000 €', already formatted → kept.
+    """
+    if not value:
+        return value
+    # If already contains €, return as-is
+    if "€" in value:
+        return value
+    # Extract digits only
+    digits = re.sub(r"[^\d]", "", value)
+    if not digits:
+        return value
+    # Format with space as thousand separator
+    formatted = f"{int(digits):,}".replace(",", " ")
+    return f"{formatted} €"
+
+
+def _format_siren(value: str) -> str:
+    """Format SIREN/RCS number as NNN NNN NNN.
+
+    '842799959' → '842 799 959', '802082560' → '802 082 560'.
+    """
+    if not value:
+        return value
+    digits = re.sub(r"[^\d]", "", value)
+    # Only format if exactly 9 digits (SIREN)
+    if len(digits) == 9:
+        return f"{digits[:3]} {digits[3:6]} {digits[6:9]}"
+    return value
+
+
 def _get_logo_filename(company_name: str) -> str:
     """Return the logo filename (relative to TEMPLATE_DIR) for the given company name."""
     lower = company_name.lower() if company_name else ""
@@ -79,6 +112,8 @@ class HtmlPdfContractGenerator:
         # Disable autoescape for the template since we use | safe manually
         env.autoescape = False
         env.filters["md"] = _md_inline
+        env.filters["capital"] = _format_capital
+        env.filters["siren"] = _format_siren
         template = env.get_template(TEMPLATE_NAME)
         html_content = template.render(**template_context)
 
