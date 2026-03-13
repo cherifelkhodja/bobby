@@ -507,6 +507,53 @@ class BoondCrmAdapter:
         )
         return int(result_id) if result_id else 0
 
+    async def update_company_information(  # noqa: PLR0913
+        self,
+        company_id: int,
+        postcode: str | None = None,
+        address: str | None = None,
+        town: str | None = None,
+        country: str | None = None,
+        legal_status: str | None = None,
+        registered_office: str | None = None,
+    ) -> None:
+        """Update a company's information in BoondManager.
+
+        Uses PUT /companies/{id}/information with data.attributes.postcode etc.
+        """
+        attributes: dict[str, Any] = {}
+        if postcode:
+            attributes["postcode"] = postcode
+        if address:
+            attributes["address"] = address
+        if town:
+            attributes["town"] = town
+        if country:
+            attributes["country"] = country
+        if legal_status:
+            attributes["legalStatus"] = legal_status
+        if registered_office:
+            attributes["registeredOffice"] = registered_office
+
+        if not attributes:
+            return
+
+        payload: dict[str, Any] = {
+            "data": {
+                "attributes": attributes,
+            }
+        }
+
+        logger.info(
+            "boond_update_company_information",
+            company_id=company_id,
+            fields=list(attributes.keys()),
+        )
+        await self._boond._make_request(
+            "PUT", f"/companies/{company_id}/information", json=payload
+        )
+        logger.info("boond_company_information_updated", company_id=company_id)
+
     async def create_contact(
         self,
         company_id: int,

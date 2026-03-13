@@ -81,6 +81,15 @@ class SyncToBoondAfterSigningUseCase:
         resource_id: int | None = cr.boond_candidate_id
 
         # ── Étape 1 : Création société fournisseur ─────────────────────────
+        # Build formatted legal fields
+        legal_status = None
+        if tp and tp.legal_form and tp.capital:
+            legal_status = f"{tp.legal_form} au capital de {tp.capital} €"
+        registered_office = None
+        if tp and tp.rcs_number and tp.rcs_city:
+            formatted_siren = _format_siren(tp.rcs_number)
+            registered_office = f"{formatted_siren} R.C.S. {tp.rcs_city}"
+
         # Verify cached provider_id still exists in Boond
         if tp and tp.boond_provider_id:
             exists = await self._crm.verify_company_exists(tp.boond_provider_id)
@@ -91,16 +100,26 @@ class SyncToBoondAfterSigningUseCase:
                     stale_id=tp.boond_provider_id,
                 )
                 tp.boond_provider_id = None
+            else:
+                # Company exists — update with latest data
+                try:
+                    await self._crm.update_company_information(
+                        company_id=tp.boond_provider_id,
+                        postcode=tp.head_office_postal_code,
+                        address=tp.head_office_street or tp.head_office_address,
+                        town=tp.head_office_city,
+                        country="France",
+                        legal_status=legal_status,
+                        registered_office=registered_office,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "sync_boond_update_company_failed",
+                        cr_id=str(cr.id),
+                        error=str(exc),
+                    )
 
         if tp and not tp.boond_provider_id:
-            legal_status = None
-            if tp.legal_form and tp.capital:
-                legal_status = f"{tp.legal_form} au capital de {tp.capital} €"
-            registered_office = None
-            if tp.rcs_number and tp.rcs_city:
-                formatted_siren = _format_siren(tp.rcs_number)
-                registered_office = f"{formatted_siren} R.C.S. {tp.rcs_city}"
-
             try:
                 provider_id = await self._crm.create_company_full(
                     company_name=tp.company_name or "",

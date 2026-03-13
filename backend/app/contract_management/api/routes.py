@@ -1485,6 +1485,15 @@ async def boond_create_company(
         provider_id = tp.boond_provider_id
         created_company = False
 
+        # Build formatted legal fields
+        legal_status = None
+        if tp.legal_form and tp.capital:
+            legal_status = f"{tp.legal_form} au capital de {tp.capital} €"
+        registered_office = None
+        if tp.rcs_number and tp.rcs_city:
+            formatted_siren = _format_siren(tp.rcs_number)
+            registered_office = f"{formatted_siren} R.C.S. {tp.rcs_city}"
+
         # Verify the cached provider_id still exists in Boond (may have been deleted)
         if provider_id:
             exists = await crm.verify_company_exists(provider_id)
@@ -1496,16 +1505,19 @@ async def boond_create_company(
                 )
                 provider_id = None
                 tp.boond_provider_id = None
+            else:
+                # Company exists — update with latest data
+                await crm.update_company_information(
+                    company_id=provider_id,
+                    postcode=tp.head_office_postal_code,
+                    address=tp.head_office_street or tp.head_office_address,
+                    town=tp.head_office_city,
+                    country="France",
+                    legal_status=legal_status,
+                    registered_office=registered_office,
+                )
 
         if not provider_id:
-            legal_status = None
-            if tp.legal_form and tp.capital:
-                legal_status = f"{tp.legal_form} au capital de {tp.capital} €"
-            registered_office = None
-            if tp.rcs_number and tp.rcs_city:
-                formatted_siren = _format_siren(tp.rcs_number)
-                registered_office = f"{formatted_siren} R.C.S. {tp.rcs_city}"
-
             provider_id = await crm.create_company_full(
                 company_name=tp.company_name or "",
                 state=9,
