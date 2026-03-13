@@ -193,7 +193,7 @@ class ContractRequestRepository:
         return result.scalar_one_or_none()
 
     async def get_next_reference(self, company_code: str | None = None) -> str:
-        """Generate the next final contract reference in format XXX-YYYY-NNNN.
+        """Generate the next final contract reference in format XXX-CC-NNN.
 
         The sequence counter is independent per company code.
         If company_code is not provided, the default company's code is used.
@@ -211,8 +211,7 @@ class ContractRequestRepository:
         else:
             code = company_code.upper()
 
-        year = datetime.utcnow().year
-        prefix = f"{code}-{year}-"
+        prefix = f"{code}-CC-"
 
         result = await self.session.execute(
             select(func.max(ContractRequestModel.reference)).where(
@@ -230,7 +229,7 @@ class ContractRequestRepository:
         else:
             next_num = 1
 
-        return f"{prefix}{next_num:04d}"
+        return f"{prefix}{next_num:03d}"
 
     def _to_entity(self, model: ContractRequestModel) -> ContractRequest:
         """Convert SQLAlchemy model to domain entity."""

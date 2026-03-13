@@ -23,7 +23,7 @@ class ContractRequestModel(Base):
     )
     reference: Mapped[str | None] = mapped_column(
         String(20), nullable=True, unique=True,
-        comment="Référence définitive (XXX-YYYY-NNNN), assignée à l'état PARTNER_APPROVED",
+        comment="Référence définitive (XXX-CC-NNN), assignée à l'état PARTNER_APPROVED",
     )
     boond_positioning_id: Mapped[int] = mapped_column(Integer, nullable=False)
     boond_candidate_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -136,7 +136,7 @@ class ContractCompanyModel(Base):
     signatory_name: Mapped[str] = mapped_column(String(255), nullable=False)
     # Facturation
     invoices_company_mail: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # Préfixe de référence (3 lettres, ex: "GEM") utilisé dans les références XXX-YYYY-NNN
+    # Préfixe de référence (3 lettres, ex: "GEM") utilisé dans les références XXX-CC-NNN
     code: Mapped[str] = mapped_column(String(3), nullable=False, default="GEN")
     # Identité visuelle
     color_code: Mapped[str] = mapped_column(String(7), nullable=False, default="#4BBEA8")

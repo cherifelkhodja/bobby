@@ -57,7 +57,7 @@ class ProcessPartnerReviewUseCase:
 
         if approved:
             cr.transition_to(ContractRequestStatus.PARTNER_APPROVED)
-            # Assigner la référence définitive (format XXX-YYYY-NNNN)
+            # Assigner la référence définitive (format XXX-CC-NNN)
             # Résoudre le code de la société émettrice liée à cette demande
             company_code = None
             if cr.company_id:
