@@ -472,6 +472,13 @@ class BoondCrmAdapter:
                 "agency": {"data": {"type": "agency", "id": str(agency_id)}}
             }
 
+        logger.info(
+            "boond_create_company_full_payload",
+            company_name=company_name,
+            agency_id=agency_id,
+            has_relationships="relationships" in payload["data"],
+        )
+
         response = await self._boond._make_request("POST", "/companies", json=payload)
         result_id = response.get("data", {}).get("id")
         logger.info(

@@ -1349,68 +1349,84 @@ async def boond_convert_candidate(
     # Determine state_reason_type_of: 0 = salarié, 1 = externe
     state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
 
-    # Step 1: Convert candidate → resource (skip if already a resource)
-    converted = False
-    if cr.boond_consultant_type != "resource":
-        await crm.convert_candidate_to_resource(
-            cr.boond_candidate_id,
-            state=3,
-            state_reason_type_of=state_reason_type_of,
-        )
-        converted = True
-        logger.info("boond_convert_candidate_ok", cr_id=str(cr.id), candidate_id=cr.boond_candidate_id)
-
-    # Step 2: Create Boond contract (external resources only)
-    contract_created = False
-    provider_linked = False
-    contract_type_of = None
-    resource_type_of = await crm.get_resource_type_of(cr.boond_candidate_id)
-    if resource_type_of == 1:  # externe
-        if not cr.daily_rate:
-            raise HTTPException(status_code=400, detail="TJM manquant sur la demande.")
-        contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(cr.third_party_type or "", 3)
-
-        # Extract start_date from contract request
-        start_date_str = None
-        if cr.start_date:
-            start_date_str = cr.start_date.strftime("%Y-%m-%d") if hasattr(cr.start_date, "strftime") else str(cr.start_date)
-
-        agency_id = company.boond_agency_id if company else None
-
-        await crm.create_boond_contract(
-            resource_id=cr.boond_candidate_id,
-            positioning_id=cr.boond_positioning_id,
-            daily_rate=float(cr.daily_rate),
-            type_of=contract_type_of,
-            start_date=start_date_str,
-            agency_id=agency_id,
-        )
-        contract_created = True
-
-        # Link provider if exists, using persisted commercial contact ID
-        if tp and tp.boond_provider_id:
-            await crm.update_resource_administrative(
-                resource_id=cr.boond_candidate_id,
-                provider_company_id=tp.boond_provider_id,
-                provider_contact_id=tp.boond_commercial_contact_id,
+    try:
+        # Step 1: Convert candidate → resource (skip if already a resource)
+        converted = False
+        if cr.boond_consultant_type != "resource":
+            await crm.convert_candidate_to_resource(
+                cr.boond_candidate_id,
+                state=3,
+                state_reason_type_of=state_reason_type_of,
             )
-            provider_linked = True
+            converted = True
+            logger.info("boond_convert_candidate_ok", cr_id=str(cr.id), candidate_id=cr.boond_candidate_id)
 
-    logger.info(
-        "boond_convert_and_contract_ok",
-        cr_id=str(cr.id),
-        candidate_id=cr.boond_candidate_id,
-        converted=converted,
-        contract_created=contract_created,
-    )
-    return {
-        "ok": True,
-        "boond_candidate_id": cr.boond_candidate_id,
-        "converted": converted,
-        "contract_created": contract_created,
-        "contract_type_of": contract_type_of,
-        "provider_linked": provider_linked,
-    }
+        # Step 2: Create Boond contract (external resources only)
+        contract_created = False
+        provider_linked = False
+        contract_type_of = None
+        resource_type_of = await crm.get_resource_type_of(cr.boond_candidate_id)
+        if resource_type_of == 1:  # externe
+            if not cr.daily_rate:
+                raise HTTPException(status_code=400, detail="TJM manquant sur la demande.")
+            contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(cr.third_party_type or "", 3)
+
+            # Extract start_date from contract request
+            start_date_str = None
+            if cr.start_date:
+                start_date_str = cr.start_date.strftime("%Y-%m-%d") if hasattr(cr.start_date, "strftime") else str(cr.start_date)
+
+            agency_id = company.boond_agency_id if company else None
+
+            await crm.create_boond_contract(
+                resource_id=cr.boond_candidate_id,
+                positioning_id=cr.boond_positioning_id,
+                daily_rate=float(cr.daily_rate),
+                type_of=contract_type_of,
+                start_date=start_date_str,
+                agency_id=agency_id,
+            )
+            contract_created = True
+
+            # Link provider if exists, using persisted commercial contact ID
+            if tp and tp.boond_provider_id:
+                await crm.update_resource_administrative(
+                    resource_id=cr.boond_candidate_id,
+                    provider_company_id=tp.boond_provider_id,
+                    provider_contact_id=tp.boond_commercial_contact_id,
+                )
+                provider_linked = True
+
+        logger.info(
+            "boond_convert_and_contract_ok",
+            cr_id=str(cr.id),
+            candidate_id=cr.boond_candidate_id,
+            converted=converted,
+            contract_created=contract_created,
+        )
+        return {
+            "ok": True,
+            "boond_candidate_id": cr.boond_candidate_id,
+            "converted": converted,
+            "contract_created": contract_created,
+            "contract_type_of": contract_type_of,
+            "provider_linked": provider_linked,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        detail = str(exc)
+        cause = exc.__cause__ or (getattr(exc, '__context__', None))
+        if hasattr(cause, 'response'):
+            detail = f"Boond HTTP {cause.response.status_code}: {cause.response.text[:2000]}"
+        elif hasattr(exc, 'last_attempt'):
+            inner = exc.last_attempt.exception()
+            if inner and hasattr(inner, 'response'):
+                detail = f"Boond HTTP {inner.response.status_code}: {inner.response.text[:2000]}"
+            elif inner:
+                detail = str(inner)
+        logger.error("boond_convert_candidate_failed", error=detail, cr_id=str(contract_request_id))
+        raise HTTPException(status_code=400, detail=f"Erreur Boond: {detail}")
 
 
 @router.post(
@@ -1575,11 +1591,11 @@ async def boond_create_company(
         detail = str(exc)
         cause = exc.__cause__ or (getattr(exc, '__context__', None))
         if hasattr(cause, 'response'):
-            detail = f"Boond HTTP {cause.response.status_code}: {cause.response.text[:500]}"
+            detail = f"Boond HTTP {cause.response.status_code}: {cause.response.text[:2000]}"
         elif hasattr(exc, 'last_attempt'):
             inner = exc.last_attempt.exception()
             if inner and hasattr(inner, 'response'):
-                detail = f"Boond HTTP {inner.response.status_code}: {inner.response.text[:500]}"
+                detail = f"Boond HTTP {inner.response.status_code}: {inner.response.text[:2000]}"
             elif inner:
                 detail = str(inner)
         logger.error("boond_create_company_failed", error=detail, cr_id=str(contract_request_id))
@@ -1619,17 +1635,33 @@ async def boond_create_purchase_order(
     if not contract:
         raise HTTPException(status_code=400, detail="Aucun contrat signé trouvé.")
 
-    po_id = await crm.create_purchase_order(
-        provider_id=tp.boond_provider_id,
-        positioning_id=cr.boond_positioning_id,
-        reference=cr.display_reference,
-        amount=float(cr.daily_rate),
-    )
-    contract.boond_purchase_order_id = po_id
-    await contract_repo.save(contract)
+    try:
+        po_id = await crm.create_purchase_order(
+            provider_id=tp.boond_provider_id,
+            positioning_id=cr.boond_positioning_id,
+            reference=cr.display_reference,
+            amount=float(cr.daily_rate),
+        )
+        contract.boond_purchase_order_id = po_id
+        await contract_repo.save(contract)
 
-    logger.info("boond_create_po_ok", cr_id=str(cr.id), po_id=po_id)
-    return {"ok": True, "boond_purchase_order_id": po_id}
+        logger.info("boond_create_po_ok", cr_id=str(cr.id), po_id=po_id)
+        return {"ok": True, "boond_purchase_order_id": po_id}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        detail = str(exc)
+        cause = exc.__cause__ or (getattr(exc, '__context__', None))
+        if hasattr(cause, 'response'):
+            detail = f"Boond HTTP {cause.response.status_code}: {cause.response.text[:2000]}"
+        elif hasattr(exc, 'last_attempt'):
+            inner = exc.last_attempt.exception()
+            if inner and hasattr(inner, 'response'):
+                detail = f"Boond HTTP {inner.response.status_code}: {inner.response.text[:2000]}"
+            elif inner:
+                detail = str(inner)
+        logger.error("boond_create_po_failed", error=detail, cr_id=str(contract_request_id))
+        raise HTTPException(status_code=400, detail=f"Erreur Boond: {detail}")
 
 
 @router.get(

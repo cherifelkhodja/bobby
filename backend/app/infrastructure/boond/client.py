@@ -50,7 +50,7 @@ class BoondClient:
                     method,
                     endpoint,
                     response.status_code,
-                    response.text[:1000],
+                    response.text[:2000],
                 )
             response.raise_for_status()
             return response.json()
