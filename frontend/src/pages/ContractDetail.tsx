@@ -427,15 +427,15 @@ export default function ContractDetail() {
   const canCancel = cr && isAdv && cr.status !== 'cancelled' && cr.status !== 'signed' && cr.status !== 'archived' && cr.status !== 'redirected_payfit';
   const canRollback = cr && isAdv && cr.status !== 'pending_commercial_validation' && cr.status !== 'cancelled' && cr.status !== 'archived';
 
-  const postPartnerStatuses = new Set([
-    'draft_sent_to_partner',
-    'partner_approved',
-    'sent_for_signature',
-    'signed',
-    'archived',
-    'cancelled',
+  const prePartnerStatuses = new Set([
+    'commercial_validated',
+    'collecting_documents',
+    'reviewing_compliance',
+    'compliance_blocked',
+    'configuring_contract',
+    'draft_generated',
   ]);
-  const showConfigForm = isAdv && !!cr?.status && !postPartnerStatuses.has(cr.status) && cr.status !== 'pending_commercial_validation';
+  const showConfigForm = isAdv && !!cr?.status && prePartnerStatuses.has(cr.status);
 
   // Articles are now managed globally from Admin > Contrat AT tab
 
