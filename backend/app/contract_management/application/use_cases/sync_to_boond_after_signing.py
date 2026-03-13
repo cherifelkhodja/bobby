@@ -80,9 +80,14 @@ class SyncToBoondAfterSigningUseCase:
         # On reste permissif pour les anciennes demandes (type None) en tentant
         # la conversion mais en absorbant silencieusement l'erreur.
         is_candidate = cr.boond_consultant_type == "candidate" or cr.boond_consultant_type is None
+        state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
         if resource_id and is_candidate:
             try:
-                await self._crm.convert_candidate_to_resource(resource_id, state=3)
+                await self._crm.convert_candidate_to_resource(
+                    resource_id,
+                    state=3,
+                    state_reason_type_of=state_reason_type_of,
+                )
             except Exception as exc:
                 logger.warning(
                     "sync_boond_convert_candidate_failed",
@@ -137,37 +142,45 @@ class SyncToBoondAfterSigningUseCase:
                 )
 
         # ── Étape 3 : Création des contacts (dédupliqués) ─────────────────
-        # Boond typesOf: 1=dirigeant, 2=facturation, 3=adv
-        boond_contact_ids: dict[int, int] = {}
+        # Boond typesOf: 7=dirigeant, 8=commercial, 9=adv, 10=signataire
+        boond_contact_ids: dict[str, int] = {}
 
         if tp and tp.boond_provider_id:
-            role_entries = [
-                (tp.representative_civility, tp.representative_first_name,
-                 tp.representative_last_name, tp.representative_email,
-                 tp.representative_phone, tp.representative_title, 1),
+            signatory_types = [10]
+            if tp.signatory_is_director:
+                signatory_types.append(7)
+
+            role_entries: list[tuple] = [
+                (tp.signatory_civility or tp.representative_civility,
+                 tp.signatory_first_name or tp.representative_first_name,
+                 tp.signatory_last_name or tp.representative_last_name,
+                 tp.signatory_email or tp.representative_email,
+                 tp.signatory_phone or tp.representative_phone,
+                 tp.representative_title, signatory_types, "signataire"),
                 (tp.adv_contact_civility, tp.adv_contact_first_name,
                  tp.adv_contact_last_name, tp.adv_contact_email,
-                 tp.adv_contact_phone, "ADV", 3),
+                 tp.adv_contact_phone, "ADV", [9], "adv"),
                 (tp.billing_contact_civility, tp.billing_contact_first_name,
                  tp.billing_contact_last_name, tp.billing_contact_email,
-                 tp.billing_contact_phone, "Facturation", 2),
+                 tp.billing_contact_phone, "Commercial", [8], "commercial"),
             ]
 
             # Merge contacts with same identity
             merged: dict[str, dict] = {}
-            for civ, fn, ln, email, phone, job_title, type_of in role_entries:
+            for civ, fn, ln, email, phone, job_title, types_of_list, label in role_entries:
                 if not (fn or email):
                     continue
                 key = f"{(fn or '').strip().lower()}|{(ln or '').strip().lower()}|{(email or '').strip().lower()}"
                 if key in merged:
-                    merged[key]["types_of"].append(type_of)
-                    if job_title and job_title not in ("ADV", "Facturation"):
+                    merged[key]["types_of"].extend(types_of_list)
+                    merged[key]["labels"].append(label)
+                    if job_title and job_title not in ("ADV", "Commercial"):
                         merged[key]["job_title"] = job_title
                 else:
                     merged[key] = {
                         "civility": civ, "first_name": fn, "last_name": ln,
                         "email": email, "phone": phone, "job_title": job_title,
-                        "types_of": [type_of],
+                        "types_of": list(types_of_list), "labels": [label],
                     }
 
             agency_id = company.boond_agency_id if company else None
@@ -187,8 +200,8 @@ class SyncToBoondAfterSigningUseCase:
                         town=tp.head_office_city,
                         agency_id=agency_id,
                     )
-                    for t in entry["types_of"]:
-                        boond_contact_ids[t] = contact_id
+                    for lbl in entry["labels"]:
+                        boond_contact_ids[lbl] = contact_id
                 except Exception as exc:
                     logger.warning(
                         "sync_boond_create_contact_failed",
@@ -196,6 +209,16 @@ class SyncToBoondAfterSigningUseCase:
                         types_of=entry["types_of"],
                         error=str(exc),
                     )
+
+            # Persist contact IDs on ThirdParty
+            if boond_contact_ids.get("signataire"):
+                tp.boond_signatory_contact_id = boond_contact_ids["signataire"]
+            if boond_contact_ids.get("adv"):
+                tp.boond_adv_contact_id = boond_contact_ids["adv"]
+            if boond_contact_ids.get("commercial"):
+                tp.boond_commercial_contact_id = boond_contact_ids["commercial"]
+            if boond_contact_ids:
+                await self._tp_repo.save(tp)
 
         # ── Étape 4 : Vérification typeOf de la ressource ─────────────────
         resource_type_of: int | None = None
@@ -213,12 +236,23 @@ class SyncToBoondAfterSigningUseCase:
             contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(
                 cr.third_party_type or "", 3
             )
+            start_date_str = None
+            if cr.start_date:
+                start_date_str = (
+                    cr.start_date.strftime("%Y-%m-%d")
+                    if hasattr(cr.start_date, "strftime")
+                    else str(cr.start_date)
+                )
+            agency_id = company.boond_agency_id if company else None
+
             try:
                 await self._crm.create_boond_contract(
                     resource_id=resource_id,
                     positioning_id=cr.boond_positioning_id,
                     daily_rate=float(cr.daily_rate),
                     type_of=contract_type_of,
+                    start_date=start_date_str,
+                    agency_id=agency_id,
                 )
             except Exception as exc:
                 logger.warning(
@@ -228,12 +262,12 @@ class SyncToBoondAfterSigningUseCase:
                 )
 
             if tp and tp.boond_provider_id:
-                dirigeant_contact_id = boond_contact_ids.get(7)
+                commercial_contact_id = tp.boond_commercial_contact_id or boond_contact_ids.get("commercial")
                 try:
                     await self._crm.update_resource_administrative(
                         resource_id=resource_id,
                         provider_company_id=tp.boond_provider_id,
-                        provider_contact_id=dirigeant_contact_id,
+                        provider_contact_id=commercial_contact_id,
                     )
                 except Exception as exc:
                     logger.warning(

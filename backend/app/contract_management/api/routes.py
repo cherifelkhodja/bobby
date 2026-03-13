@@ -1314,6 +1314,9 @@ async def boond_convert_candidate(
     from app.contract_management.application.use_cases.sync_to_boond_after_signing import (
         _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE,
     )
+    from app.contract_management.infrastructure.models import ContractCompanyModel
+    from sqlalchemy import select as _select
+
     settings = get_settings()
     cr_repo, _cr2, tp_repo, crm = _boond_deps(db, settings)
 
@@ -1323,10 +1326,37 @@ async def boond_convert_candidate(
     if not cr.boond_candidate_id:
         raise HTTPException(status_code=400, detail="Pas de boond_candidate_id sur cette demande.")
 
+    # Resolve third party and company for extra context
+    tp = None
+    if cr.third_party_id:
+        tp = await tp_repo.get_by_id(cr.third_party_id)
+
+    company = None
+    if cr.company_id:
+        result = await db.execute(
+            _select(ContractCompanyModel).where(ContractCompanyModel.id == cr.company_id)
+        )
+        company = result.scalar_one_or_none()
+    if not company:
+        result = await db.execute(
+            _select(ContractCompanyModel)
+            .where(ContractCompanyModel.is_default.is_(True))
+            .where(ContractCompanyModel.is_active.is_(True))
+            .limit(1)
+        )
+        company = result.scalar_one_or_none()
+
+    # Determine state_reason_type_of: 0 = salarié, 1 = externe
+    state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
+
     # Step 1: Convert candidate → resource (skip if already a resource)
     converted = False
     if cr.boond_consultant_type != "resource":
-        await crm.convert_candidate_to_resource(cr.boond_candidate_id, state=3)
+        await crm.convert_candidate_to_resource(
+            cr.boond_candidate_id,
+            state=3,
+            state_reason_type_of=state_reason_type_of,
+        )
         converted = True
         logger.info("boond_convert_candidate_ok", cr_id=str(cr.id), candidate_id=cr.boond_candidate_id)
 
@@ -1339,24 +1369,32 @@ async def boond_convert_candidate(
         if not cr.daily_rate:
             raise HTTPException(status_code=400, detail="TJM manquant sur la demande.")
         contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(cr.third_party_type or "", 3)
+
+        # Extract start_date from contract request
+        start_date_str = None
+        if cr.start_date:
+            start_date_str = cr.start_date.strftime("%Y-%m-%d") if hasattr(cr.start_date, "strftime") else str(cr.start_date)
+
+        agency_id = company.boond_agency_id if company else None
+
         await crm.create_boond_contract(
             resource_id=cr.boond_candidate_id,
             positioning_id=cr.boond_positioning_id,
             daily_rate=float(cr.daily_rate),
             type_of=contract_type_of,
+            start_date=start_date_str,
+            agency_id=agency_id,
         )
         contract_created = True
 
-        # Link provider if exists
-        if cr.third_party_id:
-            tp = await tp_repo.get_by_id(cr.third_party_id)
-            if tp and tp.boond_provider_id:
-                await crm.update_resource_administrative(
-                    resource_id=cr.boond_candidate_id,
-                    provider_company_id=tp.boond_provider_id,
-                    provider_contact_id=None,
-                )
-                provider_linked = True
+        # Link provider if exists, using persisted commercial contact ID
+        if tp and tp.boond_provider_id:
+            await crm.update_resource_administrative(
+                resource_id=cr.boond_candidate_id,
+                provider_company_id=tp.boond_provider_id,
+                provider_contact_id=tp.boond_commercial_contact_id,
+            )
+            provider_linked = True
 
     logger.info(
         "boond_convert_and_contract_ok",
@@ -1488,6 +1526,7 @@ async def boond_create_company(
     postcode = tp.head_office_postal_code
 
     contacts_created = []
+    label_to_contact_id: dict[str, int] = {}
     for entry in merged.values():
         contact_id = await crm.create_contact(
             company_id=provider_id,
@@ -1507,6 +1546,18 @@ async def boond_create_company(
             "label": " + ".join(entry["labels"]),
             "boond_contact_id": contact_id,
         })
+        for lbl in entry["labels"]:
+            label_to_contact_id[lbl] = contact_id
+
+    # Persist Boond contact IDs on the ThirdParty for future reference
+    if label_to_contact_id.get("signataire"):
+        tp.boond_signatory_contact_id = label_to_contact_id["signataire"]
+    if label_to_contact_id.get("adv"):
+        tp.boond_adv_contact_id = label_to_contact_id["adv"]
+    if label_to_contact_id.get("commercial"):
+        tp.boond_commercial_contact_id = label_to_contact_id["commercial"]
+    if label_to_contact_id:
+        await tp_repo.save(tp)
 
     return {
         "ok": True,

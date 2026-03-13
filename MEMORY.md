@@ -161,6 +161,20 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-13 (contrat : persistance contact IDs Boond + refactoring sync)
+
+#### Persistance des Boond contact IDs sur ThirdParty
+
+**Contexte** : Lors de la création des contacts Boond (signataire, ADV, commercial), les IDs retournés n'étaient pas persistés. On les perdait entre les actions individuelles.
+
+**Implémentation** :
+1. Migration 060 : ajout de `boond_signatory_contact_id`, `boond_adv_contact_id`, `boond_commercial_contact_id` sur `tp_third_parties`
+2. Domain entity + SQLAlchemy model + repository : mapping des 3 nouveaux champs
+3. Route `boond_create_company` : après création des contacts, persiste les IDs sur le ThirdParty selon le label (signataire/adv/commercial)
+4. Route `boond_convert_candidate` : passe `state_reason_type_of` (0=salarié, 1=externe), `start_date`, `agency_id` au contrat Boond, utilise `boond_commercial_contact_id` pour le lien administratif
+5. `SyncToBoondAfterSigningUseCase` : aligné avec les mêmes améliorations (typesOf Boond corrigés : 7/8/9/10, persistance contact IDs, `start_date` + `agency_id` sur contrat)
+6. `BoondCrmAdapter` : `convert_candidate_to_resource` accepte `state_reason_type_of`, `create_boond_contract` accepte `start_date` et `agency_id` avec attributs complets
+
 ### 2026-03-13 (contrat : fix accès ADV aux templates + formulaire config post-brouillon)
 
 #### Fix accès ADV aux templates articles/annexes

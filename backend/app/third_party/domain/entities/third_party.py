@@ -59,6 +59,9 @@ class ThirdParty:
     ape_code: str | None = None
     id: UUID = field(default_factory=uuid4)
     boond_provider_id: int | None = None
+    boond_signatory_contact_id: int | None = None
+    boond_adv_contact_id: int | None = None
+    boond_commercial_contact_id: int | None = None
     capital: str | None = None
     entity_category: str | None = None  # "ei" or "societe", set when portal company-info is submitted
     company_info_submitted: bool = False  # True only after full POST submit (not draft PATCH)

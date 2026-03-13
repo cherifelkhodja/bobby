@@ -364,18 +364,24 @@ class BoondCrmAdapter:
         self,
         candidate_id: int,
         state: int = 3,
+        state_reason_type_of: int | None = None,
     ) -> None:
         """Convert a candidate to a resource in BoondManager by updating state.
 
         Args:
             candidate_id: Boond candidate/resource ID.
             state: Target state (3 = Arrivée prochaine).
+            state_reason_type_of: Reason type (0 = salarié, 1 = externe/sous-traitant).
         """
+        attributes: dict[str, Any] = {"state": state}
+        if state_reason_type_of is not None:
+            attributes["stateReason"] = {"typeOf": state_reason_type_of}
+
         payload = {
             "data": {
                 "type": "resource",
                 "id": str(candidate_id),
-                "attributes": {"state": state},
+                "attributes": attributes,
             }
         }
         try:
@@ -386,6 +392,7 @@ class BoondCrmAdapter:
                 "boond_candidate_converted_to_resource",
                 candidate_id=candidate_id,
                 state=state,
+                state_reason_type_of=state_reason_type_of,
             )
         except Exception as exc:
             logger.error(
@@ -585,6 +592,8 @@ class BoondCrmAdapter:
         positioning_id: int,
         daily_rate: float,
         type_of: int,
+        start_date: str | None = None,
+        agency_id: int | None = None,
     ) -> int:
         """Create a contract in BoondManager for an external consultant.
 
@@ -594,24 +603,39 @@ class BoondCrmAdapter:
             daily_rate: Average daily production cost (TJM).
             type_of: Contract type (2=sous-traitant, 3=freelance,
                      6=portage salarial, 7=portage commercial).
+            start_date: Contract start date (YYYY-MM-DD format).
+            agency_id: Boond agency ID to link the contract to.
 
         Returns:
             Boond contract ID.
         """
+        attributes: dict[str, Any] = {
+            "typeOf": type_of,
+            "contractAverageDailyProductionCost": daily_rate,
+            "numberOfHoursPerWeek": 35,
+            "numberOfWorkingDays": 210,
+            "classification": "-1",
+            "currency": 0,
+        }
+        if start_date:
+            attributes["startDate"] = start_date
+
+        relationships: dict[str, Any] = {
+            "resource": {"data": {"type": "resource", "id": str(resource_id)}},
+            "positioning": {
+                "data": {"type": "positioning", "id": str(positioning_id)}
+            },
+        }
+        if agency_id:
+            relationships["agency"] = {
+                "data": {"type": "agency", "id": str(agency_id)}
+            }
+
         payload = {
             "data": {
                 "type": "contract",
-                "attributes": {
-                    "typeOf": type_of,
-                    "contractAverageDailyProductionCost": daily_rate,
-                    "numberOfHoursPerWeek": 35,
-                },
-                "relationships": {
-                    "resource": {"data": {"type": "resource", "id": str(resource_id)}},
-                    "positioning": {
-                        "data": {"type": "positioning", "id": str(positioning_id)}
-                    },
-                },
+                "attributes": attributes,
+                "relationships": relationships,
             }
         }
 

@@ -45,6 +45,9 @@ class ThirdPartyRepository:
 
         if model:
             model.boond_provider_id = third_party.boond_provider_id
+            model.boond_signatory_contact_id = third_party.boond_signatory_contact_id
+            model.boond_adv_contact_id = third_party.boond_adv_contact_id
+            model.boond_commercial_contact_id = third_party.boond_commercial_contact_id
             model.type = third_party.type.value
             model.company_name = third_party.company_name
             model.legal_form = third_party.legal_form
@@ -175,6 +178,9 @@ class ThirdPartyRepository:
         return ThirdParty(
             id=model.id,
             boond_provider_id=model.boond_provider_id,
+            boond_signatory_contact_id=model.boond_signatory_contact_id,
+            boond_adv_contact_id=model.boond_adv_contact_id,
+            boond_commercial_contact_id=model.boond_commercial_contact_id,
             type=ThirdPartyType(model.type),
             company_name=model.company_name,
             legal_form=model.legal_form,
@@ -225,6 +231,9 @@ class ThirdPartyRepository:
         return ThirdPartyModel(
             id=entity.id,
             boond_provider_id=entity.boond_provider_id,
+            boond_signatory_contact_id=entity.boond_signatory_contact_id,
+            boond_adv_contact_id=entity.boond_adv_contact_id,
+            boond_commercial_contact_id=entity.boond_commercial_contact_id,
             type=entity.type.value,
             company_name=entity.company_name,
             legal_form=entity.legal_form,
