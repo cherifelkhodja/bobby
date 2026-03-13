@@ -366,12 +366,12 @@ export default function ContractDetail() {
         excluded_optional_article_keys: configForm.excluded_optional_article_keys,
         special_conditions: configForm.special_conditions || undefined,
       });
-      if (cr?.status === 'draft_generated') {
+      if (cr?.status === 'draft_generated' || cr?.status === 'partner_requested_changes') {
         await contractsApi.generateDraft(id!);
       }
     },
     onSuccess: () => {
-      if (cr?.status === 'draft_generated') {
+      if (cr?.status === 'draft_generated' || cr?.status === 'partner_requested_changes') {
         toast.success('Contrat reconfiguré et brouillon régénéré avec succès.');
       } else {
         toast.success('Contrat configuré. Vous pouvez maintenant générer le brouillon.');
@@ -431,7 +431,9 @@ export default function ContractDetail() {
     cr?.status === 'commercial_validated' ||
     cr?.status === 'reviewing_compliance' ||
     cr?.status === 'compliance_blocked' ||
-    cr?.status === 'configuring_contract'
+    cr?.status === 'configuring_contract' ||
+    cr?.status === 'draft_generated' ||
+    cr?.status === 'partner_requested_changes'
   );
 
   // Articles are now managed globally from Admin > Contrat AT tab
@@ -1362,7 +1364,7 @@ export default function ContractDetail() {
               isLoading={configureMutation.isPending}
             >
               <Settings className="h-4 w-4 mr-2" />
-              {cr?.status === 'draft_generated' ? 'Reconfigurer et régénérer le brouillon' : 'Configurer le contrat'}
+              {cr?.status === 'draft_generated' || cr?.status === 'partner_requested_changes' ? 'Reconfigurer et régénérer le brouillon' : 'Configurer le contrat'}
             </Button>
           </div>
         </Card>
