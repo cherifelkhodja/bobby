@@ -1373,6 +1373,20 @@ export default function ContractDetail() {
         />
       )}
 
+      {/* Regenerate draft button — when a draft already exists and still in pre-partner phase */}
+      {showConfigForm && latestContract && (
+        <div className="flex justify-end mb-6">
+          <Button
+            variant="secondary"
+            onClick={() => actionMutation.mutate('generate-draft')}
+            disabled={actionMutation.isPending}
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            {actionMutation.isPending ? 'Régénération...' : 'Régénérer le brouillon'}
+          </Button>
+        </div>
+      )}
+
       {/* Third-party company info */}
       {isAdv && complianceDocs && (
         <Card className="mb-6">
