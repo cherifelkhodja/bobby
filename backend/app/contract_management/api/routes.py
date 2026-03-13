@@ -1433,7 +1433,11 @@ async def boond_create_company(
     if not cr.third_party_id:
         raise HTTPException(status_code=400, detail="Pas de tiers associé à cette demande.")
 
-    tp = await tp_repo.get_by_id(cr.third_party_id)
+    try:
+        tp = await tp_repo.get_by_id(cr.third_party_id)
+    except Exception as exc:
+        logger.error("boond_create_company_get_tp_failed", error=str(exc), cr_id=str(contract_request_id))
+        raise HTTPException(status_code=500, detail=f"Erreur chargement tiers: {exc}")
     if not tp:
         raise HTTPException(status_code=404, detail="Tiers introuvable.")
 
@@ -1454,117 +1458,121 @@ async def boond_create_company(
         )
         company = result.scalar_one_or_none()
 
-    provider_id = tp.boond_provider_id
-    created_company = False
-    if not provider_id:
-        legal_status = None
-        if tp.legal_form and tp.capital:
-            legal_status = f"{tp.legal_form} au capital de {tp.capital}"
-        registered_office = None
-        if tp.rcs_number and tp.rcs_city:
-            registered_office = f"{tp.rcs_number} R.C.S. {tp.rcs_city}"
+    try:
+        provider_id = tp.boond_provider_id
+        created_company = False
+        if not provider_id:
+            legal_status = None
+            if tp.legal_form and tp.capital:
+                legal_status = f"{tp.legal_form} au capital de {tp.capital}"
+            registered_office = None
+            if tp.rcs_number and tp.rcs_city:
+                registered_office = f"{tp.rcs_number} R.C.S. {tp.rcs_city}"
 
-        provider_id = await crm.create_company_full(
-            company_name=tp.company_name or "",
-            state=9,
-            postcode=tp.head_office_postal_code,
-            address=tp.head_office_street or tp.head_office_address,
-            town=tp.head_office_city,
-            country="France",
-            vat_number=tp.vat_number,
-            siret=tp.siret,
-            legal_status=legal_status,
-            registered_office=registered_office,
-            ape_code=tp.ape_code or "6202A",
-            agency_id=company.boond_agency_id if company else None,
-        )
-        tp.boond_provider_id = provider_id
-        await tp_repo.save(tp)
-        created_company = True
-        logger.info("boond_create_company_ok", cr_id=str(cr.id), provider_id=provider_id)
+            provider_id = await crm.create_company_full(
+                company_name=tp.company_name or "",
+                state=9,
+                postcode=tp.head_office_postal_code,
+                address=tp.head_office_street or tp.head_office_address,
+                town=tp.head_office_city,
+                country="France",
+                vat_number=tp.vat_number,
+                siret=tp.siret,
+                legal_status=legal_status,
+                registered_office=registered_office,
+                ape_code=tp.ape_code or "6202A",
+                agency_id=company.boond_agency_id if company else None,
+            )
+            tp.boond_provider_id = provider_id
+            await tp_repo.save(tp)
+            created_company = True
+            logger.info("boond_create_company_ok", cr_id=str(cr.id), provider_id=provider_id)
 
-    # Build deduplicated contacts: if same person (first_name+last_name+email) has
-    # multiple roles, merge typesOf into a single contact.
-    # Boond typesOf: 7=dirigeant, 8=commercial, 9=adv, 10=signataire
-    signatory_types = [10]  # signataire
-    if tp.signatory_is_director:
-        signatory_types.append(7)  # dirigeant
+        # Build deduplicated contacts
+        # Boond typesOf: 7=dirigeant, 8=commercial, 9=adv, 10=signataire
+        signatory_types = [10]  # signataire
+        if tp.signatory_is_director:
+            signatory_types.append(7)  # dirigeant
 
-    role_entries: list[tuple] = [
-        (tp.signatory_civility or tp.representative_civility,
-         tp.signatory_first_name or tp.representative_first_name,
-         tp.signatory_last_name or tp.representative_last_name,
-         tp.signatory_email or tp.representative_email,
-         tp.signatory_phone or tp.representative_phone,
-         tp.representative_title, signatory_types, "signataire"),
-        (tp.adv_contact_civility, tp.adv_contact_first_name, tp.adv_contact_last_name,
-         tp.adv_contact_email, tp.adv_contact_phone, "ADV", [9], "adv"),
-        (tp.billing_contact_civility, tp.billing_contact_first_name, tp.billing_contact_last_name,
-         tp.billing_contact_email, tp.billing_contact_phone, "Commercial", [8], "commercial"),
-    ]
+        role_entries: list[tuple] = [
+            (tp.signatory_civility or tp.representative_civility,
+             tp.signatory_first_name or tp.representative_first_name,
+             tp.signatory_last_name or tp.representative_last_name,
+             tp.signatory_email or tp.representative_email,
+             tp.signatory_phone or tp.representative_phone,
+             tp.representative_title, signatory_types, "signataire"),
+            (tp.adv_contact_civility, tp.adv_contact_first_name, tp.adv_contact_last_name,
+             tp.adv_contact_email, tp.adv_contact_phone, "ADV", [9], "adv"),
+            (tp.billing_contact_civility, tp.billing_contact_first_name, tp.billing_contact_last_name,
+             tp.billing_contact_email, tp.billing_contact_phone, "Commercial", [8], "commercial"),
+        ]
 
-    # Group by identity key (normalized first_name + last_name + email)
-    merged: dict[str, dict] = {}
-    for civ, fn, ln, email, phone, job_title, types_of_list, label in role_entries:
-        if not (fn or email):
-            continue
-        key = f"{(fn or '').strip().lower()}|{(ln or '').strip().lower()}|{(email or '').strip().lower()}"
-        if key in merged:
-            merged[key]["types_of"].extend(types_of_list)
-            merged[key]["labels"].append(label)
-            # Keep the most descriptive job_title (representative_title over generic)
-            if job_title and job_title not in ("ADV", "Commercial"):
-                merged[key]["job_title"] = job_title
-        else:
-            merged[key] = {
-                "civility": civ, "first_name": fn, "last_name": ln,
-                "email": email, "phone": phone, "job_title": job_title,
-                "types_of": list(types_of_list), "labels": [label],
-            }
+        # Group by identity key (normalized first_name + last_name + email)
+        merged: dict[str, dict] = {}
+        for civ, fn, ln, email, phone, job_title, types_of_list, label in role_entries:
+            if not (fn or email):
+                continue
+            key = f"{(fn or '').strip().lower()}|{(ln or '').strip().lower()}|{(email or '').strip().lower()}"
+            if key in merged:
+                merged[key]["types_of"].extend(types_of_list)
+                merged[key]["labels"].append(label)
+                if job_title and job_title not in ("ADV", "Commercial"):
+                    merged[key]["job_title"] = job_title
+            else:
+                merged[key] = {
+                    "civility": civ, "first_name": fn, "last_name": ln,
+                    "email": email, "phone": phone, "job_title": job_title,
+                    "types_of": list(types_of_list), "labels": [label],
+                }
 
-    agency_id = company.boond_agency_id if company else None
-    postcode = tp.head_office_postal_code
+        agency_id = company.boond_agency_id if company else None
+        postcode = tp.head_office_postal_code
 
-    contacts_created = []
-    label_to_contact_id: dict[str, int] = {}
-    for entry in merged.values():
-        contact_id = await crm.create_contact(
-            company_id=provider_id,
-            civility=entry["civility"],
-            first_name=entry["first_name"],
-            last_name=entry["last_name"],
-            email=entry["email"],
-            phone=entry["phone"],
-            job_title=entry["job_title"],
-            types_of=entry["types_of"],
-            postcode=postcode,
-            address=tp.head_office_street or tp.head_office_address,
-            town=tp.head_office_city,
-            agency_id=agency_id,
-        )
-        contacts_created.append({
-            "label": " + ".join(entry["labels"]),
-            "boond_contact_id": contact_id,
-        })
-        for lbl in entry["labels"]:
-            label_to_contact_id[lbl] = contact_id
+        contacts_created = []
+        label_to_contact_id: dict[str, int] = {}
+        for entry in merged.values():
+            contact_id = await crm.create_contact(
+                company_id=provider_id,
+                civility=entry["civility"],
+                first_name=entry["first_name"],
+                last_name=entry["last_name"],
+                email=entry["email"],
+                phone=entry["phone"],
+                job_title=entry["job_title"],
+                types_of=entry["types_of"],
+                postcode=postcode,
+                address=tp.head_office_street or tp.head_office_address,
+                town=tp.head_office_city,
+                agency_id=agency_id,
+            )
+            contacts_created.append({
+                "label": " + ".join(entry["labels"]),
+                "boond_contact_id": contact_id,
+            })
+            for lbl in entry["labels"]:
+                label_to_contact_id[lbl] = contact_id
 
-    # Persist Boond contact IDs on the ThirdParty for future reference
-    if label_to_contact_id.get("signataire"):
-        tp.boond_signatory_contact_id = label_to_contact_id["signataire"]
-    if label_to_contact_id.get("adv"):
-        tp.boond_adv_contact_id = label_to_contact_id["adv"]
-    if label_to_contact_id.get("commercial"):
-        tp.boond_commercial_contact_id = label_to_contact_id["commercial"]
-    if label_to_contact_id:
-        await tp_repo.save(tp)
+        # Persist Boond contact IDs on the ThirdParty for future reference
+        if label_to_contact_id.get("signataire"):
+            tp.boond_signatory_contact_id = label_to_contact_id["signataire"]
+        if label_to_contact_id.get("adv"):
+            tp.boond_adv_contact_id = label_to_contact_id["adv"]
+        if label_to_contact_id.get("commercial"):
+            tp.boond_commercial_contact_id = label_to_contact_id["commercial"]
+        if label_to_contact_id:
+            await tp_repo.save(tp)
 
-    return {
-        "ok": True,
-        "created_company": created_company,
-        "boond_provider_id": provider_id,
-        "contacts_created": contacts_created,
-    }
+        return {
+            "ok": True,
+            "created_company": created_company,
+            "boond_provider_id": provider_id,
+            "contacts_created": contacts_created,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("boond_create_company_failed", error=str(exc), cr_id=str(contract_request_id))
+        raise HTTPException(status_code=400, detail=f"Erreur Boond: {exc}")
 
 
 @router.post(
