@@ -161,6 +161,24 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-13 (fix: payloads Boond contrat + lien admin + suppression étape typeOf)
+
+#### Corrections payloads API BoondManager
+1. **`create_boond_contract()`** :
+   - Remplacé `resource` + `positioning` dans relationships par `dependsOn` (format attendu par l'API Boond)
+   - Ajouté `forceContractAverageDailyProductionCost: true` pour forcer le TJM
+2. **`update_resource_administrative()`** :
+   - Ajouté `id` et `type: "resource"` dans le root `data` du payload (format attendu par PUT /resources/{id}/administrative)
+3. **Suppression étape `get_resource_type_of`** :
+   - L'étape 4 (vérification typeOf après conversion) était inutile car on connaît déjà le type via `third_party_type`
+   - Condition simplifiée : `is_external = cr.third_party_type != "salarie"` au lieu de `resource_type_of == 1`
+   - Appliqué dans `sync_to_boond_after_signing.py` et `routes.py` (endpoint convert-candidate)
+
+**Fichiers modifiés** :
+- `backend/app/contract_management/infrastructure/adapters/boond_crm_adapter.py` : payloads corrigés
+- `backend/app/contract_management/application/use_cases/sync_to_boond_after_signing.py` : suppression étape 4, renumérotation
+- `backend/app/contract_management/api/routes.py` : suppression appel `get_resource_type_of`
+
 ### 2026-03-13 (fix: formatage données légales Boond + vérification société existante)
 
 #### Vérification société Boond avant création contacts

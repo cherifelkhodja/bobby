@@ -1373,8 +1373,8 @@ async def boond_convert_candidate(
         contract_created = False
         provider_linked = False
         contract_type_of = None
-        resource_type_of = await crm.get_resource_type_of(cr.boond_candidate_id)
-        if resource_type_of == 1:  # externe
+        is_external = cr.third_party_type != "salarie"
+        if is_external:
             if not cr.daily_rate:
                 raise HTTPException(status_code=400, detail="TJM manquant sur la demande.")
             contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(cr.third_party_type or "", 3)

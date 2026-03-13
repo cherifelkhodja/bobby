@@ -688,6 +688,7 @@ class BoondCrmAdapter:
         """
         attributes: dict[str, Any] = {
             "typeOf": type_of,
+            "forceContractAverageDailyProductionCost": True,
             "contractAverageDailyProductionCost": daily_rate,
             "numberOfHoursPerWeek": 35,
             "numberOfWorkingDays": 210,
@@ -698,9 +699,8 @@ class BoondCrmAdapter:
             attributes["startDate"] = start_date
 
         relationships: dict[str, Any] = {
-            "resource": {"data": {"type": "resource", "id": str(resource_id)}},
-            "positioning": {
-                "data": {"type": "positioning", "id": str(positioning_id)}
+            "dependsOn": {
+                "data": {"type": "resource", "id": str(resource_id)}
             },
         }
         if agency_id:
@@ -749,7 +749,13 @@ class BoondCrmAdapter:
                 "data": {"type": "contact", "id": str(provider_contact_id)}
             }
 
-        payload = {"data": {"relationships": relationships}}
+        payload = {
+            "data": {
+                "id": str(resource_id),
+                "type": "resource",
+                "relationships": relationships,
+            }
+        }
 
         await self._boond._make_request(
             "PUT", f"/resources/{resource_id}/administrative", json=payload

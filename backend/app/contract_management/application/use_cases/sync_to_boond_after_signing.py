@@ -37,11 +37,10 @@ class SyncToBoondAfterSigningUseCase:
     1. Create the provider company in Boond with full legal details.
     2. Create the contacts (signataire, ADV, commercial) linked to the company.
     3. Convert the candidate to a resource (state 3) if boond_candidate_id is set.
-    4. Fetch the resource typeOf to determine if the consultant is external.
-    5. If external (typeOf=1): create a Boond contract and update the resource
-       administrative data to link it to the provider company/contact.
-    6. Create the purchase order.
-    7. Transition the contract request to ARCHIVED.
+    4. If external (third_party_type != "salarie"): create a Boond contract and
+       update the resource administrative data to link it to the provider.
+    5. Create the purchase order.
+    6. Transition the contract request to ARCHIVED.
     """
 
     def __init__(
@@ -257,19 +256,10 @@ class SyncToBoondAfterSigningUseCase:
                 resource_id=resource_id,
             )
 
-        # ── Étape 4 : Vérification typeOf de la ressource ─────────────────
-        resource_type_of: int | None = None
-        if resource_id:
-            resource_type_of = await self._crm.get_resource_type_of(resource_id)
-            logger.info(
-                "sync_boond_resource_type_of",
-                cr_id=str(cr.id),
-                resource_id=resource_id,
-                type_of=resource_type_of,
-            )
-
-        # ── Étape 5 : Contrat + lien administratif (externe uniquement) ───
-        if resource_id and resource_type_of == 1 and cr.daily_rate:
+        # ── Étape 4 : Contrat + lien administratif (externe uniquement) ───
+        # Le typeOf est déterminé par le type de tiers : tout sauf "salarie" → externe (1)
+        is_external = cr.third_party_type != "salarie"
+        if resource_id and is_external and cr.daily_rate:
             contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(
                 cr.third_party_type or "", 3
             )
@@ -313,7 +303,7 @@ class SyncToBoondAfterSigningUseCase:
                         error=str(exc),
                     )
 
-        # ── Étape 6 : Bon de commande ──────────────────────────────────────
+        # ── Étape 5 : Bon de commande ──────────────────────────────────────
         contract = await self._contract_repo.get_by_request_id(cr.id)
         if tp and tp.boond_provider_id and cr.daily_rate and contract:
             try:
@@ -332,7 +322,7 @@ class SyncToBoondAfterSigningUseCase:
                     error=str(exc),
                 )
 
-        # ── Étape 7 : Transition → ARCHIVED (si pas déjà) ────────────────
+        # ── Étape 6 : Transition → ARCHIVED (si pas déjà) ────────────────
         if cr.status != ContractRequestStatus.ARCHIVED:
             cr.transition_to(ContractRequestStatus.ARCHIVED)
         saved = await self._cr_repo.save(cr)
