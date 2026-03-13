@@ -171,9 +171,10 @@ docker-compose up # Start all services
 1. Backend : ajout des champs `custom_articles`, `custom_annexes`, `article_order`, `annex_order` dans le schéma `ArticleOverridesRequest`
 2. Backend : route `PATCH /{id}/article-overrides` persiste les nouveaux champs dans `contract_config` (JSON)
 3. Backend : `generate_draft.py` fusionne les articles/annexes custom avec les templates, applique l'ordre personnalisé, puis renumérrote séquentiellement
-4. Frontend : `ArticleAnnexEditor` supporte l'ajout d'articles/annexes custom (bouton "+"), le réordonnancement (flèches haut/bas), et la suppression permanente des custom items
+4. Frontend : `ArticleAnnexEditor` avec drag-and-drop (`@dnd-kit`) pour réordonner, bouton "+" pour ajouter, suppression des custom items
 5. Frontend : l'éditeur est maintenant visible dans les états `configuring_contract` et `draft_generated` (plus seulement `partner_requested_changes`)
-6. Aucune migration nécessaire (tout stocké dans le champ JSON `contract_config`)
+6. Frontend : les annexes sont chargées dans tous les états (plus seulement `partner_requested_changes`)
+7. Aucune migration nécessaire (tout stocké dans le champ JSON `contract_config`)
 
 **Fichiers modifiés** : schemas.py, routes.py, generate_draft.py, contracts.ts, ContractDetail.tsx
 

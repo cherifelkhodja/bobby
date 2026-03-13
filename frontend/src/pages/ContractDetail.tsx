@@ -22,8 +22,7 @@ import {
   RotateCcw,
   MessageSquare,
   Plus,
-  ArrowUp,
-  ArrowDown,
+  GripVertical,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -157,7 +156,7 @@ export default function ContractDetail() {
   const { data: allAnnexes = [] } = useQuery({
     queryKey: ['contract-annexes'],
     queryFn: contractAnnexesApi.list,
-    enabled: isAdv && (cr?.status === 'partner_requested_changes' || cr?.status === 'configuring_contract' || cr?.status === 'draft_generated'),
+    enabled: isAdv,
   });
   const activeAnnexes = allAnnexes.filter((a) => a.is_active);
 
@@ -1681,6 +1680,174 @@ export default function ContractDetail() {
 // ─── Article / Annex per-contract editor ─────────────────────────────────────
 
 import type { ArticleTemplate, AnnexTemplate, CustomArticleItem, CustomAnnexItem } from '../api/contracts';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// ─── Sortable row used inside ArticleAnnexEditor ─────────────────────────────
+
+function SortableEditorRow({
+  itemKey,
+  title,
+  defaultContent,
+  label,
+  isAnnex,
+  isCustom,
+  isExpanded,
+  isDeleted,
+  isDirty,
+  hasOverride,
+  value,
+  isPending,
+  onToggleExpand,
+  onToggleDelete,
+  onChange,
+  onReset,
+  onSave,
+}: {
+  itemKey: string;
+  title: string;
+  defaultContent: string;
+  label: string;
+  isAnnex: boolean;
+  isCustom: boolean;
+  isExpanded: boolean;
+  isDeleted: boolean;
+  isDirty: boolean;
+  hasOverride: boolean;
+  value: string;
+  isPending: boolean;
+  onToggleExpand: () => void;
+  onToggleDelete: (e: React.MouseEvent) => void;
+  onChange: (v: string) => void;
+  onReset: () => void;
+  onSave: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: itemKey,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`border rounded-lg overflow-hidden ${isDragging ? 'shadow-lg z-10 relative' : ''} ${isDeleted ? 'border-red-200 dark:border-red-800 opacity-60' : 'border-gray-200 dark:border-gray-700'}`}
+    >
+      <div className="flex items-center">
+        {/* Drag handle */}
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="flex-shrink-0 px-2 py-3 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing touch-none bg-gray-50 dark:bg-gray-800/60"
+          title="Glisser pour réordonner"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          className={`flex-1 flex items-center justify-between px-4 py-3 text-left transition-colors ${isDeleted ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+          onClick={() => !isDeleted && onToggleExpand()}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-shrink-0">
+              {label}
+            </span>
+            <span className={`text-sm font-medium truncate ${isDeleted ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-200'}`}>
+              {title}
+            </span>
+            {isCustom && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-700 flex-shrink-0">
+                ajouté
+              </span>
+            )}
+            {isDeleted && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-700 flex-shrink-0">
+                supprimé
+              </span>
+            )}
+            {!isDeleted && !isCustom && hasOverride && !isDirty && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex-shrink-0">
+                <Pencil className="h-3 w-3 mr-1" />modifié
+              </span>
+            )}
+            {!isDeleted && isDirty && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-700 flex-shrink-0">
+                non sauvegardé
+              </span>
+            )}
+          </div>
+          {!isDeleted && (isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />)}
+        </button>
+        <button
+          type="button"
+          title={isDeleted ? 'Restaurer' : 'Supprimer du PDF'}
+          onClick={onToggleDelete}
+          disabled={isPending}
+          className={`px-3 py-3 flex-shrink-0 transition-colors ${isDeleted ? 'text-green-500 hover:text-green-700 dark:hover:text-green-400 bg-red-50 dark:bg-red-900/20' : 'text-gray-300 hover:text-red-500 dark:hover:text-red-400 bg-gray-50 dark:bg-gray-800/60'}`}
+        >
+          {isDeleted ? <RotateCcw className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+        </button>
+      </div>
+
+      {isExpanded && !isDeleted && (
+        <div className="p-4 bg-white dark:bg-gray-900">
+          <textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full text-sm font-mono border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y"
+            rows={10}
+          />
+          <div className="flex items-center justify-between mt-2">
+            {!isCustom ? (
+              <button
+                type="button"
+                onClick={onReset}
+                className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                disabled={isPending}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Restaurer le modèle
+              </button>
+            ) : <span />}
+            {isDirty && (
+              <Button
+                size="sm"
+                onClick={onSave}
+                disabled={isPending}
+                isLoading={isPending}
+              >
+                Enregistrer
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main editor ─────────────────────────────────────────────────────────────
 
 function ArticleAnnexEditor({
   contractRequestId,
@@ -1715,6 +1882,12 @@ function ArticleAnnexEditor({
   const [showAddAnnex, setShowAddAnnex] = useState(false);
   const [newTitle, setNewTitle] = useState('');
 
+  // dnd-kit sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
   // Build ordered lists of keys for articles and annexes
   const buildArticleKeys = () => {
     const templateKeys = articles.map((a) => a.article_key);
@@ -1722,7 +1895,6 @@ function ArticleAnnexEditor({
     const allKeys = [...templateKeys, ...customKeys];
     if (serverArticleOrder.length > 0) {
       const ordered = [...serverArticleOrder];
-      // Add any new keys not in the saved order
       for (const k of allKeys) {
         if (!ordered.includes(k)) ordered.push(k);
       }
@@ -1802,7 +1974,6 @@ function ArticleAnnexEditor({
 
   const handleSave = (key: string, isAnnex = false) => {
     const value = editing[key] ?? '';
-    // For custom items, save the content in custom_articles/custom_annexes
     if (isAnnex && customAnnexMap.has(key)) {
       const updated = customAnnexes.map((c) =>
         c.key === key ? { ...c, content: value } : c,
@@ -1832,7 +2003,6 @@ function ArticleAnnexEditor({
         ? deletedAnnexes.filter((k) => k !== key)
         : [...deletedAnnexes, key];
       setDeletedAnnexes(next);
-      // For custom annexes, also remove from custom list when deleting permanently
       if (customAnnexMap.has(key) && !deletedAnnexes.includes(key)) {
         const updated = customAnnexes.filter((c) => c.key !== key);
         setCustomAnnexes(updated);
@@ -1857,15 +2027,20 @@ function ArticleAnnexEditor({
     }
   };
 
-  const handleMove = (keys: string[], setKeys: (k: string[]) => void, index: number, direction: -1 | 1, isAnnex: boolean) => {
-    const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= keys.length) return;
-    const updated = [...keys];
-    [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
-    setKeys(updated);
+  const handleDragEnd = (isAnnex: boolean) => (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const keys = isAnnex ? annexKeys : articleKeys;
+    const setKeys = isAnnex ? setAnnexKeys : setArticleKeys;
+    const oldIndex = keys.indexOf(active.id as string);
+    const newIndex = keys.indexOf(over.id as string);
+    const newOrder = arrayMove(keys, oldIndex, newIndex);
+
+    setKeys(newOrder);
     const payload = isAnnex
-      ? { annex_order: updated }
-      : { article_order: updated };
+      ? { annex_order: newOrder }
+      : { article_order: newOrder };
     saveMutation.mutate(payload);
   };
 
@@ -1892,137 +2067,6 @@ function ArticleAnnexEditor({
     setNewTitle('');
     setShowAddArticle(false);
     setShowAddAnnex(false);
-  };
-
-  const renderItem = (
-    key: string,
-    title: string,
-    defaultContent: string,
-    label: string,
-    isAnnex: boolean,
-    index: number,
-    totalCount: number,
-    isCustom: boolean,
-  ) => {
-    const isExpanded = !!expanded[key];
-    const value = getValue(key, defaultContent, isAnnex);
-    const isDirty = !!dirty[key];
-    const hasOverride = isAnnex ? !!annexOverrides[key] : !!articleOverrides[key];
-    const isDeleted = isAnnex ? deletedAnnexes.includes(key) : deletedArticles.includes(key);
-
-    return (
-      <div key={key} className={`border rounded-lg overflow-hidden ${isDeleted ? 'border-red-200 dark:border-red-800 opacity-60' : 'border-gray-200 dark:border-gray-700'}`}>
-        <div className="flex items-center">
-          {/* Move buttons */}
-          <div className="flex flex-col border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60">
-            <button
-              type="button"
-              title="Monter"
-              disabled={index === 0 || saveMutation.isPending}
-              onClick={() => {
-                const keys = isAnnex ? annexKeys : articleKeys;
-                const setter = isAnnex ? setAnnexKeys : setArticleKeys;
-                handleMove(keys, setter, index, -1, isAnnex);
-              }}
-              className="px-1.5 py-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ArrowUp className="h-3 w-3" />
-            </button>
-            <button
-              type="button"
-              title="Descendre"
-              disabled={index === totalCount - 1 || saveMutation.isPending}
-              onClick={() => {
-                const keys = isAnnex ? annexKeys : articleKeys;
-                const setter = isAnnex ? setAnnexKeys : setArticleKeys;
-                handleMove(keys, setter, index, 1, isAnnex);
-              }}
-              className="px-1.5 py-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ArrowDown className="h-3 w-3" />
-            </button>
-          </div>
-          <button
-            type="button"
-            className={`flex-1 flex items-center justify-between px-4 py-3 text-left transition-colors ${isDeleted ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-            onClick={() => !isDeleted && setExpanded((e) => ({ ...e, [key]: !e[key] }))}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-shrink-0">
-                {label}
-              </span>
-              <span className={`text-sm font-medium truncate ${isDeleted ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-200'}`}>
-                {title}
-              </span>
-              {isCustom && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-700 flex-shrink-0">
-                  ajouté
-                </span>
-              )}
-              {isDeleted && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-700 flex-shrink-0">
-                  supprimé
-                </span>
-              )}
-              {!isDeleted && !isCustom && hasOverride && !isDirty && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex-shrink-0">
-                  <Pencil className="h-3 w-3 mr-1" />modifié
-                </span>
-              )}
-              {!isDeleted && isDirty && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-700 flex-shrink-0">
-                  non sauvegardé
-                </span>
-              )}
-            </div>
-            {!isDeleted && (isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />)}
-          </button>
-          <button
-            type="button"
-            title={isDeleted ? 'Restaurer' : 'Supprimer du PDF'}
-            onClick={(e) => handleToggleDelete(key, isAnnex, e)}
-            disabled={saveMutation.isPending}
-            className={`px-3 py-3 flex-shrink-0 transition-colors ${isDeleted ? 'text-green-500 hover:text-green-700 dark:hover:text-green-400 bg-red-50 dark:bg-red-900/20' : 'text-gray-300 hover:text-red-500 dark:hover:text-red-400 bg-gray-50 dark:bg-gray-800/60'}`}
-          >
-            {isDeleted ? <RotateCcw className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
-          </button>
-        </div>
-
-        {isExpanded && !isDeleted && (
-          <div className="p-4 bg-white dark:bg-gray-900">
-            <textarea
-              value={value}
-              onChange={(e) => handleChange(key, e.target.value)}
-              className="w-full text-sm font-mono border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y"
-              rows={10}
-            />
-            <div className="flex items-center justify-between mt-2">
-              {!isCustom ? (
-                <button
-                  type="button"
-                  onClick={() => handleReset(key, defaultContent, isAnnex)}
-                  className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  disabled={saveMutation.isPending}
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Restaurer le modèle
-                </button>
-              ) : <span />}
-              {isDirty && (
-                <Button
-                  size="sm"
-                  onClick={() => handleSave(key, isAnnex)}
-                  disabled={saveMutation.isPending}
-                  isLoading={saveMutation.isPending}
-                >
-                  Enregistrer
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    );
   };
 
   const renderAddForm = (isAnnex: boolean, show: boolean, setShow: (v: boolean) => void) => (
@@ -2066,40 +2110,92 @@ function ArticleAnnexEditor({
         Édition des articles et annexes
       </h3>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-        Modifiez le contenu, ajoutez des articles/annexes ou réorganisez l'ordre pour ce contrat uniquement.
+        Glissez pour réordonner, modifiez le contenu ou ajoutez des articles/annexes pour ce contrat uniquement.
       </p>
 
       {/* Articles */}
       <div className="mb-4">
         <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Articles</h4>
-        <div className="space-y-2">
-          {articleKeys.map((key, index) => {
-            const tpl = articleMap.get(key);
-            const custom = customArticleMap.get(key);
-            if (!tpl && !custom) return null;
-            const title = tpl?.title ?? custom?.title ?? '';
-            const content = tpl?.content ?? custom?.content ?? '';
-            const isCustom = !!custom;
-            return renderItem(key, title, content, `Art.`, false, index, articleKeys.length, isCustom);
-          })}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd(false)}>
+          <SortableContext items={articleKeys} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {articleKeys.map((key) => {
+                const tpl = articleMap.get(key);
+                const custom = customArticleMap.get(key);
+                if (!tpl && !custom) return null;
+                const title = tpl?.title ?? custom?.title ?? '';
+                const content = tpl?.content ?? custom?.content ?? '';
+                const isCustom = !!custom;
+                const isDeleted = deletedArticles.includes(key);
+                return (
+                  <SortableEditorRow
+                    key={key}
+                    itemKey={key}
+                    title={title}
+                    defaultContent={content}
+                    label="Art."
+                    isAnnex={false}
+                    isCustom={isCustom}
+                    isExpanded={!!expanded[key]}
+                    isDeleted={isDeleted}
+                    isDirty={!!dirty[key]}
+                    hasOverride={!!articleOverrides[key]}
+                    value={getValue(key, content, false)}
+                    isPending={saveMutation.isPending}
+                    onToggleExpand={() => setExpanded((e) => ({ ...e, [key]: !e[key] }))}
+                    onToggleDelete={(e) => handleToggleDelete(key, false, e)}
+                    onChange={(v) => handleChange(key, v)}
+                    onReset={() => handleReset(key, content, false)}
+                    onSave={() => handleSave(key, false)}
+                  />
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
         {renderAddForm(false, showAddArticle, setShowAddArticle)}
       </div>
 
       {/* Annexes */}
       <div>
         <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Annexes</h4>
-        <div className="space-y-2">
-          {annexKeys.map((key, index) => {
-            const tpl = annexMap.get(key);
-            const custom = customAnnexMap.get(key);
-            if (!tpl && !custom) return null;
-            const title = tpl?.title ?? custom?.title ?? '';
-            const content = tpl?.content ?? custom?.content ?? '';
-            const isCustom = !!custom;
-            return renderItem(key, title, content, 'Annexe', true, index, annexKeys.length, isCustom);
-          })}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd(true)}>
+          <SortableContext items={annexKeys} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {annexKeys.map((key) => {
+                const tpl = annexMap.get(key);
+                const custom = customAnnexMap.get(key);
+                if (!tpl && !custom) return null;
+                const title = tpl?.title ?? custom?.title ?? '';
+                const content = tpl?.content ?? custom?.content ?? '';
+                const isCustom = !!custom;
+                const isDeleted = deletedAnnexes.includes(key);
+                return (
+                  <SortableEditorRow
+                    key={key}
+                    itemKey={key}
+                    title={title}
+                    defaultContent={content}
+                    label="Annexe"
+                    isAnnex={true}
+                    isCustom={isCustom}
+                    isExpanded={!!expanded[key]}
+                    isDeleted={isDeleted}
+                    isDirty={!!dirty[key]}
+                    hasOverride={!!annexOverrides[key]}
+                    value={getValue(key, content, true)}
+                    isPending={saveMutation.isPending}
+                    onToggleExpand={() => setExpanded((e) => ({ ...e, [key]: !e[key] }))}
+                    onToggleDelete={(e) => handleToggleDelete(key, true, e)}
+                    onChange={(v) => handleChange(key, v)}
+                    onReset={() => handleReset(key, content, true)}
+                    onSave={() => handleSave(key, true)}
+                  />
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
         {renderAddForm(true, showAddAnnex, setShowAddAnnex)}
       </div>
     </Card>
