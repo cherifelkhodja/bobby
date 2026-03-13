@@ -27,9 +27,9 @@ class SyncToBoondAfterSigningUseCase:
     Executes the following steps (best-effort — individual failures are logged
     but do not abort the overall flow):
 
-    1. Convert the candidate to a resource (state 3) if boond_candidate_id is set.
-    2. Create the provider company in Boond with full legal details.
-    3. Create the contacts (dirigeant, ADV, facturation) linked to the company.
+    1. Create the provider company in Boond with full legal details.
+    2. Create the contacts (signataire, ADV, commercial) linked to the company.
+    3. Convert the candidate to a resource (state 3) if boond_candidate_id is set.
     4. Fetch the resource typeOf to determine if the consultant is external.
     5. If external (typeOf=1): create a Boond contract and update the resource
        administrative data to link it to the provider company/contact.
@@ -73,37 +73,7 @@ class SyncToBoondAfterSigningUseCase:
 
         resource_id: int | None = cr.boond_candidate_id
 
-        # ── Étape 1 : Conversion candidat → ressource ──────────────────────
-        # N'effectuer la conversion que si le consultant est un candidat Boond.
-        # Si c'est déjà une ressource (boond_consultant_type == "resource"),
-        # l'appel /candidates/{id} échouerait et la conversion est inutile.
-        # On reste permissif pour les anciennes demandes (type None) en tentant
-        # la conversion mais en absorbant silencieusement l'erreur.
-        is_candidate = cr.boond_consultant_type == "candidate" or cr.boond_consultant_type is None
-        state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
-        if resource_id and is_candidate:
-            try:
-                await self._crm.convert_candidate_to_resource(
-                    resource_id,
-                    state=3,
-                    state_reason_type_of=state_reason_type_of,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "sync_boond_convert_candidate_failed",
-                    cr_id=str(cr.id),
-                    resource_id=resource_id,
-                    consultant_type=cr.boond_consultant_type,
-                    error=str(exc),
-                )
-        elif resource_id and cr.boond_consultant_type == "resource":
-            logger.info(
-                "sync_boond_skip_convert_already_resource",
-                cr_id=str(cr.id),
-                resource_id=resource_id,
-            )
-
-        # ── Étape 2 : Création société fournisseur ─────────────────────────
+        # ── Étape 1 : Création société fournisseur ─────────────────────────
         if tp and not tp.boond_provider_id:
             legal_status = None
             if tp.legal_form and tp.capital:
@@ -141,7 +111,7 @@ class SyncToBoondAfterSigningUseCase:
                     error=str(exc),
                 )
 
-        # ── Étape 3 : Création des contacts (dédupliqués) ─────────────────
+        # ── Étape 2 : Création des contacts (dédupliqués) ─────────────────
         # Boond typesOf: 7=dirigeant, 8=commercial, 9=adv, 10=signataire
         boond_contact_ids: dict[str, int] = {}
 
@@ -219,6 +189,34 @@ class SyncToBoondAfterSigningUseCase:
                 tp.boond_commercial_contact_id = boond_contact_ids["commercial"]
             if boond_contact_ids:
                 await self._tp_repo.save(tp)
+
+        # ── Étape 3 : Conversion candidat → ressource ──────────────────────
+        # N'effectuer la conversion que si le consultant est un candidat Boond.
+        # Si c'est déjà une ressource (boond_consultant_type == "resource"),
+        # l'appel /candidates/{id} échouerait et la conversion est inutile.
+        is_candidate = cr.boond_consultant_type == "candidate" or cr.boond_consultant_type is None
+        state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
+        if resource_id and is_candidate:
+            try:
+                await self._crm.convert_candidate_to_resource(
+                    resource_id,
+                    state=3,
+                    state_reason_type_of=state_reason_type_of,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "sync_boond_convert_candidate_failed",
+                    cr_id=str(cr.id),
+                    resource_id=resource_id,
+                    consultant_type=cr.boond_consultant_type,
+                    error=str(exc),
+                )
+        elif resource_id and cr.boond_consultant_type == "resource":
+            logger.info(
+                "sync_boond_skip_convert_already_resource",
+                cr_id=str(cr.id),
+                resource_id=resource_id,
+            )
 
         # ── Étape 4 : Vérification typeOf de la ressource ─────────────────
         resource_type_of: int | None = None
