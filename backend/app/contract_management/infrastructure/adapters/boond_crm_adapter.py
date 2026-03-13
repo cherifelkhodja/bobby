@@ -483,27 +483,40 @@ class BoondCrmAdapter:
         email: str | None,
         phone: str | None,
         job_title: str | None,
-        type_of: int,
+        types_of: list[int] | None = None,
+        postcode: str | None = None,
+        address: str | None = None,
+        town: str | None = None,
+        agency_id: int | None = None,
     ) -> int:
         """Create a contact linked to a company in BoondManager.
 
         Args:
             company_id: Boond company ID.
-            civility: Civility string ("M." → 1, "Mme" → 2).
+            civility: Civility string ("M." → 0 homme, "Mme" → 1 femme).
             first_name: First name.
             last_name: Last name.
             email: Email address.
             phone: Phone number.
             job_title: Job title / fonction.
-            type_of: Contact type (7=dirigeant, 9=adv, 2=facturation).
+            types_of: List of contact types (1=dirigeant, 2=facturation, 3=adv, etc.).
+            postcode: Postal code.
+            address: Street address.
+            town: City.
+            agency_id: Boond agency ID.
 
         Returns:
             Boond contact ID.
         """
-        civility_map = {"M.": 1, "Mme": 2, "M": 1}
-        civility_int = civility_map.get(civility or "", 1)
+        # Boond civility: 0 = homme, 1 = femme
+        civility_map = {"M.": 0, "M": 0, "Mme": 1}
+        civility_int = civility_map.get(civility or "", 0)
 
-        attributes: dict[str, Any] = {"typeOf": type_of, "civility": civility_int}
+        attributes: dict[str, Any] = {
+            "typesOf": types_of or [],
+            "civility": civility_int,
+            "state": 9,
+        }
         if first_name:
             attributes["firstName"] = first_name
         if last_name:
@@ -513,15 +526,25 @@ class BoondCrmAdapter:
         if phone:
             attributes["phone1"] = phone
         if job_title:
-            attributes["jobTitle"] = job_title
+            attributes["function"] = job_title
+        if postcode:
+            attributes["postcode"] = postcode
+        if address:
+            attributes["address"] = address
+        if town:
+            attributes["town"] = town
+
+        relationships: dict[str, Any] = {
+            "company": {"data": {"type": "company", "id": str(company_id)}}
+        }
+        if agency_id:
+            relationships["agency"] = {"data": {"type": "agency", "id": str(agency_id)}}
 
         payload = {
             "data": {
                 "type": "contact",
                 "attributes": attributes,
-                "relationships": {
-                    "company": {"data": {"type": "company", "id": str(company_id)}}
-                },
+                "relationships": relationships,
             }
         }
 
@@ -531,7 +554,7 @@ class BoondCrmAdapter:
             "boond_contact_created",
             contact_id=result_id,
             company_id=company_id,
-            type_of=type_of,
+            types_of=types_of,
         )
         return int(result_id) if result_id else 0
 

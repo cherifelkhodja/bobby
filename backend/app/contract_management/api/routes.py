@@ -1431,24 +1431,60 @@ async def boond_create_company(
         created_company = True
         logger.info("boond_create_company_ok", cr_id=str(cr.id), provider_id=provider_id)
 
-    # Create contacts
-    contacts_created = []
-    contacts_to_create = [
+    # Build deduplicated contacts: if same person (first_name+last_name+email) has
+    # multiple roles, merge typesOf into a single contact.
+    # Boond typesOf: 1=dirigeant, 2=facturation, 3=adv
+    role_entries = [
         (tp.representative_civility, tp.representative_first_name, tp.representative_last_name,
-         tp.representative_email, tp.representative_phone, tp.representative_title, 7, "dirigeant"),
+         tp.representative_email, tp.representative_phone, tp.representative_title, 1, "dirigeant"),
         (tp.adv_contact_civility, tp.adv_contact_first_name, tp.adv_contact_last_name,
-         tp.adv_contact_email, tp.adv_contact_phone, "ADV", 9, "adv"),
+         tp.adv_contact_email, tp.adv_contact_phone, "ADV", 3, "adv"),
         (tp.billing_contact_civility, tp.billing_contact_first_name, tp.billing_contact_last_name,
          tp.billing_contact_email, tp.billing_contact_phone, "Facturation", 2, "facturation"),
     ]
-    for civ, fn, ln, email, phone, job_title, type_of, label in contacts_to_create:
-        if fn or email:
-            contact_id = await crm.create_contact(
-                company_id=provider_id,
-                civility=civ, first_name=fn, last_name=ln,
-                email=email, phone=phone, job_title=job_title, type_of=type_of,
-            )
-            contacts_created.append({"label": label, "boond_contact_id": contact_id})
+
+    # Group by identity key (normalized first_name + last_name + email)
+    merged: dict[str, dict] = {}
+    for civ, fn, ln, email, phone, job_title, type_of, label in role_entries:
+        if not (fn or email):
+            continue
+        key = f"{(fn or '').strip().lower()}|{(ln or '').strip().lower()}|{(email or '').strip().lower()}"
+        if key in merged:
+            merged[key]["types_of"].append(type_of)
+            merged[key]["labels"].append(label)
+            # Keep the most descriptive job_title (representative_title over generic)
+            if job_title and job_title not in ("ADV", "Facturation"):
+                merged[key]["job_title"] = job_title
+        else:
+            merged[key] = {
+                "civility": civ, "first_name": fn, "last_name": ln,
+                "email": email, "phone": phone, "job_title": job_title,
+                "types_of": [type_of], "labels": [label],
+            }
+
+    agency_id = company.boond_agency_id if company else None
+    postcode = tp.head_office_postal_code
+
+    contacts_created = []
+    for entry in merged.values():
+        contact_id = await crm.create_contact(
+            company_id=provider_id,
+            civility=entry["civility"],
+            first_name=entry["first_name"],
+            last_name=entry["last_name"],
+            email=entry["email"],
+            phone=entry["phone"],
+            job_title=entry["job_title"],
+            types_of=entry["types_of"],
+            postcode=postcode,
+            address=tp.head_office_street or tp.head_office_address,
+            town=tp.head_office_city,
+            agency_id=agency_id,
+        )
+        contacts_created.append({
+            "label": " + ".join(entry["labels"]),
+            "boond_contact_id": contact_id,
+        })
 
     return {
         "ok": True,

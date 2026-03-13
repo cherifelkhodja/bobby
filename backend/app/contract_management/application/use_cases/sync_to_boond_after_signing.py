@@ -136,61 +136,66 @@ class SyncToBoondAfterSigningUseCase:
                     error=str(exc),
                 )
 
-        # ── Étape 3 : Création des contacts ───────────────────────────────
-        # type_of → Boond contact ID
+        # ── Étape 3 : Création des contacts (dédupliqués) ─────────────────
+        # Boond typesOf: 1=dirigeant, 2=facturation, 3=adv
         boond_contact_ids: dict[int, int] = {}
 
         if tp and tp.boond_provider_id:
-            contacts_to_create = [
-                (
-                    tp.representative_civility,
-                    tp.representative_first_name,
-                    tp.representative_last_name,
-                    tp.representative_email,
-                    tp.representative_phone,
-                    tp.representative_title,
-                    7,  # dirigeant
-                ),
-                (
-                    tp.adv_contact_civility,
-                    tp.adv_contact_first_name,
-                    tp.adv_contact_last_name,
-                    tp.adv_contact_email,
-                    tp.adv_contact_phone,
-                    "ADV",
-                    9,  # adv
-                ),
-                (
-                    tp.billing_contact_civility,
-                    tp.billing_contact_first_name,
-                    tp.billing_contact_last_name,
-                    tp.billing_contact_email,
-                    tp.billing_contact_phone,
-                    "Facturation",
-                    2,  # facturation
-                ),
+            role_entries = [
+                (tp.representative_civility, tp.representative_first_name,
+                 tp.representative_last_name, tp.representative_email,
+                 tp.representative_phone, tp.representative_title, 1),
+                (tp.adv_contact_civility, tp.adv_contact_first_name,
+                 tp.adv_contact_last_name, tp.adv_contact_email,
+                 tp.adv_contact_phone, "ADV", 3),
+                (tp.billing_contact_civility, tp.billing_contact_first_name,
+                 tp.billing_contact_last_name, tp.billing_contact_email,
+                 tp.billing_contact_phone, "Facturation", 2),
             ]
-            for civ, fn, ln, email, phone, job_title, contact_type in contacts_to_create:
-                if fn or email:
-                    try:
-                        contact_id = await self._crm.create_contact(
-                            company_id=tp.boond_provider_id,
-                            civility=civ,
-                            first_name=fn,
-                            last_name=ln,
-                            email=email,
-                            phone=phone,
-                            job_title=job_title,
-                            type_of=contact_type,
-                        )
-                        boond_contact_ids[contact_type] = contact_id
-                    except Exception as exc:
-                        logger.warning(
-                            "sync_boond_create_contact_failed",
-                            cr_id=str(cr.id),
-                            contact_type=contact_type,
-                            error=str(exc),
-                        )
+
+            # Merge contacts with same identity
+            merged: dict[str, dict] = {}
+            for civ, fn, ln, email, phone, job_title, type_of in role_entries:
+                if not (fn or email):
+                    continue
+                key = f"{(fn or '').strip().lower()}|{(ln or '').strip().lower()}|{(email or '').strip().lower()}"
+                if key in merged:
+                    merged[key]["types_of"].append(type_of)
+                    if job_title and job_title not in ("ADV", "Facturation"):
+                        merged[key]["job_title"] = job_title
+                else:
+                    merged[key] = {
+                        "civility": civ, "first_name": fn, "last_name": ln,
+                        "email": email, "phone": phone, "job_title": job_title,
+                        "types_of": [type_of],
+                    }
+
+            agency_id = company.boond_agency_id if company else None
+            for entry in merged.values():
+                try:
+                    contact_id = await self._crm.create_contact(
+                        company_id=tp.boond_provider_id,
+                        civility=entry["civility"],
+                        first_name=entry["first_name"],
+                        last_name=entry["last_name"],
+                        email=entry["email"],
+                        phone=entry["phone"],
+                        job_title=entry["job_title"],
+                        types_of=entry["types_of"],
+                        postcode=tp.head_office_postal_code,
+                        address=tp.head_office_street or tp.head_office_address,
+                        town=tp.head_office_city,
+                        agency_id=agency_id,
+                    )
+                    for t in entry["types_of"]:
+                        boond_contact_ids[t] = contact_id
+                except Exception as exc:
+                    logger.warning(
+                        "sync_boond_create_contact_failed",
+                        cr_id=str(cr.id),
+                        types_of=entry["types_of"],
+                        error=str(exc),
+                    )
 
         # ── Étape 4 : Vérification typeOf de la ressource ─────────────────
         resource_type_of: int | None = None

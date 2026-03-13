@@ -72,7 +72,11 @@ class CrmServicePort(Protocol):
         email: str | None,
         phone: str | None,
         job_title: str | None,
-        type_of: int,
+        types_of: list[int] | None = None,
+        postcode: str | None = None,
+        address: str | None = None,
+        town: str | None = None,
+        agency_id: int | None = None,
     ) -> int:
         """Create a contact linked to a company."""
         ...
