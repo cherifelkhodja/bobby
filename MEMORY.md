@@ -161,6 +161,27 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-13 (portail tiers : checkbox dirigeant, renommage contact, typesOf Boond)
+
+#### Ajout checkbox "Dirigeant de la société" + renommage Contact facturation → Contact commercial + mapping typesOf Boond
+
+**Contexte** : Le portail tiers permettait de saisir un signataire mais ne distinguait pas s'il était dirigeant. Le champ "Contact facturation" devait être renommé "Contact commercial". Les typesOf Boond devaient être mis à jour.
+
+**Implémentation** :
+1. Ajouté champ `signatory_is_director` (Boolean) sur `ThirdParty` (entity, model, repo, migration 058)
+2. Ajouté checkbox dans le portail (section Signataire) avec label "Cette personne est le dirigeant de la société"
+3. Renommé "Contact facturation" → "Contact commercial" dans le formulaire portail
+4. Mis à jour le mapping Boond typesOf lors du push CRM :
+   - typeOf 10 : Signataire (toujours)
+   - typeOf 7 : Dirigeant (si checkbox cochée)
+   - typeOf 9 : Contact ADV
+   - typeOf 8 : Commercial
+5. Les typesOf se cumulent lors de la déduplication des contacts (même nom+email = merge des types)
+
+**Fichiers modifiés** : entity, model, repo, migration 058, schemas, portal routes, contract_management routes, frontend types/api/Portal.tsx
+
+---
+
 ### 2026-03-13 (régénération brouillon avec référence définitive)
 
 #### Régénération automatique du PDF contrat à l'approbation partenaire
