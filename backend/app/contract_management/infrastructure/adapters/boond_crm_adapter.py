@@ -711,6 +711,9 @@ class BoondCrmAdapter:
             "dependsOn": {
                 "data": {"type": "resource", "id": str(resource_id)}
             },
+            "positioning": {
+                "data": {"type": "positioning", "id": str(positioning_id)}
+            },
         }
         if agency_id:
             relationships["agency"] = {
