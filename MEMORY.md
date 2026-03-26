@@ -161,6 +161,28 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-26 (fix: Boond 422 — missing dependsOn on candidate conversion)
+
+#### Correction conversion candidat → ressource
+L'API BoondManager exige la relation `dependsOn` (manager/responsable hiérarchique)
+lors du `PUT /candidates/{id}/information` pour convertir un candidat en ressource.
+Sans cette relation, Boond renvoie HTTP 422 code 1017 "Missing required attribute"
+au pointer `/data/relationships/dependsOn`.
+
+**Corrections** :
+1. **`convert_candidate_to_resource()`** : ajout du paramètre `manager_id` et inclusion
+   de `relationships.dependsOn` dans le payload quand un manager est disponible.
+2. **`SyncToBoondAfterSigningUseCase`** : récupère le `manager_id` via `get_need()`
+   (mainManager du besoin Boond) avant d'appeler la conversion.
+3. **`CrmServicePort`** : signature mise à jour avec le paramètre `manager_id`.
+
+**Fichiers modifiés** :
+- `backend/app/contract_management/infrastructure/adapters/boond_crm_adapter.py`
+- `backend/app/contract_management/application/use_cases/sync_to_boond_after_signing.py`
+- `backend/app/contract_management/domain/ports/crm_service.py`
+
+---
+
 ### 2026-03-13 (fix: payloads Boond contrat + lien admin + suppression étape typeOf)
 
 #### Corrections payloads API BoondManager

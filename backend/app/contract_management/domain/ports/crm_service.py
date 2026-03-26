@@ -43,6 +43,7 @@ class CrmServicePort(Protocol):
         state: int = 3,
         state_reason_type_of: int | None = None,
         type_of: int | None = None,
+        manager_id: int | None = None,
     ) -> None:
         """Convert a candidate to a resource by updating their state."""
         ...

@@ -1356,6 +1356,16 @@ async def boond_convert_candidate(
     # Determine state_reason_type_of: 0 = salarié, 1 = externe
     state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
 
+    # Fetch manager_id from Boond need (required as dependsOn for conversion)
+    manager_id: int | None = None
+    if cr.boond_need_id:
+        try:
+            need_data = await crm.get_need(cr.boond_need_id)
+            if need_data:
+                manager_id = need_data.get("manager_id")
+        except Exception:
+            pass  # Best-effort: conversion will still be attempted
+
     try:
         # Step 1: Convert candidate → resource (skip if already a resource)
         converted = False
@@ -1365,6 +1375,7 @@ async def boond_convert_candidate(
                 state=3,
                 state_reason_type_of=state_reason_type_of,
                 type_of=state_reason_type_of,  # 0=salarié, 1=externe
+                manager_id=manager_id,
             )
             converted = True
             logger.info("boond_convert_candidate_ok", cr_id=str(cr.id), candidate_id=cr.boond_candidate_id)

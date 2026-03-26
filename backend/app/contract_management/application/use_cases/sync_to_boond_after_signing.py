@@ -231,6 +231,21 @@ class SyncToBoondAfterSigningUseCase:
         # N'effectuer la conversion que si le consultant est un candidat Boond.
         # Si c'est déjà une ressource (boond_consultant_type == "resource"),
         # l'appel /candidates/{id} échouerait et la conversion est inutile.
+        # Boond exige la relation dependsOn (manager) lors de la conversion.
+        manager_id: int | None = None
+        if cr.boond_need_id:
+            try:
+                need_data = await self._crm.get_need(cr.boond_need_id)
+                if need_data:
+                    manager_id = need_data.get("manager_id")
+            except Exception as exc:
+                logger.warning(
+                    "sync_boond_get_need_for_manager_failed",
+                    cr_id=str(cr.id),
+                    need_id=cr.boond_need_id,
+                    error=str(exc),
+                )
+
         is_candidate = cr.boond_consultant_type == "candidate" or cr.boond_consultant_type is None
         state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
         if resource_id and is_candidate:
@@ -240,6 +255,7 @@ class SyncToBoondAfterSigningUseCase:
                     state=3,
                     state_reason_type_of=state_reason_type_of,
                     type_of=state_reason_type_of,  # 0=salarié, 1=externe
+                    manager_id=manager_id,
                 )
             except Exception as exc:
                 logger.warning(

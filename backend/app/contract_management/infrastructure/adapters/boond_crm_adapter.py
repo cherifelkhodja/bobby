@@ -366,6 +366,7 @@ class BoondCrmAdapter:
         state: int = 3,
         state_reason_type_of: int | None = None,
         type_of: int | None = None,
+        manager_id: int | None = None,
     ) -> None:
         """Convert a candidate to a resource in BoondManager by updating state.
 
@@ -374,6 +375,7 @@ class BoondCrmAdapter:
             state: Target state (3 = Arrivée prochaine).
             state_reason_type_of: Reason type (0 = salarié, 1 = externe/sous-traitant).
             type_of: Resource type (0 = salarié, 1 = externe).
+            manager_id: Boond resource ID of the manager (required by Boond as dependsOn).
         """
         attributes: dict[str, Any] = {"state": state}
         if state_reason_type_of is not None:
@@ -381,13 +383,20 @@ class BoondCrmAdapter:
         if type_of is not None:
             attributes["typeOf"] = type_of
 
-        payload = {
-            "data": {
-                "type": "resource",
-                "id": str(candidate_id),
-                "attributes": attributes,
-            }
+        data_payload: dict[str, Any] = {
+            "type": "resource",
+            "id": str(candidate_id),
+            "attributes": attributes,
         }
+
+        if manager_id is not None:
+            data_payload["relationships"] = {
+                "dependsOn": {
+                    "data": {"type": "resource", "id": str(manager_id)}
+                }
+            }
+
+        payload = {"data": data_payload}
         try:
             await self._boond._make_request(
                 "PUT", f"/candidates/{candidate_id}/information", json=payload
