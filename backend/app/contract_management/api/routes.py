@@ -1310,14 +1310,75 @@ def _require_signed_or_archived(cr, contract_request_id: UUID):
 
 @router.post(
     "/{contract_request_id}/boond/convert-candidate",
-    summary="[Boond] Convertir le candidat en ressource + créer contrat Boond",
+    summary="[Boond] Convertir le candidat en ressource",
 )
 async def boond_convert_candidate(
     contract_request_id: UUID,
     user_id: AdvOrAdminUser,
     db: AsyncSession = Depends(get_db),
 ):
-    """Convertit le candidat en ressource (state=3) puis crée le contrat Boond (externe). ADV/admin only."""
+    """Convertit le candidat en ressource (state=3). ADV/admin only."""
+    settings = get_settings()
+    cr_repo, _cr2, tp_repo, crm = _boond_deps(db, settings)
+
+    cr = await cr_repo.get_by_id(contract_request_id)
+    _require_signed_or_archived(cr, contract_request_id)
+
+    if not cr.boond_candidate_id:
+        raise HTTPException(status_code=400, detail="Pas de boond_candidate_id sur cette demande.")
+
+    if cr.boond_consultant_type == "resource":
+        return {"ok": True, "boond_candidate_id": cr.boond_candidate_id, "converted": False, "already_resource": True}
+
+    # Determine state_reason_type_of: 0 = salarié, 1 = externe
+    state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
+
+    # Fetch manager_id from Boond need (required as dependsOn for conversion)
+    manager_id: int | None = None
+    if cr.boond_need_id:
+        try:
+            need_data = await crm.get_need(cr.boond_need_id)
+            if need_data:
+                manager_id = need_data.get("manager_id")
+        except Exception:
+            pass  # Best-effort: conversion will still be attempted
+
+    try:
+        await crm.convert_candidate_to_resource(
+            cr.boond_candidate_id,
+            state=3,
+            state_reason_type_of=state_reason_type_of,
+            type_of=state_reason_type_of,  # 0=salarié, 1=externe
+            manager_id=manager_id,
+        )
+        logger.info("boond_convert_candidate_ok", cr_id=str(cr.id), candidate_id=cr.boond_candidate_id)
+        return {
+            "ok": True,
+            "boond_candidate_id": cr.boond_candidate_id,
+            "converted": True,
+            "already_resource": False,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        detail = str(exc)
+        cause = exc.__cause__ or (getattr(exc, '__context__', None))
+        if hasattr(cause, 'response'):
+            detail = f"Boond HTTP {cause.response.status_code}: {cause.response.text[:2000]}"
+        logger.error("boond_convert_candidate_failed", error=detail, cr_id=str(contract_request_id))
+        raise HTTPException(status_code=400, detail=f"Erreur Boond: {detail}")
+
+
+@router.post(
+    "/{contract_request_id}/boond/create-contract",
+    summary="[Boond] Créer le contrat Boond (externe)",
+)
+async def boond_create_contract(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Crée le contrat Boond et lie le fournisseur (externe uniquement). ADV/admin only."""
     from app.contract_management.application.use_cases.sync_to_boond_after_signing import (
         _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE,
     )
@@ -1333,7 +1394,14 @@ async def boond_convert_candidate(
     if not cr.boond_candidate_id:
         raise HTTPException(status_code=400, detail="Pas de boond_candidate_id sur cette demande.")
 
-    # Resolve third party and company for extra context
+    is_external = cr.third_party_type != "salarie"
+    if not is_external:
+        return {"ok": True, "contract_created": False, "reason": "Type salarié, pas de contrat Boond."}
+
+    if not cr.daily_rate:
+        raise HTTPException(status_code=400, detail="TJM manquant sur la demande.")
+
+    # Resolve third party and company
     tp = None
     if cr.third_party_id:
         tp = await tp_repo.get_by_id(cr.third_party_id)
@@ -1353,81 +1421,42 @@ async def boond_convert_candidate(
         )
         company = result.scalar_one_or_none()
 
-    # Determine state_reason_type_of: 0 = salarié, 1 = externe
-    state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
-
-    # Fetch manager_id from Boond need (required as dependsOn for conversion)
-    manager_id: int | None = None
-    if cr.boond_need_id:
-        try:
-            need_data = await crm.get_need(cr.boond_need_id)
-            if need_data:
-                manager_id = need_data.get("manager_id")
-        except Exception:
-            pass  # Best-effort: conversion will still be attempted
+    contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(cr.third_party_type or "", 3)
+    start_date_str = None
+    if cr.start_date:
+        start_date_str = cr.start_date.strftime("%Y-%m-%d") if hasattr(cr.start_date, "strftime") else str(cr.start_date)
+    agency_id = company.boond_agency_id if company else None
 
     try:
-        # Step 1: Convert candidate → resource (skip if already a resource)
-        converted = False
-        if cr.boond_consultant_type != "resource":
-            await crm.convert_candidate_to_resource(
-                cr.boond_candidate_id,
-                state=3,
-                state_reason_type_of=state_reason_type_of,
-                type_of=state_reason_type_of,  # 0=salarié, 1=externe
-                manager_id=manager_id,
-            )
-            converted = True
-            logger.info("boond_convert_candidate_ok", cr_id=str(cr.id), candidate_id=cr.boond_candidate_id)
+        await crm.create_boond_contract(
+            resource_id=cr.boond_candidate_id,
+            positioning_id=cr.boond_positioning_id,
+            daily_rate=float(cr.daily_rate),
+            type_of=contract_type_of,
+            start_date=start_date_str,
+            agency_id=agency_id,
+        )
 
-        # Step 2: Create Boond contract (external resources only)
-        contract_created = False
+        # Link provider if exists
         provider_linked = False
-        contract_type_of = None
-        is_external = cr.third_party_type != "salarie"
-        if is_external:
-            if not cr.daily_rate:
-                raise HTTPException(status_code=400, detail="TJM manquant sur la demande.")
-            contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(cr.third_party_type or "", 3)
-
-            # Extract start_date from contract request
-            start_date_str = None
-            if cr.start_date:
-                start_date_str = cr.start_date.strftime("%Y-%m-%d") if hasattr(cr.start_date, "strftime") else str(cr.start_date)
-
-            agency_id = company.boond_agency_id if company else None
-
-            await crm.create_boond_contract(
+        if tp and tp.boond_provider_id:
+            await crm.update_resource_administrative(
                 resource_id=cr.boond_candidate_id,
-                positioning_id=cr.boond_positioning_id,
-                daily_rate=float(cr.daily_rate),
-                type_of=contract_type_of,
-                start_date=start_date_str,
-                agency_id=agency_id,
+                provider_company_id=tp.boond_provider_id,
+                provider_contact_id=tp.boond_commercial_contact_id,
             )
-            contract_created = True
-
-            # Link provider if exists, using persisted commercial contact ID
-            if tp and tp.boond_provider_id:
-                await crm.update_resource_administrative(
-                    resource_id=cr.boond_candidate_id,
-                    provider_company_id=tp.boond_provider_id,
-                    provider_contact_id=tp.boond_commercial_contact_id,
-                )
-                provider_linked = True
+            provider_linked = True
 
         logger.info(
-            "boond_convert_and_contract_ok",
+            "boond_create_contract_ok",
             cr_id=str(cr.id),
             candidate_id=cr.boond_candidate_id,
-            converted=converted,
-            contract_created=contract_created,
+            contract_type_of=contract_type_of,
+            provider_linked=provider_linked,
         )
         return {
             "ok": True,
-            "boond_candidate_id": cr.boond_candidate_id,
-            "converted": converted,
-            "contract_created": contract_created,
+            "contract_created": True,
             "contract_type_of": contract_type_of,
             "provider_linked": provider_linked,
         }
@@ -1438,13 +1467,7 @@ async def boond_convert_candidate(
         cause = exc.__cause__ or (getattr(exc, '__context__', None))
         if hasattr(cause, 'response'):
             detail = f"Boond HTTP {cause.response.status_code}: {cause.response.text[:2000]}"
-        elif hasattr(exc, 'last_attempt'):
-            inner = exc.last_attempt.exception()
-            if inner and hasattr(inner, 'response'):
-                detail = f"Boond HTTP {inner.response.status_code}: {inner.response.text[:2000]}"
-            elif inner:
-                detail = str(inner)
-        logger.error("boond_convert_candidate_failed", error=detail, cr_id=str(contract_request_id))
+        logger.error("boond_create_contract_failed", error=detail, cr_id=str(contract_request_id))
         raise HTTPException(status_code=400, detail=f"Erreur Boond: {detail}")
 
 

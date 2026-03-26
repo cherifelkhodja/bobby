@@ -162,11 +162,20 @@ export const contractsApi = {
     ok: boolean;
     boond_candidate_id: number;
     converted: boolean;
+    already_resource: boolean;
+  }> => {
+    const response = await apiClient.post(`/contract-requests/${id}/boond/convert-candidate`);
+    return response.data;
+  },
+
+  boondCreateContract: async (id: string): Promise<{
+    ok: boolean;
     contract_created: boolean;
     contract_type_of: number | null;
     provider_linked: boolean;
+    reason?: string;
   }> => {
-    const response = await apiClient.post(`/contract-requests/${id}/boond/convert-candidate`);
+    const response = await apiClient.post(`/contract-requests/${id}/boond/create-contract`);
     return response.data;
   },
 

@@ -250,11 +250,25 @@ export default function ContractDetail() {
   const boondConvertMutation = useMutation({
     mutationFn: () => contractsApi.boondConvertCandidate(id!),
     onSuccess: (data) => {
-      const parts: string[] = [];
-      if (data.converted) parts.push(`Candidat #${data.boond_candidate_id} converti en ressource`);
-      if (data.contract_created) parts.push('contrat Boond créé');
-      if (data.provider_linked) parts.push('société fournisseur liée');
-      toast.success(parts.join(', ') + '.');
+      if (data.already_resource) {
+        toast.info(`Candidat #${data.boond_candidate_id} est déjà une ressource.`);
+      } else {
+        toast.success(`Candidat #${data.boond_candidate_id} converti en ressource.`);
+      }
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const boondContractMutation = useMutation({
+    mutationFn: () => contractsApi.boondCreateContract(id!),
+    onSuccess: (data) => {
+      if (!data.contract_created) {
+        toast.info(data.reason || 'Pas de contrat créé.');
+      } else {
+        const parts = ['Contrat Boond créé'];
+        if (data.provider_linked) parts.push('fournisseur lié');
+        toast.success(parts.join(', ') + '.');
+      }
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -1090,14 +1104,14 @@ export default function ContractDetail() {
               </Button>
             </div>
 
-            {/* Action 2 — candidat → ressource + contrat Boond */}
+            {/* Action 2 — candidat → ressource */}
             {cr.boond_candidate_id && (
               <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                  2 · Candidat → Ressource + Contrat
+                  2 · Candidat → Ressource
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  Convertit le candidat #{cr.boond_candidate_id} en ressource et crée le contrat Boond (externe).
+                  Convertit le candidat #{cr.boond_candidate_id} en ressource Boond.
                 </span>
                 <Button
                   variant="outline"
@@ -1112,10 +1126,30 @@ export default function ContractDetail() {
               </div>
             )}
 
-            {/* Action 3 — bon de commande */}
+            {/* Action 3 — création contrat Boond */}
             <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
               <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                3 · Bon de commande
+                3 · Création du contrat
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Crée le contrat Boond et lie le fournisseur (externe).
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-1 self-start"
+                disabled={boondContractMutation.isPending}
+                onClick={() => boondContractMutation.mutate()}
+              >
+                <RotateCcw className={`h-3.5 w-3.5 mr-1 ${boondContractMutation.isPending ? 'animate-spin' : ''}`} />
+                {boondContractMutation.isPending ? 'En cours…' : 'Exécuter'}
+              </Button>
+            </div>
+
+            {/* Action 4 — bon de commande */}
+            <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                4 · Bon de commande
               </span>
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 Crée le BDC dans Boond et enregistre son ID sur le contrat signé.
