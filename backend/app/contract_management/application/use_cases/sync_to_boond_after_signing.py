@@ -247,6 +247,7 @@ class SyncToBoondAfterSigningUseCase:
                 )
 
         is_candidate = cr.boond_consultant_type == "candidate" or cr.boond_consultant_type is None
+        is_resource = not is_candidate  # Already a resource in Boond
         state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
         if resource_id and is_candidate:
             try:
@@ -257,6 +258,7 @@ class SyncToBoondAfterSigningUseCase:
                     type_of=state_reason_type_of,  # 0=salarié, 1=externe
                     manager_id=manager_id,
                 )
+                is_resource = True  # Conversion succeeded
             except Exception as exc:
                 logger.warning(
                     "sync_boond_convert_candidate_failed",
@@ -274,8 +276,9 @@ class SyncToBoondAfterSigningUseCase:
 
         # ── Étape 4 : Contrat + lien administratif (externe uniquement) ───
         # Le typeOf est déterminé par le type de tiers : tout sauf "salarie" → externe (1)
+        # Skip if candidate conversion failed — Boond requires a valid resource for contracts.
         is_external = cr.third_party_type != "salarie"
-        if resource_id and is_external and cr.daily_rate:
+        if resource_id and is_resource and is_external and cr.daily_rate:
             contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(
                 cr.third_party_type or "", 3
             )

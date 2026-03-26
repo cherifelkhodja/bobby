@@ -175,6 +175,9 @@ au pointer `/data/relationships/dependsOn`.
 2. **`SyncToBoondAfterSigningUseCase`** : récupère le `manager_id` via `get_need()`
    (mainManager du besoin Boond) avant d'appeler la conversion.
 3. **`CrmServicePort`** : signature mise à jour avec le paramètre `manager_id`.
+4. **Étape 4 (création contrat)** : skip si la conversion candidat → ressource a échoué.
+   Boond exige un `type: "resource"` valide dans `dependsOn` du contrat — un ID candidat
+   non converti cause aussi une erreur 422/1017.
 
 **Fichiers modifiés** :
 - `backend/app/contract_management/infrastructure/adapters/boond_crm_adapter.py`
