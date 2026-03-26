@@ -725,6 +725,12 @@ class BoondCrmAdapter:
             }
         }
 
+        logger.info(
+            "boond_contract_payload",
+            resource_id=resource_id,
+            positioning_id=positioning_id,
+            payload=payload,
+        )
         response = await self._boond._make_request("POST", "/contracts", json=payload)
         result_id = response.get("data", {}).get("id")
         logger.info(
