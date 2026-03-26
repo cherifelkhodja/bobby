@@ -1377,8 +1377,13 @@ async def boond_create_contract(
     contract_request_id: UUID,
     user_id: AdvOrAdminUser,
     db: AsyncSession = Depends(get_db),
+    resource_id: int | None = None,
 ):
-    """Crée le contrat Boond et lie le fournisseur (externe uniquement). ADV/admin only."""
+    """Crée le contrat Boond et lie le fournisseur (externe uniquement). ADV/admin only.
+
+    Args:
+        resource_id: Override Boond resource ID (query param). Falls back to cr.boond_candidate_id.
+    """
     from app.contract_management.application.use_cases.sync_to_boond_after_signing import (
         _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE,
     )
@@ -1391,8 +1396,9 @@ async def boond_create_contract(
     cr = await cr_repo.get_by_id(contract_request_id)
     _require_signed_or_archived(cr, contract_request_id)
 
-    if not cr.boond_candidate_id:
-        raise HTTPException(status_code=400, detail="Pas de boond_candidate_id sur cette demande.")
+    effective_resource_id = resource_id or cr.boond_candidate_id
+    if not effective_resource_id:
+        raise HTTPException(status_code=400, detail="Pas de resource_id fourni et pas de boond_candidate_id sur cette demande.")
 
     is_external = cr.third_party_type != "salarie"
     if not is_external:
@@ -1429,7 +1435,7 @@ async def boond_create_contract(
 
     try:
         await crm.create_boond_contract(
-            resource_id=cr.boond_candidate_id,
+            resource_id=effective_resource_id,
             positioning_id=cr.boond_positioning_id,
             daily_rate=float(cr.daily_rate),
             type_of=contract_type_of,
@@ -1441,7 +1447,7 @@ async def boond_create_contract(
         provider_linked = False
         if tp and tp.boond_provider_id:
             await crm.update_resource_administrative(
-                resource_id=cr.boond_candidate_id,
+                resource_id=effective_resource_id,
                 provider_company_id=tp.boond_provider_id,
                 provider_contact_id=tp.boond_commercial_contact_id,
             )

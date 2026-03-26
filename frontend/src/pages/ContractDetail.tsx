@@ -89,6 +89,7 @@ export default function ContractDetail() {
   const [showOverride, setShowOverride] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [contractResourceId, setContractResourceId] = useState('');
   const [tempValidatingDocId, setTempValidatingDocId] = useState<string | null>(null);
 
   // Commercial validation form state — pre-filled from Boond data
@@ -260,7 +261,7 @@ export default function ContractDetail() {
   });
 
   const boondContractMutation = useMutation({
-    mutationFn: () => contractsApi.boondCreateContract(id!),
+    mutationFn: () => contractsApi.boondCreateContract(id!, contractResourceId ? parseInt(contractResourceId, 10) : undefined),
     onSuccess: (data) => {
       if (!data.contract_created) {
         toast.info(data.reason || 'Pas de contrat créé.');
@@ -1134,16 +1135,24 @@ export default function ContractDetail() {
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 Crée le contrat Boond et lie le fournisseur (externe).
               </span>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-1 self-start"
-                disabled={boondContractMutation.isPending}
-                onClick={() => boondContractMutation.mutate()}
-              >
-                <RotateCcw className={`h-3.5 w-3.5 mr-1 ${boondContractMutation.isPending ? 'animate-spin' : ''}`} />
-                {boondContractMutation.isPending ? 'En cours…' : 'Exécuter'}
-              </Button>
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="number"
+                  placeholder={`Resource ID (défaut: ${cr.boond_candidate_id || '—'})`}
+                  value={contractResourceId}
+                  onChange={(e) => setContractResourceId(e.target.value)}
+                  className="w-48 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={boondContractMutation.isPending}
+                  onClick={() => boondContractMutation.mutate()}
+                >
+                  <RotateCcw className={`h-3.5 w-3.5 mr-1 ${boondContractMutation.isPending ? 'animate-spin' : ''}`} />
+                  {boondContractMutation.isPending ? 'En cours…' : 'Exécuter'}
+                </Button>
+              </div>
             </div>
 
             {/* Action 4 — bon de commande */}

@@ -168,14 +168,15 @@ export const contractsApi = {
     return response.data;
   },
 
-  boondCreateContract: async (id: string): Promise<{
+  boondCreateContract: async (id: string, resourceId?: number): Promise<{
     ok: boolean;
     contract_created: boolean;
     contract_type_of: number | null;
     provider_linked: boolean;
     reason?: string;
   }> => {
-    const response = await apiClient.post(`/contract-requests/${id}/boond/create-contract`);
+    const params = resourceId ? { resource_id: resourceId } : undefined;
+    const response = await apiClient.post(`/contract-requests/${id}/boond/create-contract`, null, { params });
     return response.data;
   },
 
