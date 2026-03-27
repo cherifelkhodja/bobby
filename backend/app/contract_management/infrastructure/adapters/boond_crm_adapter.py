@@ -711,6 +711,7 @@ class BoondCrmAdapter:
             "numberOfWorkingDays": 210,
             "classification": "-1",
             "currency": 0,
+            "workingTimeType": 0,
         }
         if start_date:
             attributes["startDate"] = start_date
