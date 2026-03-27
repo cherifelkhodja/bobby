@@ -1431,6 +1431,9 @@ async def boond_create_contract(
     start_date_str = None
     if cr.start_date:
         start_date_str = cr.start_date.strftime("%Y-%m-%d") if hasattr(cr.start_date, "strftime") else str(cr.start_date)
+    end_date_str = None
+    if cr.end_date:
+        end_date_str = cr.end_date.strftime("%Y-%m-%d") if hasattr(cr.end_date, "strftime") else str(cr.end_date)
     agency_id = company.boond_agency_id if company else None
 
     try:
@@ -1440,6 +1443,7 @@ async def boond_create_contract(
             daily_rate=float(cr.daily_rate),
             type_of=contract_type_of,
             start_date=start_date_str,
+            end_date=end_date_str,
             agency_id=agency_id,
         )
 

@@ -107,6 +107,9 @@ class CrmServicePort(Protocol):
         positioning_id: int,
         daily_rate: float,
         type_of: int,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        agency_id: int | None = None,
     ) -> int:
         """Create a contract in the CRM for an external consultant."""
         ...

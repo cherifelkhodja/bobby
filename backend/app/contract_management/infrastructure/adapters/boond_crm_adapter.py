@@ -679,6 +679,7 @@ class BoondCrmAdapter:
         daily_rate: float,
         type_of: int,
         start_date: str | None = None,
+        end_date: str | None = None,
         agency_id: int | None = None,
     ) -> int:
         """Create a contract in BoondManager for an external consultant.
@@ -690,6 +691,7 @@ class BoondCrmAdapter:
             type_of: Contract type (2=sous-traitant, 3=freelance,
                      6=portage salarial, 7=portage commercial).
             start_date: Contract start date (YYYY-MM-DD format).
+            end_date: Contract end date (YYYY-MM-DD format).
             agency_id: Boond agency ID to link the contract to.
 
         Returns:
@@ -706,6 +708,8 @@ class BoondCrmAdapter:
         }
         if start_date:
             attributes["startDate"] = start_date
+        if end_date:
+            attributes["endDate"] = end_date
 
         relationships: dict[str, Any] = {
             "dependsOn": {
