@@ -180,6 +180,11 @@ au pointer `/data/relationships/dependsOn`.
    - `POST /{id}/boond/convert-candidate` → conversion candidat seule
    - `POST /{id}/boond/create-contract` → création contrat Boond + lien fournisseur
    Frontend mis à jour avec 4 boutons individuels au lieu de 3.
+6. **Capture du nouvel ID ressource** : après conversion candidat → ressource, Boond peut
+   assigner un nouvel ID. `convert_candidate_to_resource()` retourne maintenant cet ID,
+   et le use case + l'endpoint le persistent en DB (`cr.boond_candidate_id`).
+7. **`end_date`** ajouté au payload de création de contrat Boond (`endDate`).
+8. **`workingTimeType: 0`** ajouté au payload de création de contrat Boond.
 
 **Fichiers modifiés** :
 - `backend/app/contract_management/infrastructure/adapters/boond_crm_adapter.py`
