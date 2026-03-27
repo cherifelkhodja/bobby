@@ -254,8 +254,9 @@ export default function ContractDetail() {
       if (data.already_resource) {
         toast.info(`Candidat #${data.boond_candidate_id} est déjà une ressource.`);
       } else {
-        toast.success(`Candidat #${data.boond_candidate_id} converti en ressource.`);
+        toast.success(`Candidat converti en ressource #${data.new_resource_id}.`);
       }
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });

@@ -251,14 +251,25 @@ class SyncToBoondAfterSigningUseCase:
         state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
         if resource_id and is_candidate:
             try:
-                await self._crm.convert_candidate_to_resource(
+                new_resource_id = await self._crm.convert_candidate_to_resource(
                     resource_id,
                     state=3,
                     state_reason_type_of=state_reason_type_of,
                     type_of=state_reason_type_of,  # 0=salarié, 1=externe
                     manager_id=manager_id,
                 )
-                is_resource = True  # Conversion succeeded
+                is_resource = True
+                # Update resource_id if Boond assigned a new ID after conversion
+                if new_resource_id and new_resource_id != resource_id:
+                    logger.info(
+                        "sync_boond_resource_id_changed",
+                        cr_id=str(cr.id),
+                        old_id=resource_id,
+                        new_id=new_resource_id,
+                    )
+                    resource_id = new_resource_id
+                    cr.boond_candidate_id = new_resource_id
+                cr.boond_consultant_type = "resource"
             except Exception as exc:
                 logger.warning(
                     "sync_boond_convert_candidate_failed",

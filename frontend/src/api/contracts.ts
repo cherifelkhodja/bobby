@@ -161,6 +161,7 @@ export const contractsApi = {
   boondConvertCandidate: async (id: string): Promise<{
     ok: boolean;
     boond_candidate_id: number;
+    new_resource_id: number;
     converted: boolean;
     already_resource: boolean;
   }> => {

@@ -367,7 +367,7 @@ class BoondCrmAdapter:
         state_reason_type_of: int | None = None,
         type_of: int | None = None,
         manager_id: int | None = None,
-    ) -> None:
+    ) -> int:
         """Convert a candidate to a resource in BoondManager by updating state.
 
         Args:
@@ -376,6 +376,9 @@ class BoondCrmAdapter:
             state_reason_type_of: Reason type (0 = salarié, 1 = externe/sous-traitant).
             type_of: Resource type (0 = salarié, 1 = externe).
             manager_id: Boond resource ID of the manager (required by Boond as dependsOn).
+
+        Returns:
+            The new Boond resource ID (may differ from candidate_id after conversion).
         """
         attributes: dict[str, Any] = {"state": state}
         if state_reason_type_of is not None:
@@ -398,15 +401,18 @@ class BoondCrmAdapter:
 
         payload = {"data": data_payload}
         try:
-            await self._boond._make_request(
+            response = await self._boond._make_request(
                 "PUT", f"/candidates/{candidate_id}/information", json=payload
             )
+            new_resource_id = int(response.get("data", {}).get("id", candidate_id))
             logger.info(
                 "boond_candidate_converted_to_resource",
                 candidate_id=candidate_id,
+                new_resource_id=new_resource_id,
                 state=state,
                 state_reason_type_of=state_reason_type_of,
             )
+            return new_resource_id
         except Exception as exc:
             logger.error(
                 "boond_convert_candidate_failed",

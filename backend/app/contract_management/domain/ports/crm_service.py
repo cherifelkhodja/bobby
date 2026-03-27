@@ -44,8 +44,8 @@ class CrmServicePort(Protocol):
         state_reason_type_of: int | None = None,
         type_of: int | None = None,
         manager_id: int | None = None,
-    ) -> None:
-        """Convert a candidate to a resource by updating their state."""
+    ) -> int:
+        """Convert a candidate to a resource. Returns the new resource ID."""
         ...
 
     async def update_company_information(

@@ -1344,17 +1344,29 @@ async def boond_convert_candidate(
             pass  # Best-effort: conversion will still be attempted
 
     try:
-        await crm.convert_candidate_to_resource(
+        new_resource_id = await crm.convert_candidate_to_resource(
             cr.boond_candidate_id,
             state=3,
             state_reason_type_of=state_reason_type_of,
             type_of=state_reason_type_of,  # 0=salarié, 1=externe
             manager_id=manager_id,
         )
-        logger.info("boond_convert_candidate_ok", cr_id=str(cr.id), candidate_id=cr.boond_candidate_id)
+        # Persist the new resource ID and type
+        if new_resource_id and new_resource_id != cr.boond_candidate_id:
+            cr.boond_candidate_id = new_resource_id
+        cr.boond_consultant_type = "resource"
+        await cr_repo.save(cr)
+
+        logger.info(
+            "boond_convert_candidate_ok",
+            cr_id=str(cr.id),
+            old_candidate_id=cr.boond_candidate_id,
+            new_resource_id=new_resource_id,
+        )
         return {
             "ok": True,
             "boond_candidate_id": cr.boond_candidate_id,
+            "new_resource_id": new_resource_id,
             "converted": True,
             "already_resource": False,
         }
