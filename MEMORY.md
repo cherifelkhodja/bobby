@@ -161,6 +161,22 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-03-30 (fix: extraction du nouvel ID ressource après conversion candidat)
+
+#### Correction récupération du resource ID
+Après conversion candidat → ressource (`PUT /candidates/{id}/information` state=3),
+Boond retourne le nouvel ID ressource dans `data.relationships.resource.data.id`,
+et NON dans `data.id` (qui reste l'ID candidat). Le code lisait `data.id`, donc
+la sync complète utilisait l'ancien ID candidat pour créer le contrat → 422.
+
+**Correction** : `convert_candidate_to_resource()` extrait maintenant le resource ID
+depuis `response.data.relationships.resource.data.id` avec fallback sur `data.id`.
+
+**Fichiers modifiés** :
+- `backend/app/contract_management/infrastructure/adapters/boond_crm_adapter.py`
+
+---
+
 ### 2026-03-26 (fix: Boond 422 — missing dependsOn on candidate conversion)
 
 #### Correction conversion candidat → ressource
