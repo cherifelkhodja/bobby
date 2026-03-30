@@ -404,7 +404,22 @@ class BoondCrmAdapter:
             response = await self._boond._make_request(
                 "PUT", f"/candidates/{candidate_id}/information", json=payload
             )
-            new_resource_id = int(response.get("data", {}).get("id", candidate_id))
+            # After conversion, the new resource ID is in
+            # data.relationships.resource.data.id (NOT data.id which
+            # remains the candidate ID).
+            resource_rel = (
+                response.get("data", {})
+                .get("relationships", {})
+                .get("resource", {})
+                .get("data")
+            )
+            if resource_rel and resource_rel.get("id"):
+                new_resource_id = int(resource_rel["id"])
+            else:
+                # Fallback: use data.id (shouldn't happen for state=3)
+                new_resource_id = int(
+                    response.get("data", {}).get("id", candidate_id)
+                )
             logger.info(
                 "boond_candidate_converted_to_resource",
                 candidate_id=candidate_id,
