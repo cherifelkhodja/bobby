@@ -131,6 +131,82 @@ async def process_framework_contract_renewals():
         )
 
 
+async def archive_inactive_contract_requests():
+    """CRON: Archive contract requests with no active BDC for 6 months.
+
+    Runs daily at 3h. A contract request in ACTIVE status is archived
+    when all linked purchase orders have been closed or archived for
+    more than 6 months.
+    """
+    from datetime import datetime, timedelta
+
+    from sqlalchemy import select
+
+    from app.contract_management.domain.value_objects.contract_request_status import (
+        ContractRequestStatus,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        ContractRequestRepository,
+        FrameworkContractRepository,
+        PurchaseOrderRepository,
+    )
+    from app.contract_management.infrastructure.models import (
+        ContractRequestModel,
+        FrameworkContractModel,
+    )
+    from app.infrastructure.database.connection import async_session_factory
+
+    six_months_ago = datetime.utcnow() - timedelta(days=180)
+
+    async with async_session_factory() as session:
+        cr_repo = ContractRequestRepository(session)
+        fc_repo = FrameworkContractRepository(session)
+        po_repo = PurchaseOrderRepository(session)
+
+        # Find all ACTIVE contract requests
+        result = await session.execute(
+            select(ContractRequestModel).where(
+                ContractRequestModel.status == ContractRequestStatus.ACTIVE.value,
+            )
+        )
+        active_crs = result.scalars().all()
+
+        archived_count = 0
+        for cr_model in active_crs:
+            cr = cr_repo._to_entity(cr_model)
+
+            # Find the framework contract for this CR's third party
+            if not cr.third_party_id:
+                continue
+
+            fc = await fc_repo.get_active_by_third_party(cr.third_party_id)
+            if not fc:
+                # No FC → archive the CR
+                cr.transition_to(ContractRequestStatus.ARCHIVED)
+                await cr_repo.save(cr)
+                archived_count += 1
+                continue
+
+            # Check if any PO is still active
+            purchase_orders = await po_repo.list_by_framework_contract(fc.id)
+            has_recent_active = any(
+                po.status.value in ("draft", "sent", "active")
+                or (po.updated_at and po.updated_at > six_months_ago)
+                for po in purchase_orders
+            )
+
+            if not has_recent_active:
+                cr.transition_to(ContractRequestStatus.ARCHIVED)
+                await cr_repo.save(cr)
+                archived_count += 1
+
+        await session.commit()
+        logger.info(
+            "cron_archive_inactive_contracts_completed",
+            archived=archived_count,
+        )
+
+
 def setup_scheduler():
     """Configure and return the APScheduler instance.
 
@@ -160,6 +236,15 @@ def setup_scheduler():
         hour=2,
         minute=0,
         id="process_framework_contract_renewals",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        archive_inactive_contract_requests,
+        "cron",
+        hour=3,
+        minute=0,
+        id="archive_inactive_contract_requests",
         replace_existing=True,
     )
 

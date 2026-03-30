@@ -14,6 +14,23 @@ export const portalApi = {
     return response.data;
   },
 
+  checkSiren: async (
+    token: string,
+    siret: string,
+  ): Promise<{
+    has_framework_contract: boolean;
+    framework_contract?: {
+      id: string;
+      reference: string;
+      signed_at: string | null;
+    };
+    purchase_order_request_id?: string;
+    message: string;
+  }> => {
+    const response = await portalClient.post(`/${token}/check-siren`, { siret });
+    return response.data;
+  },
+
   getDocuments: async (
     token: string,
   ): Promise<{

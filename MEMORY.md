@@ -178,7 +178,7 @@ docker-compose up # Start all services
 - `cm_purchase_orders` : bons de commande (N par contrat cadre, résultat final des deux workflows)
 - `cm_purchase_order_requests` : demandes de BDC (workflow simplifié, 7 statuts)
 
-**`ContractRequest` reste inchangé** : pas de `request_type`, pas de `framework_contract_id`
+**`ContractRequest` modifié** : nouveau statut `ACTIVE` entre `SIGNED` et `ARCHIVED`. Le CR reste en ACTIVE tant qu'il y a des BDC actifs. Archivé automatiquement (CRON) quand plus de BDC actif depuis 6 mois.
 
 #### Workflows
 
@@ -195,16 +195,17 @@ PENDING_VALIDATION → VALIDATED → CHECKING_COMPLIANCE → ACTIVE → ARCHIVED
                                COMPLIANCE_EXPIRED (docs expirés → re-collecte)
 ```
 
-#### Détection (Option C — au SIREN)
-Quand le fournisseur soumet ses infos via le portail, si un contrat cadre actif est détecté :
-1. Le `ContractRequest` est annulé
-2. Un `PurchaseOrderRequest` est créé avec les données existantes
+#### Détection (au SIREN — portail step 1)
+Le portail est maintenant en 3 étapes :
+1. **SIREN/SIRET** : `POST /portal/{token}/check-siren` — détecte si un contrat cadre actif existe
+   - Si OUI : annule le ContractRequest, crée un PurchaseOrderRequest, affiche un message de succès
+   - Si NON : continue vers l'étape contacts
+2. **Contacts** : formulaire existant (représentant, signataire, ADV, facturation)
+3. **Documents** : upload des documents de conformité
 
-#### CRON : Tacite reconduction
-- Job quotidien à 2h (`process_framework_contract_renewals`)
-- FC expirant dans 30j → `expiring_soon`
-- FC expiré + tacite_renewal → prolongé de 1 an
-- FC expiré sans tacite → `expired`
+#### CRON jobs
+- **Tacite reconduction** (2h) : `process_framework_contract_renewals` — FC expirant → `expiring_soon`, FC expiré + tacite → +1 an, FC expiré sans tacite → `expired`
+- **Archivage inactif** (3h) : `archive_inactive_contract_requests` — CR ACTIVE sans BDC actif depuis 6 mois → ARCHIVED
 
 #### API
 - `GET/POST /purchase-order-requests` — liste et validation

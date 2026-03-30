@@ -41,7 +41,7 @@ class SyncToBoondAfterSigningUseCase:
     4. If external (third_party_type != "salarie"): create a Boond contract and
        update the resource administrative data to link it to the provider.
     5. Create the purchase order.
-    6. Transition the contract request to ARCHIVED.
+    6. Transition the contract request to ACTIVE.
     """
 
     def __init__(
@@ -65,7 +65,7 @@ class SyncToBoondAfterSigningUseCase:
             contract_request_id: ID of the contract request.
 
         Returns:
-            The updated (ARCHIVED) contract request.
+            The updated (ACTIVE) contract request.
         """
         cr = await self._cr_repo.get_by_id(contract_request_id)
         if not cr:
@@ -462,9 +462,12 @@ class SyncToBoondAfterSigningUseCase:
                     error=str(exc),
                 )
 
-        # ── Étape 6 : Transition → ARCHIVED (si pas déjà) ────────────────
-        if cr.status != ContractRequestStatus.ARCHIVED:
-            cr.transition_to(ContractRequestStatus.ARCHIVED)
+        # ── Étape 6 : Transition → ACTIVE ─────────────────────────────────
+        # Le contrat cadre reste ACTIVE tant qu'il y a des BDC actifs.
+        # Il passera en ARCHIVED automatiquement (CRON) quand plus aucun
+        # BDC n'est actif depuis 6 mois.
+        if cr.status == ContractRequestStatus.SIGNED:
+            cr.transition_to(ContractRequestStatus.ACTIVE)
         saved = await self._cr_repo.save(cr)
 
         logger.info(

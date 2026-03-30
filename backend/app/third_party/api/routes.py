@@ -700,8 +700,126 @@ async def submit_contract_review(
 
 
 @router.post(
+    "/portal/{token}/check-siren",
+    summary="Step 1: Check SIREN/SIRET for existing framework contract",
+)
+async def check_siren_for_framework_contract(
+    token: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """Portal step 1: Supplier enters SIRET.
+
+    Checks if a third party with this SIREN already has an active framework
+    contract. If so, cancels the current ContractRequest and creates a
+    PurchaseOrderRequest instead. Returns the result so the portal frontend
+    can redirect accordingly.
+    """
+    siret = body.get("siret", "")
+    if not siret or len(siret) < 9:
+        raise HTTPException(status_code=400, detail="SIRET invalide (14 chiffres requis).")
+
+    result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
+    siren = siret[:9]
+
+    # Check for existing framework contract
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        FrameworkContractRepository,
+    )
+
+    fc_repo = FrameworkContractRepository(db)
+    fc = await fc_repo.get_by_third_party_siren(siren)
+
+    if fc and fc.is_usable and result.contract_request_id:
+        from app.contract_management.domain.entities.purchase_order_request import (
+            PurchaseOrderRequest,
+        )
+        from app.contract_management.domain.value_objects.contract_request_status import (
+            ContractRequestStatus,
+        )
+        from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+            ContractRequestRepository,
+            PurchaseOrderRequestRepository,
+        )
+
+        cr_repo = ContractRequestRepository(db)
+        cr = await cr_repo.get_by_id(result.contract_request_id)
+
+        if cr and cr.status != ContractRequestStatus.CANCELLED:
+            # Cancel the ContractRequest
+            cr.transition_to(ContractRequestStatus.CANCELLED)
+            await cr_repo.save(cr)
+
+            # Create a PurchaseOrderRequest
+            por_repo = PurchaseOrderRequestRepository(db)
+            por_ref = await por_repo.get_next_reference()
+            por = PurchaseOrderRequest(
+                framework_contract_id=fc.id,
+                boond_positioning_id=cr.boond_positioning_id,
+                boond_candidate_id=cr.boond_candidate_id,
+                boond_consultant_type=cr.boond_consultant_type,
+                boond_need_id=cr.boond_need_id,
+                third_party_id=fc.third_party_id,
+                reference=por_ref,
+                commercial_email=cr.commercial_email,
+                daily_rate=cr.daily_rate,
+                start_date=cr.start_date,
+                end_date=cr.end_date,
+                client_name=cr.client_name,
+                mission_title=cr.mission_title,
+                consultant_civility=cr.consultant_civility,
+                consultant_first_name=cr.consultant_first_name,
+                consultant_last_name=cr.consultant_last_name,
+                consultant_email=cr.consultant_email,
+                consultant_phone=cr.consultant_phone,
+                original_contract_request_id=cr.id,
+            )
+            saved_por = await por_repo.save(por)
+
+            logger.info(
+                "siren_check_framework_contract_found",
+                siren=siren,
+                cr_id=str(cr.id),
+                por_id=str(saved_por.id),
+                fc_reference=fc.reference,
+            )
+
+            audit_logger.log(
+                AuditAction.PORTAL_ACCESSED,
+                AuditResource.MAGIC_LINK,
+                resource_id=str(result.magic_link.id),
+                details={
+                    "action": "siren_check_redirected_to_bdc",
+                    "siren": siren,
+                    "framework_contract_id": str(fc.id),
+                    "purchase_order_request_id": str(saved_por.id),
+                },
+            )
+
+            return {
+                "has_framework_contract": True,
+                "framework_contract": {
+                    "id": str(fc.id),
+                    "reference": fc.reference,
+                    "signed_at": fc.signed_at.isoformat() if fc.signed_at else None,
+                },
+                "purchase_order_request_id": str(saved_por.id),
+                "message": (
+                    f"Un contrat cadre actif a été détecté (réf. {fc.reference}). "
+                    "Un bon de commande a été créé automatiquement. "
+                    "Vous n'avez pas besoin de remplir les informations de contact."
+                ),
+            }
+
+    return {
+        "has_framework_contract": False,
+        "message": "Aucun contrat cadre trouvé pour ce SIREN. Veuillez continuer avec les informations de contact.",
+    }
+
+
+@router.post(
     "/portal/{token}/company-info",
-    summary="Submit company identity info via portal",
+    summary="Step 2-3: Submit company identity + contacts via portal",
 )
 async def submit_company_info(
     token: str,
@@ -814,76 +932,6 @@ async def submit_company_info(
     )
     await request_docs_uc.execute(tp.id, entity_category=body.entity_category)
 
-    # ── Detect existing framework contract for this SIREN ──────────────
-    # At SIREN submission time, check if another ThirdParty with the same
-    # SIREN already has an active framework contract. If so, cancel the
-    # current ContractRequest and create a PurchaseOrderRequest instead.
-    framework_contract_info = None
-    if result.contract_request_id:
-        from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-            ContractRequestRepository,
-            FrameworkContractRepository,
-            PurchaseOrderRequestRepository,
-        )
-
-        fc_repo = FrameworkContractRepository(db)
-        fc = await fc_repo.get_by_third_party_siren(siren)
-
-        if fc and fc.is_usable:
-            cr_repo = ContractRequestRepository(db)
-            cr = await cr_repo.get_by_id(result.contract_request_id)
-            if cr:
-                from app.contract_management.domain.entities.purchase_order_request import (
-                    PurchaseOrderRequest,
-                )
-                from app.contract_management.domain.value_objects.contract_request_status import (
-                    ContractRequestStatus,
-                )
-
-                # Cancel the ContractRequest
-                cr.transition_to(ContractRequestStatus.CANCELLED)
-                await cr_repo.save(cr)
-
-                # Create a PurchaseOrderRequest
-                por_repo = PurchaseOrderRequestRepository(db)
-                por_ref = await por_repo.get_next_reference()
-                por = PurchaseOrderRequest(
-                    framework_contract_id=fc.id,
-                    boond_positioning_id=cr.boond_positioning_id,
-                    boond_candidate_id=cr.boond_candidate_id,
-                    boond_consultant_type=cr.boond_consultant_type,
-                    boond_need_id=cr.boond_need_id,
-                    third_party_id=fc.third_party_id,
-                    reference=por_ref,
-                    commercial_email=cr.commercial_email,
-                    daily_rate=cr.daily_rate,
-                    start_date=cr.start_date,
-                    end_date=cr.end_date,
-                    client_name=cr.client_name,
-                    mission_title=cr.mission_title,
-                    consultant_civility=cr.consultant_civility,
-                    consultant_first_name=cr.consultant_first_name,
-                    consultant_last_name=cr.consultant_last_name,
-                    consultant_email=cr.consultant_email,
-                    consultant_phone=cr.consultant_phone,
-                    original_contract_request_id=cr.id,
-                )
-                saved_por = await por_repo.save(por)
-
-                logger.info(
-                    "contract_request_converted_to_purchase_order_request",
-                    cr_id=str(cr.id),
-                    por_id=str(saved_por.id),
-                    framework_contract_id=str(fc.id),
-                    siren=siren,
-                )
-                framework_contract_info = {
-                    "id": str(fc.id),
-                    "reference": fc.reference,
-                    "status": fc.status.value,
-                    "purchase_order_request_id": str(saved_por.id),
-                }
-
     audit_logger.log(
         AuditAction.PORTAL_ACCESSED,
         AuditResource.MAGIC_LINK,
@@ -897,15 +945,7 @@ async def submit_company_info(
         },
     )
 
-    response = {"message": "Informations enregistrées avec succès."}
-    if framework_contract_info:
-        response["framework_contract"] = framework_contract_info
-        response["message"] = (
-            "Informations enregistrées. Un contrat cadre actif a été détecté "
-            f"(réf. {framework_contract_info['reference']}). "
-            "Un bon de commande a été créé automatiquement."
-        )
-    return response
+    return {"message": "Informations enregistrées avec succès."}
 
 
 @router.patch(

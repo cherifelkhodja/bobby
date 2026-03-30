@@ -18,6 +18,7 @@ class ContractRequestStatus(str, Enum):
     PARTNER_REQUESTED_CHANGES = "partner_requested_changes"
     SENT_FOR_SIGNATURE = "sent_for_signature"
     SIGNED = "signed"
+    ACTIVE = "active"
     ARCHIVED = "archived"
     REDIRECTED_PAYFIT = "redirected_payfit"
     CANCELLED = "cancelled"
@@ -103,6 +104,11 @@ class ContractRequestStatus(str, Enum):
             ),
             ContractRequestStatus.SIGNED: frozenset(
                 {
+                    ContractRequestStatus.ACTIVE,
+                }
+            ),
+            ContractRequestStatus.ACTIVE: frozenset(
+                {
                     ContractRequestStatus.ARCHIVED,
                 }
             ),
@@ -132,6 +138,7 @@ class ContractRequestStatus(str, Enum):
             "partner_requested_changes": "Modifications demandées",
             "sent_for_signature": "Envoyé pour signature",
             "signed": "Signé",
+            "active": "En cours",
             "archived": "Archivé",
             "redirected_payfit": "Redirigé vers PayFit",
             "cancelled": "Annulé",
