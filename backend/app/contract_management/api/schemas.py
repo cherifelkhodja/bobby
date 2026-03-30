@@ -14,10 +14,6 @@ class ContractRequestResponse(BaseModel):
     provisional_reference: str
     reference: str | None = None
     display_reference: str
-    request_type: str = "full"  # "full" or "purchase_order_only"
-    framework_contract_id: UUID | None = None
-    framework_contract_reference: str | None = None
-    framework_contract_signed_at: str | None = None
     boond_positioning_id: int
     boond_candidate_id: int | None = None
     boond_consultant_type: str | None = None
@@ -222,6 +218,63 @@ class ContractResponse(BaseModel):
     partner_comments: str | None = None
     created_at: datetime
     signed_at: datetime | None = None
+
+
+class PurchaseOrderRequestResponse(BaseModel):
+    """Purchase order request response."""
+
+    id: UUID
+    framework_contract_id: UUID
+    framework_contract_reference: str | None = None
+    reference: str
+    boond_positioning_id: int
+    boond_candidate_id: int | None = None
+    status: str
+    status_display: str
+    daily_rate: float | None = None
+    quantity_sold: int | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    client_name: str | None = None
+    mission_title: str | None = None
+    consultant_civility: str | None = None
+    consultant_first_name: str | None = None
+    consultant_last_name: str | None = None
+    consultant_email: str | None = None
+    consultant_phone: str | None = None
+    commercial_email: str
+    commercial_name: str | None = None
+    third_party_id: UUID | None = None
+    purchase_order_id: UUID | None = None
+    original_contract_request_id: UUID | None = None
+    status_history: list[dict] = []
+    created_at: datetime
+    updated_at: datetime
+
+
+class PurchaseOrderRequestListResponse(BaseModel):
+    """Paginated list of purchase order requests."""
+
+    items: list[PurchaseOrderRequestResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class PurchaseOrderRequestValidationRequest(BaseModel):
+    """Request for POR commercial validation."""
+
+    daily_rate: Decimal = Field(..., gt=0)
+    quantity_sold: int | None = Field(None, ge=0)
+    start_date: date
+    end_date: date | None = None
+    client_name: str | None = Field(None, max_length=255)
+    mission_title: str | None = Field(None, max_length=500)
+    consultant_civility: str | None = Field(None, max_length=10)
+    consultant_first_name: str | None = Field(None, max_length=255)
+    consultant_last_name: str | None = Field(None, max_length=255)
+    consultant_email: str | None = Field(None, max_length=255)
+    consultant_phone: str | None = Field(None, max_length=50)
 
 
 class FrameworkContractResponse(BaseModel):

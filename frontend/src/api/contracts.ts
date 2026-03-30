@@ -4,8 +4,9 @@ import type {
   ContractRequestListResponse,
   ContractRequestStatus,
   Contract,
-  FrameworkContract,
-  PurchaseOrder,
+  PurchaseOrderRequestItem,
+  PurchaseOrderRequestListResponse,
+  PurchaseOrderRequestStatus,
 } from '../types';
 
 export const contractsApi = {
@@ -257,27 +258,6 @@ export const contractsApi = {
     return response.data.url;
   },
 
-  // Framework contracts & purchase orders
-  getFrameworkContract: async (contractRequestId: string): Promise<FrameworkContract> => {
-    const response = await apiClient.get<FrameworkContract>(
-      `/contract-requests/${contractRequestId}/framework-contract`,
-    );
-    return response.data;
-  },
-
-  listPurchaseOrders: async (contractRequestId: string): Promise<PurchaseOrder[]> => {
-    const response = await apiClient.get<PurchaseOrder[]>(
-      `/contract-requests/${contractRequestId}/purchase-orders`,
-    );
-    return response.data;
-  },
-
-  createPurchaseOrder: async (contractRequestId: string): Promise<PurchaseOrder> => {
-    const response = await apiClient.post<PurchaseOrder>(
-      `/contract-requests/${contractRequestId}/create-purchase-order`,
-    );
-    return response.data;
-  },
 };
 
 // ── Contract companies ──────────────────────────────────────────────────────
@@ -457,5 +437,63 @@ export const contractArticlesApi = {
 
   delete: async (articleKey: string): Promise<void> => {
     await apiClient.delete(`/admin/contract-articles/${articleKey}`);
+  },
+};
+
+// ── Purchase order requests (BDC workflow) ─────────────────────────────
+
+export const purchaseOrderRequestsApi = {
+  list: async (params?: {
+    skip?: number;
+    limit?: number;
+    status_filter?: PurchaseOrderRequestStatus;
+  }): Promise<PurchaseOrderRequestListResponse> => {
+    const response = await apiClient.get<PurchaseOrderRequestListResponse>(
+      '/purchase-order-requests',
+      { params },
+    );
+    return response.data;
+  },
+
+  get: async (id: string): Promise<PurchaseOrderRequestItem> => {
+    const response = await apiClient.get<PurchaseOrderRequestItem>(
+      `/purchase-order-requests/${id}`,
+    );
+    return response.data;
+  },
+
+  validate: async (
+    id: string,
+    data: {
+      daily_rate: number;
+      start_date: string;
+      end_date?: string;
+      quantity_sold?: number;
+      client_name?: string;
+      mission_title?: string;
+      consultant_civility?: string;
+      consultant_first_name?: string;
+      consultant_last_name?: string;
+      consultant_email?: string;
+      consultant_phone?: string;
+    },
+  ): Promise<PurchaseOrderRequestItem> => {
+    const response = await apiClient.post<PurchaseOrderRequestItem>(
+      `/purchase-order-requests/${id}/validate`,
+      data,
+    );
+    return response.data;
+  },
+
+  finalize: async (id: string): Promise<unknown> => {
+    const response = await apiClient.post(`/purchase-order-requests/${id}/finalize`);
+    return response.data;
+  },
+
+  cancel: async (id: string): Promise<PurchaseOrderRequestItem> => {
+    const response = await apiClient.delete<PurchaseOrderRequestItem>(
+      `/purchase-order-requests/${id}`,
+    );
+    return response.data;
   },
 };

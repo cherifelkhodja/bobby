@@ -25,6 +25,7 @@ import { OpportunityDetail } from './pages/OpportunityDetail';
 import ProposeCandidate from './pages/ProposeCandidate';
 import { ContractManagement } from './pages/ContractManagement';
 import ContractDetail from './pages/ContractDetail';
+import PurchaseOrderRequestDetail from './pages/PurchaseOrderRequestDetail';
 import ComplianceDashboard from './pages/ComplianceDashboard';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import Portal from './pages/Portal';
@@ -120,6 +121,16 @@ function App() {
             <ProtectedRoute allowedRoles={['admin', 'adv', 'commercial']}>
               <ErrorBoundary level="page">
                 <ContractDetail />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="contracts/po/:id"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'adv', 'commercial']}>
+              <ErrorBoundary level="page">
+                <PurchaseOrderRequestDetail />
               </ErrorBoundary>
             </ProtectedRoute>
           }

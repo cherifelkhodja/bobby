@@ -35,7 +35,7 @@
 | Row Level Security | ✅ Done | PostgreSQL RLS |
 | Audit Logging | ✅ Done | Structuré |
 | Contractualisation | ✅ Done | Workflow BoondManager → validation → contrat PDF (HTML+WeasyPrint) → signature YouSign → push Boond |
-| Contrats cadres & BDC | ✅ Done | 1 fournisseur = 1 contrat cadre, N bons de commande. Détection SIREN, parcours rapide |
+| Contrats cadres & BDC | ✅ Done | Workflows séparés : ContractRequest (14 statuts) + PurchaseOrderRequest (7 statuts). Détection SIREN, tacite reconduction |
 | Vigilance documentaire | ✅ Done | Cycle de vie docs légaux tiers (request → upload → validate/reject → expiration) |
 | Portail tiers (magic link) | ✅ Done | Upload documents + review contrat via lien sécurisé |
 | CRON jobs (APScheduler) | ✅ Done | Expirations documents, relances, purge magic links |
@@ -162,49 +162,62 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
-### 2026-03-30 (feat: contrats cadres et bons de commande — skip fournisseurs existants)
+### 2026-03-30 (feat: séparation workflows contrat cadre et bon de commande)
 
-#### Contexte
-Quand un fournisseur a déjà un contrat cadre signé, il ne faut pas refaire tout le processus
-(collecte documents, configuration, draft, signature). On vérifie simplement que les documents
-sont à jour, puis on crée un bon de commande.
+#### ADR-007 : Séparation ContractRequest / PurchaseOrderRequest
+- **Date** : 2026-03-30
+- **Décision** : Deux workflows distincts avec entités séparées
+- **Raison** : Le contrat cadre et le BDC ont des cycles de vie différents. Mélanger les deux dans
+  un seul `ContractRequest` avec `request_type` complexifie la machine à états.
+- **Conséquence** : `ContractRequest` = contrat cadre complet (14 statuts), `PurchaseOrderRequest` = BDC simplifié (7 statuts)
 
-#### Nouveautés
+#### Modèle de données
 
-**Modèle de données** :
-- `cm_framework_contracts` : contrat cadre (1 par fournisseur+société, validité 2 ans, tacite reconduction)
-- `cm_purchase_orders` : bons de commande (N par contrat cadre, 1 par consultant/mission)
-- `cm_contract_requests.request_type` : `full` (nouveau fournisseur) ou `purchase_order_only` (contrat cadre existant)
-- `cm_contract_requests.framework_contract_id` : FK vers le contrat cadre si parcours rapide
+**Tables créées (migrations 061 + 062)** :
+- `cm_framework_contracts` : contrat cadre (1 actif par fournisseur+société, validité 2 ans, tacite reconduction +1 an)
+- `cm_purchase_orders` : bons de commande (N par contrat cadre, résultat final des deux workflows)
+- `cm_purchase_order_requests` : demandes de BDC (workflow simplifié, 7 statuts)
 
-**Détection (Option C — au SIREN)** :
-Quand le fournisseur soumet ses infos société via le portail (`POST /portal/{token}/company-info`),
-le système vérifie si un autre ThirdParty avec le même SIREN a un contrat cadre actif.
-Si oui, la demande est automatiquement basculée en `purchase_order_only`.
+**`ContractRequest` reste inchangé** : pas de `request_type`, pas de `framework_contract_id`
 
-**Création automatique du contrat cadre** :
-Lors du `SyncToBoondAfterSigning` d'une demande `full`, un `FrameworkContract` est créé
-automatiquement (1 an, tacite reconduction) + un `PurchaseOrder` lié.
+#### Workflows
 
-**Parcours rapide (purchase_order_only)** :
-- Validation commerciale simplifiée (TJM, dates, consultant)
-- Vérification compliance documents existants
-- Création directe du bon de commande (`POST /contract-requests/{id}/create-purchase-order`)
-- Pas de configuration articles, pas de draft, pas de signature
+**Contrat cadre** (`ContractRequest` — 14 statuts, inchangé) :
+```
+Webhook → Validation commerciale → Documents → Compliance → Config → Draft → Signature → ARCHIVED
+→ Crée automatiquement un FrameworkContract (2 ans) + 1er PurchaseOrder
+```
 
-**UI/UX** :
-- Badge "BDC" (vert) ou "Contrat cadre" (bleu) sur la liste des contrats
-- Référence du contrat cadre affichée dans la liste
-- Bandeau vert sur la page détail avec info contrat cadre + liste des BDC
-- Bouton "Créer le bon de commande" pour le parcours rapide
-- Sections configuration/articles/draft/signature masquées pour le parcours rapide
+**Bon de commande** (`PurchaseOrderRequest` — 7 statuts) :
+```
+PENDING_VALIDATION → VALIDATED → CHECKING_COMPLIANCE → ACTIVE → ARCHIVED
+                                      ↓
+                               COMPLIANCE_EXPIRED (docs expirés → re-collecte)
+```
 
-**Migration** : `061_add_framework_contracts_and_purchase_orders.py`
+#### Détection (Option C — au SIREN)
+Quand le fournisseur soumet ses infos via le portail, si un contrat cadre actif est détecté :
+1. Le `ContractRequest` est annulé
+2. Un `PurchaseOrderRequest` est créé avec les données existantes
 
-**Fichiers modifiés** :
-- Backend: entities, value_objects, models, repositories, use_cases (validate_commercial, sync_to_boond, create_purchase_order), routes, schemas
-- Frontend: types, API client, ContractManagement, ContractDetail
-- Portal: détection SIREN dans `submit_company_info`
+#### CRON : Tacite reconduction
+- Job quotidien à 2h (`process_framework_contract_renewals`)
+- FC expirant dans 30j → `expiring_soon`
+- FC expiré + tacite_renewal → prolongé de 1 an
+- FC expiré sans tacite → `expired`
+
+#### API
+- `GET/POST /purchase-order-requests` — liste et validation
+- `POST /purchase-order-requests/{id}/validate` — validation commerciale
+- `POST /purchase-order-requests/{id}/finalize` — création BDC
+- `DELETE /purchase-order-requests/{id}` — annulation
+
+#### UI/UX
+- Page `/contracts` avec 2 onglets : "Contrats cadres" / "Bons de commande"
+- Page détail BDC : `/contracts/po/:id` — formulaire simplifié
+- Chaque onglet a ses propres filtres (statuts, en cours/finalisés)
+
+**Migrations** : `061_add_framework_contracts_and_purchase_orders.py`, `062_add_purchase_order_requests_table.py`
 
 ---
 

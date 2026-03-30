@@ -362,9 +362,9 @@ class SyncToBoondAfterSigningUseCase:
                 )
 
         # ── Étape 5b : Créer le contrat cadre (FrameworkContract) ─────────
-        # Pour les demandes "full", on crée un FrameworkContract qui sera
-        # réutilisé pour les prochains consultants du même fournisseur.
-        if tp and company and cr.request_type == "full" and not cr.is_purchase_order_only:
+        # Crée un FrameworkContract qui sera réutilisé pour les prochains
+        # consultants du même fournisseur.
+        if tp and company:
             try:
                 from app.contract_management.domain.entities.framework_contract import (
                     FrameworkContract,
@@ -419,7 +419,7 @@ class SyncToBoondAfterSigningUseCase:
                 )
 
         # ── Étape 5c : Créer le PurchaseOrder dans Bobby ──────────────────
-        if contract and cr.request_type == "full":
+        if contract:
             try:
                 from app.contract_management.domain.entities.purchase_order import PurchaseOrder
                 from app.contract_management.infrastructure.adapters.postgres_contract_repo import (

@@ -26,14 +26,6 @@ class ContractRequestModel(Base):
         comment="Référence définitive (XXX-CC-NNNN), assignée à l'état PARTNER_APPROVED",
     )
     boond_positioning_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    request_type: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="full",
-        comment="full = nouveau fournisseur, purchase_order_only = contrat cadre existant",
-    )
-    framework_contract_id: Mapped[UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("cm_framework_contracts.id"), nullable=True,
-        comment="Contrat cadre existant (si request_type = purchase_order_only)",
-    )
     boond_candidate_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     boond_consultant_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     boond_need_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -177,6 +169,55 @@ class ContractAnnexTemplateModel(Base):
     )
     updated_by: Mapped[UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+
+
+class PurchaseOrderRequestModel(Base):
+    """Purchase order request SQLAlchemy model.
+
+    Separate workflow for creating a BDC when a framework contract
+    already exists.
+    """
+
+    __tablename__ = "cm_purchase_order_requests"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    framework_contract_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_framework_contracts.id"), nullable=False
+    )
+    boond_positioning_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    boond_candidate_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    boond_consultant_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    boond_need_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    third_party_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tp_third_parties.id"), nullable=True
+    )
+    reference: Mapped[str] = mapped_column(String(30), nullable=False, unique=True)
+    commercial_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="pending_validation"
+    )
+    daily_rate: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    quantity_sold: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    client_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mission_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    consultant_civility: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    consultant_first_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    consultant_last_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    consultant_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    consultant_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    purchase_order_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_purchase_orders.id"), nullable=True
+    )
+    original_contract_request_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_contract_requests.id"), nullable=True
+    )
+    status_history: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
 

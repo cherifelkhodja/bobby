@@ -35,8 +35,6 @@ class ContractRequest:
     commercial_email: str
     id: UUID = field(default_factory=uuid4)
     reference: str | None = None
-    request_type: str = "full"  # "full" or "purchase_order_only"
-    framework_contract_id: UUID | None = None
     boond_candidate_id: int | None = None
     boond_consultant_type: str | None = None  # "candidate" ou "resource"
     boond_need_id: int | None = None
@@ -73,11 +71,6 @@ class ContractRequest:
     def display_reference(self) -> str:
         """Référence à afficher : définitive si assignée, provisoire sinon."""
         return self.reference or self.provisional_reference
-
-    @property
-    def is_purchase_order_only(self) -> bool:
-        """Whether this request uses the fast path (existing framework contract)."""
-        return self.request_type == "purchase_order_only"
 
     def can_transition_to(self, target: ContractRequestStatus) -> bool:
         """Check if the transition to target status is allowed."""

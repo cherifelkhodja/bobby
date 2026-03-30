@@ -15,8 +15,12 @@ from app.contract_management.domain.value_objects.contract_request_status import
 )
 from app.contract_management.domain.entities.framework_contract import FrameworkContract
 from app.contract_management.domain.entities.purchase_order import PurchaseOrder
+from app.contract_management.domain.entities.purchase_order_request import PurchaseOrderRequest
 from app.contract_management.domain.value_objects.framework_contract_status import (
     FrameworkContractStatus,
+)
+from app.contract_management.domain.value_objects.purchase_order_request_status import (
+    PurchaseOrderRequestStatus,
 )
 from app.contract_management.domain.value_objects.purchase_order_status import (
     PurchaseOrderStatus,
@@ -27,6 +31,7 @@ from app.contract_management.infrastructure.models import (
     ContractRequestModel,
     FrameworkContractModel,
     PurchaseOrderModel,
+    PurchaseOrderRequestModel,
     WebhookEventModel,
 )
 
@@ -72,8 +77,6 @@ class ContractRequestRepository:
         if model:
             model.status = request.status.value
             model.reference = request.reference
-            model.request_type = request.request_type
-            model.framework_contract_id = request.framework_contract_id
             model.third_party_id = request.third_party_id
             model.third_party_type = request.third_party_type
             model.daily_rate = request.daily_rate
@@ -249,8 +252,6 @@ class ContractRequestRepository:
             id=model.id,
             provisional_reference=model.provisional_reference,
             reference=model.reference,
-            request_type=model.request_type or "full",
-            framework_contract_id=model.framework_contract_id,
             boond_positioning_id=model.boond_positioning_id,
             boond_candidate_id=model.boond_candidate_id,
             boond_consultant_type=model.boond_consultant_type,
@@ -292,8 +293,6 @@ class ContractRequestRepository:
             id=entity.id,
             provisional_reference=entity.provisional_reference,
             reference=entity.reference,
-            request_type=entity.request_type,
-            framework_contract_id=entity.framework_contract_id,
             boond_positioning_id=entity.boond_positioning_id,
             boond_candidate_id=entity.boond_candidate_id,
             boond_consultant_type=entity.boond_consultant_type,
@@ -700,6 +699,192 @@ class PurchaseOrderRepository:
             boond_purchase_order_id=entity.boond_purchase_order_id,
             status=entity.status.value,
             s3_key=entity.s3_key,
+            created_at=entity.created_at,
+            updated_at=entity.updated_at,
+        )
+
+
+class PurchaseOrderRequestRepository:
+    """PostgreSQL-backed purchase order request repository."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_by_id(self, por_id: UUID) -> PurchaseOrderRequest | None:
+        result = await self.session.execute(
+            select(PurchaseOrderRequestModel).where(PurchaseOrderRequestModel.id == por_id)
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def get_by_positioning_id(self, positioning_id: int) -> PurchaseOrderRequest | None:
+        """Get an active POR by Boond positioning ID (excludes cancelled)."""
+        result = await self.session.execute(
+            select(PurchaseOrderRequestModel).where(
+                PurchaseOrderRequestModel.boond_positioning_id == positioning_id,
+                PurchaseOrderRequestModel.status != PurchaseOrderRequestStatus.CANCELLED.value,
+            )
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def list_all(
+        self,
+        skip: int = 0,
+        limit: int = 50,
+        status: PurchaseOrderRequestStatus | None = None,
+    ) -> list[PurchaseOrderRequest]:
+        query = select(PurchaseOrderRequestModel)
+        if status:
+            query = query.where(PurchaseOrderRequestModel.status == status.value)
+        query = query.order_by(PurchaseOrderRequestModel.created_at.desc()).offset(skip).limit(limit)
+        result = await self.session.execute(query)
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def count(self, status: PurchaseOrderRequestStatus | None = None) -> int:
+        query = select(func.count(PurchaseOrderRequestModel.id))
+        if status:
+            query = query.where(PurchaseOrderRequestModel.status == status.value)
+        result = await self.session.execute(query)
+        return result.scalar_one()
+
+    async def list_by_commercial_email(
+        self,
+        email: str,
+        skip: int = 0,
+        limit: int = 50,
+        status: PurchaseOrderRequestStatus | None = None,
+    ) -> list[PurchaseOrderRequest]:
+        query = select(PurchaseOrderRequestModel).where(
+            func.lower(PurchaseOrderRequestModel.commercial_email) == str(email).lower()
+        )
+        if status:
+            query = query.where(PurchaseOrderRequestModel.status == status.value)
+        query = query.order_by(PurchaseOrderRequestModel.created_at.desc()).offset(skip).limit(limit)
+        result = await self.session.execute(query)
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def count_by_commercial_email(
+        self,
+        email: str,
+        status: PurchaseOrderRequestStatus | None = None,
+    ) -> int:
+        query = select(func.count(PurchaseOrderRequestModel.id)).where(
+            func.lower(PurchaseOrderRequestModel.commercial_email) == str(email).lower()
+        )
+        if status:
+            query = query.where(PurchaseOrderRequestModel.status == status.value)
+        result = await self.session.execute(query)
+        return result.scalar_one()
+
+    async def get_next_reference(self) -> str:
+        """Generate the next reference in format PORBDC-YYYY-NNNN."""
+        from datetime import datetime as dt
+
+        year = dt.utcnow().year
+        prefix = f"PORBDC-{year}-"
+        result = await self.session.execute(
+            select(func.max(PurchaseOrderRequestModel.reference)).where(
+                PurchaseOrderRequestModel.reference.like(f"{prefix}%")
+            )
+        )
+        max_ref = result.scalar_one_or_none()
+        if max_ref:
+            try:
+                last_num = int(max_ref.rsplit("-", 1)[-1])
+                next_num = last_num + 1
+            except (ValueError, IndexError):
+                next_num = 1
+        else:
+            next_num = 1
+        return f"{prefix}{next_num:04d}"
+
+    async def save(self, por: PurchaseOrderRequest) -> PurchaseOrderRequest:
+        result = await self.session.execute(
+            select(PurchaseOrderRequestModel).where(PurchaseOrderRequestModel.id == por.id)
+        )
+        model = result.scalar_one_or_none()
+
+        if model:
+            model.status = por.status.value
+            model.daily_rate = por.daily_rate
+            model.quantity_sold = por.quantity_sold
+            model.start_date = por.start_date
+            model.end_date = por.end_date
+            model.client_name = por.client_name
+            model.mission_title = por.mission_title
+            model.consultant_civility = por.consultant_civility
+            model.consultant_first_name = por.consultant_first_name
+            model.consultant_last_name = por.consultant_last_name
+            model.consultant_email = por.consultant_email
+            model.consultant_phone = por.consultant_phone
+            model.purchase_order_id = por.purchase_order_id
+            model.status_history = por.status_history
+            flag_modified(model, "status_history")
+            model.updated_at = por.updated_at
+        else:
+            model = self._to_model(por)
+            self.session.add(model)
+
+        await self.session.flush()
+        return self._to_entity(model)
+
+    def _to_entity(self, model: PurchaseOrderRequestModel) -> PurchaseOrderRequest:
+        return PurchaseOrderRequest(
+            id=model.id,
+            framework_contract_id=model.framework_contract_id,
+            boond_positioning_id=model.boond_positioning_id,
+            boond_candidate_id=model.boond_candidate_id,
+            boond_consultant_type=model.boond_consultant_type,
+            boond_need_id=model.boond_need_id,
+            third_party_id=model.third_party_id,
+            reference=model.reference,
+            commercial_email=model.commercial_email,
+            status=PurchaseOrderRequestStatus(model.status),
+            daily_rate=model.daily_rate,
+            quantity_sold=model.quantity_sold,
+            start_date=model.start_date,
+            end_date=model.end_date,
+            client_name=model.client_name,
+            mission_title=model.mission_title,
+            consultant_civility=model.consultant_civility,
+            consultant_first_name=model.consultant_first_name,
+            consultant_last_name=model.consultant_last_name,
+            consultant_email=model.consultant_email,
+            consultant_phone=model.consultant_phone,
+            purchase_order_id=model.purchase_order_id,
+            original_contract_request_id=model.original_contract_request_id,
+            status_history=model.status_history or [],
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
+
+    def _to_model(self, entity: PurchaseOrderRequest) -> PurchaseOrderRequestModel:
+        return PurchaseOrderRequestModel(
+            id=entity.id,
+            framework_contract_id=entity.framework_contract_id,
+            boond_positioning_id=entity.boond_positioning_id,
+            boond_candidate_id=entity.boond_candidate_id,
+            boond_consultant_type=entity.boond_consultant_type,
+            boond_need_id=entity.boond_need_id,
+            third_party_id=entity.third_party_id,
+            reference=entity.reference,
+            commercial_email=entity.commercial_email,
+            status=entity.status.value,
+            daily_rate=entity.daily_rate,
+            quantity_sold=entity.quantity_sold,
+            start_date=entity.start_date,
+            end_date=entity.end_date,
+            client_name=entity.client_name,
+            mission_title=entity.mission_title,
+            consultant_civility=entity.consultant_civility,
+            consultant_first_name=entity.consultant_first_name,
+            consultant_last_name=entity.consultant_last_name,
+            consultant_email=entity.consultant_email,
+            consultant_phone=entity.consultant_phone,
+            purchase_order_id=entity.purchase_order_id,
+            original_contract_request_id=entity.original_contract_request_id,
+            status_history=entity.status_history,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
         )

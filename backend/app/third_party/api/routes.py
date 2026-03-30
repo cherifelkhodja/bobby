@@ -815,14 +815,15 @@ async def submit_company_info(
     await request_docs_uc.execute(tp.id, entity_category=body.entity_category)
 
     # ── Detect existing framework contract for this SIREN ──────────────
-    # Option C: at SIREN submission time, check if another ThirdParty
-    # with the same SIREN already has an active framework contract.
-    # If so, switch the contract request to purchase_order_only mode.
+    # At SIREN submission time, check if another ThirdParty with the same
+    # SIREN already has an active framework contract. If so, cancel the
+    # current ContractRequest and create a PurchaseOrderRequest instead.
     framework_contract_info = None
     if result.contract_request_id:
         from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
             ContractRequestRepository,
             FrameworkContractRepository,
+            PurchaseOrderRequestRepository,
         )
 
         fc_repo = FrameworkContractRepository(db)
@@ -831,15 +832,48 @@ async def submit_company_info(
         if fc and fc.is_usable:
             cr_repo = ContractRequestRepository(db)
             cr = await cr_repo.get_by_id(result.contract_request_id)
-            if cr and cr.request_type != "purchase_order_only":
-                cr.request_type = "purchase_order_only"
-                cr.framework_contract_id = fc.id
-                # Link to the same third party as the framework contract
-                cr.third_party_id = fc.third_party_id
+            if cr:
+                from app.contract_management.domain.entities.purchase_order_request import (
+                    PurchaseOrderRequest,
+                )
+                from app.contract_management.domain.value_objects.contract_request_status import (
+                    ContractRequestStatus,
+                )
+
+                # Cancel the ContractRequest
+                cr.transition_to(ContractRequestStatus.CANCELLED)
                 await cr_repo.save(cr)
+
+                # Create a PurchaseOrderRequest
+                por_repo = PurchaseOrderRequestRepository(db)
+                por_ref = await por_repo.get_next_reference()
+                por = PurchaseOrderRequest(
+                    framework_contract_id=fc.id,
+                    boond_positioning_id=cr.boond_positioning_id,
+                    boond_candidate_id=cr.boond_candidate_id,
+                    boond_consultant_type=cr.boond_consultant_type,
+                    boond_need_id=cr.boond_need_id,
+                    third_party_id=fc.third_party_id,
+                    reference=por_ref,
+                    commercial_email=cr.commercial_email,
+                    daily_rate=cr.daily_rate,
+                    start_date=cr.start_date,
+                    end_date=cr.end_date,
+                    client_name=cr.client_name,
+                    mission_title=cr.mission_title,
+                    consultant_civility=cr.consultant_civility,
+                    consultant_first_name=cr.consultant_first_name,
+                    consultant_last_name=cr.consultant_last_name,
+                    consultant_email=cr.consultant_email,
+                    consultant_phone=cr.consultant_phone,
+                    original_contract_request_id=cr.id,
+                )
+                saved_por = await por_repo.save(por)
+
                 logger.info(
-                    "contract_request_switched_to_purchase_order_only",
+                    "contract_request_converted_to_purchase_order_request",
                     cr_id=str(cr.id),
+                    por_id=str(saved_por.id),
                     framework_contract_id=str(fc.id),
                     siren=siren,
                 )
@@ -847,6 +881,7 @@ async def submit_company_info(
                     "id": str(fc.id),
                     "reference": fc.reference,
                     "status": fc.status.value,
+                    "purchase_order_request_id": str(saved_por.id),
                 }
 
     audit_logger.log(
@@ -868,7 +903,7 @@ async def submit_company_info(
         response["message"] = (
             "Informations enregistrées. Un contrat cadre actif a été détecté "
             f"(réf. {framework_contract_info['reference']}). "
-            "La vérification des documents de conformité est en cours."
+            "Un bon de commande a été créé automatiquement."
         )
     return response
 
