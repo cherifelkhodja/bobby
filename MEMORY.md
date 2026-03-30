@@ -187,9 +187,22 @@ Liste complète des endpoints mise à jour avec les nouveaux endpoints Boond spl
 `start-compliance-review`, `block-compliance`, `resend-collection-email`,
 `next-reference`, `companies`, `contracts/{id}/download`).
 
+#### 5. Documentation `docs/api/boondmanager.md` — section Contractualisation
+Ajout complet de tous les endpoints Boond utilisés par le module contractualisation :
+- Lecture données (positionnement, besoin, candidat/ressource)
+- Société fournisseur (création, vérification, mise à jour)
+- Contacts (création avec types et civilité)
+- Conversion candidat → ressource (avec extraction du nouvel ID)
+- Contrat Boond (payload complet avec `workingTimeType`, `endDate`)
+- Lien ressource ↔ fournisseur (administrative)
+- Bon de commande
+- Workflow complet sync 6 étapes (tableau récapitulatif)
+- Table de mapping endpoints Bobby ↔ méthodes Boond
+
 **Fichiers modifiés** :
 - `backend/app/contract_management/infrastructure/adapters/boond_crm_adapter.py`
 - `CLAUDE.md` (endpoints Contract Management)
+- `docs/api/boondmanager.md` (section Contractualisation complète)
 
 ---
 

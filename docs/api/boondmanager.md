@@ -324,6 +324,267 @@ async def _request(self, method: str, endpoint: str, **kwargs):
 
 ---
 
+## Contractualisation — Endpoints Boond
+
+> **Client** : `backend/app/contract_management/infrastructure/adapters/boond_crm_adapter.py`
+
+### Lecture de données
+
+#### GET /positionings/{id}
+Récupère un positionnement et les infos du consultant (nom) via `included` + `dependsOn`.
+
+```python
+async def get_positioning(self, positioning_id: int) -> dict[str, Any] | None
+```
+
+#### GET /opportunities/{id}/information
+Récupère un besoin/opportunité avec l'email du commercial (mainManager).
+Fallback : `GET /resources/{manager_id}` pour l'email, `GET /opportunities/{id}` pour l'agency_id.
+
+```python
+async def get_need(self, need_id: int) -> dict[str, Any] | None
+```
+
+**Retourne** : `{"title", "commercial_email", "manager_id", "agency_id"}`
+
+#### GET /resources/{id}/information ou GET /candidates/{id}/information
+Récupère les infos du consultant. Route vers `/resources/` ou `/candidates/` selon `consultant_type`.
+Si inconnu, essaie `/resources/` d'abord puis fallback `/candidates/`.
+
+```python
+async def get_candidate_info(
+    self, candidate_id: int, consultant_type: str | None = None,
+) -> dict[str, Any] | None
+```
+
+**Retourne** : `{"first_name", "last_name", "email", "phone", "type"}`
+
+#### GET /resources/{id}
+Récupère le `typeOf` d'une ressource (0=salarié, 1=externe).
+
+```python
+async def get_resource_type_of(self, resource_id: int) -> int | None
+```
+
+### Société fournisseur
+
+#### POST /companies
+Crée une société fournisseur avec toutes les données légales.
+
+```python
+async def create_company_full(
+    self, company_name: str, state: int,
+    postcode: str | None, address: str | None, town: str | None,
+    country: str, vat_number: str | None, siret: str | None,
+    legal_status: str | None, registered_office: str | None,
+    ape_code: str, agency_id: int | None,
+) -> int  # Retourne company_id Boond
+```
+
+**Payload clé** :
+```json
+{
+  "data": {
+    "attributes": {
+      "name": "...", "state": 9,
+      "postcode": "...", "address": "...", "town": "...", "country": "France",
+      "vatNumber": "...", "siretNumber": "...",
+      "legalStatus": "SAS au capital de 752 000 €",
+      "registeredOffice": "894 213 669 R.C.S. Paris",
+      "apeCode": "6202A"
+    },
+    "relationships": {
+      "agency": {"data": {"type": "agency", "id": "5"}}
+    }
+  }
+}
+```
+
+> **Note** : `postcode` en minuscules (pas `postCode`).
+
+#### GET /companies/{id}
+Vérifie si une société existe encore dans Boond (avant de créer des contacts).
+
+```python
+async def verify_company_exists(self, company_id: int) -> bool
+```
+
+#### PUT /companies/{id}/information
+Met à jour les données d'une société existante.
+
+```python
+async def update_company_information(
+    self, company_id: int,
+    postcode: str | None = None, address: str | None = None,
+    town: str | None = None, country: str | None = None,
+    legal_status: str | None = None, registered_office: str | None = None,
+) -> None
+```
+
+### Contacts
+
+#### POST /contacts
+Crée un contact lié à une société.
+
+```python
+async def create_contact(
+    self, company_id: int, civility: str | None,
+    first_name: str | None, last_name: str | None,
+    email: str | None, phone: str | None, job_title: str | None,
+    types_of: list[int] | None = None,
+    postcode: str | None = None, address: str | None = None,
+    town: str | None = None, agency_id: int | None = None,
+) -> int  # Retourne contact_id Boond
+```
+
+**Mapping civility** : `"M."` → 0 (homme), `"Mme"` → 1 (femme)
+**Types de contact** : 1=dirigeant, 2=facturation, 3=adv
+
+### Conversion candidat → ressource
+
+#### PUT /candidates/{id}/information
+Convertit un candidat en ressource en passant `state: 3`.
+
+```python
+async def convert_candidate_to_resource(
+    self, candidate_id: int, state: int = 3,
+    state_reason_type_of: int | None = None,
+    type_of: int | None = None,
+    manager_id: int | None = None,
+) -> int  # Retourne le NOUVEAU resource_id
+```
+
+**Payload** :
+```json
+{
+  "data": {
+    "id": "2565", "type": "candidate",
+    "attributes": {
+      "state": 3,
+      "stateReason": {"typeOf": 0},
+      "typeOf": 1
+    },
+    "relationships": {
+      "dependsOn": {"data": {"type": "resource", "id": "1096"}}
+    }
+  }
+}
+```
+
+> **IMPORTANT** : Après conversion, le **nouvel ID ressource** est dans
+> `response.data.relationships.resource.data.id` (ex: 2674),
+> et NON dans `response.data.id` (qui reste l'ID candidat, ex: 2565).
+
+**Paramètres** :
+- `state_reason_type_of` : 0 = salarié, 1 = externe
+- `type_of` : 0 = salarié, 1 = externe (attribut distinct de `stateReason.typeOf`)
+- `manager_id` : ID du responsable hiérarchique (relation `dependsOn`, **obligatoire**)
+
+### Contrat
+
+#### POST /contracts
+Crée un contrat Boond pour un consultant externe.
+
+```python
+async def create_boond_contract(
+    self, resource_id: int, positioning_id: int, daily_rate: float,
+    type_of: int, start_date: str | None = None,
+    end_date: str | None = None, agency_id: int | None = None,
+) -> int  # Retourne contract_id Boond
+```
+
+**Payload** :
+```json
+{
+  "data": {
+    "attributes": {
+      "typeOf": 2,
+      "forceContractAverageDailyProductionCost": true,
+      "contractAverageDailyProductionCost": 450.0,
+      "numberOfHoursPerWeek": 35,
+      "numberOfWorkingDays": 210,
+      "classification": "-1",
+      "currency": 0,
+      "workingTimeType": 0,
+      "startDate": "2026-04-01",
+      "endDate": "2026-12-31"
+    },
+    "relationships": {
+      "dependsOn": {"data": {"type": "resource", "id": "2674"}},
+      "positioning": {"data": {"type": "positioning", "id": "1234"}},
+      "agency": {"data": {"type": "agency", "id": "5"}}
+    }
+  }
+}
+```
+
+**Types de contrat** (`typeOf`) :
+| Valeur | Type |
+|--------|------|
+| 2 | Sous-traitant |
+| 3 | Freelance |
+| 6 | Portage salarial |
+| 7 | Portage commercial |
+
+### Lien ressource ↔ fournisseur
+
+#### PUT /resources/{id}/administrative
+Lie une ressource à sa société fournisseur et son contact.
+
+```python
+async def update_resource_administrative(
+    self, resource_id: int, provider_company_id: int,
+    provider_contact_id: int | None,
+) -> None
+```
+
+**Payload** :
+```json
+{
+  "data": {
+    "id": "2674", "type": "resource",
+    "relationships": {
+      "providerCompany": {"data": {"type": "company", "id": "123"}},
+      "providerContact": {"data": {"type": "contact", "id": "456"}}
+    }
+  }
+}
+```
+
+### Bon de commande
+
+#### POST /purchase-orders
+Crée un bon de commande lié au fournisseur et au positionnement.
+
+```python
+async def create_purchase_order(
+    self, provider_id: int, positioning_id: int,
+    reference: str, amount: float,
+) -> int  # Retourne purchase_order_id Boond
+```
+
+---
+
+## Workflow complet Sync Boond (après signature contrat)
+
+> **Use case** : `backend/app/contract_management/application/use_cases/sync_to_boond_after_signing.py`
+
+**6 étapes (best-effort, continue même si une étape échoue)** :
+
+| Étape | Action | Endpoint Boond | Données persistées |
+|-------|--------|----------------|-------------------|
+| 1 | Créer société fournisseur | `POST /companies` | `tp.boond_provider_id` |
+| 2 | Créer contacts (signataire + facturation) | `POST /contacts` | `tp.boond_signer_contact_id`, `tp.boond_billing_contact_id` |
+| 3 | Convertir candidat → ressource | `PUT /candidates/{id}/information` | `cr.boond_candidate_id` (nouvel ID), `cr.boond_consultant_type = "resource"` |
+| 4 | Créer contrat Boond | `POST /contracts` | `cr.boond_contract_id` |
+| 5 | Créer bon de commande | `POST /purchase-orders` | `cr.boond_purchase_order_id` |
+| 6 | Archiver positionnement | `PATCH /positionings/{id}` | — |
+
+> **Pré-requis étape 3** : `manager_id` récupéré via `get_need()` (mainManager du besoin).
+> **Pré-requis étape 4** : `resource_id` doit être le nouvel ID ressource (pas l'ancien ID candidat).
+
+---
+
 ## Utilisation dans Bobby
 
 ### Endpoints API Bobby
@@ -336,6 +597,11 @@ async def _request(self, method: str, endpoint: str, **kwargs):
 | `GET /opportunities/sync` | `get_opportunities()` |
 | `GET /published-opportunities/my-boond` | `get_manager_opportunities()` |
 | `GET /hr/opportunities` | `get_hr_manager_opportunities()` |
+| `POST /contract-requests/{id}/boond/create-company` | `create_company_full()`, `create_contact()` |
+| `POST /contract-requests/{id}/boond/convert-candidate` | `convert_candidate_to_resource()` |
+| `POST /contract-requests/{id}/boond/create-contract` | `create_boond_contract()`, `update_resource_administrative()` |
+| `POST /contract-requests/{id}/boond/create-purchase-order` | `create_purchase_order()` |
+| `POST /contract-requests/{id}/push-to-crm` | Toutes les méthodes (sync complète 6 étapes) |
 
 ### Exemple d'utilisation
 
