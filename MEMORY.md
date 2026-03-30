@@ -172,7 +172,7 @@ sont à jour, puis on crée un bon de commande.
 #### Nouveautés
 
 **Modèle de données** :
-- `cm_framework_contracts` : contrat cadre (1 par fournisseur+société, validité 1 an, tacite reconduction)
+- `cm_framework_contracts` : contrat cadre (1 par fournisseur+société, validité 2 ans, tacite reconduction)
 - `cm_purchase_orders` : bons de commande (N par contrat cadre, 1 par consultant/mission)
 - `cm_contract_requests.request_type` : `full` (nouveau fournisseur) ou `purchase_order_only` (contrat cadre existant)
 - `cm_contract_requests.framework_contract_id` : FK vers le contrat cadre si parcours rapide

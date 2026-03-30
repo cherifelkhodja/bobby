@@ -394,7 +394,7 @@ class SyncToBoondAfterSigningUseCase:
                         s3_key_signed=contract.s3_key_signed if contract else None,
                         signed_at=contract.signed_at if contract else now,
                         status=FrameworkContractStatus.ACTIVE,
-                        expires_at=now + timedelta(days=365),  # 1 year
+                        expires_at=now + timedelta(days=730),  # 2 years
                         tacit_renewal=True,
                     )
                     saved_fc = await fc_repo.save(fc)
