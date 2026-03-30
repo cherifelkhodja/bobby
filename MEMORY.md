@@ -35,6 +35,7 @@
 | Row Level Security | ✅ Done | PostgreSQL RLS |
 | Audit Logging | ✅ Done | Structuré |
 | Contractualisation | ✅ Done | Workflow BoondManager → validation → contrat PDF (HTML+WeasyPrint) → signature YouSign → push Boond |
+| Contrats cadres & BDC | ✅ Done | 1 fournisseur = 1 contrat cadre, N bons de commande. Détection SIREN, parcours rapide |
 | Vigilance documentaire | ✅ Done | Cycle de vie docs légaux tiers (request → upload → validate/reject → expiration) |
 | Portail tiers (magic link) | ✅ Done | Upload documents + review contrat via lien sécurisé |
 | CRON jobs (APScheduler) | ✅ Done | Expirations documents, relances, purge magic links |
@@ -160,6 +161,52 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-03-30 (feat: contrats cadres et bons de commande — skip fournisseurs existants)
+
+#### Contexte
+Quand un fournisseur a déjà un contrat cadre signé, il ne faut pas refaire tout le processus
+(collecte documents, configuration, draft, signature). On vérifie simplement que les documents
+sont à jour, puis on crée un bon de commande.
+
+#### Nouveautés
+
+**Modèle de données** :
+- `cm_framework_contracts` : contrat cadre (1 par fournisseur+société, validité 1 an, tacite reconduction)
+- `cm_purchase_orders` : bons de commande (N par contrat cadre, 1 par consultant/mission)
+- `cm_contract_requests.request_type` : `full` (nouveau fournisseur) ou `purchase_order_only` (contrat cadre existant)
+- `cm_contract_requests.framework_contract_id` : FK vers le contrat cadre si parcours rapide
+
+**Détection (Option C — au SIREN)** :
+Quand le fournisseur soumet ses infos société via le portail (`POST /portal/{token}/company-info`),
+le système vérifie si un autre ThirdParty avec le même SIREN a un contrat cadre actif.
+Si oui, la demande est automatiquement basculée en `purchase_order_only`.
+
+**Création automatique du contrat cadre** :
+Lors du `SyncToBoondAfterSigning` d'une demande `full`, un `FrameworkContract` est créé
+automatiquement (1 an, tacite reconduction) + un `PurchaseOrder` lié.
+
+**Parcours rapide (purchase_order_only)** :
+- Validation commerciale simplifiée (TJM, dates, consultant)
+- Vérification compliance documents existants
+- Création directe du bon de commande (`POST /contract-requests/{id}/create-purchase-order`)
+- Pas de configuration articles, pas de draft, pas de signature
+
+**UI/UX** :
+- Badge "BDC" (vert) ou "Contrat cadre" (bleu) sur la liste des contrats
+- Référence du contrat cadre affichée dans la liste
+- Bandeau vert sur la page détail avec info contrat cadre + liste des BDC
+- Bouton "Créer le bon de commande" pour le parcours rapide
+- Sections configuration/articles/draft/signature masquées pour le parcours rapide
+
+**Migration** : `061_add_framework_contracts_and_purchase_orders.py`
+
+**Fichiers modifiés** :
+- Backend: entities, value_objects, models, repositories, use_cases (validate_commercial, sync_to_boond, create_purchase_order), routes, schemas
+- Frontend: types, API client, ContractManagement, ContractDetail
+- Portal: détection SIREN dans `submit_company_info`
+
+---
 
 ### 2026-03-30 (fix: sync Boond — resource ID, endDate, workingTimeType)
 

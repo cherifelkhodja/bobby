@@ -814,6 +814,41 @@ async def submit_company_info(
     )
     await request_docs_uc.execute(tp.id, entity_category=body.entity_category)
 
+    # ── Detect existing framework contract for this SIREN ──────────────
+    # Option C: at SIREN submission time, check if another ThirdParty
+    # with the same SIREN already has an active framework contract.
+    # If so, switch the contract request to purchase_order_only mode.
+    framework_contract_info = None
+    if result.contract_request_id:
+        from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+            ContractRequestRepository,
+            FrameworkContractRepository,
+        )
+
+        fc_repo = FrameworkContractRepository(db)
+        fc = await fc_repo.get_by_third_party_siren(siren)
+
+        if fc and fc.is_usable:
+            cr_repo = ContractRequestRepository(db)
+            cr = await cr_repo.get_by_id(result.contract_request_id)
+            if cr and cr.request_type != "purchase_order_only":
+                cr.request_type = "purchase_order_only"
+                cr.framework_contract_id = fc.id
+                # Link to the same third party as the framework contract
+                cr.third_party_id = fc.third_party_id
+                await cr_repo.save(cr)
+                logger.info(
+                    "contract_request_switched_to_purchase_order_only",
+                    cr_id=str(cr.id),
+                    framework_contract_id=str(fc.id),
+                    siren=siren,
+                )
+                framework_contract_info = {
+                    "id": str(fc.id),
+                    "reference": fc.reference,
+                    "status": fc.status.value,
+                }
+
     audit_logger.log(
         AuditAction.PORTAL_ACCESSED,
         AuditResource.MAGIC_LINK,
@@ -827,7 +862,15 @@ async def submit_company_info(
         },
     )
 
-    return {"message": "Informations enregistrées avec succès."}
+    response = {"message": "Informations enregistrées avec succès."}
+    if framework_contract_info:
+        response["framework_contract"] = framework_contract_info
+        response["message"] = (
+            "Informations enregistrées. Un contrat cadre actif a été détecté "
+            f"(réf. {framework_contract_info['reference']}). "
+            "La vérification des documents de conformité est en cours."
+        )
+    return response
 
 
 @router.patch(

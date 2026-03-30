@@ -13,10 +13,20 @@ from app.contract_management.domain.entities.contract_request import ContractReq
 from app.contract_management.domain.value_objects.contract_request_status import (
     ContractRequestStatus,
 )
+from app.contract_management.domain.entities.framework_contract import FrameworkContract
+from app.contract_management.domain.entities.purchase_order import PurchaseOrder
+from app.contract_management.domain.value_objects.framework_contract_status import (
+    FrameworkContractStatus,
+)
+from app.contract_management.domain.value_objects.purchase_order_status import (
+    PurchaseOrderStatus,
+)
 from app.contract_management.infrastructure.models import (
     ContractCompanyModel,
     ContractModel,
     ContractRequestModel,
+    FrameworkContractModel,
+    PurchaseOrderModel,
     WebhookEventModel,
 )
 
@@ -62,6 +72,8 @@ class ContractRequestRepository:
         if model:
             model.status = request.status.value
             model.reference = request.reference
+            model.request_type = request.request_type
+            model.framework_contract_id = request.framework_contract_id
             model.third_party_id = request.third_party_id
             model.third_party_type = request.third_party_type
             model.daily_rate = request.daily_rate
@@ -237,6 +249,8 @@ class ContractRequestRepository:
             id=model.id,
             provisional_reference=model.provisional_reference,
             reference=model.reference,
+            request_type=model.request_type or "full",
+            framework_contract_id=model.framework_contract_id,
             boond_positioning_id=model.boond_positioning_id,
             boond_candidate_id=model.boond_candidate_id,
             boond_consultant_type=model.boond_consultant_type,
@@ -278,6 +292,8 @@ class ContractRequestRepository:
             id=entity.id,
             provisional_reference=entity.provisional_reference,
             reference=entity.reference,
+            request_type=entity.request_type,
+            framework_contract_id=entity.framework_contract_id,
             boond_positioning_id=entity.boond_positioning_id,
             boond_candidate_id=entity.boond_candidate_id,
             boond_consultant_type=entity.boond_consultant_type,
@@ -443,3 +459,247 @@ class WebhookEventRepository:
         )
         await self.session.flush()
         return result.rowcount
+
+
+class FrameworkContractRepository:
+    """PostgreSQL-backed framework contract repository."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_by_id(self, fc_id: UUID) -> FrameworkContract | None:
+        """Get a framework contract by ID."""
+        result = await self.session.execute(
+            select(FrameworkContractModel).where(FrameworkContractModel.id == fc_id)
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def get_active_by_third_party(
+        self, third_party_id: UUID, company_id: UUID | None = None
+    ) -> FrameworkContract | None:
+        """Get the active framework contract for a supplier.
+
+        If company_id is provided, filters by company too.
+        """
+        query = select(FrameworkContractModel).where(
+            FrameworkContractModel.third_party_id == third_party_id,
+            FrameworkContractModel.status.in_(["active", "expiring_soon"]),
+        )
+        if company_id:
+            query = query.where(FrameworkContractModel.company_id == company_id)
+        query = query.order_by(FrameworkContractModel.created_at.desc()).limit(1)
+        result = await self.session.execute(query)
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def get_by_third_party_siren(self, siren: str) -> FrameworkContract | None:
+        """Get the active framework contract for a supplier identified by SIREN.
+
+        Joins with tp_third_parties to find the matching supplier.
+        """
+        from app.third_party.infrastructure.models import ThirdPartyModel
+
+        query = (
+            select(FrameworkContractModel)
+            .join(ThirdPartyModel, FrameworkContractModel.third_party_id == ThirdPartyModel.id)
+            .where(
+                ThirdPartyModel.siren == siren,
+                FrameworkContractModel.status.in_(["active", "expiring_soon"]),
+            )
+            .order_by(FrameworkContractModel.created_at.desc())
+            .limit(1)
+        )
+        result = await self.session.execute(query)
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def list_by_third_party(self, third_party_id: UUID) -> list[FrameworkContract]:
+        """List all framework contracts for a supplier."""
+        result = await self.session.execute(
+            select(FrameworkContractModel)
+            .where(FrameworkContractModel.third_party_id == third_party_id)
+            .order_by(FrameworkContractModel.created_at.desc())
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def save(self, fc: FrameworkContract) -> FrameworkContract:
+        """Save a framework contract (create or update)."""
+        result = await self.session.execute(
+            select(FrameworkContractModel).where(FrameworkContractModel.id == fc.id)
+        )
+        model = result.scalar_one_or_none()
+
+        if model:
+            model.status = fc.status.value
+            model.s3_key_signed = fc.s3_key_signed
+            model.signed_at = fc.signed_at
+            model.expires_at = fc.expires_at
+            model.tacit_renewal = fc.tacit_renewal
+            model.original_contract_id = fc.original_contract_id
+            model.updated_at = fc.updated_at
+        else:
+            model = self._to_model(fc)
+            self.session.add(model)
+
+        await self.session.flush()
+        return self._to_entity(model)
+
+    def _to_entity(self, model: FrameworkContractModel) -> FrameworkContract:
+        return FrameworkContract(
+            id=model.id,
+            third_party_id=model.third_party_id,
+            company_id=model.company_id,
+            original_contract_request_id=model.original_contract_request_id,
+            original_contract_id=model.original_contract_id,
+            reference=model.reference,
+            s3_key_signed=model.s3_key_signed,
+            signed_at=model.signed_at,
+            status=FrameworkContractStatus(model.status),
+            expires_at=model.expires_at,
+            tacit_renewal=model.tacit_renewal,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
+
+    def _to_model(self, entity: FrameworkContract) -> FrameworkContractModel:
+        return FrameworkContractModel(
+            id=entity.id,
+            third_party_id=entity.third_party_id,
+            company_id=entity.company_id,
+            original_contract_request_id=entity.original_contract_request_id,
+            original_contract_id=entity.original_contract_id,
+            reference=entity.reference,
+            s3_key_signed=entity.s3_key_signed,
+            signed_at=entity.signed_at,
+            status=entity.status.value,
+            expires_at=entity.expires_at,
+            tacit_renewal=entity.tacit_renewal,
+            created_at=entity.created_at,
+            updated_at=entity.updated_at,
+        )
+
+
+class PurchaseOrderRepository:
+    """PostgreSQL-backed purchase order repository."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_by_id(self, po_id: UUID) -> PurchaseOrder | None:
+        """Get a purchase order by ID."""
+        result = await self.session.execute(
+            select(PurchaseOrderModel).where(PurchaseOrderModel.id == po_id)
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def get_by_contract_request_id(self, cr_id: UUID) -> PurchaseOrder | None:
+        """Get the purchase order for a contract request."""
+        result = await self.session.execute(
+            select(PurchaseOrderModel)
+            .where(PurchaseOrderModel.contract_request_id == cr_id)
+            .order_by(PurchaseOrderModel.created_at.desc())
+            .limit(1)
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def list_by_framework_contract(self, fc_id: UUID) -> list[PurchaseOrder]:
+        """List all purchase orders for a framework contract."""
+        result = await self.session.execute(
+            select(PurchaseOrderModel)
+            .where(PurchaseOrderModel.framework_contract_id == fc_id)
+            .order_by(PurchaseOrderModel.created_at.desc())
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def get_next_reference(self, framework_contract_reference: str) -> str:
+        """Generate the next purchase order reference.
+
+        Format: BDC-{framework_reference}-NNNN
+        e.g. BDC-GEM-CC-0001-0001
+        """
+        prefix = f"BDC-{framework_contract_reference}-"
+        result = await self.session.execute(
+            select(func.max(PurchaseOrderModel.reference)).where(
+                PurchaseOrderModel.reference.like(f"{prefix}%")
+            )
+        )
+        max_ref = result.scalar_one_or_none()
+
+        if max_ref:
+            try:
+                last_num = int(max_ref.rsplit("-", 1)[-1])
+                next_num = last_num + 1
+            except (ValueError, IndexError):
+                next_num = 1
+        else:
+            next_num = 1
+
+        return f"{prefix}{next_num:04d}"
+
+    async def save(self, po: PurchaseOrder) -> PurchaseOrder:
+        """Save a purchase order (create or update)."""
+        result = await self.session.execute(
+            select(PurchaseOrderModel).where(PurchaseOrderModel.id == po.id)
+        )
+        model = result.scalar_one_or_none()
+
+        if model:
+            model.status = po.status.value
+            model.daily_rate = po.daily_rate
+            model.start_date = po.start_date
+            model.end_date = po.end_date
+            model.quantity = po.quantity
+            model.boond_purchase_order_id = po.boond_purchase_order_id
+            model.s3_key = po.s3_key
+            model.consultant_first_name = po.consultant_first_name
+            model.consultant_last_name = po.consultant_last_name
+            model.updated_at = po.updated_at
+        else:
+            model = self._to_model(po)
+            self.session.add(model)
+
+        await self.session.flush()
+        return self._to_entity(model)
+
+    def _to_entity(self, model: PurchaseOrderModel) -> PurchaseOrder:
+        return PurchaseOrder(
+            id=model.id,
+            framework_contract_id=model.framework_contract_id,
+            contract_request_id=model.contract_request_id,
+            reference=model.reference,
+            consultant_first_name=model.consultant_first_name,
+            consultant_last_name=model.consultant_last_name,
+            daily_rate=model.daily_rate,
+            start_date=model.start_date,
+            end_date=model.end_date,
+            quantity=model.quantity,
+            boond_positioning_id=model.boond_positioning_id,
+            boond_purchase_order_id=model.boond_purchase_order_id,
+            status=PurchaseOrderStatus(model.status),
+            s3_key=model.s3_key,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
+
+    def _to_model(self, entity: PurchaseOrder) -> PurchaseOrderModel:
+        return PurchaseOrderModel(
+            id=entity.id,
+            framework_contract_id=entity.framework_contract_id,
+            contract_request_id=entity.contract_request_id,
+            reference=entity.reference,
+            consultant_first_name=entity.consultant_first_name,
+            consultant_last_name=entity.consultant_last_name,
+            daily_rate=entity.daily_rate,
+            start_date=entity.start_date,
+            end_date=entity.end_date,
+            quantity=entity.quantity,
+            boond_positioning_id=entity.boond_positioning_id,
+            boond_purchase_order_id=entity.boond_purchase_order_id,
+            status=entity.status.value,
+            s3_key=entity.s3_key,
+            created_at=entity.created_at,
+            updated_at=entity.updated_at,
+        )

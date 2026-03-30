@@ -23,6 +23,8 @@ import {
   MessageSquare,
   Plus,
   GripVertical,
+  ShieldCheck,
+  ShoppingCart,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -165,6 +167,33 @@ export default function ContractDetail() {
     queryKey: ['compliance-docs', cr?.third_party_id],
     queryFn: () => vigilanceApi.getThirdPartyDocuments(cr!.third_party_id!),
     enabled: !!cr?.third_party_id && isAdv,
+  });
+
+  // Framework contract and purchase orders for fast-path requests
+  const isPurchaseOrderOnly = cr?.request_type === 'purchase_order_only';
+
+  const { data: frameworkContract } = useQuery({
+    queryKey: ['framework-contract', id],
+    queryFn: () => contractsApi.getFrameworkContract(id!),
+    enabled: !!id && isPurchaseOrderOnly,
+  });
+
+  const { data: purchaseOrders = [] } = useQuery({
+    queryKey: ['purchase-orders', id],
+    queryFn: () => contractsApi.listPurchaseOrders(id!),
+    enabled: !!id && isPurchaseOrderOnly,
+  });
+
+  const createPurchaseOrderMutation = useMutation({
+    mutationFn: () => contractsApi.createPurchaseOrder(id!),
+    onSuccess: () => {
+      toast.success('Bon de commande créé avec succès.');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders', id] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
   });
 
   // Pre-fill validation form with Boond data when CR loads
@@ -452,7 +481,7 @@ export default function ContractDetail() {
     'draft_generated',
     'partner_requested_changes',
   ]);
-  const showConfigForm = isAdv && !!cr?.status && prePartnerStatuses.has(cr.status);
+  const showConfigForm = isAdv && !!cr?.status && prePartnerStatuses.has(cr.status) && cr?.request_type !== 'purchase_order_only';
 
   // Articles are now managed globally from Admin > Contrat AT tab
 
@@ -468,7 +497,7 @@ export default function ContractDetail() {
   }
 
   const statusConfig = CONTRACT_STATUS_CONFIG[cr.status];
-  const actionConfig = isAdv ? ACTION_CONFIG[cr.status] : undefined;
+  const actionConfig = isAdv && !isPurchaseOrderOnly ? ACTION_CONFIG[cr.status] : undefined;
 
   // Latest contract (for partner_comments)
   const latestContract = contracts && contracts.length > 0
@@ -538,6 +567,78 @@ export default function ContractDetail() {
           </div>
         </div>
       </div>
+
+      {/* Framework contract banner — fast path */}
+      {isPurchaseOrderOnly && (
+        <Card className="mb-6 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20">
+          <div className="flex items-start gap-3">
+            <div className="shrink-0 p-2 bg-emerald-100 dark:bg-emerald-800 rounded-lg">
+              <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                Contrat cadre existant
+              </h3>
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                Ce fournisseur dispose d&apos;un contrat cadre actif
+                {cr.framework_contract_reference && (
+                  <> (ref. <span className="font-mono font-semibold">{cr.framework_contract_reference}</span>)</>
+                )}
+                {cr.framework_contract_signed_at && (
+                  <>, signé le {new Date(cr.framework_contract_signed_at).toLocaleDateString('fr-FR')}</>
+                )}.
+                Seule la vérification de conformité des documents et la création du bon de commande sont nécessaires.
+              </p>
+
+              {/* Purchase orders list */}
+              {purchaseOrders.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300 mb-2">
+                    Bons de commande ({purchaseOrders.length})
+                  </p>
+                  <div className="space-y-1">
+                    {purchaseOrders.map((po) => (
+                      <div key={po.id} className="flex items-center justify-between text-xs bg-white dark:bg-gray-800 rounded px-3 py-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-semibold text-gray-900 dark:text-white">{po.reference}</span>
+                          {po.consultant_full_name && (
+                            <span className="text-gray-600 dark:text-gray-400">{po.consultant_full_name}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {po.daily_rate && <span className="text-gray-500">{po.daily_rate}€/j</span>}
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            po.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                            po.status === 'draft' ? 'bg-gray-100 text-gray-600' :
+                            'bg-blue-100 text-blue-700'
+                          }`}>
+                            {po.status_display}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Create purchase order action */}
+              {isAdv && cr.status !== 'archived' && cr.status !== 'cancelled' && (
+                <div className="mt-3">
+                  <Button
+                    size="sm"
+                    onClick={() => createPurchaseOrderMutation.mutate()}
+                    isLoading={createPurchaseOrderMutation.isPending}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
+                    Créer le bon de commande
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Commercial validation form */}
       {isCommercialOrAdmin && cr.status === 'pending_commercial_validation' && (
@@ -1071,8 +1172,8 @@ export default function ContractDetail() {
         </Card>
       )}
 
-      {/* Boond sync actions — visible when signed or archived */}
-      {isAdv && (cr.status === 'signed' || cr.status === 'archived') && (
+      {/* Boond sync actions — visible when signed or archived (full path only) */}
+      {isAdv && !isPurchaseOrderOnly && (cr.status === 'signed' || cr.status === 'archived') && (
         <Card className="mb-6 border-emerald-200 dark:border-emerald-800">
           <div className="flex items-start gap-3 mb-4">
             <RotateCcw className="h-5 w-5 text-emerald-500 mt-0.5 flex-shrink-0" />

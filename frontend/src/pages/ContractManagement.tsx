@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FileSignature, X } from 'lucide-react';
+import { FileSignature, X, ShieldCheck, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { contractsApi } from '../api/contracts';
@@ -168,6 +168,19 @@ export function ContractManagement() {
                         {config?.label ?? cr.status_display}
                       </span>
 
+                      {/* Request type badge */}
+                      {cr.request_type === 'purchase_order_only' ? (
+                        <span className="shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" title={`Contrat cadre: ${cr.framework_contract_reference ?? 'N/A'}`}>
+                          <ShoppingCart className="h-3 w-3" />
+                          BDC
+                        </span>
+                      ) : (
+                        <span className="shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
+                          <ShieldCheck className="h-3 w-3" />
+                          Contrat cadre
+                        </span>
+                      )}
+
                       {/* Main info */}
                       <div className="min-w-0">
                         {cr.client_name && (
@@ -183,6 +196,14 @@ export function ContractManagement() {
                           {cr.daily_rate && <span>{cr.daily_rate}€/j</span>}
                           {(cr.third_party_type || cr.daily_rate) && cr.start_date && <span>·</span>}
                           {cr.start_date && <span>Début {formatDate(cr.start_date)}</span>}
+                          {cr.request_type === 'purchase_order_only' && cr.framework_contract_reference && (
+                            <>
+                              <span>·</span>
+                              <span className="text-emerald-600 dark:text-emerald-400">
+                                CC {cr.framework_contract_reference}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -14,6 +14,10 @@ class ContractRequestResponse(BaseModel):
     provisional_reference: str
     reference: str | None = None
     display_reference: str
+    request_type: str = "full"  # "full" or "purchase_order_only"
+    framework_contract_id: UUID | None = None
+    framework_contract_reference: str | None = None
+    framework_contract_signed_at: str | None = None
     boond_positioning_id: int
     boond_candidate_id: int | None = None
     boond_consultant_type: str | None = None
@@ -218,6 +222,49 @@ class ContractResponse(BaseModel):
     partner_comments: str | None = None
     created_at: datetime
     signed_at: datetime | None = None
+
+
+class FrameworkContractResponse(BaseModel):
+    """Framework contract response."""
+
+    id: UUID
+    third_party_id: UUID
+    company_id: UUID
+    original_contract_request_id: UUID
+    original_contract_id: UUID | None = None
+    reference: str
+    s3_key_signed: str | None = None
+    signed_at: datetime | None = None
+    status: str
+    status_display: str
+    expires_at: datetime | None = None
+    tacit_renewal: bool = True
+    created_at: datetime
+    updated_at: datetime
+    purchase_orders_count: int = 0
+    third_party_name: str | None = None
+
+
+class PurchaseOrderResponse(BaseModel):
+    """Purchase order response."""
+
+    id: UUID
+    framework_contract_id: UUID
+    contract_request_id: UUID
+    reference: str
+    consultant_first_name: str | None = None
+    consultant_last_name: str | None = None
+    consultant_full_name: str | None = None
+    daily_rate: float | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    quantity: int | None = None
+    boond_positioning_id: int
+    boond_purchase_order_id: int | None = None
+    status: str
+    status_display: str
+    created_at: datetime
+    updated_at: datetime
 
 
 class WebhookResponse(BaseModel):

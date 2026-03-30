@@ -26,6 +26,14 @@ class ContractRequestModel(Base):
         comment="Référence définitive (XXX-CC-NNNN), assignée à l'état PARTNER_APPROVED",
     )
     boond_positioning_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    request_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="full",
+        comment="full = nouveau fournisseur, purchase_order_only = contrat cadre existant",
+    )
+    framework_contract_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_framework_contracts.id"), nullable=True,
+        comment="Contrat cadre existant (si request_type = purchase_order_only)",
+    )
     boond_candidate_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     boond_consultant_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     boond_need_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -169,6 +177,68 @@ class ContractAnnexTemplateModel(Base):
     )
     updated_by: Mapped[UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+
+
+class FrameworkContractModel(Base):
+    """Framework contract (contrat cadre) SQLAlchemy model.
+
+    One active framework contract per (third_party, company) pair.
+    """
+
+    __tablename__ = "cm_framework_contracts"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    third_party_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tp_third_parties.id"), nullable=False
+    )
+    company_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_contract_companies.id"), nullable=False
+    )
+    original_contract_request_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_contract_requests.id"), nullable=False
+    )
+    original_contract_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_contracts.id"), nullable=True
+    )
+    reference: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    s3_key_signed: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    tacit_renewal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class PurchaseOrderModel(Base):
+    """Purchase order (bon de commande) SQLAlchemy model."""
+
+    __tablename__ = "cm_purchase_orders"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    framework_contract_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_framework_contracts.id"), nullable=False
+    )
+    contract_request_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_contract_requests.id"), nullable=False
+    )
+    reference: Mapped[str] = mapped_column(String(30), nullable=False, unique=True)
+    consultant_first_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    consultant_last_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    daily_rate: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    boond_positioning_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    boond_purchase_order_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
+    s3_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
 

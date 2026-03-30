@@ -114,6 +114,8 @@ def _cr_to_response(
     *,
     commercial_name: str | None = None,
     portal_url: str | None = None,
+    framework_contract_reference: str | None = None,
+    framework_contract_signed_at: str | None = None,
 ) -> ContractRequestResponse:
     """Convert a ContractRequest entity to response."""
     return ContractRequestResponse(
@@ -121,6 +123,10 @@ def _cr_to_response(
         provisional_reference=cr.provisional_reference,
         reference=cr.reference,
         display_reference=cr.display_reference,
+        request_type=cr.request_type,
+        framework_contract_id=cr.framework_contract_id,
+        framework_contract_reference=framework_contract_reference,
+        framework_contract_signed_at=framework_contract_signed_at,
         boond_positioning_id=cr.boond_positioning_id,
         boond_candidate_id=cr.boond_candidate_id,
         boond_consultant_type=cr.boond_consultant_type,
@@ -268,8 +274,28 @@ async def get_contract_request(
             settings = get_settings()
             portal_url = f"{settings.BOBBY_PORTAL_BASE_URL}/{active_link.token}"
 
+    # Resolve framework contract info if linked
+    fc_reference: str | None = None
+    fc_signed_at: str | None = None
+    if cr.framework_contract_id:
+        from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+            FrameworkContractRepository,
+        )
+
+        fc_repo = FrameworkContractRepository(db)
+        fc = await fc_repo.get_by_id(cr.framework_contract_id)
+        if fc:
+            fc_reference = fc.reference
+            fc_signed_at = fc.signed_at.isoformat() if fc.signed_at else None
+
     name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name, portal_url=portal_url)
+    return _cr_to_response(
+        cr,
+        commercial_name=name,
+        portal_url=portal_url,
+        framework_contract_reference=fc_reference,
+        framework_contract_signed_at=fc_signed_at,
+    )
 
 
 @router.post(
@@ -1872,3 +1898,222 @@ async def rollback_status(
 
     name = await _resolve_commercial_name(db, saved.commercial_email)
     return _cr_to_response(saved, commercial_name=name)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Framework contracts & Purchase orders
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get(
+    "/{contract_request_id}/framework-contract",
+    summary="Get framework contract linked to this request",
+)
+async def get_framework_contract(
+    contract_request_id: UUID,
+    auth: ContractAccessUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the framework contract linked to a contract request (if any)."""
+    from app.contract_management.api.schemas import FrameworkContractResponse
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        FrameworkContractRepository,
+        PurchaseOrderRepository,
+    )
+
+    _user_id, role, email = auth
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+
+    if role == "commercial" and cr.commercial_email != email:
+        raise HTTPException(status_code=403, detail="Accès non autorisé.")
+
+    if not cr.framework_contract_id:
+        raise HTTPException(status_code=404, detail="Aucun contrat cadre associé.")
+
+    fc_repo = FrameworkContractRepository(db)
+    fc = await fc_repo.get_by_id(cr.framework_contract_id)
+    if not fc:
+        raise HTTPException(status_code=404, detail="Contrat cadre non trouvé.")
+
+    po_repo = PurchaseOrderRepository(db)
+    purchase_orders = await po_repo.list_by_framework_contract(fc.id)
+
+    tp_name = None
+    if fc.third_party_id:
+        tp_repo = ThirdPartyRepository(db)
+        tp = await tp_repo.get_by_id(fc.third_party_id)
+        if tp:
+            tp_name = tp.company_name
+
+    return FrameworkContractResponse(
+        id=fc.id,
+        third_party_id=fc.third_party_id,
+        company_id=fc.company_id,
+        original_contract_request_id=fc.original_contract_request_id,
+        original_contract_id=fc.original_contract_id,
+        reference=fc.reference,
+        s3_key_signed=fc.s3_key_signed,
+        signed_at=fc.signed_at,
+        status=fc.status.value,
+        status_display=fc.status.display_name,
+        expires_at=fc.expires_at,
+        tacit_renewal=fc.tacit_renewal,
+        created_at=fc.created_at,
+        updated_at=fc.updated_at,
+        purchase_orders_count=len(purchase_orders),
+        third_party_name=tp_name,
+    )
+
+
+@router.get(
+    "/{contract_request_id}/purchase-orders",
+    summary="List purchase orders for a framework contract",
+)
+async def list_purchase_orders(
+    contract_request_id: UUID,
+    auth: ContractAccessUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """List all purchase orders linked to the framework contract of this request."""
+    from app.contract_management.api.schemas import PurchaseOrderResponse
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        FrameworkContractRepository,
+        PurchaseOrderRepository,
+    )
+
+    _user_id, role, email = auth
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+
+    if role == "commercial" and cr.commercial_email != email:
+        raise HTTPException(status_code=403, detail="Accès non autorisé.")
+
+    if not cr.framework_contract_id:
+        return []
+
+    fc_repo = FrameworkContractRepository(db)
+    fc = await fc_repo.get_by_id(cr.framework_contract_id)
+    if not fc:
+        return []
+
+    po_repo = PurchaseOrderRepository(db)
+    purchase_orders = await po_repo.list_by_framework_contract(fc.id)
+
+    return [
+        PurchaseOrderResponse(
+            id=po.id,
+            framework_contract_id=po.framework_contract_id,
+            contract_request_id=po.contract_request_id,
+            reference=po.reference,
+            consultant_first_name=po.consultant_first_name,
+            consultant_last_name=po.consultant_last_name,
+            consultant_full_name=po.consultant_full_name,
+            daily_rate=float(po.daily_rate) if po.daily_rate else None,
+            start_date=po.start_date,
+            end_date=po.end_date,
+            quantity=po.quantity,
+            boond_positioning_id=po.boond_positioning_id,
+            boond_purchase_order_id=po.boond_purchase_order_id,
+            status=po.status.value,
+            status_display=po.status.display_name,
+            created_at=po.created_at,
+            updated_at=po.updated_at,
+        )
+        for po in purchase_orders
+    ]
+
+
+@router.post(
+    "/{contract_request_id}/create-purchase-order",
+    summary="Create purchase order for a fast-path contract request",
+)
+async def create_purchase_order(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a purchase order for a purchase_order_only contract request.
+
+    This is the fast path: the supplier already has an active framework contract,
+    so we skip the full contract lifecycle and just create a purchase order.
+    ADV/admin only.
+    """
+    from app.contract_management.api.schemas import PurchaseOrderResponse
+    from app.contract_management.application.use_cases.create_purchase_order import (
+        CreatePurchaseOrderCommand,
+        CreatePurchaseOrderUseCase,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        FrameworkContractRepository,
+        PurchaseOrderRepository,
+    )
+
+    cr_repo = ContractRequestRepository(db)
+    fc_repo = FrameworkContractRepository(db)
+    po_repo = PurchaseOrderRepository(db)
+    tp_repo = ThirdPartyRepository(db)
+
+    # Optionally wire up CRM service for Boond sync
+    crm_service = None
+    try:
+        settings = get_settings()
+        from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+            BoondCrmAdapter,
+        )
+        from app.infrastructure.boond.client import BoondClient
+
+        boond_client = BoondClient(settings)
+        crm_service = BoondCrmAdapter(boond_client)
+    except Exception:
+        pass
+
+    use_case = CreatePurchaseOrderUseCase(
+        contract_request_repository=cr_repo,
+        framework_contract_repository=fc_repo,
+        purchase_order_repository=po_repo,
+        third_party_repository=tp_repo,
+        crm_service=crm_service,
+    )
+
+    try:
+        po = await use_case.execute(
+            CreatePurchaseOrderCommand(contract_request_id=contract_request_id)
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    audit_logger.log(
+        AuditAction.COMMERCIAL_VALIDATED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(contract_request_id),
+        details={
+            "action": "purchase_order_created",
+            "po_id": str(po.id),
+            "po_reference": po.reference,
+        },
+    )
+
+    return PurchaseOrderResponse(
+        id=po.id,
+        framework_contract_id=po.framework_contract_id,
+        contract_request_id=po.contract_request_id,
+        reference=po.reference,
+        consultant_first_name=po.consultant_first_name,
+        consultant_last_name=po.consultant_last_name,
+        consultant_full_name=po.consultant_full_name,
+        daily_rate=float(po.daily_rate) if po.daily_rate else None,
+        start_date=po.start_date,
+        end_date=po.end_date,
+        quantity=po.quantity,
+        boond_positioning_id=po.boond_positioning_id,
+        boond_purchase_order_id=po.boond_purchase_order_id,
+        status=po.status.value,
+        status_display=po.status.display_name,
+        created_at=po.created_at,
+        updated_at=po.updated_at,
+    )

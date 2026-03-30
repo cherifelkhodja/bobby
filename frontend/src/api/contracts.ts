@@ -4,6 +4,8 @@ import type {
   ContractRequestListResponse,
   ContractRequestStatus,
   Contract,
+  FrameworkContract,
+  PurchaseOrder,
 } from '../types';
 
 export const contractsApi = {
@@ -253,6 +255,28 @@ export const contractsApi = {
       { params: { which } },
     );
     return response.data.url;
+  },
+
+  // Framework contracts & purchase orders
+  getFrameworkContract: async (contractRequestId: string): Promise<FrameworkContract> => {
+    const response = await apiClient.get<FrameworkContract>(
+      `/contract-requests/${contractRequestId}/framework-contract`,
+    );
+    return response.data;
+  },
+
+  listPurchaseOrders: async (contractRequestId: string): Promise<PurchaseOrder[]> => {
+    const response = await apiClient.get<PurchaseOrder[]>(
+      `/contract-requests/${contractRequestId}/purchase-orders`,
+    );
+    return response.data;
+  },
+
+  createPurchaseOrder: async (contractRequestId: string): Promise<PurchaseOrder> => {
+    const response = await apiClient.post<PurchaseOrder>(
+      `/contract-requests/${contractRequestId}/create-purchase-order`,
+    );
+    return response.data;
   },
 };
 

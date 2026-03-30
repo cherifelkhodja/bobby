@@ -1,6 +1,7 @@
 """Use case: Synchronise all data to BoondManager after contract signing."""
 
 import re
+from datetime import datetime
 from uuid import UUID
 
 import structlog
@@ -356,6 +357,107 @@ class SyncToBoondAfterSigningUseCase:
             except Exception as exc:
                 logger.warning(
                     "sync_boond_create_purchase_order_failed",
+                    cr_id=str(cr.id),
+                    error=str(exc),
+                )
+
+        # ── Étape 5b : Créer le contrat cadre (FrameworkContract) ─────────
+        # Pour les demandes "full", on crée un FrameworkContract qui sera
+        # réutilisé pour les prochains consultants du même fournisseur.
+        if tp and company and cr.request_type == "full" and not cr.is_purchase_order_only:
+            try:
+                from app.contract_management.domain.entities.framework_contract import (
+                    FrameworkContract,
+                )
+                from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+                    FrameworkContractRepository,
+                )
+
+                fc_repo = FrameworkContractRepository(self._db)
+
+                # Check if a framework contract already exists for this supplier+company
+                existing_fc = await fc_repo.get_active_by_third_party(tp.id, company.id)
+                if not existing_fc:
+                    from datetime import timedelta
+
+                    from app.contract_management.domain.value_objects.framework_contract_status import (
+                        FrameworkContractStatus,
+                    )
+
+                    now = datetime.utcnow()
+                    fc = FrameworkContract(
+                        third_party_id=tp.id,
+                        company_id=company.id,
+                        original_contract_request_id=cr.id,
+                        original_contract_id=contract.id if contract else None,
+                        reference=cr.display_reference,
+                        s3_key_signed=contract.s3_key_signed if contract else None,
+                        signed_at=contract.signed_at if contract else now,
+                        status=FrameworkContractStatus.ACTIVE,
+                        expires_at=now + timedelta(days=365),  # 1 year
+                        tacit_renewal=True,
+                    )
+                    saved_fc = await fc_repo.save(fc)
+                    logger.info(
+                        "framework_contract_created",
+                        cr_id=str(cr.id),
+                        fc_id=str(saved_fc.id),
+                        reference=saved_fc.reference,
+                        third_party_id=str(tp.id),
+                    )
+                else:
+                    logger.info(
+                        "framework_contract_already_exists",
+                        cr_id=str(cr.id),
+                        fc_id=str(existing_fc.id),
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "framework_contract_creation_failed",
+                    cr_id=str(cr.id),
+                    error=str(exc),
+                )
+
+        # ── Étape 5c : Créer le PurchaseOrder dans Bobby ──────────────────
+        if contract and cr.request_type == "full":
+            try:
+                from app.contract_management.domain.entities.purchase_order import PurchaseOrder
+                from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+                    FrameworkContractRepository,
+                    PurchaseOrderRepository,
+                )
+
+                fc_repo = FrameworkContractRepository(self._db)
+                po_repo = PurchaseOrderRepository(self._db)
+
+                fc = await fc_repo.get_active_by_third_party(
+                    tp.id if tp else cr.third_party_id, company.id if company else None
+                )
+                if fc:
+                    po_ref = await po_repo.get_next_reference(fc.reference)
+                    po = PurchaseOrder(
+                        framework_contract_id=fc.id,
+                        contract_request_id=cr.id,
+                        reference=po_ref,
+                        boond_positioning_id=cr.boond_positioning_id,
+                        consultant_first_name=cr.consultant_first_name,
+                        consultant_last_name=cr.consultant_last_name,
+                        daily_rate=cr.daily_rate,
+                        start_date=cr.start_date,
+                        end_date=cr.end_date,
+                        quantity=cr.quantity_sold,
+                        boond_purchase_order_id=contract.boond_purchase_order_id,
+                    )
+                    po.mark_active()
+                    await po_repo.save(po)
+                    logger.info(
+                        "purchase_order_created",
+                        cr_id=str(cr.id),
+                        po_ref=po_ref,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "purchase_order_creation_failed",
                     cr_id=str(cr.id),
                     error=str(exc),
                 )

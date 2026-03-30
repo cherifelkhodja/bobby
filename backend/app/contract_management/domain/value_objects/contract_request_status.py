@@ -37,12 +37,14 @@ class ContractRequestStatus(str, Enum):
                 {
                     ContractRequestStatus.COLLECTING_DOCUMENTS,
                     ContractRequestStatus.CONFIGURING_CONTRACT,
+                    ContractRequestStatus.ARCHIVED,  # Fast path: purchase_order_only
                     ContractRequestStatus.CANCELLED,
                 }
             ),
             ContractRequestStatus.COLLECTING_DOCUMENTS: frozenset(
                 {
                     ContractRequestStatus.REVIEWING_COMPLIANCE,
+                    ContractRequestStatus.ARCHIVED,  # Fast path: purchase_order_only
                     ContractRequestStatus.CANCELLED,
                 }
             ),
@@ -51,6 +53,7 @@ class ContractRequestStatus(str, Enum):
                     ContractRequestStatus.CONFIGURING_CONTRACT,
                     ContractRequestStatus.COMPLIANCE_BLOCKED,
                     ContractRequestStatus.COLLECTING_DOCUMENTS,
+                    ContractRequestStatus.ARCHIVED,  # Fast path: purchase_order_only
                     ContractRequestStatus.CANCELLED,
                 }
             ),
