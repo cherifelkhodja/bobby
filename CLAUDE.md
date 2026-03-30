@@ -459,18 +459,32 @@ nouveau → en_cours → entretien → accepté
 - `GET /batches/{id}/download/zip` - Download ZIP
 
 ### Contract Management (`/api/v1/contract-requests`)
+- `GET /companies` - List contract companies (active)
 - `GET /` - List contract requests (commercial: own, adv/admin: all)
+- `GET /next-reference` - Get next contract request reference
 - `GET /{id}` - Get contract request detail
+- `POST /{id}/sync-from-boond` - Re-sync data from Boond (ADV/admin)
 - `POST /{id}/validate-commercial` - Commercial validation (type tiers, TJM, dates, consultant, address)
+- `POST /{id}/resend-collection-email` - Resend document collection email
 - `POST /{id}/configure` - Configure contract (ADV/admin)
+- `PATCH /{id}/article-overrides` - Override contract articles (ADV/admin)
 - `POST /{id}/compliance-override` - Override compliance check (ADV/admin)
+- `POST /{id}/start-compliance-review` - Start compliance review (ADV/admin)
+- `POST /{id}/block-compliance` - Block for compliance issue (ADV/admin)
+- `DELETE /{id}` - Cancel contract request (ADV/admin)
 - `POST /{id}/generate-draft` - Generate DOCX draft (ADV/admin)
 - `POST /{id}/send-draft-to-partner` - Send draft via magic link (ADV/admin)
 - `POST /{id}/send-for-signature` - Send to YouSign (ADV/admin)
-- `POST /{id}/push-to-crm` - Push to BoondManager (ADV/admin)
-- `POST /{id}/sync-from-boond` - Re-sync data from Boond (ADV/admin)
+- `POST /{id}/mark-as-signed` - Mark contract as signed (ADV/admin)
+- `POST /{id}/push-to-crm` - Push to BoondManager (ADV/admin, full sync)
+- `POST /{id}/retry-boond-sync` - Retry failed Boond sync (ADV/admin)
+- `POST /{id}/boond/create-company` - [Boond] Create supplier company + contacts
+- `POST /{id}/boond/convert-candidate` - [Boond] Convert candidate to resource
+- `POST /{id}/boond/create-contract` - [Boond] Create Boond contract (external, optional resource_id override)
+- `POST /{id}/boond/create-purchase-order` - [Boond] Create purchase order
 - `GET /{id}/contracts` - List contract documents
-- `DELETE /{id}` - Cancel contract request (ADV/admin)
+- `GET /{id}/contracts/{contract_id}/download` - Get presigned download URL
+- `POST /{id}/rollback` - Rollback contract request status (ADV/admin)
 
 ### Webhooks (`/api/v1/webhooks`)
 - `POST /boondmanager/positioning-update` - Boond positioning webhook (always 200 OK)

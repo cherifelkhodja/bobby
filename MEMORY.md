@@ -161,19 +161,35 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
-### 2026-03-30 (fix: extraction du nouvel ID ressource après conversion candidat)
+### 2026-03-30 (fix: sync Boond — resource ID, endDate, workingTimeType)
 
-#### Correction récupération du resource ID
-Après conversion candidat → ressource (`PUT /candidates/{id}/information` state=3),
+#### 1. Correction extraction nouvel ID ressource après conversion candidat
+**Problème** : Après conversion candidat → ressource (`PUT /candidates/{id}/information` state=3),
 Boond retourne le nouvel ID ressource dans `data.relationships.resource.data.id`,
 et NON dans `data.id` (qui reste l'ID candidat). Le code lisait `data.id`, donc
-la sync complète utilisait l'ancien ID candidat pour créer le contrat → 422.
+la sync complète utilisait l'ancien ID candidat pour créer le contrat → erreur 422.
 
 **Correction** : `convert_candidate_to_resource()` extrait maintenant le resource ID
 depuis `response.data.relationships.resource.data.id` avec fallback sur `data.id`.
 
+#### 2. Ajout `endDate` au payload de création de contrat Boond
+Le contrat Boond inclut maintenant la date de fin de mission (`cr.end_date`) via
+le champ `endDate` dans les attributs du payload `POST /contracts`.
+
+#### 3. Ajout `workingTimeType: 0` au payload de création de contrat Boond
+Attribut requis par Boond pour spécifier le temps de travail (0 = temps plein).
+
+#### 4. Mise à jour CLAUDE.md — endpoints Contract Management
+Liste complète des endpoints mise à jour avec les nouveaux endpoints Boond splittés
+(`boond/create-company`, `boond/convert-candidate`, `boond/create-contract`,
+`boond/create-purchase-order`) et les endpoints ajoutés récemment
+(`rollback`, `mark-as-signed`, `retry-boond-sync`, `article-overrides`,
+`start-compliance-review`, `block-compliance`, `resend-collection-email`,
+`next-reference`, `companies`, `contracts/{id}/download`).
+
 **Fichiers modifiés** :
 - `backend/app/contract_management/infrastructure/adapters/boond_crm_adapter.py`
+- `CLAUDE.md` (endpoints Contract Management)
 
 ---
 
