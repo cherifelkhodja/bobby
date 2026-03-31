@@ -56,47 +56,39 @@
 Tous les webhooks Boond (positionnement, candidat, ressource) utilisent le **meme format** :
 
 ```json
-[
-  {
-    "data": {
-      "id": "3_abc123...",
-      "type": "webhookevent",
-      "attributes": {
-        "type": "update"
+{
+  "data": {
+    "id": "6_69cbd09b4ae56",
+    "type": "webhookevent",
+    "attributes": {
+      "userToken": "322e67656d696e69",
+      "clientToken": "67656d696e69",
+      "type": "update"
+    },
+    "relationships": {
+      "webhook": {
+        "id": "6",
+        "type": "webhook"
       },
-      "relationships": {
-        "dependsOn": {
-          "id": "433",
-          "type": "positioning"
-        },
-        "log": {
-          "id": "117497",
-          "type": "log"
-        }
+      "dependsOn": {
+        "id": "2565",
+        "type": "candidate"
       },
-      "included": [
-        {
-          "id": "117497",
-          "type": "log",
-          "attributes": {
-            "content": {
-              "context": {
-                "id": "433"
-              },
-              "diff": {
-                "state": {
-                  "old": 0,
-                  "new": 7
-                }
-              }
-            }
-          }
-        }
-      ]
+      "log": {
+        "id": "123634",
+        "type": "log"
+      }
     }
   }
-]
+}
 ```
+
+### Points importants
+
+- **Le payload ne contient PAS le nouvel etat** (`state`) de l'entite.
+- Seul `dependsOn.type` et `dependsOn.id` sont fournis.
+- Bobby **fetch l'etat actuel via l'API Boond** (`GET /candidates/{id}/information` ou `GET /resources/{id}/information`) apres reception du webhook.
+- Le champ `relationships.log.id` reference le log Boond mais nous ne l'utilisons pas.
 
 ### Differences par entite
 
@@ -104,7 +96,7 @@ Tous les webhooks Boond (positionnement, candidat, ressource) utilisent le **mem
 |-------|---------------|----------|-----------|
 | `dependsOn.type` | `"positioning"` | `"candidate"` | `"resource"` |
 | `dependsOn.id` | ID positionnement | ID candidat | ID ressource |
-| `diff.state.new` | 7 | 11 | 4 ou 5 |
+| Etat obtenu via | API positionnement | API candidat | API ressource |
 
 ### Cle d'idempotence
 

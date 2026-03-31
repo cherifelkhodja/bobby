@@ -94,7 +94,7 @@ class CreateContractRequestFromEntityUseCase:
             data = entry.get("data", entry)
             webhook_event_id = data.get("id", "")
 
-            entity_id, new_state = self._parse_webhook_event(data, entity_type)
+            entity_id, webhook_state = self._parse_webhook_event(data, entity_type)
 
             if not entity_id:
                 logger.warning(
@@ -104,12 +104,28 @@ class CreateContractRequestFromEntityUseCase:
                 )
                 continue
 
+            # Fetch entity info from Boond API (includes current state)
+            consultant_type = entity_type  # "candidate" or "resource"
+            entity_info = await self._crm.get_candidate_info(entity_id, consultant_type)
+            if not entity_info:
+                logger.error(
+                    "boond_entity_not_found",
+                    entity_id=entity_id,
+                    entity_type=entity_type,
+                )
+                continue
+
+            # Determine actual state: prefer API state, fallback to webhook diff
+            new_state = entity_info.get("state") if entity_info.get("state") is not None else webhook_state
+
             logger.info(
-                "webhook_entity_parsed",
+                "webhook_entity_state_resolved",
                 webhook_event_id=webhook_event_id,
                 entity_type=entity_type,
                 entity_id=entity_id,
-                new_state=new_state,
+                api_state=entity_info.get("state"),
+                webhook_state=webhook_state,
+                resolved_state=new_state,
             )
 
             # Filter: only process expected states
@@ -131,17 +147,6 @@ class CreateContractRequestFromEntityUseCase:
             if await self._webhook_repo.exists(event_id):
                 logger.info("webhook_duplicate_event", event_id=event_id)
                 raise WebhookDuplicateError(event_id)
-
-            # Fetch entity info from Boond
-            consultant_type = entity_type  # "candidate" or "resource"
-            entity_info = await self._crm.get_candidate_info(entity_id, consultant_type)
-            if not entity_info:
-                logger.error(
-                    "boond_entity_not_found",
-                    entity_id=entity_id,
-                    entity_type=entity_type,
-                )
-                continue
 
             # Generate provisional reference
             reference = await self._cr_repo.get_next_provisional_reference()

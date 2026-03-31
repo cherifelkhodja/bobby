@@ -264,6 +264,7 @@ class BoondCrmAdapter:
                     "last_name": attributes.get("lastName", ""),
                     "email": attributes.get("email1", "") or attributes.get("email2", ""),
                     "phone": phone,
+                    "state": attributes.get("state"),
                 }
             except Exception as exc:
                 last_exc = exc

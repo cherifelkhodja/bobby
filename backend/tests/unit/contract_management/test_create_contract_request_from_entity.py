@@ -42,7 +42,7 @@ def _build_webhook_payload(entity_type: str, entity_id: int, new_state: int) -> 
     ]
 
 
-def _make_use_case(**overrides) -> CreateContractRequestFromEntityUseCase:
+def _make_use_case(entity_state: int = 11, **overrides) -> CreateContractRequestFromEntityUseCase:
     """Create use case with mock dependencies."""
     cr_repo = AsyncMock()
     cr_repo.get_next_provisional_reference = AsyncMock(return_value="PROV-2026-0001")
@@ -61,6 +61,7 @@ def _make_use_case(**overrides) -> CreateContractRequestFromEntityUseCase:
         "last_name": "Dupont",
         "email": "jean.dupont@example.com",
         "phone": "+33 6 12 34 56 78",
+        "state": entity_state,
     })
 
     email_service = AsyncMock()
@@ -173,9 +174,10 @@ class TestExecuteCandidateState11:
 
     @pytest.mark.asyncio
     async def test_filters_wrong_state(self):
-        """Should return None when state doesn't match expected."""
-        uc = _make_use_case()
-        payload = _build_webhook_payload("candidate", 42, 7)
+        """Should return None when entity's actual state doesn't match expected."""
+        # Entity state from API is 7 (not 11)
+        uc = _make_use_case(entity_state=7)
+        payload = _build_webhook_payload("candidate", 42, 11)
 
         result = await uc.execute(
             payload=payload,
@@ -241,7 +243,7 @@ class TestExecuteResourceState4:
     @pytest.mark.asyncio
     async def test_creates_cr_with_trigger_ressource_4(self):
         """Should create a CR with trigger_type=ressource_4."""
-        uc = _make_use_case()
+        uc = _make_use_case(entity_state=4)
         payload = _build_webhook_payload("resource", 99, 4)
 
         result = await uc.execute(
@@ -272,7 +274,7 @@ class TestExecuteResourceState4:
         cr_repo.get_latest_by_resource_id = AsyncMock(return_value=previous_cr)
         cr_repo.save = AsyncMock(side_effect=lambda cr: cr)
 
-        uc = _make_use_case(contract_request_repository=cr_repo)
+        uc = _make_use_case(entity_state=4, contract_request_repository=cr_repo)
         payload = _build_webhook_payload("resource", 99, 4)
 
         result = await uc.execute(
@@ -294,7 +296,7 @@ class TestExecuteResourceState5:
     @pytest.mark.asyncio
     async def test_creates_cr_with_trigger_ressource_5(self):
         """Should create a CR with trigger_type=ressource_5."""
-        uc = _make_use_case()
+        uc = _make_use_case(entity_state=5)
         payload = _build_webhook_payload("resource", 77, 5)
 
         result = await uc.execute(
