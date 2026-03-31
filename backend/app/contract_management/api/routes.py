@@ -86,8 +86,10 @@ async def _notify_commercial(
         logger.warning("commercial_notification_failed", error=str(exc), to=to)
 
 
-async def _resolve_commercial_name(db: AsyncSession, email: str) -> str | None:
+async def _resolve_commercial_name(db: AsyncSession, email: str | None) -> str | None:
     """Resolve a commercial email to full name from users table."""
+    if not email:
+        return None
     from sqlalchemy import select
 
     stmt = select(UserModel.first_name, UserModel.last_name).where(UserModel.email == email)
