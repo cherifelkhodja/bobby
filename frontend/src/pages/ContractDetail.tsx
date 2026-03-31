@@ -95,12 +95,6 @@ const ACTION_CONFIG: Partial<
     icon: PenTool,
     variant: 'primary',
   },
-  signed: {
-    label: 'Pousser vers Boond',
-    action: 'push-to-crm',
-    icon: Upload,
-    variant: 'primary',
-  },
 };
 
 
