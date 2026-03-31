@@ -88,7 +88,7 @@ class BoondCrmAdapter:
                 "candidate_id": candidate_id,
                 "consultant_type": consultant_type,
                 "need_id": need_id,
-                "daily_rate": attributes.get("averageDailyPriceExcludingTax"),
+                "daily_rate": attributes.get("averageDailyCost"),
                 "quantity": attributes.get("numberOfDaysInvoicedOrQuantity"),
                 "start_date": attributes.get("startDate"),
                 "end_date": attributes.get("endDate"),
