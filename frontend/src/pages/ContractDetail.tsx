@@ -499,6 +499,23 @@ export default function ContractDetail() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Download signed contract button */}
+            {latestContract?.signed_at && latestContract?.s3_key_signed && (
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  try {
+                    const url = await contractsApi.getContractDownloadUrl(cr.id, latestContract.id, 'signed');
+                    window.open(url, '_blank');
+                  } catch {
+                    toast.error('Impossible de telecharger le contrat signe.');
+                  }
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Contrat signe
+              </Button>
+            )}
             {actionConfig && (
               <Button
                 onClick={() => actionMutation.mutate(actionConfig.action)}
@@ -1409,53 +1426,72 @@ export default function ContractDetail() {
             Documents contractuels
           </h3>
           <div className="space-y-2">
-            {contracts.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
-              >
-                <div className="flex items-center gap-3">
-                  <FileSignature className="h-4 w-4 text-gray-400" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {c.reference} - v{c.version}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {formatDate(c.created_at)}
-                    </p>
+            {contracts.map((c) => {
+              const isSigned = !!(c.signed_at && c.s3_key_signed);
+              return (
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                >
+                  <div className="flex items-center gap-3">
+                    <FileSignature className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {c.reference} - v{c.version}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {formatDate(c.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {isSigned && (
+                      <span className="flex items-center text-xs text-green-600 dark:text-green-400">
+                        <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                        Signe le {formatDate(c.signed_at!)}
+                      </span>
+                    )}
+                    {c.yousign_status && !c.signed_at && (
+                      <span className="text-xs text-violet-600 dark:text-violet-400">
+                        YouSign: {c.yousign_status}
+                      </span>
+                    )}
+                    {/* Download draft */}
+                    <button
+                      onClick={async () => {
+                        try {
+                          const url = await contractsApi.getContractDownloadUrl(cr.id, c.id, 'draft');
+                          window.open(url, '_blank');
+                        } catch {
+                          toast.error('Impossible de telecharger le brouillon.');
+                        }
+                      }}
+                      className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 transition-colors"
+                    >
+                      <Download className="h-4 w-4" />
+                      Brouillon
+                    </button>
+                    {/* Download signed version */}
+                    {isSigned && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const url = await contractsApi.getContractDownloadUrl(cr.id, c.id, 'signed');
+                            window.open(url, '_blank');
+                          } catch {
+                            toast.error('Impossible de telecharger le contrat signe.');
+                          }
+                        }}
+                        className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200 transition-colors font-medium"
+                      >
+                        <Download className="h-4 w-4" />
+                        Contrat signe
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {c.signed_at && (
-                    <span className="flex items-center text-xs text-green-600 dark:text-green-400">
-                      <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                      Signé le {formatDate(c.signed_at)}
-                    </span>
-                  )}
-                  {c.yousign_status && !c.signed_at && (
-                    <span className="text-xs text-violet-600 dark:text-violet-400">
-                      YouSign: {c.yousign_status}
-                    </span>
-                  )}
-                  <button
-                    onClick={async () => {
-                      try {
-                        const which = c.signed_at && c.s3_key_signed ? 'signed' : 'draft';
-                        const url = await contractsApi.getContractDownloadUrl(cr.id, c.id, which);
-                        window.open(url, '_blank');
-                      } catch {
-                        toast.error('Impossible de générer le lien de téléchargement.');
-                      }
-                    }}
-                    className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 transition-colors"
-                    title="Télécharger"
-                  >
-                    <Download className="h-4 w-4" />
-                    Télécharger
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Card>
       )}

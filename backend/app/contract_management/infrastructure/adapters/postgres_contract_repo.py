@@ -807,12 +807,10 @@ class PurchaseOrderRequestRepository:
         result = await self.session.execute(query)
         return result.scalar_one()
 
-    async def get_next_reference(self) -> str:
-        """Generate the next reference in format PORBDC-YYYY-NNNN."""
-        from datetime import datetime as dt
-
-        year = dt.utcnow().year
-        prefix = f"PORBDC-{year}-"
+    async def get_next_reference(self, company_code: str = "GEN") -> str:
+        """Generate the next reference in format {CODE}-PO-NNN."""
+        code = company_code.upper()
+        prefix = f"{code}-PO-"
         result = await self.session.execute(
             select(func.max(PurchaseOrderRequestModel.reference)).where(
                 PurchaseOrderRequestModel.reference.like(f"{prefix}%")
