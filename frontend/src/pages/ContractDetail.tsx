@@ -120,7 +120,7 @@ export default function ContractDetail() {
   const [showOverride, setShowOverride] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [contractResourceId, setContractResourceId] = useState('');
+
   const [tempValidatingDocId, setTempValidatingDocId] = useState<string | null>(null);
 
   // Commercial validation form state — simplified for contrat cadre
@@ -271,20 +271,6 @@ export default function ContractDetail() {
     onError: (error) => toast.error(getErrorMessage(error)),
   });
 
-  const boondContractMutation = useMutation({
-    mutationFn: () => contractsApi.boondCreateContract(id!, contractResourceId ? parseInt(contractResourceId, 10) : undefined),
-    onSuccess: (data) => {
-      if (!data.contract_created) {
-        toast.info(data.reason || 'Pas de contrat créé.');
-      } else {
-        const parts = ['Contrat Boond créé'];
-        if (data.provider_linked) parts.push('fournisseur lié');
-        toast.success(parts.join(', ') + '.');
-      }
-    },
-    onError: (error) => toast.error(getErrorMessage(error)),
-  });
-
   const boondCompanyMutation = useMutation({
     mutationFn: () => contractsApi.boondCreateCompany(id!),
     onSuccess: (data) => {
@@ -293,15 +279,6 @@ export default function ContractDetail() {
         : `Société déjà existante (ID ${data.boond_provider_id}), ${data.contacts_created.length} contact(s) ajouté(s).`;
       toast.success(msg);
       queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
-    },
-    onError: (error) => toast.error(getErrorMessage(error)),
-  });
-
-  const boondPOMutation = useMutation({
-    mutationFn: () => contractsApi.boondCreatePurchaseOrder(id!),
-    onSuccess: (data) => {
-      toast.success(`Bon de commande créé (ID ${data.boond_purchase_order_id}).`);
-      queryClient.invalidateQueries({ queryKey: ['contracts', id] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
