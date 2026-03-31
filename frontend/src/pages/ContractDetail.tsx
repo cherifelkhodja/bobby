@@ -398,7 +398,6 @@ export default function ContractDetail() {
     },
     onSuccess: () => {
       toast.success('Brouillon généré avec succès.');
-      }
       queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
       queryClient.invalidateQueries({ queryKey: ['contracts', id] });
     },
