@@ -525,23 +525,6 @@ export default function ContractDetail() {
                 ) : null;
               })()}
             </div>
-            <div className="flex items-center gap-1.5 mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {cr.third_party_name && (
-                <>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">{cr.third_party_name}</span>
-                  <span className="text-gray-300 dark:text-gray-600">·</span>
-                </>
-              )}
-              {(cr.consultant_first_name || cr.consultant_last_name) && (
-                <>
-                  <span>{[cr.consultant_civility, cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ')}</span>
-                  <span className="text-gray-300 dark:text-gray-600">·</span>
-                </>
-              )}
-              {cr.third_party_type && (
-                <span>{cr.third_party_type === 'freelance' ? 'Freelance' : cr.third_party_type === 'sous_traitant' ? 'Sous-traitant' : cr.third_party_type === 'portage_salarial' ? 'Portage' : 'Salarié'}</span>
-              )}
-            </div>
           </div>
 
           <div className="flex items-center gap-2">
