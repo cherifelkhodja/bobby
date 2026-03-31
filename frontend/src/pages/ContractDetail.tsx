@@ -856,7 +856,7 @@ export default function ContractDetail() {
                 Actions BoondManager
               </h3>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                Exécuter chaque action Boond séparément, ou tout relancer en une fois.
+                Synchronisation fournisseur et consultant vers Boond.
               </p>
             </div>
           </div>
@@ -864,10 +864,10 @@ export default function ContractDetail() {
             {/* Action 1 — société + contacts */}
             <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
               <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                1 · Société + Contacts
+                1 · Societe fournisseur + Contacts
               </span>
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                Crée la société fournisseur et les 3 contacts (signataire, ADV, commercial).
+                Cree la societe fournisseur et les contacts (signataire, ADV, commercial).
               </span>
               <Button
                 variant="outline"
@@ -877,18 +877,18 @@ export default function ContractDetail() {
                 onClick={() => boondCompanyMutation.mutate()}
               >
                 <RotateCcw className={`h-3.5 w-3.5 mr-1 ${boondCompanyMutation.isPending ? 'animate-spin' : ''}`} />
-                {boondCompanyMutation.isPending ? 'En cours…' : 'Exécuter'}
+                {boondCompanyMutation.isPending ? 'En cours...' : 'Executer'}
               </Button>
             </div>
 
             {/* Action 2 — candidat → ressource */}
-            {cr.boond_candidate_id && (
+            {(cr.boond_candidate_id || cr.boond_resource_id) && (
               <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                   2 · Candidat → Ressource
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  Convertit le candidat #{cr.boond_candidate_id} en ressource Boond.
+                  Convertit le candidat en ressource Boond et lie le fournisseur.
                 </span>
                 <Button
                   variant="outline"
@@ -898,58 +898,10 @@ export default function ContractDetail() {
                   onClick={() => boondConvertMutation.mutate()}
                 >
                   <RotateCcw className={`h-3.5 w-3.5 mr-1 ${boondConvertMutation.isPending ? 'animate-spin' : ''}`} />
-                  {boondConvertMutation.isPending ? 'En cours…' : 'Exécuter'}
+                  {boondConvertMutation.isPending ? 'En cours...' : 'Executer'}
                 </Button>
               </div>
             )}
-
-            {/* Action 3 — création contrat Boond */}
-            <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                3 · Création du contrat
-              </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                Crée le contrat Boond et lie le fournisseur (externe).
-              </span>
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  type="number"
-                  placeholder={`Resource ID (défaut: ${cr.boond_candidate_id || '—'})`}
-                  value={contractResourceId}
-                  onChange={(e) => setContractResourceId(e.target.value)}
-                  className="w-48 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={boondContractMutation.isPending}
-                  onClick={() => boondContractMutation.mutate()}
-                >
-                  <RotateCcw className={`h-3.5 w-3.5 mr-1 ${boondContractMutation.isPending ? 'animate-spin' : ''}`} />
-                  {boondContractMutation.isPending ? 'En cours…' : 'Exécuter'}
-                </Button>
-              </div>
-            </div>
-
-            {/* Action 4 — bon de commande */}
-            <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                4 · Bon de commande
-              </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                Crée le BDC dans Boond et enregistre son ID sur le contrat signé.
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-1 self-start"
-                disabled={boondPOMutation.isPending}
-                onClick={() => boondPOMutation.mutate()}
-              >
-                <RotateCcw className={`h-3.5 w-3.5 mr-1 ${boondPOMutation.isPending ? 'animate-spin' : ''}`} />
-                {boondPOMutation.isPending ? 'En cours…' : 'Exécuter'}
-              </Button>
-            </div>
           </div>
 
           {/* Tout relancer */}
@@ -961,7 +913,7 @@ export default function ContractDetail() {
               onClick={() => retryBoondSyncMutation.mutate()}
             >
               <RotateCcw className={`h-4 w-4 mr-1 ${retryBoondSyncMutation.isPending ? 'animate-spin' : ''}`} />
-              {retryBoondSyncMutation.isPending ? 'En cours…' : 'Tout relancer (sync complète)'}
+              {retryBoondSyncMutation.isPending ? 'En cours...' : 'Tout relancer'}
             </Button>
           </div>
         </Card>

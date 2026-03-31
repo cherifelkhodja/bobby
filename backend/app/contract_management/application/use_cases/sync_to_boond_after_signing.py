@@ -38,10 +38,12 @@ class SyncToBoondAfterSigningUseCase:
     1. Create the provider company in Boond with full legal details.
     2. Create the contacts (signataire, ADV, commercial) linked to the company.
     3. Convert the candidate to a resource (state 3) if boond_candidate_id is set.
-    4. If external (third_party_type != "salarie"): create a Boond contract and
-       update the resource administrative data to link it to the provider.
-    5. Create the purchase order.
+    4a. Link the resource to the provider company + commercial contact.
+    5b. Create a FrameworkContract in the local DB.
     6. Transition the contract request to ACTIVE.
+
+    Note: Boond contract creation (4b) and purchase order (5) are handled
+    by the BDC workflow, not the contrat cadre.
     """
 
     def __init__(
@@ -306,62 +308,9 @@ class SyncToBoondAfterSigningUseCase:
                     error=str(exc),
                 )
 
-        # ── Étape 4b : Contrat Boond (si TJM disponible) ─────────────────
-        # Skip if no daily_rate (will be handled later via BDC workflow).
-        if resource_id and is_resource and is_external and cr.daily_rate:
-            contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(
-                cr.third_party_type or "", 3
-            )
-            start_date_str = None
-            if cr.start_date:
-                start_date_str = (
-                    cr.start_date.strftime("%Y-%m-%d")
-                    if hasattr(cr.start_date, "strftime")
-                    else str(cr.start_date)
-                )
-            end_date_str = None
-            if cr.end_date:
-                end_date_str = (
-                    cr.end_date.strftime("%Y-%m-%d")
-                    if hasattr(cr.end_date, "strftime")
-                    else str(cr.end_date)
-                )
-            agency_id = company.boond_agency_id if company else None
-
-            try:
-                await self._crm.create_boond_contract(
-                    resource_id=resource_id,
-                    positioning_id=cr.boond_positioning_id,
-                    daily_rate=float(cr.daily_rate),
-                    type_of=contract_type_of,
-                    start_date=start_date_str,
-                    end_date=end_date_str,
-                    agency_id=agency_id,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "sync_boond_create_contract_failed",
-                    cr_id=str(cr.id),
-                    error=str(exc),
-                )
-
-        # ── Étape 5 : Bon de commande ──────────────────────────────────────
-        contract = await self._contract_repo.get_by_request_id(cr.id)
-        if tp and tp.boond_provider_id and cr.daily_rate and contract:
-            try:
-                po_id = await self._crm.create_purchase_order(
-                    provider_id=tp.boond_provider_id,
-                    positioning_id=cr.boond_positioning_id,
-                    reference=cr.display_reference,
-                    amount=float(cr.daily_rate),
-                )
-                contract.boond_purchase_order_id = po_id
-                await self._contract_repo.save(contract)
-            except Exception as exc:
-                logger.warning(
-                    "sync_boond_create_purchase_order_failed",
-                    cr_id=str(cr.id),
-                    error=str(exc),
+        # ── Étapes 4b/5 (Contrat Boond + BDC) → gérées par le workflow BDC ──
+        # Le contrat cadre ne crée pas de contrat Boond ni de bon de commande.
+        # Ces étapes seront effectuées lors de la création du BDC.
                 )
 
         # ── Étape 5b : Créer le contrat cadre (FrameworkContract) ─────────
