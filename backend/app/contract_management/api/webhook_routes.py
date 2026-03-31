@@ -328,12 +328,16 @@ async def handle_boond_resource_webhook(
 
 @router.post(
     "/boondmanager/test",
-    summary="Test endpoint - simulate a Boond positioning webhook",
+    summary="Test endpoint - capture any Boond webhook payload",
 )
-async def test_boond_webhook(request: Request):
-    """Test endpoint that logs the raw payload without processing.
+async def test_boond_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Capture and store any Boond webhook payload for inspection.
 
-    Use this to verify connectivity and inspect the payload format.
+    Stores the payload in cm_webhook_events with event_type='debug_capture'.
+    Use GET /boondmanager/debug-webhooks to retrieve captured payloads.
     Not available in production.
     """
     settings = get_settings()
@@ -344,19 +348,70 @@ async def test_boond_webhook(request: Request):
     try:
         payload = json.loads(raw_body)
     except Exception:
-        payload = None
+        payload = {"raw": raw_body.decode("utf-8", errors="replace")}
+
+    # Store in DB for later inspection
+    from datetime import datetime
+
+    webhook_repo = WebhookEventRepository(db)
+    event_id = f"debug_{datetime.utcnow().isoformat()}"
+    await webhook_repo.save(
+        event_id=event_id,
+        event_type="debug_capture",
+        payload=payload if isinstance(payload, dict) else {"data": payload},
+    )
+    await db.commit()
 
     return {
         "status": "ok",
-        "message": "Test webhook received",
+        "message": "Webhook captured and stored",
+        "event_id": event_id,
         "headers": {
             k: v
             for k, v in request.headers.items()
             if k.lower() in ("content-type", "user-agent", "x-forwarded-for", "host")
         },
         "body_length": len(raw_body),
-        "payload_type": type(payload).__name__ if payload else "invalid_json",
         "payload": payload,
+    }
+
+
+@router.get(
+    "/boondmanager/debug-webhooks",
+    summary="Debug: list captured webhook payloads",
+)
+async def debug_list_webhooks(
+    db: AsyncSession = Depends(get_db),
+    limit: int = 20,
+):
+    """List recently captured webhook payloads. Not available in production."""
+    from sqlalchemy import select
+
+    from app.contract_management.infrastructure.models import WebhookEventModel
+
+    settings = get_settings()
+    if settings.is_production:
+        return {"status": "error", "message": "Not available in production"}
+
+    result = await db.execute(
+        select(WebhookEventModel)
+        .where(WebhookEventModel.event_type == "debug_capture")
+        .order_by(WebhookEventModel.processed_at.desc())
+        .limit(limit)
+    )
+    events = result.scalars().all()
+
+    return {
+        "status": "ok",
+        "total": len(events),
+        "webhooks": [
+            {
+                "event_id": e.event_id,
+                "payload": e.payload,
+                "received_at": e.processed_at.isoformat() if e.processed_at else None,
+            }
+            for e in events
+        ],
     }
 
 
