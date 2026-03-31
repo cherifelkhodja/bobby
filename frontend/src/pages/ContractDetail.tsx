@@ -846,8 +846,8 @@ export default function ContractDetail() {
         </Card>
       )}
 
-      {/* Boond sync actions — visible when signed or archived */}
-      {isAdv && (cr.status === 'signed' || cr.status === 'archived') && (
+      {/* Boond sync actions — visible when signed, active or archived */}
+      {isAdv && (cr.status === 'signed' || cr.status === 'active' || cr.status === 'archived') && (
         <Card className="mb-6 border-emerald-200 dark:border-emerald-800">
           <div className="flex items-start gap-3 mb-4">
             <RotateCcw className="h-5 w-5 text-emerald-500 mt-0.5 flex-shrink-0" />
