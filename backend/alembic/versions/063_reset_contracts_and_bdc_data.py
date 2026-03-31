@@ -6,7 +6,11 @@ Create Date: 2026-03-31
 
 One-time data migration: clear all contract management operational data.
 Preserves configuration tables: article templates, annex templates, contract companies.
+Also purges S3 contract files (prefix: contracts/).
 """
+
+import asyncio
+import logging
 
 import sqlalchemy as sa
 
@@ -16,6 +20,24 @@ revision = "063"
 down_revision = "062"
 branch_labels = None
 depends_on = None
+
+logger = logging.getLogger(__name__)
+
+
+def _purge_s3_contracts() -> None:
+    """Best-effort S3 cleanup of contract PDFs."""
+    try:
+        from app.config import get_settings
+        from app.infrastructure.storage.s3_client import S3StorageClient
+
+        settings = get_settings()
+        s3 = S3StorageClient(settings)
+        deleted = asyncio.get_event_loop().run_until_complete(
+            s3.delete_prefix("contracts/")
+        )
+        logger.info(f"S3 cleanup: deleted {deleted} contract files")
+    except Exception as exc:
+        logger.warning(f"S3 cleanup skipped (non-blocking): {exc}")
 
 
 def upgrade() -> None:
@@ -47,6 +69,9 @@ def upgrade() -> None:
 
     # 9. Third parties (no more FKs pointing to them)
     op.execute(sa.text("DELETE FROM tp_third_parties"))
+
+    # 10. Purge S3 contract files (best-effort, non-blocking)
+    _purge_s3_contracts()
 
     # NOT deleted (configuration data):
     # - cm_contract_article_templates

@@ -213,6 +213,51 @@ class S3StorageClient:
             logger.error(f"Unexpected error deleting {key}: {e}")
             raise S3StorageError(f"Erreur inattendue: {str(e)}")
 
+    async def delete_prefix(self, prefix: str) -> int:
+        """Delete all objects with a given key prefix from S3 storage.
+
+        Args:
+            prefix: Key prefix to match (e.g. 'contracts/').
+
+        Returns:
+            Number of deleted objects.
+
+        Raises:
+            S3StorageError: If deletion fails.
+        """
+        if not self._is_configured():
+            raise S3StorageError("S3 storage not configured")
+
+        logger.info(f"Deleting all objects with prefix: {prefix}")
+        deleted = 0
+
+        try:
+            async with self._session.client("s3", **self._get_client_kwargs()) as s3:
+                paginator = s3.get_paginator("list_objects_v2")
+                async for page in paginator.paginate(
+                    Bucket=self.bucket_name, Prefix=prefix
+                ):
+                    objects = page.get("Contents", [])
+                    if not objects:
+                        continue
+                    delete_keys = [{"Key": obj["Key"]} for obj in objects]
+                    await s3.delete_objects(
+                        Bucket=self.bucket_name,
+                        Delete={"Objects": delete_keys},
+                    )
+                    deleted += len(delete_keys)
+
+                logger.info(f"Deleted {deleted} objects with prefix: {prefix}")
+                return deleted
+
+        except ClientError as e:
+            error_msg = e.response.get("Error", {}).get("Message", str(e))
+            logger.error(f"S3 prefix delete failed for {prefix}: {error_msg}")
+            raise S3StorageError(f"Suppression par préfixe échouée: {error_msg}")
+        except Exception as e:
+            logger.error(f"Unexpected error deleting prefix {prefix}: {e}")
+            raise S3StorageError(f"Erreur inattendue: {str(e)}")
+
     async def file_exists(self, key: str) -> bool:
         """Check if a file exists in S3 storage.
 
