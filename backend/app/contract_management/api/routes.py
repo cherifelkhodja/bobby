@@ -114,6 +114,7 @@ def _cr_to_response(
     cr,
     *,
     commercial_name: str | None = None,
+    third_party_name: str | None = None,
     portal_url: str | None = None,
 ) -> ContractRequestResponse:
     """Convert a ContractRequest entity to response."""
@@ -151,6 +152,7 @@ def _cr_to_response(
         commercial_name=commercial_name,
         contractualization_contact_email=cr.contractualization_contact_email,
         third_party_id=cr.third_party_id,
+        third_party_name=third_party_name,
         portal_url=portal_url,
         compliance_override=cr.compliance_override,
         company_id=cr.company_id,
@@ -229,9 +231,24 @@ async def list_contract_requests(
     emails = list({cr.commercial_email for cr in items if cr.commercial_email})
     name_map = await _resolve_commercial_names(db, emails)
 
+    # Resolve third party names for the list
+    tp_ids = list({cr.third_party_id for cr in items if cr.third_party_id})
+    tp_name_map: dict = {}
+    if tp_ids:
+        from sqlalchemy import select as _sel
+        from app.third_party.infrastructure.models import ThirdPartyModel
+        result = await db.execute(
+            _sel(ThirdPartyModel.id, ThirdPartyModel.company_name).where(ThirdPartyModel.id.in_(tp_ids))
+        )
+        tp_name_map = {row[0]: row[1] for row in result.all() if row[1]}
+
     return ContractRequestListResponse(
         items=[
-            _cr_to_response(cr, commercial_name=name_map.get(cr.commercial_email)) for cr in items
+            _cr_to_response(
+                cr,
+                commercial_name=name_map.get(cr.commercial_email),
+                third_party_name=tp_name_map.get(cr.third_party_id),
+            ) for cr in items
         ],
         total=total,
         skip=skip,

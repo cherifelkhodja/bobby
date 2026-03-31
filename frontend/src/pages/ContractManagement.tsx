@@ -162,32 +162,31 @@ export function ContractManagement() {
                               {thirdPartyLabel}
                             </span>
                           )}
-                          {cr.trigger_type && cr.trigger_type !== 'positioning_7' && (
-                            <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-full px-2 py-0.5">
-                              {cr.trigger_type === 'candidat_11' ? 'Nouveau' : cr.trigger_type === 'ressource_4' ? 'Renouvellement' : 'Chgt societe'}
-                            </span>
-                          )}
                         </div>
 
-                        {/* Line 2: Consultant (main info for contrat cadre) */}
-                        {consultantName && (
-                          <div className="mt-2 flex items-center gap-2">
-                            <User className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-                              {cr.consultant_civility && <span className="mr-1">{cr.consultant_civility}</span>}
-                              {consultantName}
-                            </span>
-                            {cr.client_name && (
-                              <span className="text-xs text-gray-400 dark:text-gray-500">— {cr.client_name}</span>
+                        {/* Line 2: Fournisseur + consultant */}
+                        {(cr.third_party_name || consultantName) && (
+                          <div className="mt-2 flex items-center gap-2 text-sm">
+                            {cr.third_party_name && (
+                              <>
+                                <Building2 className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                                <span className="font-medium text-gray-700 dark:text-gray-300 truncate">
+                                  {cr.third_party_name}
+                                </span>
+                              </>
                             )}
-                          </div>
-                        )}
-                        {!consultantName && cr.client_name && (
-                          <div className="mt-2 flex items-center gap-2">
-                            <Building2 className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-                              {cr.client_name}
-                            </span>
+                            {cr.third_party_name && consultantName && (
+                              <span className="text-gray-300 dark:text-gray-600">|</span>
+                            )}
+                            {consultantName && (
+                              <>
+                                <User className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                                <span className="text-gray-500 dark:text-gray-400 truncate">
+                                  {cr.consultant_civility && <span className="mr-0.5">{cr.consultant_civility}</span>}
+                                  {consultantName}
+                                </span>
+                              </>
+                            )}
                           </div>
                         )}
                       </div>

@@ -43,6 +43,7 @@ class ContractRequestResponse(BaseModel):
     commercial_name: str | None = None
     contractualization_contact_email: str | None = None
     third_party_id: UUID | None = None
+    third_party_name: str | None = None
     portal_url: str | None = None
     compliance_override: bool
     company_id: UUID | None = None
