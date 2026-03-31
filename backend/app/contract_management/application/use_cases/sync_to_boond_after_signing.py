@@ -233,8 +233,7 @@ class SyncToBoondAfterSigningUseCase:
 
         # ── Étape 3 : Conversion candidat → ressource ──────────────────────
         # N'effectuer la conversion que si le consultant est un candidat Boond.
-        # Si c'est déjà une ressource (boond_consultant_type == "resource"),
-        # l'appel /candidates/{id} échouerait et la conversion est inutile.
+        # If already a resource (boond_consultant_type == "resource"), skip.
         # Boond exige la relation dependsOn (manager) lors de la conversion.
         manager_id: int | None = None
         if cr.boond_need_id:
@@ -249,6 +248,18 @@ class SyncToBoondAfterSigningUseCase:
                     need_id=cr.boond_need_id,
                     error=str(exc),
                 )
+
+        # Fallback: get manager from candidate info (dependsOn relationship)
+        if not manager_id and resource_id:
+            try:
+                candidate_info = await self._crm.get_candidate_info(
+                    resource_id,
+                    cr.boond_consultant_type,
+                )
+                if candidate_info and candidate_info.get("manager_id"):
+                    manager_id = candidate_info["manager_id"]
+            except Exception:
+                pass  # Best effort
 
         is_candidate = cr.boond_consultant_type == "candidate" or cr.boond_consultant_type is None
         is_resource = not is_candidate  # Already a resource in Boond
@@ -292,8 +303,10 @@ class SyncToBoondAfterSigningUseCase:
         # ── Étape 4a : Lien fournisseur → ressource (administrative) ───────
         # Link the resource to the provider company and commercial contact.
         # This is independent of having a daily_rate (contrat cadre workflow).
+        # We attempt this even if conversion failed — the person may already
+        # be a resource in Boond (trigger ressource_4/5) or become one later.
         is_external = cr.third_party_type != "salarie"
-        if resource_id and is_resource and is_external and tp and tp.boond_provider_id:
+        if resource_id and is_external and tp and tp.boond_provider_id:
             commercial_contact_id = tp.boond_commercial_contact_id or boond_contact_ids.get("commercial")
             try:
                 await self._crm.update_resource_administrative(

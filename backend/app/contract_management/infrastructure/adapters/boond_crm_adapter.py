@@ -257,6 +257,16 @@ class BoondCrmAdapter:
                     or attributes.get("phone2")
                     or ""
                 )
+                # Extract manager ID from dependsOn relationship
+                relationships = data.get("relationships", {})
+                depends_on = relationships.get("dependsOn", {}).get("data", {})
+                mgr_id = None
+                if depends_on and depends_on.get("id"):
+                    try:
+                        mgr_id = int(depends_on["id"])
+                    except (ValueError, TypeError):
+                        pass
+
                 return {
                     "id": candidate_id,
                     "civility": civility,
@@ -265,6 +275,7 @@ class BoondCrmAdapter:
                     "email": attributes.get("email1", "") or attributes.get("email2", ""),
                     "phone": phone,
                     "state": attributes.get("state"),
+                    "manager_id": mgr_id,
                 }
             except Exception as exc:
                 last_exc = exc
