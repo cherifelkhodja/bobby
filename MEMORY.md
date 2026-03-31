@@ -100,6 +100,25 @@
 - **Rôle ADV** : Nouveau rôle `adv` dans UserRole pour la gestion des contrats et de la vigilance (Direction = admin)
 - **Pattern suivi** : Identique à `quotation_generator/` (module top-level sous `app/`)
 
+### ADR-009 : Refonte Simplification Fournisseurs (Contrat Cadre + BDC)
+- **Date** : 2026-03-31
+- **Statut** : Planifié
+- **Décision** : Découpler le contrat cadre du BDC, ajouter des webhooks candidat/ressource Boond
+- **Raison** : Le contrat cadre doit sécuriser le consultant rapidement, indépendamment des infos mission (BDC). Les re-contractualisations ne sont pas gérées.
+- **Documentation complète** : `docs/contracts/refonte-contrat-cadre-bdc.md`
+- **Changements clés** :
+  - 3 nouveaux webhooks : Candidat state 11 (nouveau contrat), Ressource state 4 (contrat expiré), Ressource state 5 (changement société)
+  - Webhook positionnement state 7 conservé pour les BDC
+  - Saisie commerciale simplifiée (type tiers + contact uniquement pour contrat cadre)
+  - Statuts contrat cadre simplifiés (suppression CONFIGURING_CONTRACT)
+  - UI progressive : sections masquées tant que prérequis non remplis
+  - Conformité intégrée dans la page contrat (plus de page séparée pour l'action)
+  - BDC en pages séparées (Option B) liées au contrat cadre
+  - Ressource state 4 : réutilisation docs conformité valides, re-demande si non conformes
+  - Ressource state 5 : workflow complet nouvelle société
+  - Conversion candidat → ressource (state 3) après signature (inchangé)
+  - Gestion idempotence : pas de doublon si ContractRequest déjà en cours
+
 ---
 
 ## Problèmes connus
@@ -124,6 +143,13 @@
 
 ## Prochaines étapes
 
+- [ ] **Refonte contrat cadre/BDC** (ADR-009) — voir `docs/contracts/refonte-contrat-cadre-bdc.md`
+  - [ ] Webhooks candidat state 11 + ressource states 4/5
+  - [ ] Simplification saisie commerciale
+  - [ ] Simplification statuts contrat cadre
+  - [ ] UI progressive (sections masquées)
+  - [ ] Conformité intégrée dans page contrat
+  - [ ] Pages BDC séparées
 - [ ] Améliorer couverture tests E2E
 - [ ] Dashboard analytics cooptations
 - [ ] Notifications push
@@ -161,6 +187,26 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-03-31 (plan: refonte simplification fournisseurs contrat cadre + BDC)
+
+**ADR-009** — Documentation de la refonte planifiée du workflow fournisseurs.
+
+**Décisions prises** :
+- 3 nouveaux webhooks Boond : candidat state 11, ressource state 4, ressource state 5
+- Contrat cadre découplé du BDC (deux workflows indépendants)
+- Saisie commerciale simplifiée (type tiers + contact uniquement)
+- Suppression statut CONFIGURING_CONTRACT (intégré dans génération draft)
+- UI progressive (sections masquées tant que prérequis non remplis)
+- Conformité intégrée dans page contrat
+- BDC en pages séparées (Option B)
+- Ressource state 4 : réutilisation docs valides, re-demande si non conformes
+- Idempotence : ignore si ContractRequest déjà en cours
+
+**Fichiers créés** : `docs/contracts/refonte-contrat-cadre-bdc.md`
+**Fichiers modifiés** : `MEMORY.md` (ADR-009, prochaines étapes)
+
+---
 
 ### 2026-03-30 (feat: séparation workflows contrat cadre et bon de commande)
 
