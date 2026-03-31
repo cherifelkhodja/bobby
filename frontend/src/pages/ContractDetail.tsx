@@ -1225,12 +1225,6 @@ export default function ContractDetail() {
                 </p>
               </div>
             )}
-            {cr.contractualization_contact_email && (
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Email contact tiers</p>
-                <p className="font-medium text-gray-900 dark:text-white">{cr.contractualization_contact_email}</p>
-              </div>
-            )}
             {complianceDocs.company_name && (
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Raison sociale</p>
@@ -1349,6 +1343,24 @@ export default function ContractDetail() {
               </div>
             );
           })()}
+
+          {/* Consultant sub-section */}
+          {(cr.consultant_first_name || cr.consultant_last_name) && (
+            <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Consultant</p>
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 text-sm inline-block min-w-[250px]">
+                <p className="font-medium text-gray-900 dark:text-white mb-1">
+                  {[cr.consultant_civility, cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ')}
+                </p>
+                {cr.consultant_email && (
+                  <p className="text-gray-600 dark:text-gray-400 text-xs">{cr.consultant_email}</p>
+                )}
+                {cr.consultant_phone && (
+                  <p className="text-gray-500 dark:text-gray-500 text-xs">{cr.consultant_phone}</p>
+                )}
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
