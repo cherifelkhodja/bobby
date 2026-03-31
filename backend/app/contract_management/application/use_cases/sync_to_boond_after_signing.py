@@ -383,49 +383,9 @@ class SyncToBoondAfterSigningUseCase:
                     error=str(exc),
                 )
 
-        # ── Étape 5c : Créer le PurchaseOrder dans Bobby ──────────────────
-        if contract:
-            try:
-                from app.contract_management.domain.entities.purchase_order import PurchaseOrder
-                from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-                    FrameworkContractRepository,
-                    PurchaseOrderRepository,
-                )
-
-                fc_repo = FrameworkContractRepository(self._db)
-                po_repo = PurchaseOrderRepository(self._db)
-
-                fc = await fc_repo.get_active_by_third_party(
-                    tp.id if tp else cr.third_party_id, company.id if company else None
-                )
-                if fc:
-                    po_ref = await po_repo.get_next_reference(fc.reference)
-                    po = PurchaseOrder(
-                        framework_contract_id=fc.id,
-                        contract_request_id=cr.id,
-                        reference=po_ref,
-                        boond_positioning_id=cr.boond_positioning_id,
-                        consultant_first_name=cr.consultant_first_name,
-                        consultant_last_name=cr.consultant_last_name,
-                        daily_rate=cr.daily_rate,
-                        start_date=cr.start_date,
-                        end_date=cr.end_date,
-                        quantity=cr.quantity_sold,
-                        boond_purchase_order_id=contract.boond_purchase_order_id,
-                    )
-                    po.mark_active()
-                    await po_repo.save(po)
-                    logger.info(
-                        "purchase_order_created",
-                        cr_id=str(cr.id),
-                        po_ref=po_ref,
-                    )
-            except Exception as exc:
-                logger.warning(
-                    "purchase_order_creation_failed",
-                    cr_id=str(cr.id),
-                    error=str(exc),
-                )
+        # ── Étape 5c : PurchaseOrder → géré par le workflow BDC ─────────────
+        # Le contrat cadre ne crée pas de PurchaseOrder. Ce sera fait lors
+        # de la création du BDC (positionnement state 7).
 
         # ── Étape 6 : Transition → ACTIVE ─────────────────────────────────
         # Le contrat cadre reste ACTIVE tant qu'il y a des BDC actifs.
