@@ -308,6 +308,15 @@ class SyncToBoondAfterSigningUseCase:
         is_external = cr.third_party_type != "salarie"
         if resource_id and is_external and tp and tp.boond_provider_id:
             commercial_contact_id = tp.boond_commercial_contact_id or boond_contact_ids.get("commercial")
+            logger.info(
+                "sync_boond_link_provider_to_resource",
+                cr_id=str(cr.id),
+                resource_id=resource_id,
+                provider_company_id=tp.boond_provider_id,
+                commercial_contact_id=commercial_contact_id,
+                tp_boond_commercial_contact_id=tp.boond_commercial_contact_id,
+                boond_contact_ids=boond_contact_ids,
+            )
             try:
                 await self._crm.update_resource_administrative(
                     resource_id=resource_id,
