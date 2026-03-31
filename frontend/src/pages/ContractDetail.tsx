@@ -37,10 +37,41 @@ import { getErrorMessage } from '../api/client';
 import { CONTRACT_STATUS_CONFIG, getDocumentBadgeConfig } from '../types';
 import type { ContractRequestStatus } from '../types';
 
+// Progressive UI: status ordering for determining which sections to show
+const STATUS_ORDER: Record<ContractRequestStatus, number> = {
+  pending_commercial_validation: 0,
+  commercial_validated: 1,
+  collecting_documents: 2,
+  reviewing_compliance: 3,
+  compliance_blocked: 3,
+  configuring_contract: 4, // Legacy
+  draft_generated: 5,
+  draft_sent_to_partner: 6,
+  partner_approved: 7,
+  partner_requested_changes: 5,
+  sent_for_signature: 8,
+  signed: 9,
+  active: 10,
+  archived: 11,
+  redirected_payfit: -1,
+  cancelled: -1,
+};
+
+/** Check if a CR has reached at least the given status level. */
+function hasReachedStatus(current: ContractRequestStatus, target: ContractRequestStatus): boolean {
+  return STATUS_ORDER[current] >= STATUS_ORDER[target];
+}
+
 const ACTION_CONFIG: Partial<
   Record<ContractRequestStatus, { label: string; action: string; icon: typeof Send; variant: 'primary' | 'secondary' }>
 > = {
-  configuring_contract: {
+  reviewing_compliance: {
+    label: 'Générer le brouillon',
+    action: 'generate-draft',
+    icon: FileSignature,
+    variant: 'primary',
+  },
+  compliance_blocked: {
     label: 'Générer le brouillon',
     action: 'generate-draft',
     icon: FileSignature,
@@ -92,27 +123,16 @@ export default function ContractDetail() {
   const [contractResourceId, setContractResourceId] = useState('');
   const [tempValidatingDocId, setTempValidatingDocId] = useState<string | null>(null);
 
-  // Commercial validation form state — pre-filled from Boond data
+  // Commercial validation form state — simplified for contrat cadre
   const [validationForm, setValidationForm] = useState({
     third_party_type: '',
-    daily_rate: '',
-    quantity_sold: '',
-    start_date: '',
-    end_date: '',
     contact_email: '',
-    client_name: '',
-    mission_title: '',
-    mission_description: '',
     consultant_civility: '',
     consultant_first_name: '',
     consultant_last_name: '',
     consultant_email: '',
     consultant_phone: '',
     company_id: '',
-    mission_site_name: '',
-    mission_address: '',
-    mission_postal_code: '',
-    mission_city: '',
   });
   const [formInitialized, setFormInitialized] = useState(false);
 
@@ -164,7 +184,7 @@ export default function ContractDetail() {
   const { data: complianceDocs } = useQuery({
     queryKey: ['compliance-docs', cr?.third_party_id],
     queryFn: () => vigilanceApi.getThirdPartyDocuments(cr!.third_party_id!),
-    enabled: !!cr?.third_party_id && isAdv,
+    enabled: !!cr?.third_party_id && isCommercialOrAdmin,
   });
 
 
@@ -173,23 +193,12 @@ export default function ContractDetail() {
     if (cr && !formInitialized) {
       setValidationForm((f) => ({
         ...f,
-        daily_rate: cr.daily_rate ? String(cr.daily_rate) : '',
-        quantity_sold: cr.quantity_sold ? String(cr.quantity_sold) : '',
-        start_date: cr.start_date ?? '',
-        end_date: cr.end_date ?? '',
-        client_name: cr.client_name ?? '',
-        mission_title: cr.mission_title ?? '',
-        mission_description: cr.mission_description ?? '',
         consultant_civility: cr.consultant_civility ?? '',
         consultant_first_name: cr.consultant_first_name ?? '',
         consultant_last_name: cr.consultant_last_name ?? '',
         consultant_email: cr.consultant_email ?? '',
         consultant_phone: cr.consultant_phone ?? '',
         company_id: cr.company_id ?? '',
-        mission_site_name: cr.mission_site_name ?? '',
-        mission_address: cr.mission_address ?? '',
-        mission_postal_code: cr.mission_postal_code ?? '',
-        mission_city: cr.mission_city ?? '',
       }));
       setFormInitialized(true);
     }
@@ -405,24 +414,13 @@ export default function ContractDetail() {
     mutationFn: () =>
       contractsApi.validateCommercial(id!, {
         third_party_type: validationForm.third_party_type,
-        daily_rate: parseFloat(validationForm.daily_rate),
-        quantity_sold: validationForm.quantity_sold ? parseInt(validationForm.quantity_sold) : undefined,
-        start_date: validationForm.start_date,
-        end_date: validationForm.end_date || undefined,
         contact_email: validationForm.contact_email,
-        client_name: validationForm.client_name || undefined,
-        mission_title: validationForm.mission_title || undefined,
-        mission_description: validationForm.mission_description || undefined,
         company_id: validationForm.company_id || undefined,
         consultant_civility: validationForm.consultant_civility || undefined,
         consultant_first_name: validationForm.consultant_first_name || undefined,
         consultant_last_name: validationForm.consultant_last_name || undefined,
         consultant_email: validationForm.consultant_email || undefined,
         consultant_phone: validationForm.consultant_phone || undefined,
-        mission_site_name: validationForm.mission_site_name || undefined,
-        mission_address: validationForm.mission_address || undefined,
-        mission_postal_code: validationForm.mission_postal_code || undefined,
-        mission_city: validationForm.mission_city || undefined,
       }),
     onSuccess: () => {
       toast.success('Validation commerciale effectuée.');
@@ -436,20 +434,14 @@ export default function ContractDetail() {
 
   const isValidationFormValid =
     validationForm.third_party_type !== '' &&
-    validationForm.daily_rate !== '' &&
-    parseFloat(validationForm.daily_rate) > 0 &&
-    validationForm.start_date !== '' &&
     validationForm.contact_email !== '';
 
   const canCancel = cr && isAdv && cr.status !== 'cancelled' && cr.status !== 'signed' && cr.status !== 'archived' && cr.status !== 'redirected_payfit';
   const canRollback = cr && isAdv && cr.status !== 'pending_commercial_validation' && cr.status !== 'cancelled' && cr.status !== 'archived';
 
   const prePartnerStatuses = new Set([
-    'commercial_validated',
-    'collecting_documents',
     'reviewing_compliance',
     'compliance_blocked',
-    'configuring_contract',
     'draft_generated',
     'partner_requested_changes',
   ]);
@@ -499,6 +491,11 @@ export default function ContractDetail() {
               >
                 {statusConfig?.label ?? cr.status_display}
               </span>
+              {cr.trigger_type && cr.trigger_type !== 'positioning_7' && (
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                  {cr.trigger_type === 'candidat_11' ? 'Nouveau consultant' : cr.trigger_type === 'ressource_4' ? 'Re-contractualisation' : 'Changement société'}
+                </span>
+              )}
               {cr.client_name && (
                 <span className="text-sm text-gray-600 dark:text-gray-400">
                   {cr.client_name}
@@ -586,64 +583,6 @@ export default function ContractDetail() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                TJM (€/j) *
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={validationForm.daily_rate}
-                onChange={(e) =>
-                  setValidationForm((f) => ({ ...f, daily_rate: e.target.value }))
-                }
-                placeholder={cr.daily_rate ? String(cr.daily_rate) : ''}
-                className={INPUT_CLS}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                UO vendues
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={validationForm.quantity_sold}
-                onChange={(e) =>
-                  setValidationForm((f) => ({ ...f, quantity_sold: e.target.value }))
-                }
-                placeholder={cr.quantity_sold ? String(cr.quantity_sold) : ''}
-                className={INPUT_CLS}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Date de début *
-              </label>
-              <input
-                type="date"
-                value={validationForm.start_date}
-                onChange={(e) =>
-                  setValidationForm((f) => ({ ...f, start_date: e.target.value }))
-                }
-                className={INPUT_CLS}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Date de fin
-              </label>
-              <input
-                type="date"
-                value={validationForm.end_date}
-                onChange={(e) =>
-                  setValidationForm((f) => ({ ...f, end_date: e.target.value }))
-                }
-                className={INPUT_CLS}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Email contact contractualisation *
               </label>
               <input
@@ -655,34 +594,6 @@ export default function ContractDetail() {
                 className={INPUT_CLS}
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Client
-              </label>
-              <input
-                type="text"
-                value={validationForm.client_name}
-                onChange={(e) =>
-                  setValidationForm((f) => ({ ...f, client_name: e.target.value }))
-                }
-                placeholder={cr.client_name ?? ''}
-                className={INPUT_CLS}
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Intitulé de la mission
-              </label>
-              <input
-                type="text"
-                value={validationForm.mission_title}
-                onChange={(e) =>
-                  setValidationForm((f) => ({ ...f, mission_title: e.target.value }))
-                }
-                className={INPUT_CLS}
-              />
-            </div>
-
             {/* Consultant */}
             <div className="md:col-span-2 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
               <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">Consultant</p>
@@ -762,64 +673,6 @@ export default function ContractDetail() {
               </div>
             </div>
 
-            {/* Adresse de la mission */}
-            <div className="md:col-span-2 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">Adresse de la mission</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Nom du site
-                  </label>
-                  <input
-                    type="text"
-                    value={validationForm.mission_site_name}
-                    onChange={(e) =>
-                      setValidationForm((f) => ({ ...f, mission_site_name: e.target.value }))
-                    }
-                    className={INPUT_CLS}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Adresse
-                  </label>
-                  <input
-                    type="text"
-                    value={validationForm.mission_address}
-                    onChange={(e) =>
-                      setValidationForm((f) => ({ ...f, mission_address: e.target.value }))
-                    }
-                    className={INPUT_CLS}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Code postal
-                  </label>
-                  <input
-                    type="text"
-                    value={validationForm.mission_postal_code}
-                    onChange={(e) =>
-                      setValidationForm((f) => ({ ...f, mission_postal_code: e.target.value }))
-                    }
-                    className={INPUT_CLS}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Ville
-                  </label>
-                  <input
-                    type="text"
-                    value={validationForm.mission_city}
-                    onChange={(e) =>
-                      setValidationForm((f) => ({ ...f, mission_city: e.target.value }))
-                    }
-                    className={INPUT_CLS}
-                  />
-                </div>
-              </div>
-            </div>
           </div>
           <div className="flex justify-end mt-4">
             <Button
@@ -1421,8 +1274,8 @@ export default function ContractDetail() {
         />
       )}
 
-      {/* Third-party company info */}
-      {isAdv && complianceDocs && (
+      {/* Third-party company info — visible after document collection starts */}
+      {isCommercialOrAdmin && complianceDocs && hasReachedStatus(cr.status, 'collecting_documents') && (
         <Card className="mb-6">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
             Informations société
@@ -1549,8 +1402,8 @@ export default function ContractDetail() {
         </Card>
       )}
 
-      {/* Compliance documents */}
-      {isAdv && complianceDocs && complianceDocs.documents.length > 0 && (
+      {/* Compliance documents — visible to ADV + commercial after document collection starts */}
+      {isCommercialOrAdmin && complianceDocs && complianceDocs.documents.length > 0 && hasReachedStatus(cr.status, 'collecting_documents') && (
         <Card className="mb-6">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
             <CheckCircle className="h-4 w-4 text-gray-400" />
@@ -2254,7 +2107,7 @@ function ArticleAnnexEditor({
 
 // ─── History Timeline ────────────────────────────────────────────────────────
 
-const NOISE_STATUSES = new Set(['configuring_contract', 'draft_generated']);
+const NOISE_STATUSES = new Set(['configuring_contract', 'draft_generated', 'commercial_validated']);
 
 function HistoryTimeline({
   statusHistory,

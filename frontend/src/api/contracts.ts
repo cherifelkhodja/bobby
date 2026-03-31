@@ -33,24 +33,13 @@ export const contractsApi = {
     id: string,
     data: {
       third_party_type: string;
-      daily_rate: number;
-      quantity_sold?: number;
-      start_date: string;
-      end_date?: string;
       contact_email: string;
-      client_name?: string;
-      mission_title?: string;
-      mission_description?: string;
       company_id?: string;
       consultant_civility?: string;
       consultant_first_name?: string;
       consultant_last_name?: string;
       consultant_email?: string;
       consultant_phone?: string;
-      mission_site_name?: string;
-      mission_address?: string;
-      mission_postal_code?: string;
-      mission_city?: string;
     },
   ): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(

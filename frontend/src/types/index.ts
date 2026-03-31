@@ -744,11 +744,16 @@ export const CONTRACT_STATUS_CONFIG: Record<ContractRequestStatus, { label: stri
   cancelled: { label: 'Annulé', color: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400', group: 'done' },
 };
 
+export type TriggerType = 'positioning_7' | 'candidat_11' | 'ressource_4' | 'ressource_5';
+
 export interface ContractRequest {
   id: string;
   reference: string;
-  boond_positioning_id: number;
+  trigger_type: TriggerType | null;
+  previous_contract_request_id: string | null;
+  boond_positioning_id: number | null;
   boond_candidate_id: number | null;
+  boond_resource_id: number | null;
   status: ContractRequestStatus;
   status_display: string;
   third_party_type: string | null;
@@ -769,7 +774,7 @@ export interface ContractRequest {
   mission_city: string | null;
   quantity_sold: number | null;
   boond_consultant_type: string | null;
-  commercial_email: string;
+  commercial_email: string | null;
   commercial_name: string | null;
   contractualization_contact_email: string | null;
   third_party_id: string | null;
