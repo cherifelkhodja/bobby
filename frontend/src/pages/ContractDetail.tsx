@@ -884,7 +884,7 @@ export default function ContractDetail() {
               onClick={() => retryBoondSyncMutation.mutate()}
             >
               <RotateCcw className={`h-4 w-4 mr-1 ${retryBoondSyncMutation.isPending ? 'animate-spin' : ''}`} />
-              {retryBoondSyncMutation.isPending ? 'En cours...' : 'Tout relancer'}
+              {retryBoondSyncMutation.isPending ? 'En cours...' : 'Relancer la sync fournisseur'}
             </Button>
           </div>
         </Card>
