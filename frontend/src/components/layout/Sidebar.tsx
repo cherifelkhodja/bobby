@@ -34,7 +34,7 @@ export function Sidebar() {
   const isAdmin = user?.role === 'admin';
   const isCommercialOrAdmin = user?.role && ['admin', 'commercial'].includes(user.role);
   const canAccessContracts = user?.role && ['admin', 'commercial', 'adv'].includes(user.role);
-  const isAdvOrAdmin = user?.role && ['admin', 'adv'].includes(user.role);
+
   const canAccessTools = user?.role && ['admin', 'commercial', 'rh'].includes(user.role);
   const canAccessHR = user?.role && ['admin', 'rh'].includes(user.role);
 
