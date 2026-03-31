@@ -1134,6 +1134,7 @@ async def mark_as_signed(
         raise HTTPException(status_code=400, detail=str(exc))
 
     saved = await cr_repo.save(cr)
+    await db.commit()  # Commit SIGNED status before attempting Boond sync
 
     logger.info(
         "contract_marked_as_signed",
