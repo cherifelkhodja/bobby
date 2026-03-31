@@ -501,41 +501,44 @@ export default function ContractDetail() {
           Retour aux contrats
         </button>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {cr.display_reference}
-            </h1>
-            <div className="flex items-center gap-3 mt-2 flex-wrap">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {cr.display_reference}
+              </h1>
               <span
                 className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${statusConfig?.color ?? 'bg-gray-100 text-gray-600'}`}
               >
                 {statusConfig?.label ?? cr.status_display}
               </span>
-              {cr.trigger_type && cr.trigger_type !== 'positioning_7' && (
-                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                  {cr.trigger_type === 'candidat_11' ? 'Nouveau consultant' : cr.trigger_type === 'ressource_4' ? 'Re-contractualisation' : 'Changement société'}
-                </span>
+            </div>
+            <div className="flex items-center gap-1.5 mt-2 text-sm text-gray-500 dark:text-gray-400">
+              {cr.third_party_name && (
+                <>
+                  <span className="font-medium text-gray-700 dark:text-gray-300">{cr.third_party_name}</span>
+                  <span className="text-gray-300 dark:text-gray-600">·</span>
+                </>
+              )}
+              {(cr.consultant_first_name || cr.consultant_last_name) && (
+                <>
+                  <span>{[cr.consultant_civility, cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ')}</span>
+                  <span className="text-gray-300 dark:text-gray-600">·</span>
+                </>
               )}
               {cr.third_party_type && (
-                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                  {cr.third_party_type === 'freelance' ? 'Freelance' : cr.third_party_type === 'sous_traitant' ? 'Sous-traitant' : cr.third_party_type === 'portage_salarial' ? 'Portage' : 'Salarié'}
-                </span>
+                <span>{cr.third_party_type === 'freelance' ? 'Freelance' : cr.third_party_type === 'sous_traitant' ? 'Sous-traitant' : cr.third_party_type === 'portage_salarial' ? 'Portage' : 'Salarié'}</span>
               )}
               {(() => {
                 const companyName = companies.find((c) => c.id === (cr.contract_config as Record<string, unknown> | null)?.company_id || c.id === cr.company_id)?.name
                   ?? companies.find((c) => c.is_default)?.name;
                 return companyName ? (
-                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                    {companyName}
-                  </span>
+                  <>
+                    <span className="text-gray-300 dark:text-gray-600">·</span>
+                    <span>{companyName}</span>
+                  </>
                 ) : null;
               })()}
-              {(cr.consultant_first_name || cr.consultant_last_name) && (
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {[cr.consultant_civility, cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ')}
-                </span>
-              )}
             </div>
           </div>
 
