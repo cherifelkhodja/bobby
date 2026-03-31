@@ -273,6 +273,7 @@ class CreateContractRequestUseCase:
             # Create contract request
             cr = ContractRequest(
                 provisional_reference=reference,
+                trigger_type="positioning_7",
                 boond_positioning_id=positioning_id,
                 boond_candidate_id=candidate_id,
                 boond_consultant_type=consultant_type,

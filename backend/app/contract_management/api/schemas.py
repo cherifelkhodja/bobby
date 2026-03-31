@@ -14,9 +14,12 @@ class ContractRequestResponse(BaseModel):
     provisional_reference: str
     reference: str | None = None
     display_reference: str
-    boond_positioning_id: int
+    trigger_type: str | None = None
+    previous_contract_request_id: UUID | None = None
+    boond_positioning_id: int | None = None
     boond_candidate_id: int | None = None
     boond_consultant_type: str | None = None
+    boond_resource_id: int | None = None
     status: str
     status_display: str
     third_party_type: str | None = None
@@ -59,27 +62,20 @@ class ContractRequestListResponse(BaseModel):
 
 
 class CommercialValidationRequest(BaseModel):
-    """Request for commercial validation."""
+    """Request for commercial validation (simplified for contrat cadre).
+
+    Only type tiers + contact email are required.
+    Mission-specific fields (TJM, dates, address) belong to BDC.
+    """
 
     third_party_type: str = Field(..., pattern=r"^(freelance|sous_traitant|salarie|portage_salarial)$")
-    daily_rate: Decimal = Field(..., gt=0)
-    quantity_sold: int | None = Field(None, ge=0)
-    start_date: date
-    end_date: date | None = None
     contact_email: EmailStr
-    client_name: str | None = Field(None, max_length=255)
-    mission_title: str | None = Field(None, max_length=500)
-    mission_description: str | None = None
     company_id: UUID | None = None
     consultant_civility: str | None = Field(None, max_length=10)
     consultant_first_name: str | None = Field(None, max_length=255)
     consultant_last_name: str | None = Field(None, max_length=255)
     consultant_email: str | None = Field(None, max_length=255)
     consultant_phone: str | None = Field(None, max_length=50)
-    mission_site_name: str | None = Field(None, max_length=255)
-    mission_address: str | None = Field(None, max_length=500)
-    mission_postal_code: str | None = Field(None, max_length=10)
-    mission_city: str | None = Field(None, max_length=255)
 
 
 class ContractConfigRequest(BaseModel):

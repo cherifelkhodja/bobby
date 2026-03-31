@@ -127,6 +127,206 @@ async def handle_boond_positioning_webhook(
 
 
 @router.post(
+    "/boondmanager/candidate-state-update",
+    response_model=WebhookResponse,
+    summary="Handle BoondManager candidate state update webhook",
+)
+async def handle_boond_candidate_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Handle candidate state update from BoondManager.
+
+    Triggers contract request creation when candidate moves to state 11
+    (En attente de contrat).
+
+    Always returns 200 OK to prevent retries from Boond.
+    """
+    settings = get_settings()
+
+    raw_body = await request.body()
+    logger.info(
+        "webhook_boond_candidate_received",
+        body_length=len(raw_body),
+        body_preview=raw_body[:500].decode("utf-8", errors="replace"),
+    )
+
+    try:
+        payload = json.loads(raw_body)
+    except Exception:
+        logger.warning("webhook_invalid_json")
+        return WebhookResponse(status="ok", message="Invalid JSON")
+
+    audit_logger.log(
+        AuditAction.WEBHOOK_RECEIVED,
+        AuditResource.CONTRACT_REQUEST,
+        details={"source": "boondmanager", "type": "candidate_state_update"},
+    )
+
+    cr_repo = ContractRequestRepository(db)
+    webhook_repo = WebhookEventRepository(db)
+
+    from app.contract_management.application.use_cases.create_contract_request_from_entity import (
+        BOOND_CANDIDATE_STATE_AWAITING_CONTRACT,
+        CreateContractRequestFromEntityUseCase,
+    )
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.infrastructure.boond.client import BoondClient
+    from app.infrastructure.database.repositories.user_repository import UserRepository
+    from app.infrastructure.email.sender import EmailService
+
+    boond_client = BoondClient(settings)
+    crm_service = BoondCrmAdapter(boond_client)
+    email_service = EmailService(settings)
+    user_repo = UserRepository(db)
+
+    use_case = CreateContractRequestFromEntityUseCase(
+        contract_request_repository=cr_repo,
+        webhook_event_repository=webhook_repo,
+        crm_service=crm_service,
+        email_service=email_service,
+        user_repository=user_repo,
+        frontend_url=settings.frontend_url,
+        company_repository=cr_repo,
+    )
+
+    try:
+        result = await use_case.execute(
+            payload=payload,
+            entity_type="candidate",
+            expected_states=[BOOND_CANDIDATE_STATE_AWAITING_CONTRACT],
+        )
+        if result:
+            await db.commit()
+            logger.info(
+                "webhook_candidate_contract_created",
+                cr_id=str(result.id),
+                reference=result.display_reference,
+            )
+            return WebhookResponse(
+                status="ok",
+                message=f"Contract request {result.display_reference} created from candidate",
+            )
+        return WebhookResponse(status="ok", message="No action taken")
+    except WebhookDuplicateError as exc:
+        logger.info("webhook_candidate_duplicate", event_id=str(exc))
+        return WebhookResponse(status="ok", message="Duplicate event")
+    except Exception as exc:
+        await db.rollback()
+        logger.error(
+            "webhook_candidate_processing_error",
+            error=str(exc),
+            traceback=traceback.format_exc(),
+        )
+        return WebhookResponse(status="ok", message="Processing error")
+
+
+@router.post(
+    "/boondmanager/resource-state-update",
+    response_model=WebhookResponse,
+    summary="Handle BoondManager resource state update webhook",
+)
+async def handle_boond_resource_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Handle resource state update from BoondManager.
+
+    Triggers contract request creation when resource moves to:
+    - State 4 (Attente nouveau contrat): re-contractualization (expired contract)
+    - State 5 (Changement de contrat): new company, full workflow
+
+    Always returns 200 OK to prevent retries from Boond.
+    """
+    settings = get_settings()
+
+    raw_body = await request.body()
+    logger.info(
+        "webhook_boond_resource_received",
+        body_length=len(raw_body),
+        body_preview=raw_body[:500].decode("utf-8", errors="replace"),
+    )
+
+    try:
+        payload = json.loads(raw_body)
+    except Exception:
+        logger.warning("webhook_invalid_json")
+        return WebhookResponse(status="ok", message="Invalid JSON")
+
+    audit_logger.log(
+        AuditAction.WEBHOOK_RECEIVED,
+        AuditResource.CONTRACT_REQUEST,
+        details={"source": "boondmanager", "type": "resource_state_update"},
+    )
+
+    cr_repo = ContractRequestRepository(db)
+    webhook_repo = WebhookEventRepository(db)
+
+    from app.contract_management.application.use_cases.create_contract_request_from_entity import (
+        BOOND_RESOURCE_STATE_AWAITING_NEW_CONTRACT,
+        BOOND_RESOURCE_STATE_CONTRACT_CHANGE,
+        CreateContractRequestFromEntityUseCase,
+    )
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.infrastructure.boond.client import BoondClient
+    from app.infrastructure.database.repositories.user_repository import UserRepository
+    from app.infrastructure.email.sender import EmailService
+
+    boond_client = BoondClient(settings)
+    crm_service = BoondCrmAdapter(boond_client)
+    email_service = EmailService(settings)
+    user_repo = UserRepository(db)
+
+    use_case = CreateContractRequestFromEntityUseCase(
+        contract_request_repository=cr_repo,
+        webhook_event_repository=webhook_repo,
+        crm_service=crm_service,
+        email_service=email_service,
+        user_repository=user_repo,
+        frontend_url=settings.frontend_url,
+        company_repository=cr_repo,
+    )
+
+    try:
+        result = await use_case.execute(
+            payload=payload,
+            entity_type="resource",
+            expected_states=[
+                BOOND_RESOURCE_STATE_AWAITING_NEW_CONTRACT,
+                BOOND_RESOURCE_STATE_CONTRACT_CHANGE,
+            ],
+        )
+        if result:
+            await db.commit()
+            logger.info(
+                "webhook_resource_contract_created",
+                cr_id=str(result.id),
+                reference=result.display_reference,
+                trigger_type=result.trigger_type,
+            )
+            return WebhookResponse(
+                status="ok",
+                message=f"Contract request {result.display_reference} created from resource",
+            )
+        return WebhookResponse(status="ok", message="No action taken")
+    except WebhookDuplicateError as exc:
+        logger.info("webhook_resource_duplicate", event_id=str(exc))
+        return WebhookResponse(status="ok", message="Duplicate event")
+    except Exception as exc:
+        await db.rollback()
+        logger.error(
+            "webhook_resource_processing_error",
+            error=str(exc),
+            traceback=traceback.format_exc(),
+        )
+        return WebhookResponse(status="ok", message="Processing error")
+
+
+@router.post(
     "/boondmanager/test",
     summary="Test endpoint - simulate a Boond positioning webhook",
 )

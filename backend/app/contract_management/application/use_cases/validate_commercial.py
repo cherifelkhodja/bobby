@@ -1,7 +1,5 @@
 """Use case: Validate commercial information for a contract request."""
 
-from datetime import date
-from decimal import Decimal
 from uuid import UUID
 
 import structlog
@@ -18,52 +16,35 @@ logger = structlog.get_logger()
 
 
 class ValidateCommercialCommand:
-    """Command data for commercial validation."""
+    """Command data for commercial validation.
+
+    Simplified for contrat cadre: only type tiers + contact email.
+    Consultant info is optional (may already come from Boond webhook).
+    Mission-specific fields (TJM, dates, address) belong to BDC.
+    """
 
     def __init__(
         self,
         *,
         contract_request_id: UUID,
         third_party_type: str,
-        daily_rate: Decimal,
-        start_date: date,
         contact_email: str,
-        end_date: date | None = None,
-        quantity_sold: int | None = None,
-        client_name: str | None = None,
-        mission_title: str | None = None,
-        mission_description: str | None = None,
         company_id: UUID | None = None,
         consultant_civility: str | None = None,
         consultant_first_name: str | None = None,
         consultant_last_name: str | None = None,
         consultant_email: str | None = None,
         consultant_phone: str | None = None,
-        mission_site_name: str | None = None,
-        mission_address: str | None = None,
-        mission_postal_code: str | None = None,
-        mission_city: str | None = None,
     ) -> None:
         self.contract_request_id = contract_request_id
         self.third_party_type = third_party_type
-        self.daily_rate = daily_rate
-        self.start_date = start_date
-        self.end_date = end_date
-        self.quantity_sold = quantity_sold
         self.contact_email = contact_email
-        self.client_name = client_name
-        self.mission_title = mission_title
-        self.mission_description = mission_description
         self.company_id = company_id
         self.consultant_civility = consultant_civility
         self.consultant_first_name = consultant_first_name
         self.consultant_last_name = consultant_last_name
         self.consultant_email = consultant_email
         self.consultant_phone = consultant_phone
-        self.mission_site_name = mission_site_name
-        self.mission_address = mission_address
-        self.mission_postal_code = mission_postal_code
-        self.mission_city = mission_city
 
 
 class ValidateCommercialUseCase:
@@ -73,6 +54,10 @@ class ValidateCommercialUseCase:
     Otherwise, creates a stub ThirdParty, requests documents and sends
     a magic link to the contact so they can fill in company info and
     upload compliance documents via the portal.
+
+    For re-contractualization (trigger_type=ressource_4), reuses the
+    ThirdParty from the previous contract request. Valid documents
+    are already attached to the ThirdParty and don't need to be re-requested.
     """
 
     def __init__(
@@ -82,12 +67,14 @@ class ValidateCommercialUseCase:
         find_or_create_third_party_use_case,
         generate_magic_link_use_case=None,
         request_documents_use_case=None,
+        document_repository=None,
     ) -> None:
         self._cr_repo = contract_request_repository
         self._tp_repo = third_party_repository
         self._find_or_create_tp = find_or_create_third_party_use_case
         self._generate_magic_link_uc = generate_magic_link_use_case
         self._request_documents_uc = request_documents_use_case
+        self._doc_repo = document_repository
 
     async def execute(self, command: ValidateCommercialCommand):
         """Execute the use case.
@@ -116,27 +103,17 @@ class ValidateCommercialUseCase:
             )
             return saved
 
-        # Apply commercial data
+        # Apply commercial data (simplified: type + contact only)
         cr.validate_commercial(
             third_party_type=command.third_party_type,
-            daily_rate=command.daily_rate,
-            start_date=command.start_date,
-            end_date=command.end_date,
             contact_email=command.contact_email,
-            client_name=command.client_name,
-            mission_title=command.mission_title,
-            mission_description=command.mission_description,
         )
-
-        # Apply quantity_sold if provided
-        if command.quantity_sold is not None:
-            cr.quantity_sold = command.quantity_sold
 
         # Apply company_id if provided
         if command.company_id is not None:
             cr.company_id = command.company_id
 
-        # Apply consultant and address fields
+        # Apply consultant fields (update only if provided, keep Boond defaults)
         if command.consultant_civility is not None:
             cr.consultant_civility = command.consultant_civility
         if command.consultant_first_name is not None:
@@ -147,18 +124,12 @@ class ValidateCommercialUseCase:
             cr.consultant_email = command.consultant_email
         if command.consultant_phone is not None:
             cr.consultant_phone = command.consultant_phone
-        if command.mission_site_name is not None:
-            cr.mission_site_name = command.mission_site_name
-        if command.mission_address is not None:
-            cr.mission_address = command.mission_address
-        if command.mission_postal_code is not None:
-            cr.mission_postal_code = command.mission_postal_code
-        if command.mission_city is not None:
-            cr.mission_city = command.mission_city
 
-        # Initiate document collection: create stub ThirdParty, request
-        # documents and send magic link to the contact.
-        if self._generate_magic_link_uc and self._request_documents_uc:
+        # Re-contractualization (ressource_4): reuse existing ThirdParty
+        if cr.trigger_type == "ressource_4" and cr.previous_contract_request_id:
+            cr = await self._handle_recontractualization(cr, command)
+        elif self._generate_magic_link_uc and self._request_documents_uc:
+            # Standard flow: create stub ThirdParty, request docs, send magic link
             cr = await self._initiate_document_collection(cr, command)
 
         saved = await self._cr_repo.save(cr)
@@ -208,5 +179,84 @@ class ValidateCommercialUseCase:
 
         # Transition directly to collecting_documents
         cr.transition_to(ContractRequestStatus.COLLECTING_DOCUMENTS)
+
+        return cr
+
+    async def _handle_recontractualization(self, cr, command: ValidateCommercialCommand):
+        """Handle re-contractualization: reuse ThirdParty from previous CR.
+
+        For resource state 4 (contract expired, same company):
+        - Reuse the existing ThirdParty (same SIREN, same company)
+        - Valid documents are already attached to the ThirdParty
+        - Only expired/rejected documents need to be re-requested
+        - Send magic link for any missing documents
+        """
+        from app.third_party.application.use_cases.generate_magic_link import (
+            GenerateMagicLinkCommand,
+        )
+
+        previous_cr = await self._cr_repo.get_by_id(cr.previous_contract_request_id)
+        if not previous_cr or not previous_cr.third_party_id:
+            # Fallback to standard flow if no previous ThirdParty
+            logger.warning(
+                "recontractualization_no_previous_tp",
+                cr_id=str(cr.id),
+                previous_cr_id=str(cr.previous_contract_request_id),
+            )
+            if self._generate_magic_link_uc and self._request_documents_uc:
+                return await self._initiate_document_collection(cr, command)
+            return cr
+
+        # Reuse the same ThirdParty
+        cr.third_party_id = previous_cr.third_party_id
+        logger.info(
+            "recontractualization_reusing_third_party",
+            cr_id=str(cr.id),
+            third_party_id=str(previous_cr.third_party_id),
+        )
+
+        # Check if there are expired/rejected documents that need re-requesting
+        has_missing_docs = False
+        if self._doc_repo:
+            from datetime import datetime
+
+            from app.vigilance.domain.value_objects.document_status import DocumentStatus
+
+            docs = await self._doc_repo.list_by_third_party(cr.third_party_id)
+            for doc in docs:
+                if doc.status in (
+                    DocumentStatus.EXPIRED,
+                    DocumentStatus.REJECTED,
+                    DocumentStatus.REQUESTED,
+                ):
+                    has_missing_docs = True
+                    break
+                if doc.expires_at and doc.expires_at <= datetime.utcnow():
+                    has_missing_docs = True
+                    break
+
+        if has_missing_docs and self._generate_magic_link_uc:
+            # Send magic link to collect missing/expired documents
+            await self._generate_magic_link_uc.execute(
+                GenerateMagicLinkCommand(
+                    third_party_id=cr.third_party_id,
+                    purpose=MagicLinkPurpose.DOCUMENT_UPLOAD,
+                    email=command.contact_email,
+                    contract_request_id=cr.id,
+                )
+            )
+            cr.transition_to(ContractRequestStatus.COLLECTING_DOCUMENTS)
+            logger.info(
+                "recontractualization_collecting_expired_docs",
+                cr_id=str(cr.id),
+            )
+        else:
+            # All documents still valid → skip to reviewing compliance
+            cr.transition_to(ContractRequestStatus.COLLECTING_DOCUMENTS)
+            cr.transition_to(ContractRequestStatus.REVIEWING_COMPLIANCE)
+            logger.info(
+                "recontractualization_docs_valid_skipping_to_review",
+                cr_id=str(cr.id),
+            )
 
         return cr

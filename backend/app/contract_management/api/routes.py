@@ -453,6 +453,7 @@ async def validate_commercial(
         find_or_create_third_party_use_case=None,
         generate_magic_link_use_case=generate_magic_link_uc,
         request_documents_use_case=request_documents_uc,
+        document_repository=doc_repo,
     )
 
     try:
@@ -460,24 +461,13 @@ async def validate_commercial(
             ValidateCommercialCommand(
                 contract_request_id=contract_request_id,
                 third_party_type=body.third_party_type,
-                daily_rate=body.daily_rate,
-                quantity_sold=body.quantity_sold,
-                start_date=body.start_date,
-                end_date=body.end_date,
                 contact_email=body.contact_email,
-                client_name=body.client_name,
-                mission_title=body.mission_title,
-                mission_description=body.mission_description,
                 company_id=body.company_id,
                 consultant_civility=body.consultant_civility,
                 consultant_first_name=body.consultant_first_name,
                 consultant_last_name=body.consultant_last_name,
                 consultant_email=body.consultant_email,
                 consultant_phone=body.consultant_phone,
-                mission_site_name=body.mission_site_name,
-                mission_address=body.mission_address,
-                mission_postal_code=body.mission_postal_code,
-                mission_city=body.mission_city,
             )
         )
     except Exception as exc:

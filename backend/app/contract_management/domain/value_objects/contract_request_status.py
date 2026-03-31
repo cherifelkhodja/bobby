@@ -11,7 +11,6 @@ class ContractRequestStatus(str, Enum):
     COLLECTING_DOCUMENTS = "collecting_documents"
     REVIEWING_COMPLIANCE = "reviewing_compliance"
     COMPLIANCE_BLOCKED = "compliance_blocked"
-    CONFIGURING_CONTRACT = "configuring_contract"
     DRAFT_GENERATED = "draft_generated"
     DRAFT_SENT_TO_PARTNER = "draft_sent_to_partner"
     PARTNER_APPROVED = "partner_approved"
@@ -22,6 +21,9 @@ class ContractRequestStatus(str, Enum):
     ARCHIVED = "archived"
     REDIRECTED_PAYFIT = "redirected_payfit"
     CANCELLED = "cancelled"
+
+    # Legacy alias — kept for backward compatibility with existing DB rows
+    CONFIGURING_CONTRACT = "configuring_contract"
 
     @property
     def allowed_transitions(self) -> frozenset["ContractRequestStatus"]:
@@ -37,7 +39,6 @@ class ContractRequestStatus(str, Enum):
             ContractRequestStatus.COMMERCIAL_VALIDATED: frozenset(
                 {
                     ContractRequestStatus.COLLECTING_DOCUMENTS,
-                    ContractRequestStatus.CONFIGURING_CONTRACT,
                     ContractRequestStatus.CANCELLED,
                 }
             ),
@@ -49,7 +50,7 @@ class ContractRequestStatus(str, Enum):
             ),
             ContractRequestStatus.REVIEWING_COMPLIANCE: frozenset(
                 {
-                    ContractRequestStatus.CONFIGURING_CONTRACT,
+                    ContractRequestStatus.DRAFT_GENERATED,
                     ContractRequestStatus.COMPLIANCE_BLOCKED,
                     ContractRequestStatus.COLLECTING_DOCUMENTS,
                     ContractRequestStatus.CANCELLED,
@@ -57,11 +58,12 @@ class ContractRequestStatus(str, Enum):
             ),
             ContractRequestStatus.COMPLIANCE_BLOCKED: frozenset(
                 {
-                    ContractRequestStatus.CONFIGURING_CONTRACT,
+                    ContractRequestStatus.DRAFT_GENERATED,
                     ContractRequestStatus.COLLECTING_DOCUMENTS,
                     ContractRequestStatus.CANCELLED,
                 }
             ),
+            # Legacy: existing rows in CONFIGURING_CONTRACT can still transition
             ContractRequestStatus.CONFIGURING_CONTRACT: frozenset(
                 {
                     ContractRequestStatus.DRAFT_GENERATED,
@@ -71,7 +73,6 @@ class ContractRequestStatus(str, Enum):
             ContractRequestStatus.DRAFT_GENERATED: frozenset(
                 {
                     ContractRequestStatus.DRAFT_SENT_TO_PARTNER,
-                    ContractRequestStatus.CONFIGURING_CONTRACT,
                     ContractRequestStatus.DRAFT_GENERATED,  # Allow re-generation
                     ContractRequestStatus.CANCELLED,
                 }
@@ -91,7 +92,6 @@ class ContractRequestStatus(str, Enum):
             ),
             ContractRequestStatus.PARTNER_REQUESTED_CHANGES: frozenset(
                 {
-                    ContractRequestStatus.CONFIGURING_CONTRACT,
                     ContractRequestStatus.DRAFT_GENERATED,
                     ContractRequestStatus.CANCELLED,
                 }
@@ -131,7 +131,7 @@ class ContractRequestStatus(str, Enum):
             "collecting_documents": "Collecte de documents",
             "reviewing_compliance": "En vérification conformité",
             "compliance_blocked": "Bloqué (conformité)",
-            "configuring_contract": "Configuration du contrat",
+            "configuring_contract": "Configuration du contrat",  # Legacy
             "draft_generated": "Brouillon généré",
             "draft_sent_to_partner": "Envoyé au partenaire",
             "partner_approved": "Approuvé par le partenaire",

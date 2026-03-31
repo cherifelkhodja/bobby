@@ -67,6 +67,27 @@ class ContractRequestRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
+    async def get_latest_by_resource_id(self, resource_id: int) -> ContractRequest | None:
+        """Get the latest contract request for a Boond resource ID.
+
+        Used for re-contractualization (resource state 4/5) to find
+        the previous contract request and pre-fill data.
+        """
+        result = await self.session.execute(
+            select(ContractRequestModel)
+            .where(
+                (ContractRequestModel.boond_resource_id == resource_id)
+                | (
+                    (ContractRequestModel.boond_candidate_id == resource_id)
+                    & (ContractRequestModel.boond_consultant_type == "resource")
+                ),
+            )
+            .order_by(ContractRequestModel.created_at.desc())
+            .limit(1)
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
     async def save(self, request: ContractRequest) -> ContractRequest:
         """Save a contract request (create or update)."""
         result = await self.session.execute(
@@ -77,6 +98,9 @@ class ContractRequestRepository:
         if model:
             model.status = request.status.value
             model.reference = request.reference
+            model.trigger_type = request.trigger_type
+            model.previous_contract_request_id = request.previous_contract_request_id
+            model.boond_resource_id = request.boond_resource_id
             model.third_party_id = request.third_party_id
             model.third_party_type = request.third_party_type
             model.daily_rate = request.daily_rate
@@ -252,10 +276,13 @@ class ContractRequestRepository:
             id=model.id,
             provisional_reference=model.provisional_reference,
             reference=model.reference,
+            trigger_type=model.trigger_type,
+            previous_contract_request_id=model.previous_contract_request_id,
             boond_positioning_id=model.boond_positioning_id,
             boond_candidate_id=model.boond_candidate_id,
             boond_consultant_type=model.boond_consultant_type,
             boond_need_id=model.boond_need_id,
+            boond_resource_id=model.boond_resource_id,
             third_party_id=model.third_party_id,
             status=ContractRequestStatus(model.status),
             third_party_type=model.third_party_type,
@@ -293,10 +320,13 @@ class ContractRequestRepository:
             id=entity.id,
             provisional_reference=entity.provisional_reference,
             reference=entity.reference,
+            trigger_type=entity.trigger_type,
+            previous_contract_request_id=entity.previous_contract_request_id,
             boond_positioning_id=entity.boond_positioning_id,
             boond_candidate_id=entity.boond_candidate_id,
             boond_consultant_type=entity.boond_consultant_type,
             boond_need_id=entity.boond_need_id,
+            boond_resource_id=entity.boond_resource_id,
             third_party_id=entity.third_party_id,
             status=entity.status.value,
             third_party_type=entity.third_party_type,

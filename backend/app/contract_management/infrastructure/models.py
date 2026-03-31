@@ -25,10 +25,22 @@ class ContractRequestModel(Base):
         String(20), nullable=True, unique=True,
         comment="Référence définitive (XXX-CC-NNNN), assignée à l'état PARTNER_APPROVED",
     )
-    boond_positioning_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    trigger_type: Mapped[str | None] = mapped_column(
+        String(30), nullable=True,
+        comment="What triggered this CR: positioning_7, candidat_11, ressource_4, ressource_5",
+    )
+    previous_contract_request_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_contract_requests.id"), nullable=True,
+        comment="Link to previous CR for re-contractualization",
+    )
+    boond_positioning_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     boond_candidate_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     boond_consultant_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     boond_need_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    boond_resource_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True,
+        comment="Boond resource ID for resource-triggered workflows",
+    )
     third_party_id: Mapped[UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("tp_third_parties.id"), nullable=True
     )
@@ -54,7 +66,7 @@ class ContractRequestModel(Base):
     mission_city: Mapped[str | None] = mapped_column(String(255), nullable=True)
     contractualization_contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     contract_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    commercial_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    commercial_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     commercial_validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     company_id: Mapped[UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("cm_contract_companies.id"), nullable=True

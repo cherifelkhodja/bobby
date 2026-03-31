@@ -31,13 +31,16 @@ class ContractRequest:
     """
 
     provisional_reference: str
-    boond_positioning_id: int
-    commercial_email: str
     id: UUID = field(default_factory=uuid4)
     reference: str | None = None
+    trigger_type: str | None = None  # positioning_7, candidat_11, ressource_4, ressource_5
+    previous_contract_request_id: UUID | None = None
+    boond_positioning_id: int | None = None
     boond_candidate_id: int | None = None
     boond_consultant_type: str | None = None  # "candidate" ou "resource"
     boond_need_id: int | None = None
+    boond_resource_id: int | None = None
+    commercial_email: str | None = None
     third_party_id: UUID | None = None
     status: ContractRequestStatus = ContractRequestStatus.PENDING_COMMERCIAL_VALIDATION
     third_party_type: str | None = None
@@ -96,23 +99,15 @@ class ContractRequest:
         self,
         *,
         third_party_type: str,
-        daily_rate: Decimal,
-        start_date: date,
         contact_email: str,
-        end_date: date | None = None,
-        client_name: str | None = None,
-        mission_title: str | None = None,
-        mission_description: str | None = None,
     ) -> None:
-        """Apply commercial validation data and transition status."""
+        """Apply commercial validation data and transition status.
+
+        Simplified for contrat cadre: only type tiers + contact.
+        Mission-specific data (TJM, dates, address) belongs to BDC.
+        """
         self.third_party_type = third_party_type
-        self.daily_rate = daily_rate
-        self.start_date = start_date
-        self.end_date = end_date
         self.contractualization_contact_email = contact_email
-        self.client_name = client_name
-        self.mission_title = mission_title
-        self.mission_description = mission_description
         self.commercial_validated_at = datetime.utcnow()
         self.transition_to(ContractRequestStatus.COMMERCIAL_VALIDATED)
 
@@ -140,16 +135,15 @@ class ContractRequest:
         self.transition_to(ContractRequestStatus.COMPLIANCE_BLOCKED)
 
     def set_contract_config(self, config: dict[str, Any]) -> None:
-        """Set contract configuration and transition to configuring.
+        """Set contract configuration (no status transition).
 
-        Idempotent: if already in CONFIGURING_CONTRACT, updates config in place.
+        Config is now applied inline before draft generation,
+        without a dedicated CONFIGURING_CONTRACT status.
 
         Args:
             config: Contract configuration dictionary.
         """
         self.contract_config = config
-        if self.status != ContractRequestStatus.CONFIGURING_CONTRACT:
-            self.transition_to(ContractRequestStatus.CONFIGURING_CONTRACT)
         self.updated_at = datetime.utcnow()
 
     def override_compliance(self, reason: str) -> None:
