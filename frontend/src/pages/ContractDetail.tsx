@@ -512,6 +512,18 @@ export default function ContractDetail() {
               >
                 {statusConfig?.label ?? cr.status_display}
               </span>
+              {(() => {
+                const company = companies.find((c) => c.id === (cr.contract_config as Record<string, unknown> | null)?.company_id || c.id === cr.company_id)
+                  ?? companies.find((c) => c.is_default);
+                return company ? (
+                  <span
+                    className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium text-white"
+                    style={{ backgroundColor: company.color_code }}
+                  >
+                    {company.name}
+                  </span>
+                ) : null;
+              })()}
             </div>
             <div className="flex items-center gap-1.5 mt-2 text-sm text-gray-500 dark:text-gray-400">
               {cr.third_party_name && (
@@ -529,16 +541,6 @@ export default function ContractDetail() {
               {cr.third_party_type && (
                 <span>{cr.third_party_type === 'freelance' ? 'Freelance' : cr.third_party_type === 'sous_traitant' ? 'Sous-traitant' : cr.third_party_type === 'portage_salarial' ? 'Portage' : 'Salarié'}</span>
               )}
-              {(() => {
-                const companyName = companies.find((c) => c.id === (cr.contract_config as Record<string, unknown> | null)?.company_id || c.id === cr.company_id)?.name
-                  ?? companies.find((c) => c.is_default)?.name;
-                return companyName ? (
-                  <>
-                    <span className="text-gray-300 dark:text-gray-600">·</span>
-                    <span>{companyName}</span>
-                  </>
-                ) : null;
-              })()}
             </div>
           </div>
 
