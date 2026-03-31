@@ -383,6 +383,7 @@ export default function ContractDetail() {
 
   const configureMutation = useMutation({
     mutationFn: async () => {
+      // Auto-save config before generating draft
       await contractsApi.configure(id!, {
         company_id: configForm.company_id || null,
         payment_terms: configForm.payment_terms,
@@ -392,15 +393,11 @@ export default function ContractDetail() {
         excluded_optional_article_keys: configForm.excluded_optional_article_keys,
         special_conditions: configForm.special_conditions || undefined,
       });
-      if (latestContract) {
-        await contractsApi.generateDraft(id!);
-      }
+      // Then generate the draft
+      await contractsApi.generateDraft(id!);
     },
     onSuccess: () => {
-      if (latestContract) {
-        toast.success('Contrat reconfiguré et brouillon régénéré avec succès.');
-      } else {
-        toast.success('Contrat configuré. Vous pouvez maintenant générer le brouillon.');
+      toast.success('Brouillon généré avec succès.');
       }
       queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
       queryClient.invalidateQueries({ queryKey: ['contracts', id] });
@@ -1107,7 +1104,7 @@ export default function ContractDetail() {
         <Card className="mb-6 border-purple-200 dark:border-purple-800">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2">
             <Settings className="h-4 w-4 text-purple-500" />
-            Configuration du contrat
+            Preparation du contrat
           </h3>
 
           {/* Section 0 — Société émettrice */}
@@ -1248,30 +1245,33 @@ export default function ContractDetail() {
             />
           </div>
 
+          {/* Section 4 — Article/annex editor (inline) */}
+          {activeArticles.length > 0 && (
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mb-5">
+              <ArticleAnnexEditor
+                contractRequestId={id!}
+                articles={activeArticles}
+                annexes={activeAnnexes}
+                existingOverrides={(cr.contract_config as Record<string, unknown> | null) ?? {}}
+                onSaved={() => queryClient.invalidateQueries({ queryKey: ['contract-request', id] })}
+                onRegenerateDraft={undefined}
+                isRegenerating={false}
+                inline
+              />
+            </div>
+          )}
+
           <div className="flex justify-end">
             <Button
               onClick={() => configureMutation.mutate()}
               disabled={configureMutation.isPending}
               isLoading={configureMutation.isPending}
             >
-              <Settings className="h-4 w-4 mr-2" />
-              {latestContract ? 'Reconfigurer et régénérer le brouillon' : 'Configurer le contrat'}
+              <FileSignature className="h-4 w-4 mr-2" />
+              {latestContract ? 'Régénérer le brouillon' : 'Générer le brouillon'}
             </Button>
           </div>
         </Card>
-      )}
-
-      {/* Article/annex editor — shown as long as contract not sent to partner */}
-      {showConfigForm && activeArticles.length > 0 && (
-        <ArticleAnnexEditor
-          contractRequestId={id!}
-          articles={activeArticles}
-          annexes={activeAnnexes}
-          existingOverrides={(cr.contract_config as Record<string, unknown> | null) ?? {}}
-          onSaved={() => queryClient.invalidateQueries({ queryKey: ['contract-request', id] })}
-          onRegenerateDraft={latestContract ? () => actionMutation.mutate('generate-draft') : undefined}
-          isRegenerating={actionMutation.isPending}
-        />
       )}
 
       {/* Third-party company info — visible after document collection starts */}
@@ -1748,6 +1748,7 @@ function ArticleAnnexEditor({
   onSaved,
   onRegenerateDraft,
   isRegenerating,
+  inline,
 }: {
   contractRequestId: string;
   articles: ArticleTemplate[];
@@ -1756,6 +1757,7 @@ function ArticleAnnexEditor({
   onSaved: () => void;
   onRegenerateDraft?: () => void;
   isRegenerating?: boolean;
+  inline?: boolean;
 }) {
   const articleOverrides = (existingOverrides.article_overrides ?? {}) as Record<string, string>;
   const annexOverrides = (existingOverrides.annex_overrides ?? {}) as Record<string, string>;
@@ -1999,13 +2001,13 @@ function ArticleAnnexEditor({
     )
   );
 
-  return (
-    <Card className="mb-6">
-      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">
-        Édition des articles et annexes
-      </h3>
+  const content = (
+    <>
+      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">
+        Edition des articles et annexes
+      </p>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-        Glissez pour réordonner, modifiez le contenu ou ajoutez des articles/annexes pour ce contrat uniquement.
+        Glissez pour reordonner, modifiez le contenu ou ajoutez des articles/annexes pour ce contrat uniquement.
       </p>
 
       {/* Articles */}
@@ -2101,8 +2103,11 @@ function ArticleAnnexEditor({
           </Button>
         </div>
       )}
-    </Card>
+    </>
   );
+
+  if (inline) return content;
+  return <Card className="mb-6">{content}</Card>;
 }
 
 // ─── History Timeline ────────────────────────────────────────────────────────
