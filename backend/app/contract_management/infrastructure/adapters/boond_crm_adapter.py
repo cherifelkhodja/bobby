@@ -809,6 +809,7 @@ class BoondCrmAdapter:
             "data": {
                 "id": str(resource_id),
                 "type": "resource",
+                "attributes": {},
                 "relationships": relationships,
             }
         }
