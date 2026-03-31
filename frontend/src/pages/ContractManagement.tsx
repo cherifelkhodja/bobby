@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FileSignature, ShoppingCart, X } from 'lucide-react';
+import { FileSignature, ShoppingCart, X, User, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { contractsApi, purchaseOrderRequestsApi } from '../api/contracts';
@@ -129,36 +129,89 @@ export function ContractManagement() {
           <div className="space-y-3">
             {filtered.map((cr) => {
               const config = CONTRACT_STATUS_CONFIG[cr.status];
+              const consultantName = [cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ');
+              const thirdPartyLabel = cr.third_party_type ? (THIRD_PARTY_TYPE_LABELS[cr.third_party_type] ?? cr.third_party_type) : null;
               return (
-                <Card key={cr.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/contracts/${cr.id}`)}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4 min-w-0">
-                      <span className="shrink-0 text-sm font-mono font-semibold text-gray-900 dark:text-white">{cr.reference}</span>
-                      <span className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config?.color ?? 'bg-gray-100 text-gray-600'}`}>{config?.label ?? cr.status_display}</span>
-                      <div className="min-w-0">
-                        {cr.client_name && <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{cr.client_name}</p>}
-                        <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
-                          {cr.third_party_type && <span>{THIRD_PARTY_TYPE_LABELS[cr.third_party_type] ?? cr.third_party_type}</span>}
-                          {cr.third_party_type && cr.daily_rate && <span>·</span>}
-                          {cr.daily_rate && <span>{cr.daily_rate}€/j</span>}
-                          {(cr.third_party_type || cr.daily_rate) && cr.start_date && <span>·</span>}
-                          {cr.start_date && <span>Début {formatDate(cr.start_date)}</span>}
+                <div
+                  key={cr.id}
+                  onClick={() => navigate(`/contracts/${cr.id}`)}
+                  className="group relative bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md transition-all cursor-pointer overflow-hidden"
+                >
+                  {/* Left accent bar */}
+                  <div className={`absolute inset-y-0 left-0 w-1 ${
+                    cr.status === 'cancelled' || cr.status === 'compliance_blocked' ? 'bg-red-400' :
+                    cr.status === 'signed' || cr.status === 'active' ? 'bg-green-400' :
+                    cr.status === 'archived' || cr.status === 'redirected_payfit' ? 'bg-gray-300 dark:bg-gray-600' :
+                    'bg-blue-400'
+                  }`} />
+
+                  <div className="pl-5 pr-4 py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      {/* Main content */}
+                      <div className="min-w-0 flex-1">
+                        {/* Line 1: Status + Reference + Third party type */}
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${config?.color ?? 'bg-gray-100 text-gray-600'}`}>
+                            {config?.label ?? cr.status_display}
+                          </span>
+                          <span className="text-sm font-mono font-bold text-gray-900 dark:text-white">
+                            {cr.reference}
+                          </span>
+                          {thirdPartyLabel && (
+                            <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-full px-2 py-0.5">
+                              {thirdPartyLabel}
+                            </span>
+                          )}
+                          {cr.trigger_type && cr.trigger_type !== 'positioning_7' && (
+                            <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-full px-2 py-0.5">
+                              {cr.trigger_type === 'candidat_11' ? 'Nouveau' : cr.trigger_type === 'ressource_4' ? 'Renouvellement' : 'Chgt societe'}
+                            </span>
+                          )}
                         </div>
+
+                        {/* Line 2: Supplier / client info */}
+                        {cr.client_name && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <Building2 className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                              {cr.client_name}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Line 3: Consultant */}
+                        {consultantName && (
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <User className="h-3.5 w-3.5 text-gray-300 dark:text-gray-600 shrink-0" />
+                            <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                              {cr.consultant_civility && <span className="mr-1">{cr.consultant_civility}</span>}
+                              {consultantName}
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0 ml-4">
-                      <div className="text-right">
-                        <p className="text-xs text-gray-400 dark:text-gray-500">{formatDate(cr.created_at)}</p>
-                        {isAdv && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{cr.commercial_name || cr.commercial_email}</p>}
+
+                      {/* Right side: date + actions */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="text-right">
+                          <p className="text-xs text-gray-400 dark:text-gray-500">{formatDate(cr.created_at)}</p>
+                          {isAdv && (cr.commercial_name || cr.commercial_email) && (
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{cr.commercial_name || cr.commercial_email}</p>
+                          )}
+                        </div>
+                        {isAdv && !CR_TERMINAL.has(cr.status) && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setCancelTarget({ id: cr.id, reference: cr.reference, type: 'contracts' }); }}
+                            className="p-1.5 rounded-md text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                            title="Annuler"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
-                      {isAdv && !CR_TERMINAL.has(cr.status) && (
-                        <button onClick={(e) => { e.stopPropagation(); setCancelTarget({ id: cr.id, reference: cr.reference, type: 'contracts' }); }} className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Annuler">
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
                     </div>
                   </div>
-                </Card>
+                </div>
               );
             })}
           </div>
