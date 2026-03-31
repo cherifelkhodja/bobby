@@ -78,7 +78,8 @@ class SyncToBoondAfterSigningUseCase:
         # Fetch the issuing company to get boond_agency_id
         company = await self._get_contract_company(cr.company_id)
 
-        resource_id: int | None = cr.boond_candidate_id
+        # For new workflow (candidat/resource triggers), boond_resource_id is set
+        resource_id: int | None = cr.boond_resource_id or cr.boond_candidate_id
 
         # ── Étape 1 : Création société fournisseur ─────────────────────────
         # Build formatted legal fields
@@ -286,10 +287,27 @@ class SyncToBoondAfterSigningUseCase:
                 resource_id=resource_id,
             )
 
-        # ── Étape 4 : Contrat + lien administratif (externe uniquement) ───
-        # Le typeOf est déterminé par le type de tiers : tout sauf "salarie" → externe (1)
-        # Skip if candidate conversion failed — Boond requires a valid resource for contracts.
+        # ── Étape 4a : Lien fournisseur → ressource (administrative) ───────
+        # Link the resource to the provider company and commercial contact.
+        # This is independent of having a daily_rate (contrat cadre workflow).
         is_external = cr.third_party_type != "salarie"
+        if resource_id and is_resource and is_external and tp and tp.boond_provider_id:
+            commercial_contact_id = tp.boond_commercial_contact_id or boond_contact_ids.get("commercial")
+            try:
+                await self._crm.update_resource_administrative(
+                    resource_id=resource_id,
+                    provider_company_id=tp.boond_provider_id,
+                    provider_contact_id=commercial_contact_id,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "sync_boond_update_resource_admin_failed",
+                    cr_id=str(cr.id),
+                    error=str(exc),
+                )
+
+        # ── Étape 4b : Contrat Boond (si TJM disponible) ─────────────────
+        # Skip if no daily_rate (will be handled later via BDC workflow).
         if resource_id and is_resource and is_external and cr.daily_rate:
             contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(
                 cr.third_party_type or "", 3
@@ -326,21 +344,6 @@ class SyncToBoondAfterSigningUseCase:
                     cr_id=str(cr.id),
                     error=str(exc),
                 )
-
-            if tp and tp.boond_provider_id:
-                commercial_contact_id = tp.boond_commercial_contact_id or boond_contact_ids.get("commercial")
-                try:
-                    await self._crm.update_resource_administrative(
-                        resource_id=resource_id,
-                        provider_company_id=tp.boond_provider_id,
-                        provider_contact_id=commercial_contact_id,
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "sync_boond_update_resource_admin_failed",
-                        cr_id=str(cr.id),
-                        error=str(exc),
-                    )
 
         # ── Étape 5 : Bon de commande ──────────────────────────────────────
         contract = await self._contract_repo.get_by_request_id(cr.id)
