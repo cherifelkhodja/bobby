@@ -332,6 +332,31 @@ export default function ContractDetail() {
     },
   });
 
+  const validateDocMutation = useMutation({
+    mutationFn: (docId: string) => vigilanceApi.validateDocument(docId),
+    onSuccess: () => {
+      toast.success('Document validé.');
+      queryClient.invalidateQueries({ queryKey: ['compliance-docs', cr?.third_party_id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const [rejectingDocId, setRejectingDocId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const rejectDocMutation = useMutation({
+    mutationFn: ({ docId, reason }: { docId: string; reason: string }) =>
+      vigilanceApi.rejectDocument(docId, reason),
+    onSuccess: () => {
+      toast.success('Document rejeté.');
+      setRejectingDocId(null);
+      setRejectReason('');
+      queryClient.invalidateQueries({ queryKey: ['compliance-docs', cr?.third_party_id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
   const cancelMutation = useMutation({
     mutationFn: () => contractsApi.cancel(id!),
     onSuccess: () => {
@@ -1411,8 +1436,10 @@ export default function ContractDetail() {
           <div className="space-y-2">
             {complianceDocs.documents.map((doc) => {
               const docBadge = getDocumentBadgeConfig(doc);
-              const canTempValidate = doc.status === 'requested' && doc.is_unavailable;
+              const canValidate = isAdv && doc.status === 'received';
+              const canTempValidate = isAdv && doc.status === 'requested' && doc.is_unavailable;
               const isTempValidating = tempValidatingDocId === doc.id;
+              const isRejecting = rejectingDocId === doc.id;
               return (
                 <div
                   key={doc.id}
@@ -1426,17 +1453,71 @@ export default function ContractDetail() {
                       {doc.file_name && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{doc.file_name}</p>
                       )}
+                      {doc.expires_at && (
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                          Expire le {new Date(doc.expires_at).toLocaleDateString('fr-FR')}
+                        </p>
+                      )}
                     </div>
-                    <span className={`ml-3 flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${docBadge.color}`}>
-                      {docBadge.label}
-                    </span>
+                    <div className="flex items-center gap-2 ml-3 shrink-0">
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${docBadge.color}`}>
+                        {docBadge.label}
+                      </span>
+                      {canValidate && (
+                        <>
+                          <button
+                            onClick={() => validateDocMutation.mutate(doc.id)}
+                            disabled={validateDocMutation.isPending}
+                            className="text-xs font-medium text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 px-2 py-1 rounded transition-colors disabled:opacity-50"
+                          >
+                            Valider
+                          </button>
+                          <button
+                            onClick={() => setRejectingDocId(doc.id)}
+                            className="text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 py-1 rounded transition-colors"
+                          >
+                            Rejeter
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                   {doc.is_unavailable && doc.unavailability_reason && (
                     <p className="mt-1.5 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 rounded px-2 py-1">
                       Indisponible : {doc.unavailability_reason}
                     </p>
                   )}
-                  {canTempValidate && (
+                  {doc.rejection_reason && (
+                    <p className="mt-1.5 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded px-2 py-1">
+                      Motif de rejet : {doc.rejection_reason}
+                    </p>
+                  )}
+                  {isRejecting && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                        placeholder="Motif du rejet..."
+                        className="flex-1 text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => rejectDocMutation.mutate({ docId: doc.id, reason: rejectReason })}
+                        disabled={!rejectReason.trim() || rejectDocMutation.isPending}
+                        className="text-xs font-medium text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
+                      >
+                        Confirmer
+                      </button>
+                      <button
+                        onClick={() => { setRejectingDocId(null); setRejectReason(''); }}
+                        className="text-xs text-gray-400 hover:underline"
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  )}
+                  {canTempValidate && !isRejecting && (
                     <div className="mt-2">
                       {!isTempValidating ? (
                         <button
@@ -1447,7 +1528,7 @@ export default function ContractDetail() {
                         </button>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Confirmer la validation temporaire ?</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">Confirmer ?</span>
                           <button
                             onClick={() => tempValidateMutation.mutate(doc.id)}
                             disabled={tempValidateMutation.isPending}
@@ -1459,7 +1540,7 @@ export default function ContractDetail() {
                             onClick={() => setTempValidatingDocId(null)}
                             className="text-xs text-gray-400 hover:underline"
                           >
-                            Annuler
+                            Non
                           </button>
                         </div>
                       )}
