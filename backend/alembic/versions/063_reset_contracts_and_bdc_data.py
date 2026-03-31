@@ -55,14 +55,14 @@ def upgrade() -> None:
     # 4. Contracts (FK → contract_requests, third_parties)
     op.execute(sa.text("DELETE FROM cm_contracts"))
 
-    # 5. Webhook events (dedup tracking)
+    # 5. Magic links (FK → third_parties, contract_requests) — BEFORE contract_requests
+    op.execute(sa.text("DELETE FROM tp_magic_links"))
+
+    # 6. Webhook events (dedup tracking)
     op.execute(sa.text("DELETE FROM cm_webhook_events"))
 
-    # 6. Contract requests (FK → third_parties, contract_companies)
+    # 7. Contract requests (FK → third_parties, contract_companies)
     op.execute(sa.text("DELETE FROM cm_contract_requests"))
-
-    # 7. Magic links (FK → third_parties, contract_requests)
-    op.execute(sa.text("DELETE FROM tp_magic_links"))
 
     # 8. Vigilance documents (FK → third_parties)
     op.execute(sa.text("DELETE FROM vig_documents"))
