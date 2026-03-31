@@ -155,7 +155,7 @@ export function ContractManagement() {
                             {config?.label ?? cr.status_display}
                           </span>
                           <span className="text-sm font-mono font-bold text-gray-900 dark:text-white">
-                            {cr.reference}
+                            {cr.display_reference}
                           </span>
                           {thirdPartyLabel && (
                             <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-full px-2 py-0.5">
@@ -169,23 +169,24 @@ export function ContractManagement() {
                           )}
                         </div>
 
-                        {/* Line 2: Supplier / client info */}
-                        {cr.client_name && (
+                        {/* Line 2: Consultant (main info for contrat cadre) */}
+                        {consultantName && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <User className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                              {cr.consultant_civility && <span className="mr-1">{cr.consultant_civility}</span>}
+                              {consultantName}
+                            </span>
+                            {cr.client_name && (
+                              <span className="text-xs text-gray-400 dark:text-gray-500">— {cr.client_name}</span>
+                            )}
+                          </div>
+                        )}
+                        {!consultantName && cr.client_name && (
                           <div className="mt-2 flex items-center gap-2">
                             <Building2 className="h-3.5 w-3.5 text-gray-400 shrink-0" />
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
                               {cr.client_name}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Line 3: Consultant */}
-                        {consultantName && (
-                          <div className="mt-1.5 flex items-center gap-2">
-                            <User className="h-3.5 w-3.5 text-gray-300 dark:text-gray-600 shrink-0" />
-                            <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                              {cr.consultant_civility && <span className="mr-1">{cr.consultant_civility}</span>}
-                              {consultantName}
                             </span>
                           </div>
                         )}
@@ -201,7 +202,7 @@ export function ContractManagement() {
                         </div>
                         {isAdv && !CR_TERMINAL.has(cr.status) && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); setCancelTarget({ id: cr.id, reference: cr.reference, type: 'contracts' }); }}
+                            onClick={(e) => { e.stopPropagation(); setCancelTarget({ id: cr.id, reference: cr.display_reference, type: 'contracts' }); }}
                             className="p-1.5 rounded-md text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
                             title="Annuler"
                           >

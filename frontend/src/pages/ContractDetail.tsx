@@ -504,7 +504,7 @@ export default function ContractDetail() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {cr.reference}
+              {cr.display_reference}
             </h1>
             <div className="flex items-center gap-3 mt-2">
               <span
@@ -1624,7 +1624,7 @@ export default function ContractDetail() {
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Voulez-vous vraiment annuler la demande <span className="font-semibold">{cr.reference}</span> ?
+            Voulez-vous vraiment annuler la demande <span className="font-semibold">{cr.display_reference}</span> ?
           </p>
           <p className="text-sm text-red-600 dark:text-red-400">
             Cette action est irréversible.

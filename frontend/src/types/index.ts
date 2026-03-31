@@ -748,7 +748,9 @@ export type TriggerType = 'positioning_7' | 'candidat_11' | 'ressource_4' | 'res
 
 export interface ContractRequest {
   id: string;
-  reference: string;
+  provisional_reference: string;
+  reference: string | null;
+  display_reference: string;
   trigger_type: TriggerType | null;
   previous_contract_request_id: string | null;
   boond_positioning_id: number | null;
