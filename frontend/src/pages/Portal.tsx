@@ -676,10 +676,10 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
       // Check for existing framework contract
       try {
         const checkResult = await portalApi.checkSiren(token, digits);
-        if (checkResult.has_framework_contract) {
+        if (checkResult.has_framework_contract && checkResult.framework_contract) {
           setFrameworkContractDetected({
             reference: checkResult.framework_contract.reference,
-            signed_at: checkResult.framework_contract.signed_at,
+            signed_at: checkResult.framework_contract.signed_at ?? null,
             message: checkResult.message,
           });
         } else {
