@@ -35,7 +35,7 @@
 | Row Level Security | ✅ Done | PostgreSQL RLS |
 | Audit Logging | ✅ Done | Structuré |
 | Contractualisation | ✅ Done | Workflow BoondManager → validation → contrat PDF (HTML+WeasyPrint) → signature YouSign → push Boond |
-| Contrats cadres & BDC | ✅ Done | Workflows séparés : ContractRequest (14 statuts) + PurchaseOrderRequest (7 statuts). Détection SIREN, tacite reconduction |
+| Contrats cadres & BDC | ✅ Done | Workflows séparés : ContractRequest (simplifié, sans CONFIGURING_CONTRACT) + PurchaseOrderRequest (7 statuts). Webhooks candidat/ressource, re-contractualisation, UI progressive |
 | Vigilance documentaire | ✅ Done | Cycle de vie docs légaux tiers (request → upload → validate/reject → expiration) |
 | Portail tiers (magic link) | ✅ Done | Upload documents + review contrat via lien sécurisé |
 | CRON jobs (APScheduler) | ✅ Done | Expirations documents, relances, purge magic links |
@@ -188,23 +188,34 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
-### 2026-03-31 (plan: refonte simplification fournisseurs contrat cadre + BDC)
+### 2026-03-31 (feat: implémentation refonte simplification fournisseurs — ADR-009)
 
-**ADR-009** — Documentation de la refonte planifiée du workflow fournisseurs.
+**Implémentation complète en 8 phases** de la refonte planifiée.
 
-**Décisions prises** :
-- 3 nouveaux webhooks Boond : candidat state 11, ressource state 4, ressource state 5
-- Contrat cadre découplé du BDC (deux workflows indépendants)
-- Saisie commerciale simplifiée (type tiers + contact uniquement)
-- Suppression statut CONFIGURING_CONTRACT (intégré dans génération draft)
-- UI progressive (sections masquées tant que prérequis non remplis)
-- Conformité intégrée dans page contrat
-- BDC en pages séparées (Option B)
-- Ressource state 4 : réutilisation docs valides, re-demande si non conformes
-- Idempotence : ignore si ContractRequest déjà en cours
+#### Backend (phases 1-5)
+- **Migration 064** : `trigger_type`, `previous_contract_request_id`, `boond_resource_id`, `boond_positioning_id`/`commercial_email` rendus nullable
+- **Statuts simplifiés** : `CONFIGURING_CONTRACT` supprimé (gardé en alias legacy), transitions directes `REVIEWING_COMPLIANCE` → `DRAFT_GENERATED`
+- **Validation commerciale simplifiée** : plus que `third_party_type` + `contact_email` + consultant optionnel. Champs mission (TJM, dates, adresse) supprimés du contrat cadre
+- **2 nouveaux webhooks** : `POST /webhooks/boondmanager/candidate-state-update` (state 11) et `POST /webhooks/boondmanager/resource-state-update` (states 4/5)
+- **Use case `CreateContractRequestFromEntityUseCase`** : gère candidat_11, ressource_4, ressource_5 avec parsing webhook, idempotence, notification email
+- **Re-contractualisation (state 4)** : réutilise ThirdParty existant, détecte docs expirés/rejetés, skip collecte si tout valide
 
-**Fichiers créés** : `docs/contracts/refonte-contrat-cadre-bdc.md`
-**Fichiers modifiés** : `MEMORY.md` (ADR-009, prochaines étapes)
+#### Frontend (phases 6-8)
+- **Formulaire validation simplifié** : 3 champs (type tiers, email contact, consultant) au lieu de 15+
+- **UI progressive** : helper `hasReachedStatus()` + `STATUS_ORDER` pour n'afficher les sections que quand leurs prérequis sont remplis
+- **Badge trigger_type** dans le header ("Nouveau consultant", "Re-contractualisation", "Changement société")
+- **Conformité visible aux commerciaux** : documents de conformité et infos société visibles pour commercial/ADV/admin
+- **ACTION_CONFIG** : `reviewing_compliance` et `compliance_blocked` peuvent déclencher la génération du brouillon directement
+
+**Fichiers créés** :
+- `backend/alembic/versions/064_simplify_contract_request_for_refonte.py`
+- `backend/app/contract_management/application/use_cases/create_contract_request_from_entity.py`
+- `docs/contracts/refonte-contrat-cadre-bdc.md`
+
+**Fichiers modifiés** :
+- Backend : `contract_request_status.py`, `contract_request.py`, `validate_commercial.py`, `create_contract_request.py`, `schemas.py`, `routes.py`, `webhook_routes.py`, `models.py`, `postgres_contract_repo.py`
+- Frontend : `ContractDetail.tsx`, `contracts.ts`, `types/index.ts`
+- `MEMORY.md`
 
 ---
 
