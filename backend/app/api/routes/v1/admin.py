@@ -1514,3 +1514,106 @@ async def delete_contract_company(
     await db.commit()
 
 
+# =============================================================================
+# Contract Data Reset
+# =============================================================================
+
+
+@router.post(
+    "/reset-contracts",
+    summary="Reset all contract and BDC operational data",
+)
+async def reset_contract_data(
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+    confirm_code: str = Query(..., description="Must be 'RESET-CONTRATS' to confirm"),
+):
+    """Delete ALL contract requests, BDC, framework contracts, third parties,
+    vigilance documents, magic links and webhook events.
+
+    Preserves configuration: article templates, annex templates, companies.
+    Also purges S3 contract files.
+
+    Admin only. Requires confirm_code='RESET-CONTRATS' as double validation.
+    """
+    import structlog
+    from sqlalchemy import text
+
+    from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
+
+    logger = structlog.get_logger()
+
+    if confirm_code != "RESET-CONTRATS":
+        raise HTTPException(
+            status_code=400,
+            detail="Code de confirmation invalide. Envoyez confirm_code=RESET-CONTRATS",
+        )
+
+    logger.warning(
+        "admin_reset_contracts_started",
+        admin_id=str(admin_id),
+    )
+
+    # Deletion order respects foreign key dependencies (children first)
+    tables = [
+        "cm_purchase_order_requests",
+        "cm_purchase_orders",
+        "cm_framework_contracts",
+        "cm_contracts",
+        "tp_magic_links",
+        "cm_webhook_events",
+        "cm_contract_requests",
+        "vig_documents",
+        "tp_third_parties",
+    ]
+
+    counts: dict[str, int] = {}
+    for table in tables:
+        result = await db.execute(text(f"SELECT count(*) FROM {table}"))  # noqa: S608
+        count = result.scalar() or 0
+        if count > 0:
+            await db.execute(text(f"DELETE FROM {table}"))  # noqa: S608
+        counts[table] = count
+
+    await db.commit()
+
+    # S3 cleanup (best-effort, non-blocking)
+    s3_deleted = 0
+    try:
+        from app.config import get_settings
+        from app.infrastructure.storage.s3_client import S3StorageClient
+
+        settings = get_settings()
+        s3 = S3StorageClient(settings)
+        s3_deleted = await s3.delete_prefix("contracts/")
+    except Exception as exc:
+        logger.warning("s3_cleanup_failed", error=str(exc))
+
+    total_deleted = sum(counts.values())
+
+    audit_logger.log(
+        AuditAction.DATA_RESET,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=admin_id,
+        details={
+            "action": "reset_all_contracts",
+            "counts": counts,
+            "s3_deleted": s3_deleted,
+        },
+    )
+
+    logger.warning(
+        "admin_reset_contracts_completed",
+        admin_id=str(admin_id),
+        total_deleted=total_deleted,
+        s3_deleted=s3_deleted,
+        counts=counts,
+    )
+
+    return {
+        "status": "ok",
+        "message": f"Remise à zéro effectuée : {total_deleted} enregistrements supprimés, {s3_deleted} fichiers S3 purgés.",
+        "counts": counts,
+        "s3_deleted": s3_deleted,
+    }
+

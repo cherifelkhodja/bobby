@@ -71,6 +71,9 @@ class AuditAction(str, Enum):
     CONTRACT_SIGNED = "contract_signed"
     CONTRACT_REQUEST_CANCELLED = "contract_request_cancelled"
 
+    # Admin data management
+    DATA_RESET = "data_reset"
+
     # RGPD
     RGPD_PURGE = "rgpd_purge"
 

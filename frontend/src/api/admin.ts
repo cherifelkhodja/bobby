@@ -285,4 +285,17 @@ export const adminApi = {
     const response = await apiClient.post<InpiTestResponse>('/admin/inpi/test');
     return response.data;
   },
+
+  // Contract data reset
+  resetContracts: async (): Promise<{
+    status: string;
+    message: string;
+    counts: Record<string, number>;
+    s3_deleted: number;
+  }> => {
+    const response = await apiClient.post('/admin/reset-contracts', null, {
+      params: { confirm_code: 'RESET-CONTRATS' },
+    });
+    return response.data;
+  },
 };
