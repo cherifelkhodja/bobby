@@ -122,9 +122,12 @@ def _cr_to_response(
         provisional_reference=cr.provisional_reference,
         reference=cr.reference,
         display_reference=cr.display_reference,
+        trigger_type=cr.trigger_type,
+        previous_contract_request_id=cr.previous_contract_request_id,
         boond_positioning_id=cr.boond_positioning_id,
         boond_candidate_id=cr.boond_candidate_id,
         boond_consultant_type=cr.boond_consultant_type,
+        boond_resource_id=cr.boond_resource_id,
         status=cr.status.value,
         status_display=cr.status.display_name,
         third_party_type=cr.third_party_type,
@@ -223,7 +226,7 @@ async def list_contract_requests(
         items = await cr_repo.list_all(skip=skip, limit=limit, status=status_obj)
         total = await cr_repo.count(status=status_obj)
 
-    emails = list({cr.commercial_email for cr in items})
+    emails = list({cr.commercial_email for cr in items if cr.commercial_email})
     name_map = await _resolve_commercial_names(db, emails)
 
     return ContractRequestListResponse(

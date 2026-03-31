@@ -39,7 +39,7 @@ class ContractRequestResponse(BaseModel):
     mission_address: str | None = None
     mission_postal_code: str | None = None
     mission_city: str | None = None
-    commercial_email: str
+    commercial_email: str | None = None
     commercial_name: str | None = None
     contractualization_contact_email: str | None = None
     third_party_id: UUID | None = None
@@ -238,7 +238,7 @@ class PurchaseOrderRequestResponse(BaseModel):
     consultant_last_name: str | None = None
     consultant_email: str | None = None
     consultant_phone: str | None = None
-    commercial_email: str
+    commercial_email: str | None = None
     commercial_name: str | None = None
     third_party_id: UUID | None = None
     purchase_order_id: UUID | None = None
