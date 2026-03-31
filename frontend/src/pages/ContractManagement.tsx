@@ -146,59 +146,31 @@ export function ContractManagement() {
                   }`} />
 
                   <div className="pl-5 pr-4 py-4">
-                    <div className="flex items-start justify-between gap-4">
-                      {/* Main content */}
-                      <div className="min-w-0 flex-1">
-                        {/* Line 1: Status + Reference + Third party type */}
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <span className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${config?.color ?? 'bg-gray-100 text-gray-600'}`}>
-                            {config?.label ?? cr.status_display}
-                          </span>
-                          <span className="text-sm font-mono font-bold text-gray-900 dark:text-white">
-                            {cr.display_reference}
-                          </span>
-                          {thirdPartyLabel && (
-                            <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-full px-2 py-0.5">
-                              {thirdPartyLabel}
-                            </span>
-                          )}
-                        </div>
+                    {/* Line 1: Status + Reference + Third party type */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${config?.color ?? 'bg-gray-100 text-gray-600'}`}>
+                        {config?.label ?? cr.status_display}
+                      </span>
+                      <span className="text-sm font-mono font-bold text-gray-900 dark:text-white">
+                        {cr.display_reference}
+                      </span>
+                      {thirdPartyLabel && (
+                        <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-full px-2 py-0.5">
+                          {thirdPartyLabel}
+                        </span>
+                      )}
+                    </div>
 
-                        {/* Line 2: Fournisseur + consultant */}
-                        {(cr.third_party_name || consultantName) && (
-                          <div className="mt-2 flex items-center gap-2 text-sm">
-                            {cr.third_party_name && (
-                              <>
-                                <Building2 className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                                <span className="font-medium text-gray-700 dark:text-gray-300 truncate">
-                                  {cr.third_party_name}
-                                </span>
-                              </>
-                            )}
-                            {cr.third_party_name && consultantName && (
-                              <span className="text-gray-300 dark:text-gray-600">|</span>
-                            )}
-                            {consultantName && (
-                              <>
-                                <User className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                                <span className="text-gray-500 dark:text-gray-400 truncate">
-                                  {cr.consultant_civility && <span className="mr-0.5">{cr.consultant_civility}</span>}
-                                  {consultantName}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        )}
+                    {/* Line 2: Fournisseur + date */}
+                    <div className="mt-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Building2 className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                          {cr.third_party_name || 'Fournisseur en attente'}
+                        </span>
                       </div>
-
-                      {/* Right side: date + actions */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="text-right">
-                          <p className="text-xs text-gray-400 dark:text-gray-500">{formatDate(cr.created_at)}</p>
-                          {isAdv && (cr.commercial_name || cr.commercial_email) && (
-                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{cr.commercial_name || cr.commercial_email}</p>
-                          )}
-                        </div>
+                      <div className="flex items-center gap-2 shrink-0 ml-4">
+                        <p className="text-xs text-gray-400 dark:text-gray-500">{formatDate(cr.created_at)}</p>
                         {isAdv && !CR_TERMINAL.has(cr.status) && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setCancelTarget({ id: cr.id, reference: cr.display_reference, type: 'contracts' }); }}
@@ -210,6 +182,17 @@ export function ContractManagement() {
                         )}
                       </div>
                     </div>
+
+                    {/* Line 3: Consultant */}
+                    {consultantName && (
+                      <div className="mt-1 flex items-center gap-2">
+                        <User className="h-3.5 w-3.5 text-gray-300 dark:text-gray-600 shrink-0" />
+                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          {cr.consultant_civility && <span className="mr-0.5">{cr.consultant_civility}</span>}
+                          {consultantName}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
