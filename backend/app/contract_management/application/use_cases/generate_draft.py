@@ -127,6 +127,7 @@ class GenerateDraftUseCase:
         if not self._db:
             return None
         company_id = None
+        # Priority: contract_config.company_id > cr.company_id > default
         if cr.contract_config and isinstance(cr.contract_config, dict):
             raw = cr.contract_config.get("company_id")
             if raw:
@@ -135,6 +136,8 @@ class GenerateDraftUseCase:
                     company_id = _UUID(str(raw))
                 except (ValueError, AttributeError):
                     pass
+        if not company_id and cr.company_id:
+            company_id = cr.company_id
         if not company_id:
             # Fall back to default company
             from sqlalchemy import select as _select
