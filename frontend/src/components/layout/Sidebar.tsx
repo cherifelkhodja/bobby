@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Users, FileText, FileSpreadsheet, UserCheck, Sparkles, FileSignature, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Users, FileText, FileSpreadsheet, UserCheck, Sparkles, FileSignature } from 'lucide-react';
 
 import { useAuthStore } from '../../stores/authStore';
 
@@ -15,7 +15,6 @@ const commercialItems = [
 
 const contractItems = [
   { to: '/contracts', icon: FileSignature, label: 'Gestion des contrats' },
-  { to: '/compliance', icon: ShieldCheck, label: 'Conformité' },
 ];
 
 const toolsItems = [
@@ -160,7 +159,7 @@ export function Sidebar() {
                 Contrats
               </p>
             </div>
-            {contractItems.filter(({ to }) => to !== '/compliance' || isAdvOrAdmin).map(({ to, icon: Icon, label }) => (
+            {contractItems.map(({ to, icon: Icon, label }) => (
               <NavLink
                 key={to}
                 to={to}
