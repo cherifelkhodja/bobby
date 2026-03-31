@@ -517,8 +517,8 @@ export default function ContractDetail() {
                   ?? companies.find((c) => c.is_default);
                 return company ? (
                   <span
-                    className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium text-white"
-                    style={{ backgroundColor: company.color_code }}
+                    className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border"
+                    style={{ color: company.color_code, borderColor: company.color_code, backgroundColor: `${company.color_code}15` }}
                   >
                     {company.name}
                   </span>
