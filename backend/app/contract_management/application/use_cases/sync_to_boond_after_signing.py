@@ -333,7 +333,6 @@ class SyncToBoondAfterSigningUseCase:
         # ── Étapes 4b/5 (Contrat Boond + BDC) → gérées par le workflow BDC ──
         # Le contrat cadre ne crée pas de contrat Boond ni de bon de commande.
         # Ces étapes seront effectuées lors de la création du BDC.
-                )
 
         # ── Étape 5b : Créer le contrat cadre (FrameworkContract) ─────────
         # Crée un FrameworkContract qui sera réutilisé pour les prochains
