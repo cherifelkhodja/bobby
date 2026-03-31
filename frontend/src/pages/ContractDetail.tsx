@@ -506,7 +506,7 @@ export default function ContractDetail() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               {cr.display_reference}
             </h1>
-            <div className="flex items-center gap-3 mt-2">
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
               <span
                 className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${statusConfig?.color ?? 'bg-gray-100 text-gray-600'}`}
               >
@@ -517,9 +517,23 @@ export default function ContractDetail() {
                   {cr.trigger_type === 'candidat_11' ? 'Nouveau consultant' : cr.trigger_type === 'ressource_4' ? 'Re-contractualisation' : 'Changement société'}
                 </span>
               )}
-              {cr.client_name && (
+              {cr.third_party_type && (
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                  {cr.third_party_type === 'freelance' ? 'Freelance' : cr.third_party_type === 'sous_traitant' ? 'Sous-traitant' : cr.third_party_type === 'portage_salarial' ? 'Portage' : 'Salarié'}
+                </span>
+              )}
+              {(() => {
+                const companyName = companies.find((c) => c.id === (cr.contract_config as Record<string, unknown> | null)?.company_id || c.id === cr.company_id)?.name
+                  ?? companies.find((c) => c.is_default)?.name;
+                return companyName ? (
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                    {companyName}
+                  </span>
+                ) : null;
+              })()}
+              {(cr.consultant_first_name || cr.consultant_last_name) && (
                 <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {cr.client_name}
+                  {[cr.consultant_civility, cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ')}
                 </span>
               )}
             </div>
@@ -704,108 +718,6 @@ export default function ContractDetail() {
               <CheckCircle className="h-4 w-4 mr-2" />
               Valider
             </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Validated commercial data (read-only, shown after validation) */}
-      {cr.status !== 'pending_commercial_validation' && cr.third_party_type && (
-        <Card className="mb-6">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-4">
-            Informations validées par le commercial
-          </h3>
-          <div className="space-y-4">
-            {/* Ligne 1 — données contrat */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {cr.third_party_type && (
-                <div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Type de tiers</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">
-                    {cr.third_party_type === 'freelance' ? 'Freelance / EI' : cr.third_party_type === 'sous_traitant' ? 'Sous-traitant' : cr.third_party_type === 'portage_salarial' ? 'Portage salarial' : 'Salarié'}
-                  </p>
-                </div>
-              )}
-              {cr.daily_rate && (
-                <div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">TJM</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {cr.daily_rate.toLocaleString('fr-FR')} €/j
-                  </p>
-                </div>
-              )}
-              {cr.quantity_sold != null && (
-                <div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">UO vendues</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {cr.quantity_sold} j
-                  </p>
-                </div>
-              )}
-              {cr.start_date && (
-                <div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Début</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{formatDate(cr.start_date)}</p>
-                </div>
-              )}
-              {cr.end_date && (
-                <div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Fin</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{formatDate(cr.end_date)}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Société émettrice */}
-            {cr.company_id && companies.length > 0 && (
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Société émettrice</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  {companies.find((c) => c.id === cr.company_id)?.name ?? cr.company_id}
-                </p>
-              </div>
-            )}
-
-            {/* Ligne 2 — mission + consultant + email */}
-            {(cr.mission_title || cr.consultant_first_name || cr.contractualization_contact_email) && (
-              <div className="pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-1 md:grid-cols-3 gap-4">
-                {cr.mission_title && (
-                  <div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Intitulé mission</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{cr.mission_title}</p>
-                  </div>
-                )}
-                {(cr.consultant_first_name || cr.consultant_last_name) && (
-                  <div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Consultant</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {[cr.consultant_civility, cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ')}
-                    </p>
-                    {cr.consultant_email && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{cr.consultant_email}</p>
-                    )}
-                    {cr.consultant_phone && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{cr.consultant_phone}</p>
-                    )}
-                  </div>
-                )}
-                {cr.contractualization_contact_email && (
-                  <div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Email contact tiers</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{cr.contractualization_contact_email}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Ligne 3 — adresse (pleine largeur si présente) */}
-            {(cr.mission_address || cr.mission_city) && (
-              <div className="pt-3 border-t border-gray-100 dark:border-gray-700">
-                <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Adresse de mission</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  {[cr.mission_site_name, cr.mission_address, cr.mission_postal_code, cr.mission_city].filter(Boolean).join(' · ')}
-                </p>
-              </div>
-            )}
           </div>
         </Card>
       )}
@@ -1305,6 +1217,20 @@ export default function ContractDetail() {
             Informations société
           </h3>
           <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+            {cr.third_party_type && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Type de tiers</p>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {cr.third_party_type === 'freelance' ? 'Freelance / EI' : cr.third_party_type === 'sous_traitant' ? 'Sous-traitant' : cr.third_party_type === 'portage_salarial' ? 'Portage salarial' : 'Salarié'}
+                </p>
+              </div>
+            )}
+            {cr.contractualization_contact_email && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Email contact tiers</p>
+                <p className="font-medium text-gray-900 dark:text-white">{cr.contractualization_contact_email}</p>
+              </div>
+            )}
             {complianceDocs.company_name && (
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Raison sociale</p>
