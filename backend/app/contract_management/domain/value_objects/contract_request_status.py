@@ -138,7 +138,7 @@ class ContractRequestStatus(str, Enum):
             "partner_requested_changes": "Modifications demandées",
             "sent_for_signature": "Envoyé pour signature",
             "signed": "Signé",
-            "active": "En cours",
+            "active": "Actif",
             "archived": "Archivé",
             "redirected_payfit": "Redirigé vers PayFit",
             "cancelled": "Annulé",

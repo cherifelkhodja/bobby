@@ -738,7 +738,7 @@ export const CONTRACT_STATUS_CONFIG: Record<ContractRequestStatus, { label: stri
   partner_requested_changes: { label: 'Modifications demandées', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300', group: 'blocked' },
   sent_for_signature: { label: 'En signature', color: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300', group: 'active' },
   signed: { label: 'Signé', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300', group: 'active' },
-  active: { label: 'En cours', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300', group: 'active' },
+  active: { label: 'Actif', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300', group: 'active' },
   archived: { label: 'Archivé', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300', group: 'done' },
   redirected_payfit: { label: 'Redirigé PayFit', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300', group: 'done' },
   cancelled: { label: 'Annulé', color: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400', group: 'done' },

@@ -190,7 +190,7 @@ class ContractRequestRepository:
         return result.scalar_one()
 
     async def get_next_provisional_reference(self) -> str:
-        """Generate the next provisional reference in format PROV-YYYY-NNNN."""
+        """Generate the next provisional reference in format PROV-YYYY-NNN."""
         year = datetime.utcnow().year
         prefix = f"PROV-{year}-"
 
@@ -210,7 +210,7 @@ class ContractRequestRepository:
         else:
             next_num = 1
 
-        return f"{prefix}{next_num:04d}"
+        return f"{prefix}{next_num:03d}"
 
     async def get_company_by_boond_agency_id(self, agency_id: int) -> UUID | None:
         """Return the company_id matching a Boond agency ID, or None."""
@@ -268,7 +268,7 @@ class ContractRequestRepository:
         else:
             next_num = 1
 
-        return f"{prefix}{next_num:04d}"
+        return f"{prefix}{next_num:03d}"
 
     def _to_entity(self, model: ContractRequestModel) -> ContractRequest:
         """Convert SQLAlchemy model to domain entity."""
@@ -666,7 +666,7 @@ class PurchaseOrderRepository:
         else:
             next_num = 1
 
-        return f"{prefix}{next_num:04d}"
+        return f"{prefix}{next_num:03d}"
 
     async def save(self, po: PurchaseOrder) -> PurchaseOrder:
         """Save a purchase order (create or update)."""
@@ -827,7 +827,7 @@ class PurchaseOrderRequestRepository:
                 next_num = 1
         else:
             next_num = 1
-        return f"{prefix}{next_num:04d}"
+        return f"{prefix}{next_num:03d}"
 
     async def save(self, por: PurchaseOrderRequest) -> PurchaseOrderRequest:
         result = await self.session.execute(
