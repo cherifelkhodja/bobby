@@ -507,11 +507,11 @@ class EmailService:
         self,
         to: str,
         third_party_name: str,
-        from_email: str | None = None,
-        company_name: str | None = None,
         doc_type: str,
         reason: str,
         portal_link: str,
+        from_email: str | None = None,
+        company_name: str | None = None,
     ) -> bool:
         """Send notification that a document was rejected."""
         subject = f"Document refusé : {doc_type} - Bobby"
@@ -544,9 +544,9 @@ class EmailService:
         to: str,
         third_party_name: str,
         contract_ref: str,
+        portal_link: str,
         from_email: str | None = None,
         company_name: str | None = None,
-        portal_link: str,
     ) -> bool:
         """Send contract draft for partner review via portal."""
         subject = f"Contrat à relire - {contract_ref or 'Nouveau contrat'}"
