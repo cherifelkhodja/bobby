@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, Trash2, Download, Eye, EyeOff, FileText, FileCheck, RefreshCw } from 'lucide-react';
+import { Upload, Trash2, Eye, EyeOff, FileText, FileCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { chartersApi } from '../../api/charters';
@@ -96,6 +96,15 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
     onError: (error) => toast.error(getErrorMessage(error)),
   });
 
+  const replaceArMutation = useMutation({
+    mutationFn: ({ id, file }: { id: string; file: File }) => chartersApi.replaceAr(id, file),
+    onSuccess: () => {
+      toast.success('AR remplace.');
+      queryClient.invalidateQueries({ queryKey: ['admin-charters', companyId] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => chartersApi.delete(id),
     onSuccess: () => {
@@ -107,6 +116,18 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
 
   const partnerCharters = charters.filter((c) => c.target === 'partner');
   const consultantCharters = charters.filter((c) => c.target === 'consultant');
+
+  const FileLink = ({ label, onDownload, onReplace }: { label: string; onDownload: () => void; onReplace: (file: File) => void }) => (
+    <span className="inline-flex items-center gap-1">
+      <button onClick={onDownload} className="text-[10px] text-primary hover:underline truncate max-w-[200px]" title="Telecharger">
+        {label}
+      </button>
+      <label className="text-[10px] text-gray-400 hover:text-blue-600 cursor-pointer" title="Remplacer">
+        [remplacer]
+        <input type="file" accept=".pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onReplace(f); e.target.value = ''; }} />
+      </label>
+    </span>
+  );
 
   const renderCharter = (charter: CharterTemplate) => (
     <div
@@ -137,59 +158,32 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
               </span>
             )}
           </div>
-          <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
-            {charter.file_name}
-            {charter.ar_file_name && ` + ${charter.ar_file_name}`}
-          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <FileLink
+              label={charter.file_name}
+              onDownload={async () => {
+                try { const { url } = await chartersApi.getDownloadUrl(charter.id); window.open(url, '_blank'); }
+                catch { toast.error('Impossible de telecharger.'); }
+              }}
+              onReplace={(file) => replaceMutation.mutate({ id: charter.id, file })}
+            />
+            {charter.ar_file_name && (
+              <>
+                <span className="text-[10px] text-gray-300">|</span>
+                <FileLink
+                  label={charter.ar_file_name}
+                  onDownload={async () => {
+                    try { const { url } = await chartersApi.getArDownloadUrl(charter.id); window.open(url, '_blank'); }
+                    catch { toast.error('Impossible de telecharger.'); }
+                  }}
+                  onReplace={(file) => replaceArMutation.mutate({ id: charter.id, file })}
+                />
+              </>
+            )}
+          </div>
         </div>
       </div>
       <div className="flex items-center gap-0.5 shrink-0 ml-2">
-        <button
-          onClick={async () => {
-            try {
-              const { url } = await chartersApi.getDownloadUrl(charter.id);
-              window.open(url, '_blank');
-            } catch {
-              toast.error('Impossible de telecharger.');
-            }
-          }}
-          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 transition-colors"
-          title="Telecharger le document"
-        >
-          <Download className="h-3.5 w-3.5" />
-        </button>
-        <label
-          className="p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
-          title="Remplacer le document"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          <input
-            type="file"
-            accept=".pdf"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) replaceMutation.mutate({ id: charter.id, file: f });
-              e.target.value = '';
-            }}
-          />
-        </label>
-        {charter.ar_file_name && (
-          <button
-            onClick={async () => {
-              try {
-                const { url } = await chartersApi.getArDownloadUrl(charter.id);
-                window.open(url, '_blank');
-              } catch {
-                toast.error('Impossible de telecharger l\'AR.');
-              }
-            }}
-            className="p-1 rounded hover:bg-amber-50 dark:hover:bg-amber-900/20 text-gray-400 hover:text-amber-600 transition-colors"
-            title="Telecharger l'accuse de reception"
-          >
-            <FileCheck className="h-3.5 w-3.5" />
-          </button>
-        )}
         <button
           onClick={() => toggleMutation.mutate({ id: charter.id, is_active: !charter.is_active })}
           className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 transition-colors"
@@ -199,7 +193,7 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
         </button>
         <button
           onClick={() => {
-            if (confirm(`Supprimer la charte "${charter.name} ${charter.version}" ?`)) {
+            if (confirm(`Supprimer "${charter.name} ${charter.version}" ?`)) {
               deleteMutation.mutate(charter.id);
             }
           }}
