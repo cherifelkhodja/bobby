@@ -1680,6 +1680,8 @@ async def create_charter(
     file: UploadFile = File(...),
 ):
     """Upload a new charter template PDF. Admin only."""
+    from app.config import get_settings
+    from app.config import get_settings
     from app.contract_management.infrastructure.models import CharterTemplateModel
     from app.infrastructure.storage.s3_client import S3StorageClient
 
@@ -1728,6 +1730,7 @@ async def upload_charter_ar(
     """Upload an accusé de réception PDF for a charter. Admin only."""
     from sqlalchemy import select as _select
 
+    from app.config import get_settings
     from app.contract_management.infrastructure.models import CharterTemplateModel
     from app.infrastructure.storage.s3_client import S3StorageClient
 
@@ -1806,6 +1809,7 @@ async def delete_charter(
     """Delete a charter template and its S3 file. Admin only."""
     from sqlalchemy import select as _select, delete as _delete
 
+    from app.config import get_settings
     from app.contract_management.infrastructure.models import CharterTemplateModel
     from app.infrastructure.storage.s3_client import S3StorageClient
 
@@ -1844,6 +1848,7 @@ async def get_charter_download_url(
     """Get a presigned download URL for a charter template. ADV/admin."""
     from sqlalchemy import select as _select
 
+    from app.config import get_settings
     from app.contract_management.infrastructure.models import CharterTemplateModel
     from app.infrastructure.storage.s3_client import S3StorageClient
 
@@ -1872,6 +1877,7 @@ async def get_charter_ar_download_url(
     """Get a presigned download URL for the AR file. ADV/admin."""
     from sqlalchemy import select as _select
 
+    from app.config import get_settings
     from app.contract_management.infrastructure.models import CharterTemplateModel
     from app.infrastructure.storage.s3_client import S3StorageClient
 
