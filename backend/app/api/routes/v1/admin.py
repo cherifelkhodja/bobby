@@ -1678,7 +1678,7 @@ async def create_charter(
     document_type: str = Query("charte", pattern="^(charte|politique|document_unilateral|engagement|autre)$"),
     requires_acknowledgement: bool = Query(False),
     file: UploadFile = File(...),
-    ar_file: UploadFile | None = File(default=None, description="Optional AR file"),
+    ar_file: UploadFile | None = None,
 ):
     """Upload a new charter template PDF. Admin only."""
     from app.contract_management.infrastructure.models import CharterTemplateModel
