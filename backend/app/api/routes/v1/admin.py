@@ -1623,6 +1623,23 @@ async def reset_contract_data(
 # =============================================================================
 
 
+def _charter_to_response(c) -> dict:
+    """Serialize a CharterTemplateModel to a response dict."""
+    return {
+        "id": str(c.id),
+        "name": c.name,
+        "version": c.version,
+        "target": c.target,
+        "document_type": c.document_type,
+        "requires_acknowledgement": c.requires_acknowledgement,
+        "file_name": c.file_name,
+        "ar_file_name": c.ar_file_name,
+        "is_active": c.is_active,
+        "company_id": str(c.company_id) if c.company_id else None,
+        "created_at": c.created_at.isoformat() if c.created_at else None,
+    }
+
+
 @router.get(
     "/charters",
     summary="List charter templates",
@@ -1644,19 +1661,7 @@ async def list_charters(
         stmt = stmt.where(CharterTemplateModel.company_id == company_id)
     result = await db.execute(stmt)
     charters = result.scalars().all()
-    return [
-        {
-            "id": str(c.id),
-            "name": c.name,
-            "version": c.version,
-            "target": c.target,
-            "file_name": c.file_name,
-            "is_active": c.is_active,
-            "company_id": str(c.company_id) if c.company_id else None,
-            "created_at": c.created_at.isoformat() if c.created_at else None,
-        }
-        for c in charters
-    ]
+    return [_charter_to_response(c) for c in charters]
 
 
 @router.post(
@@ -1670,7 +1675,10 @@ async def create_charter(
     version: str = Query(..., description="Version label (e.g. V1, V2)"),
     target: str = Query(..., pattern="^(partner|consultant)$", description="partner or consultant"),
     company_id: UUID = Query(..., description="Company ID"),
-    file: UploadFile = File(...),
+    document_type: str = Query("charte", pattern="^(charte|politique|document_unilateral|engagement|autre)$"),
+    requires_acknowledgement: bool = Query(False),
+    file: UploadFile = File(..., alias="file"),
+    ar_file: UploadFile | None = File(None),
 ):
     """Upload a new charter template PDF. Admin only."""
     from app.contract_management.infrastructure.models import CharterTemplateModel
@@ -1689,28 +1697,37 @@ async def create_charter(
         content_type=file.content_type or "application/pdf",
     )
 
+    ar_s3_key = None
+    ar_file_name = None
+    if requires_acknowledgement and ar_file and ar_file.filename:
+        ar_content = await ar_file.read()
+        ar_ext = ar_file.filename.rsplit(".", 1)[-1].lower() if "." in ar_file.filename else "pdf"
+        ar_s3_key = f"charters/{target}/{name.lower().replace(' ', '_')}_{version}_AR.{ar_ext}"
+        await s3.upload_file(
+            key=ar_s3_key,
+            content=ar_content,
+            content_type=ar_file.content_type or "application/pdf",
+        )
+        ar_file_name = ar_file.filename
+
     charter = CharterTemplateModel(
         name=name,
         version=version,
         target=target,
         company_id=company_id,
+        document_type=document_type,
+        requires_acknowledgement=requires_acknowledgement,
         file_s3_key=s3_key,
         file_name=file.filename or f"{name}_{version}.{extension}",
+        ar_file_s3_key=ar_s3_key,
+        ar_file_name=ar_file_name,
         is_active=True,
     )
     db.add(charter)
     await db.commit()
     await db.refresh(charter)
 
-    return {
-        "id": str(charter.id),
-        "name": charter.name,
-        "version": charter.version,
-        "target": charter.target,
-        "file_name": charter.file_name,
-        "is_active": charter.is_active,
-        "company_id": str(charter.company_id) if charter.company_id else None,
-    }
+    return _charter_to_response(charter)
 
 
 @router.patch(
@@ -1746,15 +1763,7 @@ async def update_charter(
 
     await db.commit()
 
-    return {
-        "id": str(charter.id),
-        "name": charter.name,
-        "version": charter.version,
-        "target": charter.target,
-        "file_name": charter.file_name,
-        "is_active": charter.is_active,
-        "company_id": str(charter.company_id) if charter.company_id else None,
-    }
+    return _charter_to_response(charter)
 
 
 @router.delete(
@@ -1780,10 +1789,12 @@ async def delete_charter(
     if not charter:
         raise HTTPException(status_code=404, detail="Charte introuvable.")
 
-    # Delete S3 file (best-effort)
+    # Delete S3 files (best-effort)
     try:
         s3 = S3StorageClient(settings)
         await s3.delete_file(charter.file_s3_key)
+        if charter.ar_file_s3_key:
+            await s3.delete_file(charter.ar_file_s3_key)
     except Exception:
         pass
 
@@ -1819,4 +1830,34 @@ async def get_charter_download_url(
     s3 = S3StorageClient(settings)
     url = await s3.generate_presigned_url(charter.file_s3_key)
     return {"url": url, "file_name": charter.file_name}
+
+
+@router.get(
+    "/charters/{charter_id}/download-ar",
+    summary="Get charter AR download URL",
+)
+async def get_charter_ar_download_url(
+    charter_id: UUID,
+    _user_id: AdvOrAdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Get a presigned download URL for the AR file. ADV/admin."""
+    from sqlalchemy import select as _select
+
+    from app.contract_management.infrastructure.models import CharterTemplateModel
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+    result = await db.execute(
+        _select(CharterTemplateModel).where(CharterTemplateModel.id == charter_id)
+    )
+    charter = result.scalar_one_or_none()
+    if not charter:
+        raise HTTPException(status_code=404, detail="Charte introuvable.")
+    if not charter.ar_file_s3_key:
+        raise HTTPException(status_code=404, detail="Pas d'accuse de reception pour cette charte.")
+
+    s3 = S3StorageClient(settings)
+    url = await s3.generate_presigned_url(charter.ar_file_s3_key)
+    return {"url": url, "file_name": charter.ar_file_name}
 

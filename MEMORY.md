@@ -192,6 +192,7 @@ docker-compose up # Start all services
 
 - **Invitations** fusionné dans l'onglet **Utilisateurs** (InvitationsTab rendu dans UsersTab)
 - **Chartes** liées aux sociétés via `company_id` (FK), affichées dans chaque carte de société (migration 068)
+- **Chartes enrichies** (migration 069) : `document_type` (charte/politique/document_unilateral/engagement/autre), `requires_acknowledgement` + upload AR optionnel (`ar_file_s3_key`, `ar_file_name`)
 - **BoondManager** supprimé du menu admin (onglet retiré)
 - **RAZ** fusionné dans l'onglet **Contrats** (sous-onglet Articles / Annexes / RAZ)
 - **Contrat AT** renommé en **Contrats**

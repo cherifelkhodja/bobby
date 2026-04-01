@@ -328,8 +328,15 @@ class CharterTemplateModel(Base):
         String(20), nullable=False,
         comment="partner or consultant",
     )
+    document_type: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="charte",
+        comment="charte, politique, document_unilateral, engagement, autre",
+    )
+    requires_acknowledgement: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     file_s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    ar_file_s3_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    ar_file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
