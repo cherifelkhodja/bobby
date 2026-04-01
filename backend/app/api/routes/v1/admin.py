@@ -1677,8 +1677,8 @@ async def create_charter(
     company_id: UUID = Query(..., description="Company ID"),
     document_type: str = Query("charte", pattern="^(charte|politique|document_unilateral|engagement|autre)$"),
     requires_acknowledgement: bool = Query(False),
-    file: UploadFile = File(..., alias="file"),
-    ar_file: UploadFile | None = File(None),
+    file: UploadFile = File(...),
+    ar_file: UploadFile | None = File(default=None, description="Optional AR file"),
 ):
     """Upload a new charter template PDF. Admin only."""
     from app.contract_management.infrastructure.models import CharterTemplateModel
@@ -1700,7 +1700,8 @@ async def create_charter(
 
     ar_s3_key = None
     ar_file_name = None
-    if requires_acknowledgement and ar_file and ar_file.filename:
+    has_ar_file = ar_file is not None and ar_file.filename and ar_file.size and ar_file.size > 0
+    if requires_acknowledgement and has_ar_file:
         ar_content = await ar_file.read()
         ar_ext = ar_file.filename.rsplit(".", 1)[-1].lower() if "." in ar_file.filename else "pdf"
         ar_s3_key = f"charters/{company_id}/{target}/{slug}_{version}_AR.{ar_ext}"
