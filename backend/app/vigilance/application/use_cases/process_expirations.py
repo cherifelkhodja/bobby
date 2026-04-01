@@ -30,11 +30,13 @@ class ProcessExpirationsUseCase:
         third_party_repository,
         email_service,
         send_alerts: bool = True,
+        company_email_resolver=None,
     ) -> None:
         self._document_repo = document_repository
         self._third_party_repo = third_party_repository
         self._email_service = email_service
         self._send_alerts = send_alerts
+        self._company_email_resolver = company_email_resolver
 
     async def execute(self) -> dict:
         """Execute the expiration processing.
@@ -95,11 +97,19 @@ class ProcessExpirationsUseCase:
                 expiring_docs_list = expiring_by_tp.get(tp_id, [])
 
                 try:
+                    _from_email, _company_name = None, None
+                    if self._company_email_resolver:
+                        try:
+                            _from_email, _company_name = await self._company_email_resolver(tp_id)
+                        except Exception:
+                            pass
                     await self._email_service.send_document_expiration_summary(
                         to=third_party.contact_email,
                         third_party_name=third_party.company_name or "Fournisseur",
                         expired_docs=expired_docs_list,
                         expiring_docs=expiring_docs_list,
+                        from_email=_from_email,
+                        company_name=_company_name,
                     )
                     emails_sent += 1
 

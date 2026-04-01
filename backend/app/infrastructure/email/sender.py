@@ -713,6 +713,8 @@ class EmailService:
         third_party_name: str,
         expired_docs: list[str],
         expiring_docs: list[tuple[str, int]],
+        from_email: str | None = None,
+        company_name: str | None = None,
     ) -> bool:
         """Send a single grouped email for all expiring/expired documents of a third party."""
         total = len(expired_docs) + len(expiring_docs)
@@ -749,7 +751,7 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body)
+        return await self._send_email(to, subject, html_body, from_email=from_email, company_name=company_name)
 
     async def send_document_expired(
         self,

@@ -34,11 +34,36 @@ async def check_document_expirations():
 
     settings = get_settings()
     async with async_session_factory() as session:
+
+        async def _resolve_company_email_for_tp(third_party_id):
+            """Resolve company email_from from a third_party_id via its most recent CR."""
+            from sqlalchemy import select
+            from app.contract_management.infrastructure.models import (
+                ContractCompanyModel,
+                ContractRequestModel,
+            )
+            cr_result = await session.execute(
+                select(ContractRequestModel.company_id)
+                .where(ContractRequestModel.third_party_id == third_party_id)
+                .order_by(ContractRequestModel.created_at.desc())
+                .limit(1)
+            )
+            company_id = cr_result.scalar_one_or_none()
+            if not company_id:
+                return None, None
+            c_result = await session.execute(
+                select(ContractCompanyModel.email_from, ContractCompanyModel.name)
+                .where(ContractCompanyModel.id == company_id)
+            )
+            row = c_result.first()
+            return (row.email_from, row.name) if row else (None, None)
+
         use_case = ProcessExpirationsUseCase(
             document_repository=DocumentRepository(session),
             third_party_repository=ThirdPartyRepository(session),
             email_service=EmailService(settings),
             send_alerts=settings.FEATURE_DOCUMENT_EXPIRATION_ALERTS,
+            company_email_resolver=_resolve_company_email_for_tp,
         )
         result = await use_case.execute()
         await session.commit()

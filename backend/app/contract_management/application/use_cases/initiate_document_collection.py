@@ -84,11 +84,13 @@ class InitiateDocumentCollectionUseCase:
         find_or_create_third_party_use_case,
         request_documents_use_case,
         generate_magic_link_use_case,
+        company_email_resolver=None,
     ) -> None:
         self._cr_repo = contract_request_repository
         self._find_or_create_tp = find_or_create_third_party_use_case
         self._request_documents = request_documents_use_case
         self._generate_magic_link = generate_magic_link_use_case
+        self._company_email_resolver = company_email_resolver
 
     async def execute(self, command: InitiateDocumentCollectionCommand):
         """Execute the use case.
@@ -151,6 +153,14 @@ class InitiateDocumentCollectionUseCase:
         # Create required document stubs (idempotent — skips already active docs)
         await self._request_documents.execute(third_party.id)
 
+        # Resolve company email for sender
+        _from_email, _company_name = None, None
+        if self._company_email_resolver and cr.company_id:
+            try:
+                _from_email, _company_name = await self._company_email_resolver(cr.company_id)
+            except Exception:
+                pass
+
         # Send the portal magic link to the contact email on the CR
         await self._generate_magic_link.execute(
             GenerateMagicLinkCommand(
@@ -158,6 +168,8 @@ class InitiateDocumentCollectionUseCase:
                 purpose=MagicLinkPurpose.DOCUMENT_UPLOAD,
                 email=contact_email,
                 contract_request_id=cr.id,
+                from_email=_from_email,
+                company_name=_company_name,
             )
         )
 

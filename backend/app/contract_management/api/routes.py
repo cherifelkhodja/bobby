@@ -618,12 +618,15 @@ async def resend_collection_email(
     )
 
     try:
+        company_email_from, company_name = await _resolve_company_email_ctx(db, cr.company_id)
         await generate_magic_link_uc.execute(
             GenerateMagicLinkCommand(
                 third_party_id=cr.third_party_id,
                 purpose=MagicLinkPurpose.DOCUMENT_UPLOAD,
                 email=cr.contractualization_contact_email,
                 contract_request_id=cr.id,
+                from_email=company_email_from,
+                company_name=company_name,
             )
         )
     except Exception as exc:

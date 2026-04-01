@@ -23,11 +23,13 @@ class RejectDocumentUseCase:
         third_party_repository,
         email_service,
         portal_base_url: str,
+        company_email_resolver=None,
     ) -> None:
         self._document_repo = document_repository
         self._third_party_repo = third_party_repository
         self._email_service = email_service
         self._portal_base_url = portal_base_url
+        self._company_email_resolver = company_email_resolver
 
     async def execute(
         self,
@@ -64,6 +66,14 @@ class RejectDocumentUseCase:
             third_party.update_compliance_status(new_status)
             await self._third_party_repo.save(third_party)
 
+        # Resolve company email for sender
+        _from_email, _company_name = None, None
+        if self._company_email_resolver:
+            try:
+                _from_email, _company_name = await self._company_email_resolver(document.third_party_id)
+            except Exception:
+                pass
+
         # Send rejection notification
         await self._email_service.send_document_rejected(
             to=third_party.contact_email,
@@ -71,6 +81,8 @@ class RejectDocumentUseCase:
             doc_type=document.document_type.display_name,
             reason=reason,
             portal_link=self._portal_base_url,
+            from_email=_from_email,
+            company_name=_company_name,
         )
 
         logger.info(

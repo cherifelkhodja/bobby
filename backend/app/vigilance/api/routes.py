@@ -307,11 +307,34 @@ async def reject_document(
 
     email_service = EmailService(settings)
 
+    async def _resolve_company_email_for_tp(third_party_id):
+        from sqlalchemy import select
+        from app.contract_management.infrastructure.models import (
+            ContractCompanyModel,
+            ContractRequestModel,
+        )
+        cr_result = await db.execute(
+            select(ContractRequestModel.company_id)
+            .where(ContractRequestModel.third_party_id == third_party_id)
+            .order_by(ContractRequestModel.created_at.desc())
+            .limit(1)
+        )
+        company_id = cr_result.scalar_one_or_none()
+        if not company_id:
+            return None, None
+        c_result = await db.execute(
+            select(ContractCompanyModel.email_from, ContractCompanyModel.name)
+            .where(ContractCompanyModel.id == company_id)
+        )
+        row = c_result.first()
+        return (row.email_from, row.name) if row else (None, None)
+
     use_case = RejectDocumentUseCase(
         document_repository=doc_repo,
         third_party_repository=tp_repo,
         email_service=email_service,
         portal_base_url=settings.BOBBY_PORTAL_BASE_URL,
+        company_email_resolver=_resolve_company_email_for_tp,
     )
 
     try:
