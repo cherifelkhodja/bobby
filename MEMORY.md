@@ -24,7 +24,7 @@
 | Auth JWT (access + refresh) | ✅ Done | Password reset, email verification |
 | Intégration BoondManager | ✅ Done | Resources, opportunities, candidates |
 | Système d'invitations | ✅ Done | Depuis ressources Boond |
-| Panel Admin | ✅ Done | Users, invitations, Boond, templates |
+| Panel Admin | ✅ Done | Users+invitations, templates, sociétés+chartes, stats, API |
 | Dark Mode | ✅ Done | System/Light/Dark |
 | CV Generator | ✅ Done | PDF/DOCX → Word via Claude, templates locaux (Gemini/Craftmania) |
 | Opportunités publiées | ✅ Done | Anonymisation IA, cooptation avec CV |
@@ -187,6 +187,13 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-04-01 (refactor: réorganisation onglets admin)
+
+- **Invitations** fusionné dans l'onglet **Utilisateurs** (InvitationsTab rendu dans UsersTab)
+- **Chartes** fusionné dans l'onglet **Sociétés** (ChartersTab rendu dans ContractCompaniesTab)
+- **BoondManager** supprimé du menu admin (onglet retiré)
+- Tabs restants : Utilisateurs, Templates, Contrat AT, Sociétés, Stats, API, RAZ
 
 ### 2026-03-31 (feat: implémentation refonte simplification fournisseurs — ADR-009)
 

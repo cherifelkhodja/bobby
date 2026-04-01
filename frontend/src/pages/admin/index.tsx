@@ -2,29 +2,25 @@
  * Admin page with tabbed interface.
  *
  * This module provides the main admin dashboard with the following tabs:
- * - Users: User management (list, edit, role change, delete)
- * - Invitations: Invite users via email or from BoondManager
- * - BoondManager: Connection status and synchronization
+ * - Users: User management + Invitations
  * - Templates: Quotation template management
+ * - Sociétés: Contract companies + Charters
  * - Stats: CV transformation statistics
  * - API: API connections tests (Boond, Gemini)
  */
 
 import { useState } from 'react';
-import { Users, Mail, Settings, FileText, Plug, BarChart3, ScrollText, Building2, DatabaseZap, Shield } from 'lucide-react';
+import { Users, FileText, Plug, BarChart3, ScrollText, Building2, DatabaseZap } from 'lucide-react';
 
 import { UsersTab } from './UsersTab';
-import { InvitationsTab } from './InvitationsTab';
-import { BoondTab } from './BoondTab';
 import { TemplatesTab } from './TemplatesTab';
 import { StatsTab } from './StatsTab';
 import { ApiTab } from './ApiTab';
 import { ContractArticlesTab } from './ContractArticlesTab';
 import { ContractCompaniesTab } from './ContractCompaniesTab';
-import { ChartersTab } from './ChartersTab';
 import { DataResetTab } from './DataResetTab';
 
-type TabType = 'users' | 'invitations' | 'boond' | 'templates' | 'stats' | 'api' | 'contract-articles' | 'contract-companies' | 'charters' | 'data-reset';
+type TabType = 'users' | 'templates' | 'stats' | 'api' | 'contract-articles' | 'contract-companies' | 'data-reset';
 
 interface TabConfig {
   id: TabType;
@@ -34,12 +30,9 @@ interface TabConfig {
 
 const TABS: TabConfig[] = [
   { id: 'users', label: 'Utilisateurs', icon: Users },
-  { id: 'invitations', label: 'Invitations', icon: Mail },
-  { id: 'boond', label: 'BoondManager', icon: Settings },
   { id: 'templates', label: 'Templates', icon: FileText },
   { id: 'contract-articles', label: 'Contrat AT', icon: ScrollText },
   { id: 'contract-companies', label: 'Sociétés', icon: Building2 },
-  { id: 'charters', label: 'Chartes', icon: Shield },
   { id: 'stats', label: 'Stats', icon: BarChart3 },
   { id: 'api', label: 'API', icon: Plug },
   { id: 'data-reset', label: 'RAZ', icon: DatabaseZap },
@@ -79,12 +72,9 @@ export function Admin() {
 
       {/* Tab Content */}
       {activeTab === 'users' && <UsersTab />}
-      {activeTab === 'invitations' && <InvitationsTab />}
-      {activeTab === 'boond' && <BoondTab />}
       {activeTab === 'templates' && <TemplatesTab />}
       {activeTab === 'contract-articles' && <ContractArticlesTab />}
       {activeTab === 'contract-companies' && <ContractCompaniesTab />}
-      {activeTab === 'charters' && <ChartersTab />}
       {activeTab === 'stats' && <StatsTab />}
       {activeTab === 'api' && <ApiTab />}
       {activeTab === 'data-reset' && <DataResetTab />}
@@ -94,8 +84,6 @@ export function Admin() {
 
 // Re-export tabs for potential direct use
 export { UsersTab } from './UsersTab';
-export { InvitationsTab } from './InvitationsTab';
-export { BoondTab } from './BoondTab';
 export { TemplatesTab } from './TemplatesTab';
 export { ContractArticlesTab } from './ContractArticlesTab';
 export { ContractAnnexesTab } from './ContractAnnexesTab';

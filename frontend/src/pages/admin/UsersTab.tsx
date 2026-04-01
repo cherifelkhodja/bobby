@@ -15,6 +15,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { PageSpinner } from '../../components/ui/Spinner';
 import { ROLE_LABELS, ROLE_COLORS } from './constants';
+import { InvitationsTab } from './InvitationsTab';
 
 export function UsersTab() {
   const queryClient = useQueryClient();
@@ -501,6 +502,9 @@ export function UsersTab() {
           </div>
         )}
       </Modal>
+
+      {/* Invitations Section */}
+      <InvitationsTab />
     </div>
   );
 }

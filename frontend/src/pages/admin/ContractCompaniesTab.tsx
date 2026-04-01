@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Plus, Pencil, Trash2, Star, ImagePlus } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, Star, ImagePlus, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { contractCompaniesApi, ContractCompany, ContractCompanyRequest } from '../../api/contracts';
+import { ChartersTab } from './ChartersTab';
 
 const EMPTY_FORM: ContractCompanyRequest = {
   name: '',
@@ -590,6 +591,15 @@ export function ContractCompaniesTab() {
           ))}
         </div>
       )}
+
+      {/* Chartes Section */}
+      <div className="mt-10">
+        <div className="flex items-center gap-2 mb-6">
+          <Shield className="h-5 w-5 text-gray-500" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Chartes</h2>
+        </div>
+        <ChartersTab />
+      </div>
     </div>
   );
 }
