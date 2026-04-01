@@ -52,6 +52,7 @@ class EmailService:
         subject: str,
         html_body: str,
         from_email: str | None = None,
+        company_name: str | None = None,
     ) -> bool:
         """Send email via Resend or SMTP.
 
@@ -60,10 +61,18 @@ class EmailService:
             subject: Email subject.
             html_body: HTML content.
             from_email: Optional sender override (e.g. per-company email).
+            company_name: Optional company name for footer ("Bobby - {name}").
         """
         if not self.enabled:
             logger.info(f"Email notifications disabled. Would send to {to}: {subject}")
             return True
+
+        # Replace footer with company-aware version
+        if company_name:
+            html_body = html_body.replace(
+                "Cet email a ete envoye par Bobby.",
+                f"Cet email a ete envoye par Bobby - {company_name}.",
+            )
 
         sender = from_email or self.from_email
         if self.use_resend:
@@ -402,6 +411,8 @@ class EmailService:
         commercial_name: str,
         contract_ref: str,
         link: str,
+        from_email: str | None = None,
+        company_name: str | None = None,
     ) -> bool:
         """Send commercial validation request for a contract."""
         subject = f"Validation commerciale requise - {contract_ref}"
@@ -424,13 +435,15 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body)
+        return await self._send_email(to, subject, html_body, from_email=from_email, company_name=company_name)
 
     async def send_document_collection_request(
         self,
         to: str,
         third_party_name: str,
         portal_link: str,
+        from_email: str | None = None,
+        company_name: str | None = None,
     ) -> bool:
         """Send document collection request to a third party via portal link."""
         subject = "Documents requis pour votre dossier - Bobby"
@@ -454,7 +467,7 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body)
+        return await self._send_email(to, subject, html_body, from_email=from_email, company_name=company_name)
 
     async def send_document_reminder(
         self,
@@ -494,6 +507,8 @@ class EmailService:
         self,
         to: str,
         third_party_name: str,
+        from_email: str | None = None,
+        company_name: str | None = None,
         doc_type: str,
         reason: str,
         portal_link: str,
@@ -522,13 +537,15 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body)
+        return await self._send_email(to, subject, html_body, from_email=from_email, company_name=company_name)
 
     async def send_contract_draft_review(
         self,
         to: str,
         third_party_name: str,
         contract_ref: str,
+        from_email: str | None = None,
+        company_name: str | None = None,
         portal_link: str,
     ) -> bool:
         """Send contract draft for partner review via portal."""
@@ -587,6 +604,8 @@ class EmailService:
         to: str,
         contract_ref: str,
         third_party_name: str,
+        from_email: str | None = None,
+        company_name: str | None = None,
     ) -> bool:
         """Notify that a contract has been signed."""
         subject = f"Contrat signé - {contract_ref}"
@@ -603,7 +622,7 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body)
+        return await self._send_email(to, subject, html_body, from_email=from_email, company_name=company_name)
 
     async def send_document_expiring(
         self,
@@ -627,7 +646,7 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body)
+        return await self._send_email(to, subject, html_body, from_email=from_email, company_name=company_name)
 
     async def send_documents_submitted_notification(
         self,
@@ -666,6 +685,8 @@ class EmailService:
         step_title: str,
         step_message: str,
         step_color: str = "#0ea5e9",
+        from_email: str | None = None,
+        company_name: str | None = None,
     ) -> bool:
         """Notify the commercial of a contract workflow progression step."""
         subject = f"{step_title} — {contract_ref}"
@@ -684,7 +705,7 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body)
+        return await self._send_email(to, subject, html_body, from_email=from_email, company_name=company_name)
 
     async def send_document_expiration_summary(
         self,

@@ -72,6 +72,8 @@ async def _notify_commercial(
     title: str,
     msg: str,
     color: str = "#0ea5e9",
+    from_email: str | None = None,
+    company_name: str | None = None,
 ) -> None:
     """Fire-and-forget contract progress notification to the commercial."""
     try:
@@ -81,9 +83,33 @@ async def _notify_commercial(
             step_title=title,
             step_message=msg,
             step_color=color,
+            from_email=from_email,
+            company_name=company_name,
         )
     except Exception as exc:
         logger.warning("commercial_notification_failed", error=str(exc), to=to)
+
+
+async def _resolve_company_email_ctx(db: AsyncSession, company_id) -> tuple[str | None, str | None]:
+    """Resolve company email_from and name from company_id.
+
+    Returns (email_from, company_name) for use in email sending.
+    """
+    if not company_id:
+        return None, None
+    from sqlalchemy import select
+
+    from app.contract_management.infrastructure.models import ContractCompanyModel
+
+    result = await db.execute(
+        select(ContractCompanyModel.email_from, ContractCompanyModel.name).where(
+            ContractCompanyModel.id == company_id
+        )
+    )
+    row = result.first()
+    if row:
+        return row.email_from, row.name
+    return None, None
 
 
 async def _resolve_commercial_name(db: AsyncSession, email: str | None) -> str | None:
@@ -478,20 +504,27 @@ async def validate_commercial(
         document_repository=doc_repo,
     )
 
+    # Resolve company email context for emails sent during validation
+    cr_for_company = await cr_repo.get_by_id(contract_request_id)
+    company_email_from, company_name = await _resolve_company_email_ctx(
+        db, cr_for_company.company_id if cr_for_company else None
+    )
+
     try:
-        cr = await use_case.execute(
-            ValidateCommercialCommand(
-                contract_request_id=contract_request_id,
-                third_party_type=body.third_party_type,
-                contact_email=body.contact_email,
-                company_id=body.company_id,
-                consultant_civility=body.consultant_civility,
-                consultant_first_name=body.consultant_first_name,
-                consultant_last_name=body.consultant_last_name,
-                consultant_email=body.consultant_email,
-                consultant_phone=body.consultant_phone,
-            )
+        cmd = ValidateCommercialCommand(
+            contract_request_id=contract_request_id,
+            third_party_type=body.third_party_type,
+            contact_email=body.contact_email,
+            company_id=body.company_id,
+            consultant_civility=body.consultant_civility,
+            consultant_first_name=body.consultant_first_name,
+            consultant_last_name=body.consultant_last_name,
+            consultant_email=body.consultant_email,
+            consultant_phone=body.consultant_phone,
         )
+        cmd.from_email = company_email_from
+        cmd.company_name = company_name
+        cr = await use_case.execute(cmd)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -1031,8 +1064,14 @@ async def send_draft_to_partner(
         generate_magic_link_use_case=magic_link_uc,
     )
 
+    # Resolve company email context
+    cr_for_ctx = await cr_repo.get_by_id(contract_request_id)
+    company_email_from, company_name = await _resolve_company_email_ctx(
+        db, cr_for_ctx.company_id if cr_for_ctx else None
+    )
+
     try:
-        cr = await use_case.execute(contract_request_id)
+        cr = await use_case.execute(contract_request_id, from_email=company_email_from, company_name=company_name)
     except Exception as exc:
         logger.error("send_draft_to_partner_failed", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))

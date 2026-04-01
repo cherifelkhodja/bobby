@@ -30,7 +30,7 @@ class SendDraftToPartnerUseCase:
         self._tp_repo = third_party_repository
         self._generate_magic_link = generate_magic_link_use_case
 
-    async def execute(self, contract_request_id: UUID):
+    async def execute(self, contract_request_id: UUID, from_email: str | None = None, company_name: str | None = None):
         """Execute the use case.
 
         Args:
@@ -66,6 +66,8 @@ class SendDraftToPartnerUseCase:
                 purpose=MagicLinkPurpose.CONTRACT_REVIEW,
                 email=email,
                 contract_request_id=cr.id,
+                from_email=from_email,
+                company_name=company_name,
             )
         )
 

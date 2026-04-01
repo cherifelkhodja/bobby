@@ -45,6 +45,8 @@ class ValidateCommercialCommand:
         self.consultant_last_name = consultant_last_name
         self.consultant_email = consultant_email
         self.consultant_phone = consultant_phone
+        self.from_email: str | None = None
+        self.company_name: str | None = None
 
 
 class ValidateCommercialUseCase:
@@ -174,6 +176,8 @@ class ValidateCommercialUseCase:
                 purpose=MagicLinkPurpose.DOCUMENT_UPLOAD,
                 email=command.contact_email,
                 contract_request_id=cr.id,
+                from_email=command.from_email,
+                company_name=command.company_name,
             )
         )
 
@@ -243,6 +247,8 @@ class ValidateCommercialUseCase:
                     purpose=MagicLinkPurpose.DOCUMENT_UPLOAD,
                     email=command.contact_email,
                     contract_request_id=cr.id,
+                    from_email=command.from_email,
+                    company_name=command.company_name,
                 )
             )
             cr.transition_to(ContractRequestStatus.COLLECTING_DOCUMENTS)
