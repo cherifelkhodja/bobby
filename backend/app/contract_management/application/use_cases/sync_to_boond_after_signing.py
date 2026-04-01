@@ -152,6 +152,55 @@ class SyncToBoondAfterSigningUseCase:
                     error=str(exc),
                 )
 
+        # ── Étape 1b : Coordonnées bancaires (IBAN/BIC) ─────────────────────
+        # Push bank details from the RIB document to the Boond company via SEPA app.
+        if tp and tp.boond_provider_id:
+            try:
+                from app.vigilance.infrastructure.adapters.postgres_document_repo import (
+                    DocumentRepository as _DocRepo,
+                )
+
+                doc_repo = _DocRepo(self._db)
+                rib_docs = await doc_repo.list_by_third_party(tp.id)
+                rib_doc = next(
+                    (d for d in rib_docs if d.document_type.value == "rib" and d.auto_check_results),
+                    None,
+                )
+                if rib_doc and rib_doc.auto_check_results:
+                    iban = rib_doc.auto_check_results.get("iban")
+                    bic = rib_doc.auto_check_results.get("bic")
+                    beneficiaire = rib_doc.auto_check_results.get("beneficiaire", "RIB Fournisseur")
+                    if iban and bic:
+                        await self._crm.update_company_bank_details(
+                            company_id=tp.boond_provider_id,
+                            iban=iban,
+                            bic=bic,
+                            description=beneficiaire or "RIB Fournisseur",
+                        )
+                        logger.info(
+                            "sync_boond_bank_details_pushed",
+                            cr_id=str(cr.id),
+                            company_id=tp.boond_provider_id,
+                        )
+                    else:
+                        logger.info(
+                            "sync_boond_bank_details_skipped_missing_data",
+                            cr_id=str(cr.id),
+                            has_iban=bool(iban),
+                            has_bic=bool(bic),
+                        )
+                else:
+                    logger.info(
+                        "sync_boond_bank_details_skipped_no_rib",
+                        cr_id=str(cr.id),
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "sync_boond_bank_details_failed",
+                    cr_id=str(cr.id),
+                    error=str(exc),
+                )
+
         # ── Étape 2 : Création des contacts (dédupliqués) ─────────────────
         # Boond typesOf: 7=dirigeant, 8=commercial, 9=adv, 10=signataire
         boond_contact_ids: dict[str, int] = {}

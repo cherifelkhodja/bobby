@@ -824,6 +824,51 @@ class BoondCrmAdapter:
             provider_contact_id=provider_contact_id,
         )
 
+    async def update_company_bank_details(
+        self,
+        company_id: int,
+        iban: str,
+        bic: str,
+        description: str = "RIB Fournisseur",
+    ) -> None:
+        """Push bank details (IBAN/BIC) to a Boond company via SEPA app.
+
+        Uses PUT /apps/sepa/companies/{id} to create a bank detail entry.
+
+        Args:
+            company_id: Boond company ID.
+            iban: IBAN (max 34 chars, no spaces).
+            bic: BIC/SWIFT code (max 11 chars).
+            description: Label for the bank detail.
+        """
+        # Remove spaces from IBAN for Boond
+        clean_iban = iban.replace(" ", "")
+
+        payload = {
+            "data": {
+                "id": str(company_id),
+                "type": "appsepacompany",
+                "attributes": {
+                    "banksDetails": [
+                        {
+                            "description": description,
+                            "iban": clean_iban,
+                            "bic": bic,
+                        }
+                    ]
+                },
+            }
+        }
+
+        await self._boond._make_request(
+            "PUT", f"/apps/sepa/companies/{company_id}", json=payload
+        )
+        logger.info(
+            "boond_company_bank_details_updated",
+            company_id=company_id,
+            iban_last4=clean_iban[-4:] if len(clean_iban) >= 4 else "****",
+        )
+
     @staticmethod
     def _extract_relationship_id(relationships: dict, key: str) -> int | None:
         """Extract a related entity ID from Boond relationships."""
