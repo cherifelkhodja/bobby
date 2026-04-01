@@ -1895,3 +1895,59 @@ async def get_charter_ar_download_url(
     url = await s3.get_presigned_url(charter.ar_file_s3_key)
     return {"url": url, "file_name": charter.ar_file_name}
 
+
+@router.post(
+    "/charters/{charter_id}/replace",
+    summary="Replace charter document file",
+)
+async def replace_charter_file(
+    charter_id: UUID,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+    version: str | None = Query(None, description="New version label"),
+    file: UploadFile = File(...),
+):
+    """Replace the main document file of a charter. Optionally update version."""
+    from sqlalchemy import select as _select
+
+    from app.config import get_settings
+    from app.contract_management.infrastructure.models import CharterTemplateModel
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+    result = await db.execute(
+        _select(CharterTemplateModel).where(CharterTemplateModel.id == charter_id)
+    )
+    charter = result.scalar_one_or_none()
+    if not charter:
+        raise HTTPException(status_code=404, detail="Charte introuvable.")
+
+    s3 = S3StorageClient(settings)
+
+    # Delete old file
+    try:
+        await s3.delete_file(charter.file_s3_key)
+    except Exception:
+        pass
+
+    # Upload new file
+    content = await file.read()
+    new_version = version or charter.version
+    extension = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "pdf"
+    slug = charter.name.lower().replace(' ', '_')
+    s3_key = f"charters/{charter.company_id}/{charter.target}/{slug}_{new_version}.{extension}"
+
+    await s3.upload_file(
+        key=s3_key,
+        content=content,
+        content_type=file.content_type or "application/pdf",
+    )
+
+    charter.file_s3_key = s3_key
+    charter.file_name = file.filename or charter.file_name
+    if version:
+        charter.version = version
+    await db.commit()
+
+    return _charter_to_response(charter)
+

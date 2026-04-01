@@ -82,6 +82,17 @@ export const chartersApi = {
     return response.data;
   },
 
+  replaceFile: async (id: string, file: File, version?: string): Promise<CharterTemplate> => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await apiClient.post<CharterTemplate>(
+      `/admin/charters/${id}/replace`,
+      form,
+      { params: version ? { version } : undefined },
+    );
+    return response.data;
+  },
+
   getArDownloadUrl: async (id: string): Promise<{ url: string; file_name: string }> => {
     const response = await apiClient.get<{ url: string; file_name: string }>(`/admin/charters/${id}/download-ar`);
     return response.data;

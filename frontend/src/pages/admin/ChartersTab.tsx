@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, Trash2, Download, Eye, EyeOff, FileText, FileCheck } from 'lucide-react';
+import { Upload, Trash2, Download, Eye, EyeOff, FileText, FileCheck, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { chartersApi } from '../../api/charters';
@@ -87,6 +87,15 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
     onError: (error) => toast.error(getErrorMessage(error)),
   });
 
+  const replaceMutation = useMutation({
+    mutationFn: ({ id, file }: { id: string; file: File }) => chartersApi.replaceFile(id, file),
+    onSuccess: () => {
+      toast.success('Document remplace.');
+      queryClient.invalidateQueries({ queryKey: ['admin-charters', companyId] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => chartersApi.delete(id),
     onSuccess: () => {
@@ -149,6 +158,22 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
         >
           <Download className="h-3.5 w-3.5" />
         </button>
+        <label
+          className="p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+          title="Remplacer le document"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          <input
+            type="file"
+            accept=".pdf"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) replaceMutation.mutate({ id: charter.id, file: f });
+              e.target.value = '';
+            }}
+          />
+        </label>
         {charter.ar_file_name && (
           <button
             onClick={async () => {
