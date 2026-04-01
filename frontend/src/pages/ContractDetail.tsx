@@ -353,6 +353,27 @@ export default function ContractDetail() {
     },
   });
 
+  const [editingAutoCheck, setEditingAutoCheck] = useState<{ docId: string; data: Record<string, string> } | null>(null);
+  const updateAutoCheckMutation = useMutation({
+    mutationFn: ({ docId, data }: { docId: string; data: Record<string, string> }) =>
+      vigilanceApi.updateAutoCheck(docId, data),
+    onSuccess: () => {
+      toast.success('Donnees mises a jour.');
+      setEditingAutoCheck(null);
+      queryClient.invalidateQueries({ queryKey: ['compliance-docs', cr?.third_party_id] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const reExtractMutation = useMutation({
+    mutationFn: (docId: string) => vigilanceApi.reExtract(docId),
+    onSuccess: () => {
+      toast.success('Re-analyse terminee.');
+      queryClient.invalidateQueries({ queryKey: ['compliance-docs', cr?.third_party_id] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
   const resendCollectionEmailMutation = useMutation({
     mutationFn: () => contractsApi.resendCollectionEmail(id!),
     onSuccess: () => {
@@ -1410,6 +1431,65 @@ export default function ContractDetail() {
                           </button>
                         </div>
                       )}
+                    </div>
+                  )}
+                  {/* Auto-check results + edit/re-extract */}
+                  {doc.auto_check_results && Object.keys(doc.auto_check_results).length > 0 && (
+                    <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-700/50 rounded text-xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide" style={{ fontSize: '10px' }}>Verifications auto</span>
+                        <div className="flex gap-1">
+                          {isAdv && (
+                            <>
+                              <button
+                                onClick={() => setEditingAutoCheck({ docId: doc.id, data: { ...doc.auto_check_results } as Record<string, string> })}
+                                className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                              >
+                                Modifier
+                              </button>
+                              <button
+                                onClick={() => reExtractMutation.mutate(doc.id)}
+                                disabled={reExtractMutation.isPending}
+                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                              >
+                                {reExtractMutation.isPending ? 'Analyse...' : 'Re-analyser'}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      {Object.entries(doc.auto_check_results).filter(([k]) => !['is_valid', 'document_date', 'expiry_date'].includes(k)).map(([key, val]) => (
+                        <div key={key} className="flex gap-2 text-gray-600 dark:text-gray-300">
+                          <span className="text-gray-400 dark:text-gray-500 capitalize">{key.replace(/_/g, ' ')} :</span>
+                          <span className="font-medium">{String(val || '—')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Inline edit form */}
+                  {editingAutoCheck?.docId === doc.id && (
+                    <div className="mt-2 p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded space-y-2">
+                      {Object.entries(editingAutoCheck.data).filter(([k]) => !['is_valid', 'document_date', 'expiry_date'].includes(k)).map(([key, val]) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <label className="text-xs text-gray-500 dark:text-gray-400 w-24 capitalize">{key.replace(/_/g, ' ')}</label>
+                          <input
+                            type="text"
+                            value={val ?? ''}
+                            onChange={(e) => setEditingAutoCheck((prev) => prev ? { ...prev, data: { ...prev.data, [key]: e.target.value } } : null)}
+                            className="flex-1 text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                          />
+                        </div>
+                      ))}
+                      <div className="flex gap-2 justify-end">
+                        <button onClick={() => setEditingAutoCheck(null)} className="text-xs text-gray-400 hover:underline">Annuler</button>
+                        <button
+                          onClick={() => updateAutoCheckMutation.mutate({ docId: doc.id, data: editingAutoCheck.data })}
+                          disabled={updateAutoCheckMutation.isPending}
+                          className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50"
+                        >
+                          {updateAutoCheckMutation.isPending ? 'Sauvegarde...' : 'Sauvegarder'}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

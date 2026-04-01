@@ -84,4 +84,19 @@ export const vigilanceApi = {
     );
     return response.data;
   },
+
+  updateAutoCheck: async (documentId: string, data: Record<string, string | null>): Promise<VigilanceDocument> => {
+    const response = await apiClient.patch<VigilanceDocument>(
+      `/vigilance/documents/${documentId}/auto-check`,
+      data,
+    );
+    return response.data;
+  },
+
+  reExtract: async (documentId: string): Promise<VigilanceDocument> => {
+    const response = await apiClient.post<VigilanceDocument>(
+      `/vigilance/documents/${documentId}/re-extract`,
+    );
+    return response.data;
+  },
 };

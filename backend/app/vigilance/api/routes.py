@@ -331,3 +331,106 @@ async def reject_document(
     )
 
     return _document_to_response(doc)
+
+
+# ── Manual edit & re-extraction ───────────────────────────────────────────────
+
+
+@router.patch(
+    "/documents/{document_id}/auto-check",
+    response_model=DocumentResponse,
+    summary="Edit auto-check results for a document",
+)
+async def update_auto_check(
+    document_id: UUID,
+    body: dict,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually edit the auto-check extraction results (beneficiaire, IBAN, BIC, dates). ADV/admin only."""
+    doc_repo = DocumentRepository(db)
+    doc = await doc_repo.get_by_id(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document introuvable.")
+
+    existing = doc.auto_check_results or {}
+    existing.update(body)
+    doc.auto_check_results = existing
+    doc.updated_at = __import__("datetime").datetime.utcnow()
+    saved = await doc_repo.save(doc)
+
+    audit_logger.log(
+        AuditAction.DOCUMENT_VALIDATED,
+        AuditResource.VIGILANCE_DOCUMENT,
+        user_id=user_id,
+        resource_id=str(document_id),
+        details={"action": "auto_check_updated", "fields": list(body.keys())},
+    )
+
+    return _document_to_response(saved)
+
+
+@router.post(
+    "/documents/{document_id}/re-extract",
+    response_model=DocumentResponse,
+    summary="Re-run auto extraction on a document",
+)
+async def re_extract_document(
+    document_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Re-run the auto extraction on an uploaded document. ADV/admin only."""
+    settings = get_settings()
+    doc_repo = DocumentRepository(db)
+    doc = await doc_repo.get_by_id(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document introuvable.")
+    if not doc.s3_key:
+        raise HTTPException(status_code=400, detail="Aucun fichier associe.")
+
+    s3 = S3StorageClient(settings)
+    try:
+        file_content = await s3.download_file(doc.s3_key)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Erreur S3: {exc}")
+
+    from app.vigilance.infrastructure.adapters.gemini_document_extractor import DocumentExtractor
+
+    extractor = DocumentExtractor(settings)
+    content_type = "application/pdf" if doc.s3_key.endswith(".pdf") else "application/octet-stream"
+    extracted = await extractor.extract(doc.document_type.value, file_content, content_type)
+
+    if extracted:
+        doc.auto_check_results = extracted
+        from datetime import date, datetime
+
+        doc_date_str = extracted.get("document_date")
+        if doc_date_str:
+            try:
+                doc.document_date = date.fromisoformat(doc_date_str)
+            except ValueError:
+                pass
+        expiry_date_str = extracted.get("expiry_date")
+        if expiry_date_str:
+            try:
+                expiry_d = date.fromisoformat(expiry_date_str)
+                doc.expires_at = datetime(expiry_d.year, expiry_d.month, expiry_d.day)
+            except ValueError:
+                pass
+        is_valid = extracted.get("is_valid")
+        if is_valid is not None:
+            doc.is_valid_at_upload = bool(is_valid)
+
+    doc.updated_at = __import__("datetime").datetime.utcnow()
+    saved = await doc_repo.save(doc)
+
+    audit_logger.log(
+        AuditAction.DOCUMENT_VALIDATED,
+        AuditResource.VIGILANCE_DOCUMENT,
+        user_id=user_id,
+        resource_id=str(document_id),
+        details={"action": "re_extracted", "results": extracted},
+    )
+
+    return _document_to_response(saved)
