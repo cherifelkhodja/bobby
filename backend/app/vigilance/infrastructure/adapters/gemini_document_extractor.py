@@ -246,9 +246,23 @@ class DocumentExtractor:
         if iban_match:
             iban = re.sub(r'\s+', ' ', iban_match.group(1)).upper().strip()
 
-        bic_match = re.search(r'\b([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b', text)
-        if bic_match:
-            bic = bic_match.group(1).upper()
+        # BIC: search after BIC/SWIFT marker first, then fallback to standalone pattern
+        bic_pattern = r'[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?'
+        # Try to find BIC after a label (BIC, SWIFT, BIC-ADRESSE SWIFT, Code BIC)
+        bic_labeled = re.search(
+            r'(?:BIC[\s\-]*(?:ADRESSE\s+)?SWIFT|SWIFT|BIC|Code\s+BIC)\s*[:\s]\s*(' + bic_pattern + r')\b',
+            text, re.IGNORECASE,
+        )
+        if bic_labeled:
+            bic = bic_labeled.group(1).upper()
+        else:
+            # Fallback: standalone BIC pattern (8 or 11 chars, must not be common words)
+            _common_words = {"IDENTITE", "BANCAIRE", "RELEVE", "BRETEUIL", "NATIONAL", "DOMICILI"}
+            for m in re.finditer(r'\b(' + bic_pattern + r')\b', text):
+                candidate = m.group(1).upper()
+                if candidate not in _common_words:
+                    bic = candidate
+                    break
 
         for pattern in (
             r'(?:titulaire|bénéficiaire|nom du compte)[^\n:]*[:\s]+([A-ZÉÈÀÂÊÎÔÛÙÄËÏÖÜ][^\n]{2,50})',
