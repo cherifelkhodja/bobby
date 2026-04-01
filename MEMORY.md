@@ -193,7 +193,9 @@ docker-compose up # Start all services
 - **Invitations** fusionné dans l'onglet **Utilisateurs** (InvitationsTab rendu dans UsersTab)
 - **Chartes** fusionné dans l'onglet **Sociétés** (ChartersTab rendu dans ContractCompaniesTab)
 - **BoondManager** supprimé du menu admin (onglet retiré)
-- Tabs restants : Utilisateurs, Templates, Contrat AT, Sociétés, Stats, API, RAZ
+- **RAZ** fusionné dans l'onglet **Contrats** (sous-onglet Articles / Annexes / RAZ)
+- **Contrat AT** renommé en **Contrats**
+- Tabs restants : Utilisateurs, Templates, Contrats, Sociétés, Stats, API
 
 ### 2026-03-31 (feat: implémentation refonte simplification fournisseurs — ADR-009)
 

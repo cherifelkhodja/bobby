@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { Users, FileText, Plug, BarChart3, ScrollText, Building2, DatabaseZap } from 'lucide-react';
+import { Users, FileText, Plug, BarChart3, ScrollText, Building2 } from 'lucide-react';
 
 import { UsersTab } from './UsersTab';
 import { TemplatesTab } from './TemplatesTab';
@@ -18,9 +18,8 @@ import { StatsTab } from './StatsTab';
 import { ApiTab } from './ApiTab';
 import { ContractArticlesTab } from './ContractArticlesTab';
 import { ContractCompaniesTab } from './ContractCompaniesTab';
-import { DataResetTab } from './DataResetTab';
 
-type TabType = 'users' | 'templates' | 'stats' | 'api' | 'contract-articles' | 'contract-companies' | 'data-reset';
+type TabType = 'users' | 'templates' | 'stats' | 'api' | 'contract-articles' | 'contract-companies';
 
 interface TabConfig {
   id: TabType;
@@ -31,11 +30,10 @@ interface TabConfig {
 const TABS: TabConfig[] = [
   { id: 'users', label: 'Utilisateurs', icon: Users },
   { id: 'templates', label: 'Templates', icon: FileText },
-  { id: 'contract-articles', label: 'Contrat AT', icon: ScrollText },
+  { id: 'contract-articles', label: 'Contrats', icon: ScrollText },
   { id: 'contract-companies', label: 'Sociétés', icon: Building2 },
   { id: 'stats', label: 'Stats', icon: BarChart3 },
   { id: 'api', label: 'API', icon: Plug },
-  { id: 'data-reset', label: 'RAZ', icon: DatabaseZap },
 ];
 
 export function Admin() {
@@ -77,7 +75,6 @@ export function Admin() {
       {activeTab === 'contract-companies' && <ContractCompaniesTab />}
       {activeTab === 'stats' && <StatsTab />}
       {activeTab === 'api' && <ApiTab />}
-      {activeTab === 'data-reset' && <DataResetTab />}
     </div>
   );
 }

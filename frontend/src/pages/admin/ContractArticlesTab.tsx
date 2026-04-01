@@ -47,6 +47,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { PageSpinner } from '../../components/ui/Spinner';
 import { ContractAnnexesTab } from './ContractAnnexesTab';
+import { DataResetTab } from './DataResetTab';
 
 // ─── Available template tags ──────────────────────────────────────────────────
 
@@ -547,7 +548,7 @@ function CreateArticleModal({
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
 export function ContractArticlesTab() {
-  const [subTab, setSubTab] = useState<'articles' | 'annexes'>('articles');
+  const [subTab, setSubTab] = useState<'articles' | 'annexes' | 'raz'>('articles');
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState<Record<string, string>>({});
@@ -670,7 +671,7 @@ export function ContractArticlesTab() {
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              Contrat AT
+              Contrats
             </h2>
             <div className="flex items-center gap-3">
               <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -694,13 +695,25 @@ export function ContractArticlesTab() {
                 >
                   Annexes
                 </button>
+                <button
+                  onClick={() => setSubTab('raz')}
+                  className={`px-4 py-1.5 text-sm font-medium transition-colors border-l border-gray-200 dark:border-gray-700 ${
+                    subTab === 'raz'
+                      ? 'bg-primary-600 text-white'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  RAZ
+                </button>
               </div>
             </div>
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {subTab === 'articles'
               ? 'Gérez les articles du contrat. Glissez pour réordonner. Les articles actifs apparaissent dans le PDF, numérotés séquentiellement.'
-              : 'Gérez le contenu des annexes. Les annexes conditionnelles ne sont incluses que si leur condition est remplie lors de la génération.'}
+              : subTab === 'annexes'
+              ? 'Gérez le contenu des annexes. Les annexes conditionnelles ne sont incluses que si leur condition est remplie lors de la génération.'
+              : 'Remise à zéro des données opérationnelles de contractualisation.'}
           </p>
         </div>
       </Card>
@@ -793,6 +806,8 @@ export function ContractArticlesTab() {
       )}
 
       {subTab === 'annexes' && <ContractAnnexesTab hideHeader />}
+
+      {subTab === 'raz' && <DataResetTab />}
     </div>
   );
 }
