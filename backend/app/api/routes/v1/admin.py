@@ -1689,7 +1689,8 @@ async def create_charter(
 
     content = await file.read()
     extension = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "pdf"
-    s3_key = f"charters/{target}/{name.lower().replace(' ', '_')}_{version}.{extension}"
+    slug = name.lower().replace(' ', '_')
+    s3_key = f"charters/{company_id}/{target}/{slug}_{version}.{extension}"
 
     await s3.upload_file(
         key=s3_key,
@@ -1702,7 +1703,7 @@ async def create_charter(
     if requires_acknowledgement and ar_file and ar_file.filename:
         ar_content = await ar_file.read()
         ar_ext = ar_file.filename.rsplit(".", 1)[-1].lower() if "." in ar_file.filename else "pdf"
-        ar_s3_key = f"charters/{target}/{name.lower().replace(' ', '_')}_{version}_AR.{ar_ext}"
+        ar_s3_key = f"charters/{company_id}/{target}/{slug}_{version}_AR.{ar_ext}"
         await s3.upload_file(
             key=ar_s3_key,
             content=ar_content,
