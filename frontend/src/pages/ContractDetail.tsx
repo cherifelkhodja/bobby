@@ -23,10 +23,12 @@ import {
   MessageSquare,
   Plus,
   GripVertical,
+  User,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { contractsApi, contractCompaniesApi, contractArticlesApi, contractAnnexesApi } from '../api/contracts';
+import { contractsApi, contractCompaniesApi, contractArticlesApi, contractAnnexesApi, contractConsultantsApi } from '../api/contracts';
 import { vigilanceApi } from '../api/vigilance';
 import { useAuthStore } from '../stores/authStore';
 import { Card } from '../components/ui/Card';
@@ -35,7 +37,7 @@ import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
 import { getErrorMessage } from '../api/client';
 import { CONTRACT_STATUS_CONFIG, getDocumentBadgeConfig } from '../types';
-import type { ContractRequestStatus } from '../types';
+import type { ContractRequestStatus, ContractRequest } from '../types';
 
 // Progressive UI: status ordering for determining which sections to show
 const STATUS_ORDER: Record<ContractRequestStatus, number> = {
@@ -926,6 +928,11 @@ export default function ContractDetail() {
             </Button>
           </div>
         </Card>
+      )}
+
+      {/* Consultants section — visible after signing */}
+      {isAdv && hasReachedStatus(cr.status, 'signed') && (
+        <ConsultantsSection contractRequestId={cr.id} cr={cr} />
       )}
 
       {/* Compliance override (for blocked status) */}
@@ -2278,5 +2285,169 @@ function HistoryTimeline({
         <p className="text-sm text-gray-400 dark:text-gray-500">Aucun historique disponible.</p>
       )}
     </>
+  );
+}
+
+
+// ── Consultants Section ─────────────────────────────────────────────────────
+
+function ConsultantsSection({ contractRequestId, cr }: { contractRequestId: string; cr: ContractRequest }) {
+  const queryClient = useQueryClient();
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState({ first_name: '', last_name: '', email: '', phone: '' });
+
+  const { data: consultants = [] } = useQuery({
+    queryKey: ['contract-consultants', contractRequestId],
+    queryFn: () => contractConsultantsApi.list(contractRequestId),
+  });
+
+  const addMutation = useMutation({
+    mutationFn: () => contractConsultantsApi.add(contractRequestId, addForm),
+    onSuccess: () => {
+      toast.success('Consultant ajoute.');
+      setShowAdd(false);
+      setAddForm({ first_name: '', last_name: '', email: '', phone: '' });
+      queryClient.invalidateQueries({ queryKey: ['contract-consultants', contractRequestId] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => contractConsultantsApi.remove(contractRequestId, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contract-consultants', contractRequestId] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const STATUS_BADGES: Record<string, { label: string; color: string }> = {
+    pending: { label: 'En attente', color: 'bg-gray-100 text-gray-600' },
+    sent: { label: 'Envoye', color: 'bg-blue-100 text-blue-700' },
+    signed: { label: 'Signe', color: 'bg-green-100 text-green-700' },
+  };
+
+  return (
+    <Card className="mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <User className="h-4 w-4 text-gray-400" />
+          Consultants
+        </h3>
+        <Button variant="secondary" size="sm" onClick={() => setShowAdd(true)}>
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          Ajouter
+        </Button>
+      </div>
+
+      {/* Add form */}
+      {showAdd && (
+        <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+            <input
+              type="text"
+              placeholder="Prenom *"
+              value={addForm.first_name}
+              onChange={(e) => setAddForm((f) => ({ ...f, first_name: e.target.value }))}
+              className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+            />
+            <input
+              type="text"
+              placeholder="Nom *"
+              value={addForm.last_name}
+              onChange={(e) => setAddForm((f) => ({ ...f, last_name: e.target.value }))}
+              className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+            />
+            <input
+              type="email"
+              placeholder="Email *"
+              value={addForm.email}
+              onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
+              className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+            />
+            <input
+              type="tel"
+              placeholder="Telephone"
+              value={addForm.phone}
+              onChange={(e) => setAddForm((f) => ({ ...f, phone: e.target.value }))}
+              className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowAdd(false)} className="text-xs text-gray-400 hover:underline">Annuler</button>
+            <Button
+              size="sm"
+              onClick={() => addMutation.mutate()}
+              disabled={!addForm.first_name || !addForm.last_name || !addForm.email || addMutation.isPending}
+              isLoading={addMutation.isPending}
+            >
+              Ajouter
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Pre-fill first consultant from CR data */}
+      {consultants.length === 0 && !showAdd && cr.consultant_first_name && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Le consultant principal ({cr.consultant_first_name} {cr.consultant_last_name}) sera ajoute automatiquement.
+          <button
+            onClick={() => {
+              setAddForm({
+                first_name: cr.consultant_first_name || '',
+                last_name: cr.consultant_last_name || '',
+                email: cr.consultant_email || '',
+                phone: cr.consultant_phone || '',
+              });
+              setShowAdd(true);
+            }}
+            className="ml-2 text-indigo-600 dark:text-indigo-400 hover:underline"
+          >
+            Ajouter maintenant
+          </button>
+        </p>
+      )}
+
+      {/* Consultants list */}
+      {consultants.length > 0 && (
+        <div className="space-y-2">
+          {consultants.map((c) => {
+            const badge = STATUS_BADGES[c.charter_status] || STATUS_BADGES.pending;
+            return (
+              <div
+                key={c.id}
+                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+              >
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {c.first_name} {c.last_name}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {c.email}{c.phone ? ` · ${c.phone}` : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badge.color}`}>
+                    {badge.label}
+                  </span>
+                  <button
+                    onClick={() => removeMutation.mutate(c.id)}
+                    className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    title="Supprimer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {consultants.length === 0 && !showAdd && !cr.consultant_first_name && (
+        <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+          Aucun consultant. Ajoutez un consultant pour envoyer les chartes.
+        </p>
+      )}
+    </Card>
   );
 }

@@ -2242,3 +2242,104 @@ async def cancel_purchase_order_request(
 
     name = await _resolve_commercial_name(db, saved.commercial_email)
     return _por_to_response(saved, commercial_name=name)
+
+
+# ── Contract Consultants ─────────────────────────────────────────────────────
+
+
+@router.get(
+    "/{contract_request_id}/consultants",
+    summary="List consultants for a contract",
+)
+async def list_consultants(
+    contract_request_id: UUID,
+    _auth: ContractAccessUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """List consultants linked to a contract for charter tracking."""
+    from sqlalchemy import select
+
+    from app.contract_management.infrastructure.models import ContractConsultantModel
+
+    result = await db.execute(
+        select(ContractConsultantModel)
+        .where(ContractConsultantModel.contract_request_id == contract_request_id)
+        .order_by(ContractConsultantModel.created_at)
+    )
+    consultants = result.scalars().all()
+    return [
+        {
+            "id": str(c.id),
+            "first_name": c.first_name,
+            "last_name": c.last_name,
+            "email": c.email,
+            "phone": c.phone,
+            "charter_status": c.charter_status,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+        }
+        for c in consultants
+    ]
+
+
+@router.post(
+    "/{contract_request_id}/consultants",
+    summary="Add a consultant to a contract",
+)
+async def add_consultant(
+    contract_request_id: UUID,
+    body: dict,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Add a consultant to a contract for charter tracking. ADV/admin only."""
+    from app.contract_management.infrastructure.models import ContractConsultantModel
+
+    cr = await ContractRequestRepository(db).get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
+
+    consultant = ContractConsultantModel(
+        contract_request_id=contract_request_id,
+        first_name=body.get("first_name", ""),
+        last_name=body.get("last_name", ""),
+        email=body.get("email", ""),
+        phone=body.get("phone"),
+        boond_candidate_id=body.get("boond_candidate_id"),
+        charter_status="pending",
+    )
+    db.add(consultant)
+    await db.commit()
+    await db.refresh(consultant)
+
+    return {
+        "id": str(consultant.id),
+        "first_name": consultant.first_name,
+        "last_name": consultant.last_name,
+        "email": consultant.email,
+        "phone": consultant.phone,
+        "charter_status": consultant.charter_status,
+    }
+
+
+@router.delete(
+    "/{contract_request_id}/consultants/{consultant_id}",
+    summary="Remove a consultant from a contract",
+)
+async def remove_consultant(
+    contract_request_id: UUID,
+    consultant_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove a consultant from a contract. ADV/admin only."""
+    from sqlalchemy import delete
+
+    from app.contract_management.infrastructure.models import ContractConsultantModel
+
+    await db.execute(
+        delete(ContractConsultantModel).where(
+            ContractConsultantModel.id == consultant_id,
+            ContractConsultantModel.contract_request_id == contract_request_id,
+        )
+    )
+    await db.commit()

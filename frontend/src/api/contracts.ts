@@ -279,6 +279,45 @@ export interface ContractCompany {
 
 export type ContractCompanyRequest = Omit<ContractCompany, 'id' | 'created_at' | 'updated_at' | 'has_logo'>;
 
+// ── Contract Consultants ──────────────────────────────────────────────────
+
+export interface ContractConsultant {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  charter_status: 'pending' | 'sent' | 'signed';
+  created_at: string;
+}
+
+export const contractConsultantsApi = {
+  list: async (contractRequestId: string): Promise<ContractConsultant[]> => {
+    const response = await apiClient.get<ContractConsultant[]>(
+      `/contract-requests/${contractRequestId}/consultants`,
+    );
+    return response.data;
+  },
+
+  add: async (contractRequestId: string, data: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone?: string;
+    boond_candidate_id?: number;
+  }): Promise<ContractConsultant> => {
+    const response = await apiClient.post<ContractConsultant>(
+      `/contract-requests/${contractRequestId}/consultants`,
+      data,
+    );
+    return response.data;
+  },
+
+  remove: async (contractRequestId: string, consultantId: string): Promise<void> => {
+    await apiClient.delete(`/contract-requests/${contractRequestId}/consultants/${consultantId}`);
+  },
+};
+
 export const contractCompaniesApi = {
   list: async (): Promise<ContractCompany[]> => {
     const response = await apiClient.get<ContractCompany[]>('/admin/contract-companies');

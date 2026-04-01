@@ -207,4 +207,26 @@ export const portalApi = {
     });
     return response.data;
   },
+
+  // Charter endpoints
+  getCharters: async (token: string): Promise<Array<{
+    id: string;
+    name: string;
+    version: string;
+    file_name: string;
+    acknowledged: boolean;
+  }>> => {
+    const response = await portalClient.get(`/${token}/charters`);
+    return response.data;
+  },
+
+  acknowledgeCharter: async (token: string, charterId: string): Promise<{ status: string }> => {
+    const response = await portalClient.post(`/${token}/charters/${charterId}/acknowledge`);
+    return response.data;
+  },
+
+  getCharterDownloadUrl: async (token: string, charterId: string): Promise<{ url: string; file_name: string }> => {
+    const response = await portalClient.get(`/${token}/charters/${charterId}/download`);
+    return response.data;
+  },
 };

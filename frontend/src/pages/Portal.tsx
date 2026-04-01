@@ -16,6 +16,7 @@ import {
   Loader2,
   PenLine,
   ChevronLeft,
+  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -146,6 +147,14 @@ export default function Portal() {
     enabled: !!token && !!portalInfo,
   });
 
+  // Charters (partner charters for acknowledgement)
+  const { data: chartersData } = useQuery({
+    queryKey: ['portal-charters', token],
+    queryFn: () => portalApi.getCharters(token!),
+    enabled: !!token && !!portalInfo,
+  });
+  const chartersAcknowledged = !chartersData || chartersData.length === 0 || chartersData.every((c) => c.acknowledged);
+
   // Contract review (if purpose is contract_review)
   const { data: contractDraft } = useQuery({
     queryKey: ['portal-contract', token],
@@ -192,9 +201,13 @@ export default function Portal() {
   const hasExpiredDoc =
     !!docsData && docsData.documents.some((d) => d.status === 'expired');
 
-  // Natural step: 0=infos société, 1=documents, 2=confirmation (post-submit)
+  // Natural step: 0=infos société, 1=documents, 2=chartes (if any), 3=confirmation
+  const hasCharters_ = chartersData && chartersData.length > 0;
   const naturalStep = isDocumentUpload
-    ? !hasSiren ? 0 : submitted ? 2 : 1
+    ? !hasSiren ? 0
+      : !submitted ? 1
+      : hasCharters_ && !chartersAcknowledged ? 2
+      : (hasCharters_ ? 3 : 2)
     : 0;
 
   // displayStep: forceStep allows going back; clamp to [0, naturalStep]
@@ -203,19 +216,16 @@ export default function Portal() {
   const buildStepStatus = (stepIndex: number): StepStatus => {
     if (stepIndex < displayStep) return 'done';
     if (stepIndex === displayStep) return 'current';
-    // Steps beyond displayStep: show natural server status
-    if (isDocumentUpload) {
-      if (stepIndex === 1) return hasSiren ? (submitted || allDocsEmpty ? 'done' : 'upcoming') : 'upcoming';
-      if (stepIndex === 2) return 'upcoming';
-    }
     return 'upcoming';
   };
 
+  const hasCharters = chartersData && chartersData.length > 0;
   const steps: Step[] = isDocumentUpload
     ? [
-        { label: 'Infos société', icon: Building2, status: buildStepStatus(0) },
+        { label: 'Infos societe', icon: Building2, status: buildStepStatus(0) },
         { label: 'Documents',     icon: Upload,    status: buildStepStatus(1) },
-        { label: 'Vérification',  icon: ShieldCheck, status: buildStepStatus(2) },
+        ...(hasCharters ? [{ label: 'Chartes', icon: ShieldCheck, status: buildStepStatus(2) }] : []),
+        { label: 'Verification',  icon: ShieldCheck, status: buildStepStatus(hasCharters ? 3 : 2) },
       ]
     : [
         { label: 'Relecture', icon: FileText, status: 'current' },
@@ -331,8 +341,75 @@ export default function Portal() {
         </div>
       )}
 
-      {/* Verification message — step 2 (all docs uploaded) */}
-      {isDocumentUpload && displayStep === 2 && (
+      {/* Chartes step — shown after document submission */}
+      {isDocumentUpload && hasCharters && displayStep === 2 && (
+        <div className="max-w-3xl mx-auto">
+          <Card>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Chartes et engagements
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Veuillez prendre connaissance des chartes suivantes et confirmer votre acceptation.
+            </p>
+            <div className="space-y-4">
+              {chartersData?.map((charter) => (
+                <div
+                  key={charter.id}
+                  className={`p-4 rounded-lg border ${
+                    charter.acknowledged
+                      ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {charter.name}
+                        <span className="ml-2 text-xs text-gray-400">{charter.version}</span>
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const { url } = await portalApi.getCharterDownloadUrl(token!, charter.id);
+                          window.open(url, '_blank');
+                        } catch {}
+                      }}
+                      className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Telecharger
+                    </button>
+                  </div>
+                  {!charter.acknowledged ? (
+                    <button
+                      onClick={async () => {
+                        try {
+                          await portalApi.acknowledgeCharter(token!, charter.id);
+                          queryClient.invalidateQueries({ queryKey: ['portal-charters', token] });
+                        } catch {}
+                      }}
+                      className="mt-2 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+                    >
+                      <div className="w-5 h-5 border-2 border-gray-300 dark:border-gray-600 rounded flex items-center justify-center">
+                      </div>
+                      J'ai lu et j'accepte cette charte
+                    </button>
+                  ) : (
+                    <p className="mt-2 flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                      <CheckCircle className="h-4 w-4" />
+                      Acceptee
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Verification message — final step (all docs uploaded + charters acknowledged) */}
+      {isDocumentUpload && displayStep === (hasCharters ? 3 : 2) && (
         <div className="max-w-3xl mx-auto">
           <Card className="text-center py-10">
             <ShieldCheck className="h-12 w-12 text-green-500 mx-auto mb-4" />

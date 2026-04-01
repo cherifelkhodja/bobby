@@ -3,7 +3,7 @@
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1199,3 +1199,153 @@ async def lookup_siret(
         rcs_city=rcs_city,
         ape_code=ape_code,
     )
+
+
+# ── Portal charter endpoints ─────────────────────────────────────────────────
+
+
+@router.get(
+    "/{token}/charters",
+    summary="Get active partner charters for acknowledgement",
+)
+async def get_portal_charters(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get active partner charters and their acknowledgement status. Public (magic link)."""
+    from sqlalchemy import select
+
+    from app.contract_management.infrastructure.models import (
+        CharterAcknowledgementModel,
+        CharterTemplateModel,
+    )
+    from app.third_party.infrastructure.adapters.postgres_magic_link_repo import MagicLinkRepository
+
+    ml_repo = MagicLinkRepository(db)
+    link = await ml_repo.get_by_token(token)
+    if not link or not link.is_valid:
+        raise HTTPException(status_code=404, detail="Lien invalide ou expire.")
+
+    # Get active partner charters
+    result = await db.execute(
+        select(CharterTemplateModel).where(
+            CharterTemplateModel.target == "partner",
+            CharterTemplateModel.is_active.is_(True),
+        ).order_by(CharterTemplateModel.created_at)
+    )
+    charters = result.scalars().all()
+
+    # Get existing acknowledgements for this third party
+    ack_result = await db.execute(
+        select(CharterAcknowledgementModel.charter_template_id).where(
+            CharterAcknowledgementModel.third_party_id == link.third_party_id,
+        )
+    )
+    acknowledged_ids = {row[0] for row in ack_result.all()}
+
+    return [
+        {
+            "id": str(c.id),
+            "name": c.name,
+            "version": c.version,
+            "file_name": c.file_name,
+            "acknowledged": c.id in acknowledged_ids,
+        }
+        for c in charters
+    ]
+
+
+@router.post(
+    "/{token}/charters/{charter_id}/acknowledge",
+    summary="Acknowledge a partner charter",
+)
+async def acknowledge_charter(
+    token: str,
+    charter_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Record acknowledgement of a partner charter. Public (magic link)."""
+    from fastapi import Request as _Req
+    from sqlalchemy import select
+
+    from app.contract_management.infrastructure.models import (
+        CharterAcknowledgementModel,
+        CharterTemplateModel,
+    )
+    from app.third_party.infrastructure.adapters.postgres_magic_link_repo import MagicLinkRepository
+
+    ml_repo = MagicLinkRepository(db)
+    link = await ml_repo.get_by_token(token)
+    if not link or not link.is_valid:
+        raise HTTPException(status_code=404, detail="Lien invalide ou expire.")
+
+    # Verify charter exists and is active
+    result = await db.execute(
+        select(CharterTemplateModel).where(
+            CharterTemplateModel.id == charter_id,
+            CharterTemplateModel.is_active.is_(True),
+        )
+    )
+    charter = result.scalar_one_or_none()
+    if not charter:
+        raise HTTPException(status_code=404, detail="Charte introuvable.")
+
+    # Check not already acknowledged
+    existing = await db.execute(
+        select(CharterAcknowledgementModel).where(
+            CharterAcknowledgementModel.charter_template_id == charter_id,
+            CharterAcknowledgementModel.third_party_id == link.third_party_id,
+        )
+    )
+    if existing.scalar_one_or_none():
+        return {"status": "ok", "message": "Deja acceptee."}
+
+    # Create acknowledgement
+    ip = request.client.host if request.client else None
+    ack = CharterAcknowledgementModel(
+        charter_template_id=charter_id,
+        third_party_id=link.third_party_id,
+        contract_request_id=link.contract_request_id,
+        method="checkbox",
+        ip_address=ip,
+    )
+    db.add(ack)
+    await db.commit()
+
+    return {"status": "ok", "message": "Charte acceptee."}
+
+
+@router.get(
+    "/{token}/charters/{charter_id}/download",
+    summary="Download charter PDF from portal",
+)
+async def download_portal_charter(
+    token: str,
+    charter_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get presigned URL for charter PDF. Public (magic link)."""
+    from sqlalchemy import select
+
+    from app.contract_management.infrastructure.models import CharterTemplateModel
+    from app.infrastructure.storage.s3_client import S3StorageClient
+    from app.third_party.infrastructure.adapters.postgres_magic_link_repo import MagicLinkRepository
+
+    ml_repo = MagicLinkRepository(db)
+    link = await ml_repo.get_by_token(token)
+    if not link or not link.is_valid:
+        raise HTTPException(status_code=404, detail="Lien invalide ou expire.")
+
+    result = await db.execute(
+        select(CharterTemplateModel).where(CharterTemplateModel.id == charter_id)
+    )
+    charter = result.scalar_one_or_none()
+    if not charter:
+        raise HTTPException(status_code=404, detail="Charte introuvable.")
+
+    from app.config import get_settings
+
+    s3 = S3StorageClient(get_settings())
+    url = await s3.generate_presigned_url(charter.file_s3_key)
+    return {"url": url, "file_name": charter.file_name}
