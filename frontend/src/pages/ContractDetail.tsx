@@ -1426,9 +1426,17 @@ export default function ContractDetail() {
             Documents contractuels
           </h3>
           <div className="space-y-2">
-            {contracts.map((c, idx) => {
+            {[...contracts].sort((a, b) => {
+              // Signed first, then final (non-PROV), then provisional (PROV) by version desc
+              const aSigned = !!(a.signed_at && a.s3_key_signed);
+              const bSigned = !!(b.signed_at && b.s3_key_signed);
+              if (aSigned !== bSigned) return aSigned ? -1 : 1;
+              const aProv = a.reference.startsWith('PROV-');
+              const bProv = b.reference.startsWith('PROV-');
+              if (aProv !== bProv) return aProv ? 1 : -1;
+              return b.version - a.version;
+            }).map((c) => {
               const isSigned = !!(c.signed_at && c.s3_key_signed);
-              const isLatest = idx === contracts.length - 1;
               const isProvisional = c.reference.startsWith('PROV-');
               const isFinal = !isProvisional;
 
@@ -1447,8 +1455,13 @@ export default function ContractDetail() {
                     <FileSignature className={`h-4 w-4 ${isSigned ? 'text-green-500' : isFinal ? 'text-blue-400' : 'text-gray-300'}`} />
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className={`text-sm font-medium ${isProvisional && !isLatest ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                          v{c.version}
+                        <p className={`text-sm font-medium ${isProvisional ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+                          {isSigned
+                            ? `${c.reference} (Signed)`
+                            : isFinal
+                              ? c.reference
+                              : `${c.reference} v${c.version}`
+                          }
                         </p>
                         {isSigned && (
                           <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
@@ -1456,9 +1469,9 @@ export default function ContractDetail() {
                             Signe
                           </span>
                         )}
-                        {!isSigned && isFinal && isLatest && (
+                        {!isSigned && isFinal && (
                           <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                            Version definitive
+                            Definitif
                           </span>
                         )}
                         {isProvisional && (
@@ -1473,34 +1486,35 @@ export default function ContractDetail() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={async () => {
-                        try {
-                          const url = await contractsApi.getContractDownloadUrl(cr.id, c.id, 'draft');
-                          window.open(url, '_blank');
-                        } catch {
-                          toast.error('Impossible de telecharger.');
-                        }
-                      }}
-                      className={`flex items-center gap-1 text-xs transition-colors ${isProvisional && !isLatest ? 'text-gray-400 hover:text-gray-600' : 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-800'}`}
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      PDF
-                    </button>
-                    {isSigned && (
+                    {isSigned ? (
                       <button
                         onClick={async () => {
                           try {
                             const url = await contractsApi.getContractDownloadUrl(cr.id, c.id, 'signed');
                             window.open(url, '_blank');
                           } catch {
-                            toast.error('Impossible de telecharger le contrat signe.');
+                            toast.error('Impossible de telecharger.');
                           }
                         }}
                         className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 hover:text-green-800 font-medium transition-colors"
                       >
                         <Download className="h-3.5 w-3.5" />
-                        Contrat signe
+                        {c.reference} (Signed).pdf
+                      </button>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const url = await contractsApi.getContractDownloadUrl(cr.id, c.id, 'draft');
+                            window.open(url, '_blank');
+                          } catch {
+                            toast.error('Impossible de telecharger.');
+                          }
+                        }}
+                        className={`flex items-center gap-1 text-xs transition-colors ${isProvisional ? 'text-gray-400 hover:text-gray-600' : 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-800'}`}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        {isProvisional ? `${c.reference} v${c.version}.pdf` : `${c.reference}.pdf`}
                       </button>
                     )}
                   </div>
