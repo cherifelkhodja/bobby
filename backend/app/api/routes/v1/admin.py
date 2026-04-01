@@ -4,7 +4,7 @@ from datetime import UTC
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import delete, select
 
 from app.api.dependencies import AdminUser, AdvOrAdminUser
@@ -1616,4 +1616,200 @@ async def reset_contract_data(
         "counts": counts,
         "s3_deleted": s3_deleted,
     }
+
+
+# =============================================================================
+# Charter Templates
+# =============================================================================
+
+
+@router.get(
+    "/charters",
+    summary="List charter templates",
+)
+async def list_charters(
+    _user_id: AdvOrAdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """List all charter templates. ADV/admin."""
+    from sqlalchemy import select as _select
+
+    from app.contract_management.infrastructure.models import CharterTemplateModel
+
+    result = await db.execute(
+        _select(CharterTemplateModel).order_by(
+            CharterTemplateModel.target, CharterTemplateModel.created_at.desc()
+        )
+    )
+    charters = result.scalars().all()
+    return [
+        {
+            "id": str(c.id),
+            "name": c.name,
+            "version": c.version,
+            "target": c.target,
+            "file_name": c.file_name,
+            "is_active": c.is_active,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+        }
+        for c in charters
+    ]
+
+
+@router.post(
+    "/charters",
+    summary="Upload a new charter template",
+)
+async def create_charter(
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+    name: str = Query(..., description="Charter name"),
+    version: str = Query(..., description="Version label (e.g. V1, V2)"),
+    target: str = Query(..., pattern="^(partner|consultant)$", description="partner or consultant"),
+    file: UploadFile = File(...),
+):
+    """Upload a new charter template PDF. Admin only."""
+    from app.contract_management.infrastructure.models import CharterTemplateModel
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+    s3 = S3StorageClient(settings)
+
+    content = await file.read()
+    extension = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "pdf"
+    s3_key = f"charters/{target}/{name.lower().replace(' ', '_')}_{version}.{extension}"
+
+    await s3.upload_file(
+        key=s3_key,
+        content=content,
+        content_type=file.content_type or "application/pdf",
+    )
+
+    charter = CharterTemplateModel(
+        name=name,
+        version=version,
+        target=target,
+        file_s3_key=s3_key,
+        file_name=file.filename or f"{name}_{version}.{extension}",
+        is_active=True,
+    )
+    db.add(charter)
+    await db.commit()
+    await db.refresh(charter)
+
+    return {
+        "id": str(charter.id),
+        "name": charter.name,
+        "version": charter.version,
+        "target": charter.target,
+        "file_name": charter.file_name,
+        "is_active": charter.is_active,
+    }
+
+
+@router.patch(
+    "/charters/{charter_id}",
+    summary="Update charter template (activate/deactivate)",
+)
+async def update_charter(
+    charter_id: UUID,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+    is_active: bool | None = None,
+    name: str | None = None,
+    version: str | None = None,
+):
+    """Update a charter template. Admin only."""
+    from sqlalchemy import select as _select
+
+    from app.contract_management.infrastructure.models import CharterTemplateModel
+
+    result = await db.execute(
+        _select(CharterTemplateModel).where(CharterTemplateModel.id == charter_id)
+    )
+    charter = result.scalar_one_or_none()
+    if not charter:
+        raise HTTPException(status_code=404, detail="Charte introuvable.")
+
+    if is_active is not None:
+        charter.is_active = is_active
+    if name is not None:
+        charter.name = name
+    if version is not None:
+        charter.version = version
+
+    await db.commit()
+
+    return {
+        "id": str(charter.id),
+        "name": charter.name,
+        "version": charter.version,
+        "target": charter.target,
+        "file_name": charter.file_name,
+        "is_active": charter.is_active,
+    }
+
+
+@router.delete(
+    "/charters/{charter_id}",
+    summary="Delete charter template",
+)
+async def delete_charter(
+    charter_id: UUID,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Delete a charter template and its S3 file. Admin only."""
+    from sqlalchemy import select as _select, delete as _delete
+
+    from app.contract_management.infrastructure.models import CharterTemplateModel
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+    result = await db.execute(
+        _select(CharterTemplateModel).where(CharterTemplateModel.id == charter_id)
+    )
+    charter = result.scalar_one_or_none()
+    if not charter:
+        raise HTTPException(status_code=404, detail="Charte introuvable.")
+
+    # Delete S3 file (best-effort)
+    try:
+        s3 = S3StorageClient(settings)
+        await s3.delete_file(charter.file_s3_key)
+    except Exception:
+        pass
+
+    await db.execute(
+        _delete(CharterTemplateModel).where(CharterTemplateModel.id == charter_id)
+    )
+    await db.commit()
+
+
+@router.get(
+    "/charters/{charter_id}/download",
+    summary="Get charter download URL",
+)
+async def get_charter_download_url(
+    charter_id: UUID,
+    _user_id: AdvOrAdminUser,
+    db: _AsyncSession = Depends(_get_db),
+):
+    """Get a presigned download URL for a charter template. ADV/admin."""
+    from sqlalchemy import select as _select
+
+    from app.contract_management.infrastructure.models import CharterTemplateModel
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+    result = await db.execute(
+        _select(CharterTemplateModel).where(CharterTemplateModel.id == charter_id)
+    )
+    charter = result.scalar_one_or_none()
+    if not charter:
+        raise HTTPException(status_code=404, detail="Charte introuvable.")
+
+    s3 = S3StorageClient(settings)
+    url = await s3.generate_presigned_url(charter.file_s3_key)
+    return {"url": url, "file_name": charter.file_name}
 

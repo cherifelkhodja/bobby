@@ -11,7 +11,7 @@
  */
 
 import { useState } from 'react';
-import { Users, Mail, Settings, FileText, Plug, BarChart3, ScrollText, Building2, DatabaseZap } from 'lucide-react';
+import { Users, Mail, Settings, FileText, Plug, BarChart3, ScrollText, Building2, DatabaseZap, Shield } from 'lucide-react';
 
 import { UsersTab } from './UsersTab';
 import { InvitationsTab } from './InvitationsTab';
@@ -21,9 +21,10 @@ import { StatsTab } from './StatsTab';
 import { ApiTab } from './ApiTab';
 import { ContractArticlesTab } from './ContractArticlesTab';
 import { ContractCompaniesTab } from './ContractCompaniesTab';
+import { ChartersTab } from './ChartersTab';
 import { DataResetTab } from './DataResetTab';
 
-type TabType = 'users' | 'invitations' | 'boond' | 'templates' | 'stats' | 'api' | 'contract-articles' | 'contract-companies' | 'data-reset';
+type TabType = 'users' | 'invitations' | 'boond' | 'templates' | 'stats' | 'api' | 'contract-articles' | 'contract-companies' | 'charters' | 'data-reset';
 
 interface TabConfig {
   id: TabType;
@@ -38,6 +39,7 @@ const TABS: TabConfig[] = [
   { id: 'templates', label: 'Templates', icon: FileText },
   { id: 'contract-articles', label: 'Contrat AT', icon: ScrollText },
   { id: 'contract-companies', label: 'Sociétés', icon: Building2 },
+  { id: 'charters', label: 'Chartes', icon: Shield },
   { id: 'stats', label: 'Stats', icon: BarChart3 },
   { id: 'api', label: 'API', icon: Plug },
   { id: 'data-reset', label: 'RAZ', icon: DatabaseZap },
@@ -82,6 +84,7 @@ export function Admin() {
       {activeTab === 'templates' && <TemplatesTab />}
       {activeTab === 'contract-articles' && <ContractArticlesTab />}
       {activeTab === 'contract-companies' && <ContractCompaniesTab />}
+      {activeTab === 'charters' && <ChartersTab />}
       {activeTab === 'stats' && <StatsTab />}
       {activeTab === 'api' && <ApiTab />}
       {activeTab === 'data-reset' && <DataResetTab />}

@@ -309,3 +309,74 @@ class WebhookEventModel(Base):
     event_type: Mapped[str] = mapped_column(String(50), nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
     processed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CharterTemplateModel(Base):
+    """Charter template (charte/engagement) uploaded by admin."""
+
+    __tablename__ = "cm_charter_templates"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    version: Mapped[str] = mapped_column(String(50), nullable=False)
+    target: Mapped[str] = mapped_column(
+        String(20), nullable=False,
+        comment="partner or consultant",
+    )
+    file_s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class CharterAcknowledgementModel(Base):
+    """Record of a charter being acknowledged/signed."""
+
+    __tablename__ = "cm_charter_acknowledgements"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    charter_template_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_charter_templates.id"), nullable=False
+    )
+    third_party_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tp_third_parties.id"), nullable=True
+    )
+    contract_request_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_contract_requests.id"), nullable=True
+    )
+    consultant_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    consultant_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    acknowledged_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    method: Mapped[str] = mapped_column(String(20), nullable=False, default="checkbox")
+    yousign_envelope_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    signed_document_s3_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ContractConsultantModel(Base):
+    """Consultant linked to a contract for charter tracking."""
+
+    __tablename__ = "cm_contract_consultants"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    contract_request_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_contract_requests.id"), nullable=False
+    )
+    boond_candidate_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    first_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    charter_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending",
+        comment="pending, sent, signed",
+    )
+    yousign_envelope_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
