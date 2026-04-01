@@ -874,25 +874,22 @@ async def cancel_contract_request(
         )
 
     # Check Boond positioning state — only allow cancel if state is NOT 7 or 2
-    boond_crm = BoondCrmAdapter(BoondClient(settings))
-    positioning = await boond_crm.get_positioning(cr.boond_positioning_id)
-    if not positioning:
-        raise HTTPException(
-            status_code=502,
-            detail="Impossible de récupérer le positionnement depuis BoondManager.",
-        )
-
-    boond_state = positioning.get("state")
-    BLOCKED_STATES = {
-        2: "Gagné",
-        7: "Gagné attente contrat",
-    }
-    if boond_state in BLOCKED_STATES:
-        label = BLOCKED_STATES[boond_state]
-        raise HTTPException(
-            status_code=400,
-            detail=f"Annulation impossible : le positionnement Boond est en état « {label} » ({boond_state}).",
-        )
+    # Skip check if no positioning (e.g. contract triggered by candidate state change)
+    if cr.boond_positioning_id:
+        boond_crm = BoondCrmAdapter(BoondClient(settings))
+        positioning = await boond_crm.get_positioning(cr.boond_positioning_id)
+        if positioning:
+            boond_state = positioning.get("state")
+            BLOCKED_STATES = {
+                2: "Gagné",
+                7: "Gagné attente contrat",
+            }
+            if boond_state in BLOCKED_STATES:
+                label = BLOCKED_STATES[boond_state]
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Annulation impossible : le positionnement Boond est en état « {label} » ({boond_state}).",
+                )
 
     previous_status = cr.status.value
     cr.transition_to(ContractRequestStatus.CANCELLED)
@@ -904,7 +901,9 @@ async def cancel_contract_request(
     )
 
     webhook_repo = WebhookEventRepository(db)
-    deleted = await webhook_repo.delete_by_prefix(f"positioning_update_{cr.boond_positioning_id}_")
+    deleted = 0
+    if cr.boond_positioning_id:
+        deleted = await webhook_repo.delete_by_prefix(f"positioning_update_{cr.boond_positioning_id}_")
 
     audit_logger.log(
         AuditAction.CONTRACT_REQUEST_CANCELLED,
