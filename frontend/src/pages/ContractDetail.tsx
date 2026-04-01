@@ -1446,7 +1446,7 @@ export default function ContractDetail() {
                   className={`flex items-center justify-between p-3 rounded-lg ${
                     isSigned
                       ? 'bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800'
-                      : isLatest && isFinal
+                      : isFinal
                         ? 'bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800'
                         : 'bg-gray-50 dark:bg-gray-800'
                   }`}
