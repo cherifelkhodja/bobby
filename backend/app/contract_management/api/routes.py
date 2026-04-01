@@ -875,6 +875,7 @@ async def cancel_contract_request(
 
     # Check Boond positioning state — only allow cancel if state is NOT 7 or 2
     # Skip check if no positioning (e.g. contract triggered by candidate state change)
+    boond_state = None
     if cr.boond_positioning_id:
         boond_crm = BoondCrmAdapter(BoondClient(settings))
         positioning = await boond_crm.get_positioning(cr.boond_positioning_id)
