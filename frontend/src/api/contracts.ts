@@ -203,6 +203,11 @@ export const contractsApi = {
     return response.data;
   },
 
+  purge: async (id: string): Promise<{ status: string; message: string }> => {
+    const response = await apiClient.post(`/contract-requests/${id}/purge`);
+    return response.data;
+  },
+
   rollbackStatus: async (id: string): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
       `/contract-requests/${id}/rollback`,

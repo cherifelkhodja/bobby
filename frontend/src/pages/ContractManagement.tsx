@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FileSignature, ShoppingCart, X, User, Building2 } from 'lucide-react';
+import { FileSignature, ShoppingCart, X, Trash2, User, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { contractsApi, purchaseOrderRequestsApi } from '../api/contracts';
@@ -80,6 +80,15 @@ export function ContractManagement() {
       toast.success('Demande de BDC annulée.');
       setCancelTarget(null);
       queryClient.invalidateQueries({ queryKey: ['purchase-order-requests'] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const purgeCrMutation = useMutation({
+    mutationFn: (id: string) => contractsApi.purge(id),
+    onSuccess: () => {
+      toast.success('Demande supprimée.');
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -178,6 +187,20 @@ export function ContractManagement() {
                             title="Annuler"
                           >
                             <X className="h-4 w-4" />
+                          </button>
+                        )}
+                        {isAdv && cr.status === 'cancelled' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Supprimer définitivement ${cr.display_reference} ?`)) {
+                                purgeCrMutation.mutate(cr.id);
+                              }
+                            }}
+                            className="p-1.5 rounded-md text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                            title="Supprimer définitivement"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         )}
                       </div>

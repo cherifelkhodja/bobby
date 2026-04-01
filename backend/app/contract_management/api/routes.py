@@ -942,6 +942,83 @@ async def cancel_contract_request(
     return _cr_to_response(saved, commercial_name=name)
 
 
+@router.post(
+    "/{contract_request_id}/purge",
+    summary="Permanently delete a cancelled contract request",
+)
+async def purge_contract_request(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Permanently delete a cancelled contract request and all related data.
+
+    Only allowed when the contract request is in CANCELLED status.
+    ADV/admin only.
+    """
+    from sqlalchemy import delete as sa_delete, select as sa_select
+
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        WebhookEventRepository,
+    )
+
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+
+    if cr.status != ContractRequestStatus.CANCELLED:
+        raise HTTPException(
+            status_code=400,
+            detail="Seules les demandes annulées peuvent être supprimées définitivement.",
+        )
+
+    # Delete related data
+    from app.contract_management.infrastructure.models import (
+        ContractConsultantModel,
+        ContractModel,
+        ContractRequestModel,
+    )
+
+    # Delete consultants
+    await db.execute(
+        sa_delete(ContractConsultantModel).where(
+            ContractConsultantModel.contract_request_id == contract_request_id
+        )
+    )
+
+    # Delete generated contracts
+    await db.execute(
+        sa_delete(ContractModel).where(
+            ContractModel.contract_request_id == contract_request_id
+        )
+    )
+
+    # Delete webhook events
+    webhook_repo = WebhookEventRepository(db)
+    if cr.boond_positioning_id:
+        await webhook_repo.delete_by_prefix(f"positioning_update_{cr.boond_positioning_id}_")
+
+    # Delete the contract request itself
+    await db.execute(
+        sa_delete(ContractRequestModel).where(
+            ContractRequestModel.id == contract_request_id
+        )
+    )
+
+    await db.commit()
+
+    audit_logger.log(
+        AuditAction.CONTRACT_REQUEST_CANCELLED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(contract_request_id),
+        details={"action": "purge", "reference": cr.reference},
+    )
+
+    return {"status": "ok", "message": f"Demande {cr.display_reference} supprimée définitivement."}
+
+
 @router.get(
     "/next-reference",
     summary="Get next contract request reference",
