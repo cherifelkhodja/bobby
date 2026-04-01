@@ -191,7 +191,7 @@ docker-compose up # Start all services
 ### 2026-04-01 (refactor: réorganisation onglets admin)
 
 - **Invitations** fusionné dans l'onglet **Utilisateurs** (InvitationsTab rendu dans UsersTab)
-- **Chartes** fusionné dans l'onglet **Sociétés** (ChartersTab rendu dans ContractCompaniesTab)
+- **Chartes** liées aux sociétés via `company_id` (FK), affichées dans chaque carte de société (migration 068)
 - **BoondManager** supprimé du menu admin (onglet retiré)
 - **RAZ** fusionné dans l'onglet **Contrats** (sous-onglet Articles / Annexes / RAZ)
 - **Contrat AT** renommé en **Contrats**

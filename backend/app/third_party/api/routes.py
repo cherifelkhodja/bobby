@@ -1221,18 +1221,31 @@ async def get_portal_charters(
     )
     from app.third_party.infrastructure.adapters.postgres_magic_link_repo import MagicLinkRepository
 
+    from app.contract_management.infrastructure.models import ContractRequestModel
+
     ml_repo = MagicLinkRepository(db)
     link = await ml_repo.get_by_token(token)
     if not link or not link.is_valid:
         raise HTTPException(status_code=404, detail="Lien invalide ou expire.")
 
-    # Get active partner charters
-    result = await db.execute(
-        select(CharterTemplateModel).where(
-            CharterTemplateModel.target == "partner",
-            CharterTemplateModel.is_active.is_(True),
-        ).order_by(CharterTemplateModel.created_at)
-    )
+    # Resolve company_id from contract request
+    company_id = None
+    if link.contract_request_id:
+        cr_result = await db.execute(
+            select(ContractRequestModel.company_id).where(
+                ContractRequestModel.id == link.contract_request_id
+            )
+        )
+        company_id = cr_result.scalar_one_or_none()
+
+    # Get active partner charters for this company
+    stmt = select(CharterTemplateModel).where(
+        CharterTemplateModel.target == "partner",
+        CharterTemplateModel.is_active.is_(True),
+    ).order_by(CharterTemplateModel.created_at)
+    if company_id:
+        stmt = stmt.where(CharterTemplateModel.company_id == company_id)
+    result = await db.execute(stmt)
     charters = result.scalars().all()
 
     # Get existing acknowledgements for this third party

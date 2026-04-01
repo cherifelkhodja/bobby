@@ -7,22 +7,25 @@ export interface CharterTemplate {
   target: 'partner' | 'consultant';
   file_name: string;
   is_active: boolean;
+  company_id: string | null;
   created_at: string;
 }
 
 export const chartersApi = {
-  list: async (): Promise<CharterTemplate[]> => {
-    const response = await apiClient.get<CharterTemplate[]>('/admin/charters');
+  list: async (companyId?: string): Promise<CharterTemplate[]> => {
+    const response = await apiClient.get<CharterTemplate[]>('/admin/charters', {
+      params: companyId ? { company_id: companyId } : undefined,
+    });
     return response.data;
   },
 
-  upload: async (name: string, version: string, target: string, file: File): Promise<CharterTemplate> => {
+  upload: async (name: string, version: string, target: string, companyId: string, file: File): Promise<CharterTemplate> => {
     const form = new FormData();
     form.append('file', file);
     const response = await apiClient.post<CharterTemplate>(
       '/admin/charters',
       form,
-      { params: { name, version, target } },
+      { params: { name, version, target, company_id: companyId } },
     );
     return response.data;
   },

@@ -1630,17 +1630,19 @@ async def reset_contract_data(
 async def list_charters(
     _user_id: AdvOrAdminUser,
     db: _AsyncSession = Depends(_get_db),
+    company_id: UUID | None = Query(None, description="Filter by company"),
 ):
     """List all charter templates. ADV/admin."""
     from sqlalchemy import select as _select
 
     from app.contract_management.infrastructure.models import CharterTemplateModel
 
-    result = await db.execute(
-        _select(CharterTemplateModel).order_by(
-            CharterTemplateModel.target, CharterTemplateModel.created_at.desc()
-        )
+    stmt = _select(CharterTemplateModel).order_by(
+        CharterTemplateModel.target, CharterTemplateModel.created_at.desc()
     )
+    if company_id is not None:
+        stmt = stmt.where(CharterTemplateModel.company_id == company_id)
+    result = await db.execute(stmt)
     charters = result.scalars().all()
     return [
         {
@@ -1650,6 +1652,7 @@ async def list_charters(
             "target": c.target,
             "file_name": c.file_name,
             "is_active": c.is_active,
+            "company_id": str(c.company_id) if c.company_id else None,
             "created_at": c.created_at.isoformat() if c.created_at else None,
         }
         for c in charters
@@ -1666,6 +1669,7 @@ async def create_charter(
     name: str = Query(..., description="Charter name"),
     version: str = Query(..., description="Version label (e.g. V1, V2)"),
     target: str = Query(..., pattern="^(partner|consultant)$", description="partner or consultant"),
+    company_id: UUID = Query(..., description="Company ID"),
     file: UploadFile = File(...),
 ):
     """Upload a new charter template PDF. Admin only."""
@@ -1689,6 +1693,7 @@ async def create_charter(
         name=name,
         version=version,
         target=target,
+        company_id=company_id,
         file_s3_key=s3_key,
         file_name=file.filename or f"{name}_{version}.{extension}",
         is_active=True,
@@ -1704,6 +1709,7 @@ async def create_charter(
         "target": charter.target,
         "file_name": charter.file_name,
         "is_active": charter.is_active,
+        "company_id": str(charter.company_id) if charter.company_id else None,
     }
 
 
@@ -1747,6 +1753,7 @@ async def update_charter(
         "target": charter.target,
         "file_name": charter.file_name,
         "is_active": charter.is_active,
+        "company_id": str(charter.company_id) if charter.company_id else None,
     }
 
 

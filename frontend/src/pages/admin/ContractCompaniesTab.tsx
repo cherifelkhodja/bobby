@@ -556,6 +556,15 @@ export function ContractCompaniesTab() {
                 </span>
               </div>
 
+              {/* Chartes */}
+              <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1.5">
+                  <Shield className="h-3.5 w-3.5" />
+                  Chartes
+                </p>
+                <ChartersTab companyId={company.id} />
+              </div>
+
               {/* Edit form */}
               {editing?.id === company.id && (
                 <div className="p-5 border-t border-gray-200 dark:border-gray-700">
@@ -591,15 +600,6 @@ export function ContractCompaniesTab() {
           ))}
         </div>
       )}
-
-      {/* Chartes Section */}
-      <div className="mt-10">
-        <div className="flex items-center gap-2 mb-6">
-          <Shield className="h-5 w-5 text-gray-500" />
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Chartes</h2>
-        </div>
-        <ChartersTab />
-      </div>
     </div>
   );
 }
