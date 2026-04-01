@@ -2320,6 +2320,15 @@ function ConsultantsSection({ contractRequestId, cr }: { contractRequestId: stri
     onError: (error) => toast.error(getErrorMessage(error)),
   });
 
+  const sendChartersMutation = useMutation({
+    mutationFn: (consultantId: string) => contractConsultantsApi.sendCharters(contractRequestId, consultantId),
+    onSuccess: () => {
+      toast.success('Documents chartes generes et envoyes.');
+      queryClient.invalidateQueries({ queryKey: ['contract-consultants', contractRequestId] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
   const STATUS_BADGES: Record<string, { label: string; color: string }> = {
     pending: { label: 'En attente', color: 'bg-gray-100 text-gray-600' },
     sent: { label: 'Envoye', color: 'bg-blue-100 text-blue-700' },
@@ -2429,6 +2438,15 @@ function ConsultantsSection({ contractRequestId, cr }: { contractRequestId: stri
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badge.color}`}>
                     {badge.label}
                   </span>
+                  {c.charter_status === 'pending' && (
+                    <button
+                      onClick={() => sendChartersMutation.mutate(c.id)}
+                      disabled={sendChartersMutation.isPending}
+                      className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 px-2 py-1 rounded transition-colors disabled:opacity-50"
+                    >
+                      {sendChartersMutation.isPending ? 'Envoi...' : 'Envoyer les chartes'}
+                    </button>
+                  )}
                   <button
                     onClick={() => removeMutation.mutate(c.id)}
                     className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"

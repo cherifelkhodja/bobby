@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page { size: A4; margin: 2.5cm; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11pt; line-height: 1.6; color: #333; }
+        h1 { font-size: 16pt; color: {{ issuer_color_code }}; text-align: center; margin-bottom: 30px; }
+        h2 { font-size: 12pt; color: {{ issuer_color_code }}; border-bottom: 1px solid {{ issuer_color_code }}; padding-bottom: 5px; margin-top: 25px; }
+        .header { text-align: center; margin-bottom: 40px; }
+        .header img { max-height: 60px; }
+        .info-block { margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 5px; }
+        .info-block p { margin: 5px 0; }
+        .article { margin: 15px 0; }
+        .article p { margin: 5px 0; }
+        .signature-block { margin-top: 60px; }
+        .signature-box { width: 45%; }
+        .signature-box p { margin: 5px 0; font-size: 10pt; }
+        .signature-line { border-bottom: 1px solid #333; height: 60px; margin-top: 10px; }
+        .footer { margin-top: 40px; font-size: 9pt; color: #666; text-align: center; border-top: 1px solid #ddd; padding-top: 10px; }
+    </style>
+</head>
+<body>
+    {% if logo_b64 %}
+    <div class="header">
+        <img src="data:{{ logo_mime }};base64,{{ logo_b64 }}" alt="Logo">
+    </div>
+    {% endif %}
+
+    <h1>ENGAGEMENT DE CONFIDENTIALITE</h1>
+
+    <h2>Entre les parties</h2>
+
+    <p>La societe <strong>{{ issuer_company_name }}</strong>, {{ issuer_legal_form }} au capital de {{ issuer_capital }} €,
+    dont le siege social est situe {{ issuer_head_office }},
+    inscrite au RCS de {{ issuer_rcs_city }} sous le n° {{ issuer_rcs_number }},</p>
+
+    <p style="text-align: right; font-style: italic;">Ci-apres denommee « la Societe »</p>
+
+    <p>Et,</p>
+
+    <div class="info-block">
+        <p><strong>{{ consultant_civility }} {{ consultant_first_name }} {{ consultant_last_name }}</strong></p>
+        <p>Email : {{ consultant_email }}</p>
+        {% if consultant_phone %}
+        <p>Telephone : {{ consultant_phone }}</p>
+        {% endif %}
+    </div>
+
+    <p style="text-align: right; font-style: italic;">Ci-apres denomme(e) « le/la Prestataire »</p>
+
+    <h2>Article 1 — Objet</h2>
+    <div class="article">
+        <p>Dans le cadre de sa mission pour le compte de la Societe ou de ses clients,
+        le/la Prestataire est susceptible d'avoir acces a des informations confidentielles.
+        Le present engagement a pour objet de definir les obligations de confidentialite
+        du/de la Prestataire.</p>
+    </div>
+
+    <h2>Article 2 — Informations confidentielles</h2>
+    <div class="article">
+        <p>Sont considerees comme confidentielles toutes les informations de nature technique,
+        commerciale, financiere, strategique ou autre, communiquees par la Societe ou ses clients,
+        sous quelque forme que ce soit (orale, ecrite, electronique), et notamment :</p>
+        <ul>
+            <li>Les donnees personnelles des collaborateurs, clients et partenaires</li>
+            <li>Les informations relatives aux projets et missions en cours</li>
+            <li>Les methodes, processus et savoir-faire</li>
+            <li>Les donnees financieres et tarifaires</li>
+            <li>Les codes d'acces et identifiants informatiques</li>
+        </ul>
+    </div>
+
+    <h2>Article 3 — Obligations</h2>
+    <div class="article">
+        <p>Le/La Prestataire s'engage a :</p>
+        <ul>
+            <li>Ne pas divulguer les informations confidentielles a des tiers</li>
+            <li>Ne pas utiliser les informations confidentielles a des fins autres que l'execution de sa mission</li>
+            <li>Prendre toutes les mesures necessaires pour proteger la confidentialite des informations</li>
+            <li>Restituer ou detruire tout support contenant des informations confidentielles a la fin de sa mission</li>
+        </ul>
+    </div>
+
+    <h2>Article 4 — Duree</h2>
+    <div class="article">
+        <p>Le present engagement de confidentialite prend effet a la date de sa signature
+        et reste en vigueur pendant toute la duree de la mission et pendant une periode
+        de <strong>2 (deux) ans</strong> apres son terme.</p>
+    </div>
+
+    <h2>Article 5 — Sanctions</h2>
+    <div class="article">
+        <p>Toute violation du present engagement pourra entrainer la mise en oeuvre de la
+        responsabilite civile et/ou penale du/de la Prestataire, ainsi que la rupture
+        immediate de la relation contractuelle.</p>
+    </div>
+
+    <div class="signature-block">
+        <p><strong>Fait a :</strong> ________________________</p>
+        <p><strong>Le :</strong> {{ date }}</p>
+        <p><strong>Lu et approuve, signature precedee de la mention "Bon pour engagement de confidentialite" :</strong></p>
+        <div class="signature-line"></div>
+        <p style="margin-top: 5px;">{{ consultant_civility }} {{ consultant_first_name }} {{ consultant_last_name }}</p>
+    </div>
+
+    <div class="footer">
+        {{ issuer_company_name }} — {{ issuer_legal_form }} au capital de {{ issuer_capital }} €
+        — RCS {{ issuer_rcs_city }} {{ issuer_rcs_number }}
+    </div>
+</body>
+</html>

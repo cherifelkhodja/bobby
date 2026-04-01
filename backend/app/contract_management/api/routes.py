@@ -2343,3 +2343,68 @@ async def remove_consultant(
         )
     )
     await db.commit()
+
+
+@router.post(
+    "/{contract_request_id}/consultants/{consultant_id}/send-charters",
+    summary="Generate and send charter documents for a consultant",
+)
+async def send_consultant_charters(
+    contract_request_id: UUID,
+    consultant_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate AR + engagement PDFs and upload to S3. ADV/admin only.
+
+    Updates consultant charter_status to 'sent'.
+    """
+    from sqlalchemy import select
+
+    from app.contract_management.application.use_cases.generate_charter_documents import (
+        GenerateCharterDocumentsUseCase,
+    )
+    from app.contract_management.infrastructure.models import ContractConsultantModel
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+    cr_repo = ContractRequestRepository(db)
+
+    result = await db.execute(
+        select(ContractConsultantModel).where(
+            ContractConsultantModel.id == consultant_id,
+            ContractConsultantModel.contract_request_id == contract_request_id,
+        )
+    )
+    consultant = result.scalar_one_or_none()
+    if not consultant:
+        raise HTTPException(status_code=404, detail="Consultant introuvable.")
+
+    s3 = S3StorageClient(settings)
+
+    use_case = GenerateCharterDocumentsUseCase(
+        contract_request_repository=cr_repo,
+        s3_service=s3,
+        db=db,
+    )
+
+    try:
+        result_keys = await use_case.execute(
+            contract_request_id=contract_request_id,
+            consultant_first_name=consultant.first_name,
+            consultant_last_name=consultant.last_name,
+            consultant_email=consultant.email,
+            consultant_phone=consultant.phone or "",
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    consultant.charter_status = "sent"
+    await db.commit()
+
+    return {
+        "status": "ok",
+        "consultant_id": str(consultant.id),
+        "charter_status": "sent",
+        "documents": result_keys,
+    }

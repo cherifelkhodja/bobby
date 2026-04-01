@@ -316,6 +316,17 @@ export const contractConsultantsApi = {
   remove: async (contractRequestId: string, consultantId: string): Promise<void> => {
     await apiClient.delete(`/contract-requests/${contractRequestId}/consultants/${consultantId}`);
   },
+
+  sendCharters: async (contractRequestId: string, consultantId: string): Promise<{
+    status: string;
+    charter_status: string;
+    documents: Record<string, string>;
+  }> => {
+    const response = await apiClient.post(
+      `/contract-requests/${contractRequestId}/consultants/${consultantId}/send-charters`,
+    );
+    return response.data;
+  },
 };
 
 export const contractCompaniesApi = {
