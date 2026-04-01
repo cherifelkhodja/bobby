@@ -267,6 +267,7 @@ export interface ContractCompany {
   representative_sub_quality?: string | null;
   signatory_name: string;
   invoices_company_mail?: string | null;
+  email_from?: string | null;
   color_code: string;
   boond_agency_id?: number | null;
   has_logo: boolean;

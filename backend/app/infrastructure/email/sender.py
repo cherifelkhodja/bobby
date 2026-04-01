@@ -40,22 +40,42 @@ class EmailService:
             self.use_resend = False
             logger.info("Email service configured with SMTP")
 
-    async def _send_email(self, to: str, subject: str, html_body: str) -> bool:
-        """Send email via Resend or SMTP."""
+    @staticmethod
+    def _email_footer(company_name: str | None = None) -> str:
+        """Generate the email footer with company name."""
+        name = f"Bobby - {company_name}" if company_name else "Bobby"
+        return f'<hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;"><p style="color: #666; font-size: 12px;">Cet email a ete envoye par {name}.</p>'
+
+    async def _send_email(
+        self,
+        to: str,
+        subject: str,
+        html_body: str,
+        from_email: str | None = None,
+    ) -> bool:
+        """Send email via Resend or SMTP.
+
+        Args:
+            to: Recipient email.
+            subject: Email subject.
+            html_body: HTML content.
+            from_email: Optional sender override (e.g. per-company email).
+        """
         if not self.enabled:
             logger.info(f"Email notifications disabled. Would send to {to}: {subject}")
             return True
 
+        sender = from_email or self.from_email
         if self.use_resend:
-            return await self._send_via_resend(to, subject, html_body)
+            return await self._send_via_resend(to, subject, html_body, sender)
         else:
-            return await self._send_via_smtp(to, subject, html_body)
+            return await self._send_via_smtp(to, subject, html_body, sender)
 
-    async def _send_via_resend(self, to: str, subject: str, html_body: str) -> bool:
+    async def _send_via_resend(self, to: str, subject: str, html_body: str, sender: str | None = None) -> bool:
         """Send email via Resend API."""
         try:
             params = {
-                "from": self.from_email,
+                "from": sender or self.from_email,
                 "to": [to],
                 "subject": subject,
                 "html": html_body,
@@ -69,12 +89,12 @@ class EmailService:
             logger.error(f"Failed to send email via Resend to {to}: {e}")
             return False
 
-    async def _send_via_smtp(self, to: str, subject: str, html_body: str) -> bool:
+    async def _send_via_smtp(self, to: str, subject: str, html_body: str, sender: str | None = None) -> bool:
         """Send email via SMTP."""
         try:
             message = MIMEMultipart("alternative")
             message["Subject"] = subject
-            message["From"] = self.from_email
+            message["From"] = sender or self.from_email
             message["To"] = to
 
             html_part = MIMEText(html_body, "html")
@@ -128,7 +148,7 @@ class EmailService:
                 <p>Ce lien expire dans 7 jours.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
                 <p style="color: #666; font-size: 12px;">
-                    Cet email a été envoyé par Bobby.
+                    Cet email a ete envoye par Bobby.
                     Si vous n'avez pas créé de compte, ignorez cet email.
                 </p>
             </div>
@@ -169,7 +189,7 @@ class EmailService:
                    Votre mot de passe restera inchangé.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
                 <p style="color: #666; font-size: 12px;">
-                    Cet email a été envoyé par Bobby.
+                    Cet email a ete envoye par Bobby.
                 </p>
             </div>
         </body>
@@ -242,7 +262,7 @@ class EmailService:
                 <p>Merci pour votre contribution !</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
                 <p style="color: #666; font-size: 12px;">
-                    Cet email a été envoyé par Bobby.
+                    Cet email a ete envoye par Bobby.
                 </p>
             </div>
         </body>
@@ -309,7 +329,7 @@ class EmailService:
                 <p>Connectez-vous à votre espace pour plus de détails.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
                 <p style="color: #666; font-size: 12px;">
-                    Cet email a été envoyé par Bobby.
+                    Cet email a ete envoye par Bobby.
                 </p>
             </div>
         </body>
@@ -362,7 +382,7 @@ class EmailService:
                 <p><strong>Ce lien expire dans 48 heures.</strong></p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
                 <p style="color: #666; font-size: 12px;">
-                    Cet email a été envoyé par Bobby.
+                    Cet email a ete envoye par Bobby.
                     Si vous n'attendiez pas cette invitation, ignorez cet email.
                 </p>
             </div>
@@ -400,7 +420,7 @@ class EmailService:
                     </a>
                 </p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby.</p>
+                <p style="color: #666; font-size: 12px;">Cet email a ete envoye par Bobby.</p>
             </div>
         </body></html>
         """
@@ -430,7 +450,7 @@ class EmailService:
                 </p>
                 <p style="color: #666; font-size: 13px;">Ce lien est valable 7 jours.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby - Gemini Consulting.</p>
+                <p style="color: #666; font-size: 12px;">Cet email a ete envoye par Bobby.</p>
             </div>
         </body></html>
         """
@@ -464,7 +484,7 @@ class EmailService:
                     </a>
                 </p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby - Gemini Consulting.</p>
+                <p style="color: #666; font-size: 12px;">Cet email a ete envoye par Bobby.</p>
             </div>
         </body></html>
         """
@@ -498,7 +518,7 @@ class EmailService:
                     </a>
                 </p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby - Gemini Consulting.</p>
+                <p style="color: #666; font-size: 12px;">Cet email a ete envoye par Bobby.</p>
             </div>
         </body></html>
         """
@@ -529,7 +549,7 @@ class EmailService:
                 </p>
                 <p style="color: #666; font-size: 13px;">Ce lien est valable 7 jours.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby - Gemini Consulting.</p>
+                <p style="color: #666; font-size: 12px;">Cet email a ete envoye par Bobby.</p>
             </div>
         </body></html>
         """
@@ -556,7 +576,7 @@ class EmailService:
                 </div>
                 <p>Veuillez traiter cette demande dans Bobby.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby.</p>
+                <p style="color: #666; font-size: 12px;">Cet email a ete envoye par Bobby.</p>
             </div>
         </body></html>
         """
@@ -579,7 +599,7 @@ class EmailService:
                 <p>Le contrat <strong>{contract_ref}</strong> avec <strong>{third_party_name}</strong> a été signé avec succès.</p>
                 <p>Le document signé est archivé dans Bobby.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby.</p>
+                <p style="color: #666; font-size: 12px;">Cet email a ete envoye par Bobby.</p>
             </div>
         </body></html>
         """
@@ -603,7 +623,7 @@ class EmailService:
                 <p>Le document <strong>{doc_type}</strong> de <strong>{third_party_name}</strong> expire dans <strong>{days_left} jour(s)</strong>.</p>
                 <p>Veuillez demander un renouvellement au partenaire.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby.</p>
+                <p style="color: #666; font-size: 12px;">Cet email a ete envoye par Bobby.</p>
             </div>
         </body></html>
         """
@@ -633,7 +653,7 @@ class EmailService:
                     </a>
                 </p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby.</p>
+                <p style="color: #666; font-size: 12px;">Cet email a ete envoye par Bobby.</p>
             </div>
         </body></html>
         """
@@ -660,7 +680,7 @@ class EmailService:
                 </div>
                 <p>{step_message}</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby.</p>
+                <p style="color: #666; font-size: 12px;">Cet email a ete envoye par Bobby.</p>
             </div>
         </body></html>
         """

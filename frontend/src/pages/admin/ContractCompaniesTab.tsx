@@ -19,6 +19,7 @@ const EMPTY_FORM: ContractCompanyRequest = {
   representative_sub_quality: '',
   signatory_name: '',
   invoices_company_mail: '',
+  email_from: '',
   color_code: '#4BBEA8',
   boond_agency_id: null,
   is_default: false,
@@ -180,6 +181,26 @@ function CompanyForm({ initial, onSubmit, onCancel, isLoading }: FormProps) {
           />
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             Utilisé dans le contrat pour la clause de facturation par email (variable <code>{'{{ invoices_company_mail }}'}</code>).
+          </p>
+        </div>
+      </div>
+
+      {/* Email expediteur */}
+      <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">
+          Email expediteur
+        </p>
+        <div>
+          <label className={LABEL_CLS}>Adresse email d'envoi</label>
+          <input
+            className={INPUT_CLS}
+            type="email"
+            value={form.email_from ?? ''}
+            onChange={(e) => set('email_from', e.target.value || null)}
+            placeholder="noreply@geminiconsulting.fr"
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Les emails lies aux contrats de cette societe seront envoyes depuis cette adresse. Le domaine doit etre verifie dans Resend.
           </p>
         </div>
       </div>
@@ -553,6 +574,7 @@ export function ContractCompaniesTab() {
                       representative_sub_quality: company.representative_sub_quality ?? '',
                       signatory_name: company.signatory_name,
                       invoices_company_mail: company.invoices_company_mail ?? '',
+                      email_from: company.email_from ?? '',
                       color_code: company.color_code,
                       boond_agency_id: company.boond_agency_id ?? null,
                       is_default: company.is_default,
