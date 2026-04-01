@@ -1861,7 +1861,7 @@ async def get_charter_download_url(
         raise HTTPException(status_code=404, detail="Charte introuvable.")
 
     s3 = S3StorageClient(settings)
-    url = await s3.generate_presigned_url(charter.file_s3_key)
+    url = await s3.get_presigned_url(charter.file_s3_key)
     return {"url": url, "file_name": charter.file_name}
 
 
@@ -1892,6 +1892,6 @@ async def get_charter_ar_download_url(
         raise HTTPException(status_code=404, detail="Pas d'accuse de reception pour cette charte.")
 
     s3 = S3StorageClient(settings)
-    url = await s3.generate_presigned_url(charter.ar_file_s3_key)
+    url = await s3.get_presigned_url(charter.ar_file_s3_key)
     return {"url": url, "file_name": charter.ar_file_name}
 
