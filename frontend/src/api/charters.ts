@@ -38,9 +38,6 @@ export const chartersApi = {
   upload: async (params: CharterUploadParams): Promise<CharterTemplate> => {
     const form = new FormData();
     form.append('file', params.file);
-    if (params.requiresAcknowledgement && params.arFile) {
-      form.append('ar_file', params.arFile);
-    }
     const response = await apiClient.post<CharterTemplate>(
       '/admin/charters',
       form,
@@ -55,7 +52,20 @@ export const chartersApi = {
         },
       },
     );
-    return response.data;
+    const charter = response.data;
+
+    // Upload AR file in a second request if provided
+    if (params.requiresAcknowledgement && params.arFile) {
+      const arForm = new FormData();
+      arForm.append('file', params.arFile);
+      const arResponse = await apiClient.post<CharterTemplate>(
+        `/admin/charters/${charter.id}/ar`,
+        arForm,
+      );
+      return arResponse.data;
+    }
+
+    return charter;
   },
 
   update: async (id: string, data: { is_active?: boolean; name?: string; version?: string }): Promise<CharterTemplate> => {

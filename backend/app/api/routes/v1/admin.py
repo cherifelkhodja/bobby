@@ -1678,7 +1678,6 @@ async def create_charter(
     document_type: str = Query("charte", pattern="^(charte|politique|document_unilateral|engagement|autre)$"),
     requires_acknowledgement: bool = Query(False),
     file: UploadFile = File(...),
-    ar_file: UploadFile | None = None,
 ):
     """Upload a new charter template PDF. Admin only."""
     from app.contract_management.infrastructure.models import CharterTemplateModel
@@ -1698,20 +1697,6 @@ async def create_charter(
         content_type=file.content_type or "application/pdf",
     )
 
-    ar_s3_key = None
-    ar_file_name = None
-    has_ar_file = ar_file is not None and ar_file.filename and ar_file.size and ar_file.size > 0
-    if requires_acknowledgement and has_ar_file:
-        ar_content = await ar_file.read()
-        ar_ext = ar_file.filename.rsplit(".", 1)[-1].lower() if "." in ar_file.filename else "pdf"
-        ar_s3_key = f"charters/{company_id}/{target}/{slug}_{version}_AR.{ar_ext}"
-        await s3.upload_file(
-            key=ar_s3_key,
-            content=ar_content,
-            content_type=ar_file.content_type or "application/pdf",
-        )
-        ar_file_name = ar_file.filename
-
     charter = CharterTemplateModel(
         name=name,
         version=version,
@@ -1721,13 +1706,54 @@ async def create_charter(
         requires_acknowledgement=requires_acknowledgement,
         file_s3_key=s3_key,
         file_name=file.filename or f"{name}_{version}.{extension}",
-        ar_file_s3_key=ar_s3_key,
-        ar_file_name=ar_file_name,
         is_active=True,
     )
     db.add(charter)
     await db.commit()
     await db.refresh(charter)
+
+    return _charter_to_response(charter)
+
+
+@router.post(
+    "/charters/{charter_id}/ar",
+    summary="Upload AR file for a charter",
+)
+async def upload_charter_ar(
+    charter_id: UUID,
+    admin_id: AdminUser,
+    db: _AsyncSession = Depends(_get_db),
+    file: UploadFile = File(...),
+):
+    """Upload an accusé de réception PDF for a charter. Admin only."""
+    from sqlalchemy import select as _select
+
+    from app.contract_management.infrastructure.models import CharterTemplateModel
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+    result = await db.execute(
+        _select(CharterTemplateModel).where(CharterTemplateModel.id == charter_id)
+    )
+    charter = result.scalar_one_or_none()
+    if not charter:
+        raise HTTPException(status_code=404, detail="Charte introuvable.")
+
+    s3 = S3StorageClient(settings)
+    content = await file.read()
+    extension = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "pdf"
+    slug = charter.name.lower().replace(' ', '_')
+    ar_s3_key = f"charters/{charter.company_id}/{charter.target}/{slug}_{charter.version}_AR.{extension}"
+
+    await s3.upload_file(
+        key=ar_s3_key,
+        content=content,
+        content_type=file.content_type or "application/pdf",
+    )
+
+    charter.ar_file_s3_key = ar_s3_key
+    charter.ar_file_name = file.filename
+    await db.commit()
 
     return _charter_to_response(charter)
 
