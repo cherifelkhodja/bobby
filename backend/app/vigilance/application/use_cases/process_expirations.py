@@ -1,10 +1,16 @@
 """Use case: Process document expirations (CRON job)."""
 
+from collections import defaultdict
+from datetime import datetime, timedelta
+
 import structlog
 
 from app.vigilance.domain.services.compliance_checker import compute_compliance_status
 
 logger = structlog.get_logger()
+
+# Cooldown: don't re-send alerts if already sent within this period
+ALERT_COOLDOWN_DAYS = 7
 
 
 class ProcessExpirationsUseCase:
@@ -14,7 +20,8 @@ class ProcessExpirationsUseCase:
     - VALIDATED documents expiring within 30 days → EXPIRING_SOON
     - VALIDATED / EXPIRING_SOON documents past expiry → EXPIRED
     - Recalculates compliance for affected third parties
-    - Sends notifications
+    - Sends grouped notifications (one email per third party, not per document)
+    - Respects cooldown: no re-alert within 7 days for same third party
     """
 
     def __init__(
@@ -22,10 +29,12 @@ class ProcessExpirationsUseCase:
         document_repository,
         third_party_repository,
         email_service,
+        send_alerts: bool = True,
     ) -> None:
         self._document_repo = document_repository
         self._third_party_repo = third_party_repository
         self._email_service = email_service
+        self._send_alerts = send_alerts
 
     async def execute(self) -> dict:
         """Execute the expiration processing.
@@ -37,6 +46,10 @@ class ProcessExpirationsUseCase:
         expiring_soon_count = 0
         affected_third_parties: set = set()
 
+        # Group alerts by third_party_id
+        expired_by_tp: dict[str, list[str]] = defaultdict(list)
+        expiring_by_tp: dict[str, list[tuple[str, int]]] = defaultdict(list)
+
         # Process expired documents
         expired_docs = await self._document_repo.list_expired()
         for doc in expired_docs:
@@ -44,14 +57,7 @@ class ProcessExpirationsUseCase:
             await self._document_repo.save(doc)
             expired_count += 1
             affected_third_parties.add(doc.third_party_id)
-
-            third_party = await self._third_party_repo.get_by_id(doc.third_party_id)
-            if third_party:
-                await self._email_service.send_document_expired(
-                    to=third_party.contact_email,
-                    third_party_name=third_party.company_name,
-                    doc_type=doc.document_type.display_name,
-                )
+            expired_by_tp[doc.third_party_id].append(doc.document_type.display_name)
 
         # Process expiring soon documents (30 days)
         expiring_docs = await self._document_repo.list_expiring(days_ahead=30)
@@ -61,17 +67,50 @@ class ProcessExpirationsUseCase:
                 await self._document_repo.save(doc)
                 expiring_soon_count += 1
                 affected_third_parties.add(doc.third_party_id)
+                if doc.expires_at:
+                    days_left = max((doc.expires_at - datetime.utcnow()).days, 0)
+                    expiring_by_tp[doc.third_party_id].append(
+                        (doc.document_type.display_name, days_left)
+                    )
 
-                third_party = await self._third_party_repo.get_by_id(doc.third_party_id)
-                if third_party and doc.expires_at:
-                    from datetime import datetime
+        # Send grouped alerts per third party (with cooldown)
+        emails_sent = 0
+        if self._send_alerts:
+            all_tp_ids = set(expired_by_tp.keys()) | set(expiring_by_tp.keys())
+            for tp_id in all_tp_ids:
+                third_party = await self._third_party_repo.get_by_id(tp_id)
+                if not third_party or not third_party.contact_email:
+                    continue
 
-                    days_left = (doc.expires_at - datetime.utcnow()).days
-                    await self._email_service.send_document_expiring(
+                # Cooldown check: skip if alert was sent recently
+                if self._was_recently_alerted(third_party):
+                    logger.info(
+                        "expiration_alert_cooldown",
+                        third_party_id=str(tp_id),
+                        company=third_party.company_name,
+                    )
+                    continue
+
+                expired_docs_list = expired_by_tp.get(tp_id, [])
+                expiring_docs_list = expiring_by_tp.get(tp_id, [])
+
+                try:
+                    await self._email_service.send_document_expiration_summary(
                         to=third_party.contact_email,
-                        third_party_name=third_party.company_name,
-                        doc_type=doc.document_type.display_name,
-                        days_left=max(days_left, 0),
+                        third_party_name=third_party.company_name or "Fournisseur",
+                        expired_docs=expired_docs_list,
+                        expiring_docs=expiring_docs_list,
+                    )
+                    emails_sent += 1
+
+                    # Mark alert timestamp on third party for cooldown
+                    third_party.last_expiration_alert_at = datetime.utcnow()
+                    await self._third_party_repo.save(third_party)
+                except Exception as exc:
+                    logger.warning(
+                        "expiration_alert_email_failed",
+                        third_party_id=str(tp_id),
+                        error=str(exc),
                     )
 
         # Recalculate compliance for affected third parties
@@ -88,7 +127,16 @@ class ProcessExpirationsUseCase:
             "expired": expired_count,
             "expiring_soon": expiring_soon_count,
             "affected_third_parties": len(affected_third_parties),
+            "emails_sent": emails_sent,
         }
 
         logger.info("expirations_processed", **summary)
         return summary
+
+    @staticmethod
+    def _was_recently_alerted(third_party) -> bool:
+        """Check if the third party was alerted within the cooldown period."""
+        last_alert = getattr(third_party, "last_expiration_alert_at", None)
+        if not last_alert:
+            return False
+        return (datetime.utcnow() - last_alert) < timedelta(days=ALERT_COOLDOWN_DAYS)

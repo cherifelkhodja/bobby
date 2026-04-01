@@ -66,6 +66,7 @@ class ThirdParty:
     entity_category: str | None = None  # "ei" or "societe", set when portal company-info is submitted
     company_info_submitted: bool = False  # True only after full POST submit (not draft PATCH)
     compliance_status: ComplianceStatus = ComplianceStatus.PENDING
+    last_expiration_alert_at: datetime | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 

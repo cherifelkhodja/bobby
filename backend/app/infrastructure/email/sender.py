@@ -666,24 +666,68 @@ class EmailService:
         """
         return await self._send_email(to, subject, html_body)
 
+    async def send_document_expiration_summary(
+        self,
+        to: str,
+        third_party_name: str,
+        expired_docs: list[str],
+        expiring_docs: list[tuple[str, int]],
+    ) -> bool:
+        """Send a single grouped email for all expiring/expired documents of a third party."""
+        total = len(expired_docs) + len(expiring_docs)
+        subject = f"Alerte documents ({total}) - {third_party_name} - Bobby"
+
+        expired_html = ""
+        if expired_docs:
+            items = "".join(
+                f'<li style="color: #ef4444;"><strong>{doc}</strong> — expire</li>'
+                for doc in expired_docs
+            )
+            expired_html = f'<h3 style="color: #ef4444; margin-top: 20px;">Documents expires</h3><ul>{items}</ul>'
+
+        expiring_html = ""
+        if expiring_docs:
+            items = "".join(
+                f'<li style="color: #f59e0b;"><strong>{doc}</strong> — expire dans <strong>{days}j</strong></li>'
+                for doc, days in expiring_docs
+            )
+            expiring_html = f'<h3 style="color: #f59e0b; margin-top: 20px;">Documents expirant bientot</h3><ul>{items}</ul>'
+
+        html_body = f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #333;">Alerte documents — {third_party_name}</h1>
+                <p>{total} document(s) necessitent votre attention :</p>
+                {expired_html}
+                {expiring_html}
+                <p style="margin-top: 20px;">Veuillez transmettre les documents renouveles via le portail.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #666; font-size: 12px;">Cet email a ete envoye par Bobby.</p>
+            </div>
+        </body></html>
+        """
+        return await self._send_email(to, subject, html_body)
+
     async def send_document_expired(
         self,
         to: str,
         third_party_name: str,
         doc_type: str,
     ) -> bool:
-        """Notify that a document has expired."""
-        subject = f"Document expiré : {doc_type} - Bobby"
+        """Notify that a document has expired (legacy, kept for backward compat)."""
+        subject = f"Document expire : {doc_type} - Bobby"
         html_body = f"""
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"></head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h1 style="color: #ef4444;">Document expiré</h1>
-                <p>Le document <strong>{doc_type}</strong> de <strong>{third_party_name}</strong> a expiré.</p>
-                <p>Le statut de conformité du tiers a été mis à jour. Un renouvellement est nécessaire.</p>
+                <h1 style="color: #ef4444;">Document expire</h1>
+                <p>Le document <strong>{doc_type}</strong> de <strong>{third_party_name}</strong> a expire.</p>
+                <p>Le statut de conformite du tiers a ete mis a jour. Un renouvellement est necessaire.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                <p style="color: #666; font-size: 12px;">Cet email a été envoyé par Bobby.</p>
+                <p style="color: #666; font-size: 12px;">Cet email a ete envoye par Bobby.</p>
             </div>
         </body></html>
         """

@@ -61,6 +61,7 @@ class ThirdPartyModel(Base):
     company_info_submitted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     contact_email: Mapped[str] = mapped_column(String(255), nullable=False)
     compliance_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    last_expiration_alert_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

@@ -38,6 +38,7 @@ async def check_document_expirations():
             document_repository=DocumentRepository(session),
             third_party_repository=ThirdPartyRepository(session),
             email_service=EmailService(settings),
+            send_alerts=settings.FEATURE_DOCUMENT_EXPIRATION_ALERTS,
         )
         result = await use_case.execute()
         await session.commit()

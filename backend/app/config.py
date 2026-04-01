@@ -129,6 +129,7 @@ class Settings(BaseSettings):
     FEATURE_MAGIC_LINK: bool = True
     FEATURE_EMAIL_NOTIFICATIONS: bool = True
     FEATURE_BOOND_SYNC: bool = True
+    FEATURE_DOCUMENT_EXPIRATION_ALERTS: bool = False
 
     @property
     def frontend_url(self) -> str:

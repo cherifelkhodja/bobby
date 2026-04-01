@@ -89,6 +89,7 @@ class ThirdPartyRepository:
             model.company_info_submitted = third_party.company_info_submitted
             model.contact_email = third_party.contact_email
             model.compliance_status = third_party.compliance_status.value
+            model.last_expiration_alert_at = third_party.last_expiration_alert_at
         else:
             model = self._to_model(third_party)
             self.session.add(model)
@@ -222,6 +223,7 @@ class ThirdPartyRepository:
             company_info_submitted=model.company_info_submitted,
             contact_email=model.contact_email,
             compliance_status=ComplianceStatus(model.compliance_status),
+            last_expiration_alert_at=model.last_expiration_alert_at,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -275,6 +277,7 @@ class ThirdPartyRepository:
             company_info_submitted=entity.company_info_submitted,
             contact_email=entity.contact_email,
             compliance_status=entity.compliance_status.value,
+            last_expiration_alert_at=entity.last_expiration_alert_at,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
         )
