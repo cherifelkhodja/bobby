@@ -71,7 +71,7 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
         arFile: uploadRequiresAr ? uploadArFile ?? undefined : undefined,
       }),
     onSuccess: () => {
-      toast.success('Charte uploadee.');
+      toast.success('Document uploade.');
       resetForm();
       queryClient.invalidateQueries({ queryKey: ['admin-charters', companyId] });
     },
@@ -90,7 +90,7 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => chartersApi.delete(id),
     onSuccess: () => {
-      toast.success('Charte supprimee.');
+      toast.success('Document supprime.');
       queryClient.invalidateQueries({ queryKey: ['admin-charters', companyId] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
