@@ -556,11 +556,11 @@ export function ContractCompaniesTab() {
                 </span>
               </div>
 
-              {/* Chartes */}
+              {/* Documents */}
               <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1.5">
                   <Shield className="h-3.5 w-3.5" />
-                  Chartes
+                  Documents
                 </p>
                 <ChartersTab companyId={company.id} />
               </div>
