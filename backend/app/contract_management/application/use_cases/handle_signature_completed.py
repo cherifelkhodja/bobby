@@ -26,12 +26,14 @@ class HandleSignatureCompletedUseCase:
         signature_service,
         s3_service,
         email_service,
+        company_email_resolver=None,
     ) -> None:
         self._cr_repo = contract_request_repository
         self._contract_repo = contract_repository
         self._signature_service = signature_service
         self._s3 = s3_service
         self._email_service = email_service
+        self._company_email_resolver = company_email_resolver
 
     async def execute(self, procedure_id: str):
         """Execute the use case.
@@ -100,10 +102,18 @@ class HandleSignatureCompletedUseCase:
             await self._cr_repo.save(cr)
 
             # Send notification
+            _from_email, _company_name = None, None
+            if self._company_email_resolver and cr.company_id:
+                try:
+                    _from_email, _company_name = await self._company_email_resolver(cr.company_id)
+                except Exception:
+                    pass
             await self._email_service.send_contract_signed_notification(
                 to=cr.commercial_email,
                 contract_ref=cr.display_reference,
                 third_party_name="",
+                from_email=_from_email,
+                company_name=_company_name,
             )
 
         logger.info(

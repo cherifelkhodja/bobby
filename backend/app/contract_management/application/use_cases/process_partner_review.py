@@ -26,11 +26,13 @@ class ProcessPartnerReviewUseCase:
         contract_repository,
         email_service,
         draft_regenerator=None,
+        company_email_resolver=None,
     ) -> None:
         self._cr_repo = contract_request_repository
         self._contract_repo = contract_repository
         self._email_service = email_service
         self._draft_regenerator = draft_regenerator
+        self._company_email_resolver = company_email_resolver
 
     async def execute(
         self,
@@ -55,6 +57,14 @@ class ProcessPartnerReviewUseCase:
         if not cr:
             raise ContractRequestNotFoundError(str(contract_request_id))
 
+        # Resolve company email context
+        _from_email, _company_name = None, None
+        if self._company_email_resolver and cr.company_id:
+            try:
+                _from_email, _company_name = await self._company_email_resolver(cr.company_id)
+            except Exception:
+                pass
+
         if approved:
             cr.transition_to(ContractRequestStatus.PARTNER_APPROVED)
             # Assigner la référence définitive (format XXX-CC-NNNN)
@@ -75,6 +85,8 @@ class ProcessPartnerReviewUseCase:
                 step_title="Partenaire a approuvé le contrat",
                 step_message=f"Le partenaire a validé le projet de contrat{client_label}. Le contrat peut maintenant être envoyé en signature.",
                 step_color="#10b981",
+                from_email=_from_email,
+                company_name=_company_name,
             )
 
             # Regenerate the draft PDF with the final reference
@@ -110,6 +122,8 @@ class ProcessPartnerReviewUseCase:
                 to=cr.commercial_email,
                 contract_ref=cr.display_reference,
                 step_title="Partenaire demande des modifications",
+                from_email=_from_email,
+                company_name=_company_name,
                 step_message=f"Le partenaire a demandé des modifications sur le contrat"
                 f"{' pour <strong>' + cr.client_name + '</strong>' if cr.client_name else ''}."
                 f"{('<br><br><strong>Commentaires :</strong> ' + comments) if comments else ''}",

@@ -543,6 +543,8 @@ async def validate_commercial(
             ref=cr.display_reference,
             title="Collecte de documents lancée",
             msg=f"Votre validation commerciale a été enregistrée{client_label}. Le tiers a été contacté pour fournir ses documents légaux.",
+            from_email=company_email_from,
+            company_name=company_name,
         )
     elif cr.status == ContractRequestStatus.REDIRECTED_PAYFIT:
         await _notify_commercial(
@@ -921,6 +923,7 @@ async def cancel_contract_request(
     )
 
     client_label = f" pour <strong>{saved.client_name}</strong>" if saved.client_name else ""
+    _c_email, _c_name = await _resolve_company_email_ctx(db, saved.company_id)
     await _notify_commercial(
         EmailService(settings),
         to=saved.commercial_email,
@@ -928,6 +931,8 @@ async def cancel_contract_request(
         title="Demande de contrat annulée",
         msg=f"La demande de contrat{client_label} a été annulée (statut précédent : {previous_status}).",
         color="#ef4444",
+        from_email=_c_email,
+        company_name=_c_name,
     )
 
     name = await _resolve_commercial_name(db, saved.commercial_email)
@@ -1083,6 +1088,8 @@ async def send_draft_to_partner(
         ref=cr.display_reference,
         title="Projet de contrat envoyé au partenaire",
         msg=f"Le projet de contrat{client_label} a été transmis au partenaire pour relecture et validation.",
+        from_email=company_email_from,
+        company_name=company_name,
     )
 
     name = await _resolve_commercial_name(db, cr.commercial_email)
@@ -1263,6 +1270,7 @@ async def push_to_crm(
         raise HTTPException(status_code=400, detail=str(exc))
 
     client_label = f" pour <strong>{cr.client_name}</strong>" if cr.client_name else ""
+    _c_email, _c_name = await _resolve_company_email_ctx(db, cr.company_id)
     await _notify_commercial(
         email_service,
         to=cr.commercial_email,
@@ -1270,6 +1278,8 @@ async def push_to_crm(
         title="Contrat versé dans BoondManager",
         msg=f"Le contrat{client_label} a été archivé et le bon de commande créé dans BoondManager.",
         color="#10b981",
+        from_email=_c_email,
+        company_name=_c_name,
     )
 
     name = await _resolve_commercial_name(db, cr.commercial_email)

@@ -63,6 +63,7 @@ class CreateContractRequestFromEntityUseCase:
         user_repository=None,
         frontend_url: str = "",
         company_repository=None,
+        company_email_resolver=None,
     ) -> None:
         self._cr_repo = contract_request_repository
         self._webhook_repo = webhook_event_repository
@@ -71,6 +72,7 @@ class CreateContractRequestFromEntityUseCase:
         self._user_repo = user_repository
         self._frontend_url = frontend_url
         self._company_repo = company_repository
+        self._company_email_resolver = company_email_resolver
 
     async def execute(
         self,
@@ -187,11 +189,19 @@ class CreateContractRequestFromEntityUseCase:
             if cr.commercial_email:
                 try:
                     contract_link = f"{self._frontend_url}/contracts/{saved.id}"
+                    _from_email, _company_name = None, None
+                    if self._company_email_resolver and cr.company_id:
+                        try:
+                            _from_email, _company_name = await self._company_email_resolver(cr.company_id)
+                        except Exception:
+                            pass
                     await self._email_service.send_commercial_validation_request(
                         to=cr.commercial_email,
                         commercial_name="",
                         contract_ref=reference,
                         link=contract_link,
+                        from_email=_from_email,
+                        company_name=_company_name,
                     )
                 except Exception as email_exc:
                     logger.error(

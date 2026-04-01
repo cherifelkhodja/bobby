@@ -661,11 +661,20 @@ async def submit_contract_review(
         db=db,
     )
 
+    # Resolve company email context
+    async def _resolve_company_email_for_cr(company_id):
+        from sqlalchemy import select as _sel
+        from app.contract_management.infrastructure.models import ContractCompanyModel
+        r = await db.execute(_sel(ContractCompanyModel.email_from, ContractCompanyModel.name).where(ContractCompanyModel.id == company_id))
+        row = r.first()
+        return (row.email_from, row.name) if row else (None, None)
+
     use_case = ProcessPartnerReviewUseCase(
         contract_request_repository=cr_repo,
         contract_repository=contract_repo,
         email_service=email_service,
         draft_regenerator=draft_regenerator,
+        company_email_resolver=_resolve_company_email_for_cr,
     )
 
     updated = await use_case.execute(

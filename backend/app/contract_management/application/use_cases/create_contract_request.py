@@ -57,11 +57,13 @@ class CreateContractRequestUseCase:
         user_repository=None,
         frontend_url: str = "",
         company_repository=None,
+        company_email_resolver=None,
     ) -> None:
         self._cr_repo = contract_request_repository
         self._webhook_repo = webhook_event_repository
         self._crm = crm_service
         self._email_service = email_service
+        self._company_email_resolver = company_email_resolver
         self._user_repo = user_repository
         self._frontend_url = frontend_url
         self._company_repo = company_repository
@@ -315,11 +317,20 @@ class CreateContractRequestUseCase:
                         contract_ref=reference,
                         link=contract_link,
                     )
+                    # Resolve company email context
+                    _from_email, _company_name = None, None
+                    if self._company_email_resolver and company_id:
+                        try:
+                            _from_email, _company_name = await self._company_email_resolver(company_id)
+                        except Exception:
+                            pass
                     email_sent = await self._email_service.send_commercial_validation_request(
                         to=commercial_email,
                         commercial_name=commercial_name,
                         contract_ref=reference,
                         link=contract_link,
+                        from_email=_from_email,
+                        company_name=_company_name,
                     )
                     logger.info(
                         "commercial_validation_email_result",

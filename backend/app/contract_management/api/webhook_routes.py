@@ -25,6 +25,20 @@ logger = structlog.get_logger()
 router = APIRouter(tags=["Webhooks"])
 
 
+def _make_company_email_resolver(db):
+    """Create a company email resolver closure bound to the given DB session."""
+    async def resolver(company_id):
+        from sqlalchemy import select as _sel
+        from app.contract_management.infrastructure.models import ContractCompanyModel
+        r = await db.execute(
+            _sel(ContractCompanyModel.email_from, ContractCompanyModel.name)
+            .where(ContractCompanyModel.id == company_id)
+        )
+        row = r.first()
+        return (row.email_from, row.name) if row else (None, None)
+    return resolver
+
+
 @router.post(
     "/boondmanager/positioning-update",
     response_model=WebhookResponse,
@@ -92,6 +106,7 @@ async def handle_boond_positioning_webhook(
         user_repository=user_repo,
         frontend_url=settings.frontend_url,
         company_repository=cr_repo,
+        company_email_resolver=_make_company_email_resolver(db),
     )
 
     try:
@@ -190,6 +205,7 @@ async def handle_boond_candidate_webhook(
         user_repository=user_repo,
         frontend_url=settings.frontend_url,
         company_repository=cr_repo,
+        company_email_resolver=_make_company_email_resolver(db),
     )
 
     try:
@@ -289,6 +305,7 @@ async def handle_boond_resource_webhook(
         user_repository=user_repo,
         frontend_url=settings.frontend_url,
         company_repository=cr_repo,
+        company_email_resolver=_make_company_email_resolver(db),
     )
 
     try:
@@ -529,6 +546,7 @@ async def handle_yousign_webhook(
             signature_service=yousign,
             s3_service=s3_service,
             email_service=email_service,
+            company_email_resolver=_make_company_email_resolver(db),
         )
 
         await use_case.execute(procedure_id)
