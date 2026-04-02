@@ -1,5 +1,12 @@
 import { apiClient } from './client';
 
+export interface SignaturePreviewItem {
+  charter_template_id: string;
+  label: string;
+  document_kind: 'charter_ar' | 'charter_engagement';
+  signer_role: 'partner' | 'consultant';
+}
+
 export interface SignatureChecklistItem {
   id: string;
   label: string;
@@ -129,9 +136,17 @@ export const contractsApi = {
     return response.data;
   },
 
-  sendForSignature: async (id: string): Promise<ContractRequest> => {
+  getSignaturePreview: async (id: string): Promise<SignaturePreviewItem[]> => {
+    const response = await apiClient.get<SignaturePreviewItem[]>(
+      `/contract-requests/${id}/signature-preview`,
+    );
+    return response.data;
+  },
+
+  sendForSignature: async (id: string, excludedCharterIds?: string[]): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
       `/contract-requests/${id}/send-for-signature`,
+      excludedCharterIds ? { excluded_charter_ids: excludedCharterIds } : undefined,
     );
     return response.data;
   },

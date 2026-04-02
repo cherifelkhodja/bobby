@@ -90,12 +90,7 @@ const ACTION_CONFIG: Partial<
     icon: Send,
     variant: 'primary',
   },
-  partner_approved: {
-    label: 'Envoyer en signature',
-    action: 'send-for-signature',
-    icon: PenTool,
-    variant: 'primary',
-  },
+  // partner_approved: handled separately with signature preview panel
 };
 
 
@@ -117,6 +112,8 @@ export default function ContractDetail() {
   const [linkCopied, setLinkCopied] = useState(false);
 
   const [tempValidatingDocId, setTempValidatingDocId] = useState<string | null>(null);
+  const [showSignaturePreview, setShowSignaturePreview] = useState(false);
+  const [excludedCharterIds, setExcludedCharterIds] = useState<Set<string>>(new Set());
 
   // Commercial validation form state — simplified for contrat cadre
   const [validationForm, setValidationForm] = useState({
@@ -223,8 +220,6 @@ export default function ContractDetail() {
           return contractsApi.generateDraft(id!);
         case 'send-draft-to-partner':
           return contractsApi.sendDraftToPartner(id!);
-        case 'send-for-signature':
-          return contractsApi.sendForSignature(id!);
         case 'push-to-crm':
           return contractsApi.pushToCrm(id!);
         default:
@@ -397,6 +392,23 @@ export default function ContractDetail() {
     onSuccess: () => {
       toast.success('Document uploade.');
       refetchChecklist();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const { data: signaturePreview } = useQuery({
+    queryKey: ['signature-preview', id],
+    queryFn: () => contractsApi.getSignaturePreview(id!),
+    enabled: !!id && cr?.status === 'partner_approved',
+  });
+
+  const sendForSignatureMutation = useMutation({
+    mutationFn: () => contractsApi.sendForSignature(id!, Array.from(excludedCharterIds)),
+    onSuccess: () => {
+      toast.success('Contrat envoye en signature.');
+      setShowSignaturePreview(false);
+      setExcludedCharterIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -826,6 +838,108 @@ export default function ContractDetail() {
             </div>
           </div>
         </Card>
+      )}
+
+      {/* Partner approved — signature preview panel */}
+      {cr.status === 'partner_approved' && isAdv && showSignaturePreview && signaturePreview && (
+        <Card className="mb-6 border-violet-200 dark:border-violet-800">
+          <div className="flex items-start gap-3">
+            <PenTool className="h-5 w-5 text-violet-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-violet-800 dark:text-violet-300">
+                Documents inclus dans la signature
+              </h3>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                Le contrat cadre est toujours inclus. Selectionnez les documents supplementaires a faire signer.
+              </p>
+
+              <div className="mt-3 space-y-1.5">
+                {/* Contract (always included, not toggleable) */}
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
+                  <input type="checkbox" checked disabled className="rounded border-gray-300" />
+                  <span className="text-xs font-medium text-gray-900 dark:text-white">Contrat cadre</span>
+                  <span className="text-[10px] text-gray-400 ml-1">(obligatoire)</span>
+                </div>
+
+                {signaturePreview.length === 0 && (
+                  <p className="text-xs text-gray-400 py-2 text-center">Aucun document supplementaire configure pour cette societe.</p>
+                )}
+
+                {/* Partner documents */}
+                {signaturePreview.filter(i => i.signer_role === 'partner').length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-1">Partenaire</p>
+                    {signaturePreview.filter(i => i.signer_role === 'partner').map(item => (
+                      <label key={item.charter_template_id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!excludedCharterIds.has(item.charter_template_id)}
+                          onChange={(e) => {
+                            const next = new Set(excludedCharterIds);
+                            e.target.checked ? next.delete(item.charter_template_id) : next.add(item.charter_template_id);
+                            setExcludedCharterIds(next);
+                          }}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="text-xs text-gray-900 dark:text-white">{item.label}</span>
+                        <span className="text-[10px] text-gray-400">{item.document_kind === 'charter_engagement' ? 'Signature' : 'AR'}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {/* Consultant documents */}
+                {signaturePreview.filter(i => i.signer_role === 'consultant').length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-purple-600 dark:text-purple-400 mb-1">Collaborateur</p>
+                    {signaturePreview.filter(i => i.signer_role === 'consultant').map(item => (
+                      <label key={item.charter_template_id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!excludedCharterIds.has(item.charter_template_id)}
+                          onChange={(e) => {
+                            const next = new Set(excludedCharterIds);
+                            e.target.checked ? next.delete(item.charter_template_id) : next.add(item.charter_template_id);
+                            setExcludedCharterIds(next);
+                          }}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="text-xs text-gray-900 dark:text-white">{item.label}</span>
+                        <span className="text-[10px] text-gray-400">{item.document_kind === 'charter_engagement' ? 'Signature' : 'AR'}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 flex gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => sendForSignatureMutation.mutate()}
+                  disabled={sendForSignatureMutation.isPending}
+                  isLoading={sendForSignatureMutation.isPending}
+                >
+                  <PenTool className="h-4 w-4 mr-1" />
+                  Confirmer et envoyer en signature
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setShowSignaturePreview(false)}>
+                  Annuler
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Partner approved — show "Envoyer en signature" button (opens preview) */}
+      {cr.status === 'partner_approved' && isAdv && !showSignaturePreview && (
+        <div className="mb-6 flex justify-end">
+          <Button onClick={() => setShowSignaturePreview(true)}>
+            <PenTool className="h-4 w-4 mr-2" />
+            Envoyer en signature
+          </Button>
+        </div>
       )}
 
       {/* Sent for signature — checklist */}
