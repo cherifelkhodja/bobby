@@ -6,7 +6,6 @@ import {
   FileSignature,
   Send,
   PenTool,
-  Upload,
   CheckCircle,
   AlertTriangle,
   Trash2,
@@ -386,18 +385,30 @@ export default function ContractDetail() {
     },
   });
 
-  const [signedFile, setSignedFile] = useState<File | null>(null);
+  const { data: signatureChecklist, refetch: refetchChecklist } = useQuery({
+    queryKey: ['signature-checklist', id],
+    queryFn: () => contractsApi.getSignatureChecklist(id!),
+    enabled: !!id && cr?.status === 'sent_for_signature',
+  });
+
+  const uploadSignatureDocMutation = useMutation({
+    mutationFn: ({ itemId, file }: { itemId: string; file: File }) =>
+      contractsApi.uploadSignatureDocument(id!, itemId, file),
+    onSuccess: () => {
+      toast.success('Document uploade.');
+      refetchChecklist();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
   const markAsSignedMutation = useMutation({
-    mutationFn: (file: File) => contractsApi.markAsSigned(id!, file),
+    mutationFn: () => contractsApi.markAsSigned(id!),
     onSuccess: () => {
       toast.success('Contrat marqué comme signé.');
-      setSignedFile(null);
       queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
       queryClient.invalidateQueries({ queryKey: ['contracts', id] });
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error));
-    },
+    onError: (error) => toast.error(getErrorMessage(error)),
   });
 
   const configureMutation = useMutation({
@@ -817,39 +828,116 @@ export default function ContractDetail() {
         </Card>
       )}
 
-      {/* Sent for signature — waiting banner */}
+      {/* Sent for signature — checklist */}
       {cr.status === 'sent_for_signature' && (
         <Card className="mb-6 border-violet-200 dark:border-violet-800">
           <div className="flex items-start gap-3">
             <PenTool className="h-5 w-5 text-violet-500 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <h3 className="text-sm font-semibold text-violet-800 dark:text-violet-300">
-                Contrat envoyé pour signature
+                Documents a signer
               </h3>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                En attente de la signature de toutes les parties. Une fois signé, uploadez le contrat signé ci-dessous.
+                Uploadez chaque document signe pour valider la signature.
               </p>
-              {isAdv && (
-                <div className="mt-3 flex items-center gap-3 flex-wrap">
-                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <Upload className="h-4 w-4" />
-                    {signedFile ? signedFile.name : 'Choisir le contrat signé…'}
-                    <input
-                      type="file"
-                      accept=".pdf,.docx"
-                      className="hidden"
-                      onChange={(e) => setSignedFile(e.target.files?.[0] ?? null)}
-                    />
-                  </label>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    disabled={!signedFile || markAsSignedMutation.isPending}
-                    onClick={() => signedFile && markAsSignedMutation.mutate(signedFile)}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-1" />
-                    Valider la signature
-                  </Button>
+
+              {isAdv && signatureChecklist && (
+                <div className="mt-4 space-y-2">
+                  {/* Partner documents */}
+                  {signatureChecklist.filter(i => i.signer_role === 'partner').length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-1.5">
+                        Partenaire
+                      </p>
+                      <div className="space-y-1.5">
+                        {signatureChecklist.filter(i => i.signer_role === 'partner').map(item => (
+                          <div key={item.id} className="flex items-center justify-between p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {item.uploaded ? (
+                                <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                              ) : (
+                                <div className="h-4 w-4 rounded-full border-2 border-gray-300 dark:border-gray-600 shrink-0" />
+                              )}
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{item.label}</p>
+                                {item.file_name && (
+                                  <p className="text-[10px] text-gray-500 truncate">{item.file_name}</p>
+                                )}
+                              </div>
+                            </div>
+                            <label className="text-xs text-primary hover:underline cursor-pointer shrink-0 ml-2">
+                              {item.uploaded ? 'Remplacer' : 'Uploader'}
+                              <input
+                                type="file"
+                                accept=".pdf"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) uploadSignatureDocMutation.mutate({ itemId: item.id, file: f });
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Consultant documents */}
+                  {signatureChecklist.filter(i => i.signer_role === 'consultant').length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-purple-600 dark:text-purple-400 mb-1.5">
+                        Collaborateur
+                      </p>
+                      <div className="space-y-1.5">
+                        {signatureChecklist.filter(i => i.signer_role === 'consultant').map(item => (
+                          <div key={item.id} className="flex items-center justify-between p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {item.uploaded ? (
+                                <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                              ) : (
+                                <div className="h-4 w-4 rounded-full border-2 border-gray-300 dark:border-gray-600 shrink-0" />
+                              )}
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{item.label}</p>
+                                {item.file_name && (
+                                  <p className="text-[10px] text-gray-500 truncate">{item.file_name}</p>
+                                )}
+                              </div>
+                            </div>
+                            <label className="text-xs text-primary hover:underline cursor-pointer shrink-0 ml-2">
+                              {item.uploaded ? 'Remplacer' : 'Uploader'}
+                              <input
+                                type="file"
+                                accept=".pdf"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) uploadSignatureDocMutation.mutate({ itemId: item.id, file: f });
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Validate button */}
+                  <div className="pt-3">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={!signatureChecklist.every(i => i.uploaded) || markAsSignedMutation.isPending}
+                      onClick={() => markAsSignedMutation.mutate()}
+                      isLoading={markAsSignedMutation.isPending}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Valider la signature ({signatureChecklist.filter(i => i.uploaded).length}/{signatureChecklist.length})
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

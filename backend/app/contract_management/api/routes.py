@@ -1,6 +1,7 @@
 """Contract management API routes."""
 
 import re
+from datetime import datetime
 from uuid import UUID
 
 import structlog
@@ -979,8 +980,16 @@ async def purge_contract_request(
         ContractConsultantModel,
         ContractModel,
         ContractRequestModel,
+        SignatureUploadModel,
     )
     from app.third_party.infrastructure.models import MagicLinkModel
+
+    # Signature uploads (FK → contract_requests)
+    await db.execute(
+        sa_delete(SignatureUploadModel).where(
+            SignatureUploadModel.contract_request_id == contract_request_id
+        )
+    )
 
     # Charter acknowledgements (FK → contract_requests)
     await db.execute(
@@ -1192,6 +1201,186 @@ async def send_draft_to_partner(
     return _cr_to_response(cr, commercial_name=name)
 
 
+@router.get(
+    "/{contract_request_id}/signature-checklist",
+    summary="Get the list of documents to sign for this contract request",
+)
+async def get_signature_checklist(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the signature checklist (auto-generated from company documents).
+
+    Each item has: id, label, document_kind, signer_role, uploaded (bool), file_name.
+    """
+    from sqlalchemy import select
+
+    from app.contract_management.infrastructure.models import SignatureUploadModel
+
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
+
+    # Ensure checklist rows exist (idempotent)
+    await _ensure_signature_checklist(db, cr)
+
+    result = await db.execute(
+        select(SignatureUploadModel)
+        .where(SignatureUploadModel.contract_request_id == contract_request_id)
+        .order_by(SignatureUploadModel.signer_role, SignatureUploadModel.document_kind, SignatureUploadModel.created_at)
+    )
+    rows = result.scalars().all()
+
+    return [
+        {
+            "id": str(r.id),
+            "label": r.label,
+            "document_kind": r.document_kind,
+            "signer_role": r.signer_role,
+            "charter_template_id": str(r.charter_template_id) if r.charter_template_id else None,
+            "uploaded": r.s3_key is not None,
+            "file_name": r.file_name,
+        }
+        for r in rows
+    ]
+
+
+@router.post(
+    "/{contract_request_id}/signature-checklist/{item_id}/upload",
+    summary="Upload a signed document for the signature checklist",
+)
+async def upload_signature_document(
+    contract_request_id: UUID,
+    item_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+    file: UploadFile = File(...),
+):
+    """Upload a signed PDF for a specific checklist item. ADV/admin only."""
+    from sqlalchemy import select
+
+    from app.config import get_settings
+    from app.contract_management.infrastructure.models import SignatureUploadModel
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+    result = await db.execute(
+        select(SignatureUploadModel).where(
+            SignatureUploadModel.id == item_id,
+            SignatureUploadModel.contract_request_id == contract_request_id,
+        )
+    )
+    item = result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Element introuvable.")
+
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+
+    s3 = S3StorageClient(settings)
+    content = await file.read()
+    ext = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "pdf"
+    ref = cr.display_reference if cr else str(contract_request_id)[:8]
+    s3_key = f"contracts/{ref}/signed/{item.document_kind}_{item.signer_role}_{str(item_id)[:8]}.{ext}"
+
+    await s3.upload_file(key=s3_key, content=content, content_type=file.content_type or "application/pdf")
+
+    item.s3_key = s3_key
+    item.file_name = file.filename
+    item.uploaded_at = datetime.utcnow()
+    await db.commit()
+
+    return {
+        "id": str(item.id),
+        "label": item.label,
+        "document_kind": item.document_kind,
+        "signer_role": item.signer_role,
+        "uploaded": True,
+        "file_name": item.file_name,
+    }
+
+
+async def _ensure_signature_checklist(db, cr) -> None:
+    """Create signature checklist rows if they don't exist yet (idempotent)."""
+    from sqlalchemy import func, select
+
+    from app.contract_management.infrastructure.models import (
+        CharterTemplateModel,
+        SignatureUploadModel,
+    )
+
+    # Check if already created
+    count_result = await db.execute(
+        select(func.count()).select_from(SignatureUploadModel).where(
+            SignatureUploadModel.contract_request_id == cr.id
+        )
+    )
+    if count_result.scalar() > 0:
+        return
+
+    items: list[SignatureUploadModel] = []
+
+    # 1. Always: Contrat cadre signé (partner signs)
+    items.append(SignatureUploadModel(
+        contract_request_id=cr.id,
+        document_kind="contract",
+        signer_role="partner",
+        label="Contrat cadre signe",
+    ))
+
+    # 2. Company charter documents
+    if cr.company_id:
+        result = await db.execute(
+            select(CharterTemplateModel).where(
+                CharterTemplateModel.company_id == cr.company_id,
+                CharterTemplateModel.is_active.is_(True),
+            ).order_by(CharterTemplateModel.target, CharterTemplateModel.created_at)
+        )
+        charters = result.scalars().all()
+
+        is_freelance = cr.third_party_type == "freelance"
+
+        for c in charters:
+            # Determine if this charter needs a signature
+            needs_signature = c.document_type == "engagement" or c.requires_acknowledgement
+
+            if not needs_signature:
+                continue
+
+            # Determine signer role
+            signer_role = c.target  # partner or consultant
+
+            # Check consultant scope
+            if c.target == "consultant" and c.consultant_scope != "all":
+                is_external = cr.third_party_type in ("freelance", "sous_traitant", "portage_salarial")
+                if c.consultant_scope == "external" and not is_external:
+                    continue
+                if c.consultant_scope == "internal" and is_external:
+                    continue
+
+            # Determine document kind and label
+            if c.document_type == "engagement":
+                kind = "charter_engagement"
+                label = f"{c.name} {c.version}"
+            else:
+                kind = "charter_ar"
+                label = f"AR - {c.name} {c.version}"
+
+            items.append(SignatureUploadModel(
+                contract_request_id=cr.id,
+                charter_template_id=c.id,
+                document_kind=kind,
+                signer_role=signer_role,
+                label=label,
+            ))
+
+    for item in items:
+        db.add(item)
+    await db.flush()
+
+
 @router.post(
     "/{contract_request_id}/send-for-signature",
     response_model=ContractRequestResponse,
@@ -1226,48 +1415,71 @@ async def send_for_signature(
 @router.post(
     "/{contract_request_id}/mark-as-signed",
     response_model=ContractRequestResponse,
-    summary="Mark contract as signed and upload signed document",
+    summary="Validate signature (all checklist documents must be uploaded)",
 )
 async def mark_as_signed(
     contract_request_id: UUID,
     user_id: AdvOrAdminUser,
     db: AsyncSession = Depends(get_db),
-    file: UploadFile = File(...),
 ):
-    """Upload the signed contract document and transition CR to SIGNED. ADV/admin only."""
+    """Check all signature documents are uploaded and transition CR to SIGNED. ADV/admin only."""
+    from sqlalchemy import func, select
+
     from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
         ContractRepository,
     )
-    from app.infrastructure.storage.s3_client import S3StorageClient
+    from app.contract_management.infrastructure.models import SignatureUploadModel
 
     settings = get_settings()
     cr_repo = ContractRequestRepository(db)
     contract_repo = ContractRepository(db)
-    s3_service = S3StorageClient(settings)
 
     cr = await cr_repo.get_by_id(contract_request_id)
     if not cr:
         raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
 
-    contracts = await contract_repo.list_by_contract_request(cr.id)
-    if not contracts:
-        raise HTTPException(status_code=400, detail="Aucun contrat généré pour cette demande.")
+    # Ensure checklist exists
+    await _ensure_signature_checklist(db, cr)
 
-    contract = contracts[-1]
-
-    # Upload signed document to S3
-    content = await file.read()
-    extension = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "pdf"
-    s3_key_signed = f"contracts/{contract.reference}/signed_v{contract.version}.{extension}"
-    await s3_service.upload_file(
-        key=s3_key_signed,
-        content=content,
-        content_type=file.content_type or "application/octet-stream",
+    # Check all checklist items are uploaded
+    total_result = await db.execute(
+        select(func.count()).select_from(SignatureUploadModel).where(
+            SignatureUploadModel.contract_request_id == contract_request_id
+        )
     )
+    total = total_result.scalar()
 
-    # Mark contract as signed
-    contract.mark_signed(s3_key_signed)
-    await contract_repo.save(contract)
+    uploaded_result = await db.execute(
+        select(func.count()).select_from(SignatureUploadModel).where(
+            SignatureUploadModel.contract_request_id == contract_request_id,
+            SignatureUploadModel.s3_key.isnot(None),
+        )
+    )
+    uploaded = uploaded_result.scalar()
+
+    if total == 0 or uploaded < total:
+        missing = total - uploaded
+        raise HTTPException(
+            status_code=400,
+            detail=f"Il reste {missing} document(s) a uploader avant de valider la signature.",
+        )
+
+    # Get signed contract s3_key from checklist
+    contract_item = await db.execute(
+        select(SignatureUploadModel).where(
+            SignatureUploadModel.contract_request_id == contract_request_id,
+            SignatureUploadModel.document_kind == "contract",
+        )
+    )
+    contract_upload = contract_item.scalar_one_or_none()
+
+    contracts = await contract_repo.list_by_contract_request(cr.id)
+    if contracts:
+        contract = contracts[-1]
+        s3_key_signed = contract_upload.s3_key if contract_upload else None
+        if s3_key_signed:
+            contract.mark_signed(s3_key_signed)
+            await contract_repo.save(contract)
 
     # Transition CR to SIGNED
     try:

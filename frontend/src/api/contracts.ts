@@ -1,4 +1,15 @@
 import { apiClient } from './client';
+
+export interface SignatureChecklistItem {
+  id: string;
+  label: string;
+  document_kind: 'contract' | 'charter_ar' | 'charter_engagement';
+  signer_role: 'partner' | 'consultant';
+  charter_template_id: string | null;
+  uploaded: boolean;
+  file_name: string | null;
+}
+
 import type {
   ContractRequest,
   ContractRequestListResponse,
@@ -125,13 +136,26 @@ export const contractsApi = {
     return response.data;
   },
 
-  markAsSigned: async (id: string, file: File): Promise<ContractRequest> => {
+  getSignatureChecklist: async (id: string): Promise<SignatureChecklistItem[]> => {
+    const response = await apiClient.get<SignatureChecklistItem[]>(
+      `/contract-requests/${id}/signature-checklist`,
+    );
+    return response.data;
+  },
+
+  uploadSignatureDocument: async (crId: string, itemId: string, file: File): Promise<SignatureChecklistItem> => {
     const form = new FormData();
     form.append('file', file);
+    const response = await apiClient.post<SignatureChecklistItem>(
+      `/contract-requests/${crId}/signature-checklist/${itemId}/upload`,
+      form,
+    );
+    return response.data;
+  },
+
+  markAsSigned: async (id: string): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
       `/contract-requests/${id}/mark-as-signed`,
-      form,
-      { headers: { 'Content-Type': undefined } },
     );
     return response.data;
   },

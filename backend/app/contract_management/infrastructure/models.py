@@ -348,6 +348,31 @@ class CharterTemplateModel(Base):
     )
 
 
+class SignatureUploadModel(Base):
+    """Tracks individual signed documents for a contract request."""
+
+    __tablename__ = "cm_signature_uploads"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    contract_request_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_contract_requests.id", ondelete="CASCADE"), nullable=False,
+    )
+    charter_template_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_charter_templates.id", ondelete="SET NULL"), nullable=True,
+    )
+    document_kind: Mapped[str] = mapped_column(
+        String(30), nullable=False, comment="contract, charter_ar, charter_engagement",
+    )
+    signer_role: Mapped[str] = mapped_column(
+        String(20), nullable=False, comment="partner or consultant",
+    )
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    s3_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    uploaded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class CharterAcknowledgementModel(Base):
     """Record of a charter being acknowledged/signed."""
 
