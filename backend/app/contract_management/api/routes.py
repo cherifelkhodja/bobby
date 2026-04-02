@@ -311,17 +311,22 @@ async def get_contract_request(
     portal_url: str | None = None
     if cr.third_party_id:
         ml_repo = MagicLinkRepository(db)
-        # Try document upload link first, then contract review link
-        active_link = await ml_repo.get_active_by_third_party_and_purpose(
-            cr.third_party_id, MagicLinkPurpose.DOCUMENT_UPLOAD
-        )
-        if not active_link:
+        # Prioritize link type based on CR status
+        if cr.status in (
+            ContractRequestStatus.DRAFT_SENT_TO_PARTNER,
+            ContractRequestStatus.PARTNER_APPROVED,
+        ):
+            purposes = [MagicLinkPurpose.CONTRACT_REVIEW, MagicLinkPurpose.DOCUMENT_UPLOAD]
+        else:
+            purposes = [MagicLinkPurpose.DOCUMENT_UPLOAD, MagicLinkPurpose.CONTRACT_REVIEW]
+        for purpose in purposes:
             active_link = await ml_repo.get_active_by_third_party_and_purpose(
-                cr.third_party_id, MagicLinkPurpose.CONTRACT_REVIEW
+                cr.third_party_id, purpose
             )
-        if active_link:
-            settings = get_settings()
-            portal_url = f"{settings.BOBBY_PORTAL_BASE_URL}/{active_link.token}"
+            if active_link:
+                settings = get_settings()
+                portal_url = f"{settings.BOBBY_PORTAL_BASE_URL}/{active_link.token}"
+                break
 
     name = await _resolve_commercial_name(db, cr.commercial_email)
     return _cr_to_response(cr, commercial_name=name, portal_url=portal_url)
