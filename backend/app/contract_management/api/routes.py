@@ -1682,8 +1682,94 @@ async def mark_as_signed(
             error=str(exc),
         )
 
+    # ── Upload signed documents to Boond (best-effort) ────────────────────
+    try:
+        await _upload_signed_docs_to_boond(db, saved)
+    except Exception as exc:
+        logger.error(
+            "boond_document_upload_failed",
+            cr_id=str(contract_request_id),
+            error=str(exc),
+        )
+
     name = await _resolve_commercial_name(db, saved.commercial_email)
     return _cr_to_response(saved, commercial_name=name)
+
+
+async def _upload_signed_docs_to_boond(db, cr) -> None:
+    """Upload signed documents to BoondManager entities (best-effort).
+
+    - Contract + partner docs → company (boond_provider_id)
+    - Consultant docs → resource (boond_resource_id)
+    """
+    from sqlalchemy import select
+
+    from app.config import get_settings
+    from app.contract_management.infrastructure.models import SignatureUploadModel
+    from app.infrastructure.boond.client import BoondClient
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+
+    # Resolve Boond IDs
+    tp_repo = ThirdPartyRepository(db)
+    tp = await tp_repo.get_by_id(cr.third_party_id) if cr.third_party_id else None
+    boond_company_id = tp.boond_provider_id if tp else None
+    boond_resource_id = cr.boond_resource_id or cr.boond_candidate_id
+
+    if not boond_company_id and not boond_resource_id:
+        logger.info("boond_doc_upload_skipped_no_ids", cr_id=str(cr.id))
+        return
+
+    # Get all uploaded signature items
+    result = await db.execute(
+        select(SignatureUploadModel).where(
+            SignatureUploadModel.contract_request_id == cr.id,
+            SignatureUploadModel.s3_key.isnot(None),
+        )
+    )
+    items = result.scalars().all()
+    if not items:
+        return
+
+    boond = BoondClient(settings)
+    s3 = S3StorageClient(settings)
+
+    for item in items:
+        try:
+            # Download from S3
+            content = await s3.download_file(item.s3_key)
+            filename = item.file_name or f"{item.label}.pdf"
+
+            # Determine Boond target
+            if item.signer_role == "partner" and boond_company_id:
+                await boond.upload_document(
+                    parent_type="company",
+                    parent_id=boond_company_id,
+                    filename=filename,
+                    file_content=content,
+                )
+            elif item.signer_role == "consultant" and boond_resource_id:
+                await boond.upload_document(
+                    parent_type="resourceResume",
+                    parent_id=boond_resource_id,
+                    filename=filename,
+                    file_content=content,
+                )
+
+            logger.info(
+                "boond_doc_uploaded",
+                item_id=str(item.id),
+                label=item.label,
+                role=item.signer_role,
+            )
+        except Exception as exc:
+            logger.warning(
+                "boond_doc_upload_item_failed",
+                item_id=str(item.id),
+                label=item.label,
+                error=str(exc),
+            )
 
 
 @router.post(

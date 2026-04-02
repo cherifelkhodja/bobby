@@ -1020,6 +1020,39 @@ class BoondClient:
             response.raise_for_status()
             logger.info(f"Uploaded CV for candidate {candidate_id}")
 
+    async def upload_document(
+        self,
+        parent_type: str,
+        parent_id: int | str,
+        filename: str,
+        file_content: bytes,
+        content_type: str = "application/pdf",
+    ) -> None:
+        """Upload a document to a BoondManager entity.
+
+        Args:
+            parent_type: Entity type (e.g. "company", "resourceResume").
+            parent_id: BoondManager ID of the parent entity.
+            filename: Filename for the uploaded document.
+            file_content: File content as bytes.
+            content_type: MIME type.
+        """
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+            logger.info(f"Uploading document to {parent_type}/{parent_id}: {filename}")
+            response = await client.post(
+                f"{self.base_url}/documents",
+                auth=self._auth,
+                data={
+                    "parentType": parent_type,
+                    "parentId": str(parent_id),
+                },
+                files={
+                    "file[0]": (filename, file_content, content_type),
+                },
+            )
+            response.raise_for_status()
+            logger.info(f"Uploaded document to {parent_type}/{parent_id}: {filename}")
+
     async def create_candidate_action(
         self,
         candidate_id: str,
