@@ -1547,6 +1547,12 @@ async def _ensure_signature_checklist(db, cr, excluded_charter_ids: set | None =
     for item in items:
         db.add(item)
     await db.flush()
+
+
+@router.post(
+    "/{contract_request_id}/mark-as-signed",
+    response_model=ContractRequestResponse,
+    summary="Validate signature (all checklist documents must be uploaded)",
 )
 async def mark_as_signed(
     contract_request_id: UUID,
