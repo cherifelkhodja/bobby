@@ -1372,7 +1372,14 @@ async def send_for_signature(
         logger.error("send_for_signature_failed", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
 
-    # Create the signature checklist with exclusions
+    # Delete any existing checklist and recreate with exclusions
+    from sqlalchemy import delete as sa_delete
+    from app.contract_management.infrastructure.models import SignatureUploadModel
+    await db.execute(
+        sa_delete(SignatureUploadModel).where(
+            SignatureUploadModel.contract_request_id == contract_request_id
+        )
+    )
     excluded_charter_ids = (body or {}).get("excluded_charter_ids", [])
     excluded = set(excluded_charter_ids)
     await _ensure_signature_checklist(db, cr, excluded_charter_ids=excluded)
