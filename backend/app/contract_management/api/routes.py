@@ -1913,10 +1913,10 @@ async def retry_boond_sync(
     cr = await cr_repo.get_by_id(contract_request_id)
     if not cr:
         raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
-    if cr.status not in ("signed", "archived"):
+    if cr.status not in ("signed", "active", "archived"):
         raise HTTPException(
             status_code=400,
-            detail="La synchronisation Boond n'est disponible que pour les contrats signés ou archivés.",
+            detail="La synchronisation Boond n'est disponible que pour les contrats signes, actifs ou archives.",
         )
 
     use_case = SyncToBoondAfterSigningUseCase(
@@ -1956,10 +1956,10 @@ def _boond_deps(db: AsyncSession, settings):
 def _require_signed_or_archived(cr, contract_request_id: UUID):
     if not cr:
         raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
-    if cr.status not in ("signed", "archived"):
+    if cr.status not in ("signed", "active", "archived"):
         raise HTTPException(
             status_code=400,
-            detail="Action disponible uniquement pour les contrats signés ou archivés.",
+            detail="Action disponible uniquement pour les contrats signes, actifs ou archives.",
         )
 
 
