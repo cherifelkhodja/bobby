@@ -849,103 +849,95 @@ export default function ContractDetail() {
         </Card>
       )}
 
-      {/* Partner approved — signature preview panel */}
-      {cr.status === 'partner_approved' && isAdv && showSignaturePreview && (
-        <Card className="mb-6 border-violet-200 dark:border-violet-800">
-          <div className="flex items-start gap-3">
-            <PenTool className="h-5 w-5 text-violet-500 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold text-violet-800 dark:text-violet-300">
-                Documents inclus dans la signature
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                Le contrat cadre est toujours inclus. Selectionnez les documents supplementaires a faire signer.
-              </p>
+      {/* Partner approved — signature documents selection modal */}
+      <Modal
+        isOpen={showSignaturePreview && cr.status === 'partner_approved'}
+        onClose={() => setShowSignaturePreview(false)}
+        title="Documents inclus dans la signature"
+      >
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600 dark:text-gray-400">
+            Le contrat cadre est toujours inclus. Selectionnez les documents supplementaires a faire signer.
+          </p>
 
-              <div className="mt-3 space-y-1.5">
-                {/* Contract (always included, not toggleable) */}
-                <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
-                  <input type="checkbox" checked disabled className="rounded border-gray-300" />
-                  <span className="text-xs font-medium text-gray-900 dark:text-white">Contrat cadre</span>
-                  <span className="text-[10px] text-gray-400 ml-1">(obligatoire)</span>
-                </div>
-
-                {!signaturePreview && (
-                  <p className="text-xs text-gray-400 py-2 text-center">Chargement...</p>
-                )}
-
-                {signaturePreview && signaturePreview.length === 0 && (
-                  <p className="text-xs text-gray-400 py-2 text-center">Aucun document supplementaire configure pour cette societe.</p>
-                )}
-
-                {/* Partner documents */}
-                {signaturePreview && signaturePreview.filter(i => i.signer_role === 'partner').length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-1">Partenaire</p>
-                    {signaturePreview.filter(i => i.signer_role === 'partner').map(item => (
-                      <label key={item.charter_template_id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={!excludedCharterIds.has(item.charter_template_id)}
-                          onChange={(e) => {
-                            const next = new Set(excludedCharterIds);
-                            e.target.checked ? next.delete(item.charter_template_id) : next.add(item.charter_template_id);
-                            setExcludedCharterIds(next);
-                          }}
-                          className="rounded border-gray-300"
-                        />
-                        <span className="text-xs text-gray-900 dark:text-white">{item.label}</span>
-                        <span className="text-[10px] text-gray-400">{item.document_kind === 'charter_engagement' ? 'Signature' : 'AR'}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-
-                {/* Consultant documents */}
-                {signaturePreview && signaturePreview.filter(i => i.signer_role === 'consultant').length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-purple-600 dark:text-purple-400 mb-1">Collaborateur</p>
-                    {signaturePreview.filter(i => i.signer_role === 'consultant').map(item => (
-                      <label key={item.charter_template_id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={!excludedCharterIds.has(item.charter_template_id)}
-                          onChange={(e) => {
-                            const next = new Set(excludedCharterIds);
-                            e.target.checked ? next.delete(item.charter_template_id) : next.add(item.charter_template_id);
-                            setExcludedCharterIds(next);
-                          }}
-                          className="rounded border-gray-300"
-                        />
-                        <span className="text-xs text-gray-900 dark:text-white">{item.label}</span>
-                        <span className="text-[10px] text-gray-400">{item.document_kind === 'charter_engagement' ? 'Signature' : 'AR'}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4 flex gap-2">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => sendForSignatureMutation.mutate()}
-                  disabled={sendForSignatureMutation.isPending}
-                  isLoading={sendForSignatureMutation.isPending}
-                >
-                  <PenTool className="h-4 w-4 mr-1" />
-                  Confirmer et envoyer en signature
-                </Button>
-                <Button variant="secondary" size="sm" onClick={() => setShowSignaturePreview(false)}>
-                  Annuler
-                </Button>
-              </div>
-            </div>
+          {/* Contract (always included, not toggleable) */}
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
+            <input type="checkbox" checked disabled className="rounded border-gray-300" />
+            <span className="text-xs font-medium text-gray-900 dark:text-white">Contrat cadre</span>
+            <span className="text-[10px] text-gray-400 ml-1">(obligatoire)</span>
           </div>
-        </Card>
-      )}
 
-      {/* Partner approved — preview panel shown below */}
+          {!signaturePreview && (
+            <p className="text-xs text-gray-400 py-2 text-center">Chargement...</p>
+          )}
+
+          {signaturePreview && signaturePreview.length === 0 && (
+            <p className="text-xs text-gray-400 py-2 text-center">Aucun document supplementaire configure pour cette societe.</p>
+          )}
+
+          {/* Partner documents */}
+          {signaturePreview && signaturePreview.filter(i => i.signer_role === 'partner').length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-1">Partenaire</p>
+              {signaturePreview.filter(i => i.signer_role === 'partner').map(item => (
+                <label key={item.charter_template_id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!excludedCharterIds.has(item.charter_template_id)}
+                    onChange={(e) => {
+                      const next = new Set(excludedCharterIds);
+                      e.target.checked ? next.delete(item.charter_template_id) : next.add(item.charter_template_id);
+                      setExcludedCharterIds(next);
+                    }}
+                    className="rounded border-gray-300"
+                  />
+                  <span className="text-xs text-gray-900 dark:text-white">{item.label}</span>
+                  <span className="text-[10px] text-gray-400">{item.document_kind === 'charter_engagement' ? 'Signature' : 'AR'}</span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          {/* Consultant documents */}
+          {signaturePreview && signaturePreview.filter(i => i.signer_role === 'consultant').length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-purple-600 dark:text-purple-400 mb-1">Collaborateur</p>
+              {signaturePreview.filter(i => i.signer_role === 'consultant').map(item => (
+                <label key={item.charter_template_id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!excludedCharterIds.has(item.charter_template_id)}
+                    onChange={(e) => {
+                      const next = new Set(excludedCharterIds);
+                      e.target.checked ? next.delete(item.charter_template_id) : next.add(item.charter_template_id);
+                      setExcludedCharterIds(next);
+                    }}
+                    className="rounded border-gray-300"
+                  />
+                  <span className="text-xs text-gray-900 dark:text-white">{item.label}</span>
+                  <span className="text-[10px] text-gray-400">{item.document_kind === 'charter_engagement' ? 'Signature' : 'AR'}</span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <Button variant="secondary" size="sm" onClick={() => setShowSignaturePreview(false)}>
+              Annuler
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => sendForSignatureMutation.mutate()}
+              disabled={sendForSignatureMutation.isPending}
+              isLoading={sendForSignatureMutation.isPending}
+            >
+              <PenTool className="h-4 w-4 mr-1" />
+              Confirmer
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Sent for signature — checklist */}
       {cr.status === 'sent_for_signature' && (
