@@ -311,9 +311,14 @@ async def get_contract_request(
     portal_url: str | None = None
     if cr.third_party_id:
         ml_repo = MagicLinkRepository(db)
+        # Try document upload link first, then contract review link
         active_link = await ml_repo.get_active_by_third_party_and_purpose(
             cr.third_party_id, MagicLinkPurpose.DOCUMENT_UPLOAD
         )
+        if not active_link:
+            active_link = await ml_repo.get_active_by_third_party_and_purpose(
+                cr.third_party_id, MagicLinkPurpose.CONTRACT_REVIEW
+            )
         if active_link:
             settings = get_settings()
             portal_url = f"{settings.BOBBY_PORTAL_BASE_URL}/{active_link.token}"
@@ -1201,184 +1206,69 @@ async def send_draft_to_partner(
     return _cr_to_response(cr, commercial_name=name)
 
 
-@router.get(
-    "/{contract_request_id}/signature-checklist",
-    summary="Get the list of documents to sign for this contract request",
+@router.post(
+    "/{contract_request_id}/resend-draft-email",
+    response_model=ContractRequestResponse,
+    summary="Resend the contract draft review magic link",
 )
-async def get_signature_checklist(
+async def resend_draft_email(
     contract_request_id: UUID,
     user_id: AdvOrAdminUser,
     db: AsyncSession = Depends(get_db),
 ):
-    """Return the signature checklist (auto-generated from company documents).
+    """Generate a new magic link and resend the draft review email. ADV/admin only."""
+    from app.infrastructure.email.sender import EmailService
+    from app.third_party.application.use_cases.generate_magic_link import (
+        GenerateMagicLinkCommand,
+        GenerateMagicLinkUseCase,
+    )
+    from app.third_party.infrastructure.adapters.postgres_magic_link_repo import (
+        MagicLinkRepository as MLRepo,
+    )
+    from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
+        ThirdPartyRepository as TPRepo,
+    )
 
-    Each item has: id, label, document_kind, signer_role, uploaded (bool), file_name.
-    """
-    from sqlalchemy import select
-
-    from app.contract_management.infrastructure.models import SignatureUploadModel
-
+    settings = get_settings()
     cr_repo = ContractRequestRepository(db)
     cr = await cr_repo.get_by_id(contract_request_id)
     if not cr:
-        raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
 
-    # Ensure checklist rows exist (idempotent)
-    await _ensure_signature_checklist(db, cr)
+    if not cr.third_party_id:
+        raise HTTPException(status_code=400, detail="Aucun tiers lié à cette demande.")
 
-    result = await db.execute(
-        select(SignatureUploadModel)
-        .where(SignatureUploadModel.contract_request_id == contract_request_id)
-        .order_by(SignatureUploadModel.signer_role, SignatureUploadModel.document_kind, SignatureUploadModel.created_at)
-    )
-    rows = result.scalars().all()
+    contact_email = cr.contractualization_contact_email
+    if not contact_email:
+        raise HTTPException(status_code=400, detail="Email de contact non renseigné.")
 
-    return [
-        {
-            "id": str(r.id),
-            "label": r.label,
-            "document_kind": r.document_kind,
-            "signer_role": r.signer_role,
-            "charter_template_id": str(r.charter_template_id) if r.charter_template_id else None,
-            "uploaded": r.s3_key is not None,
-            "file_name": r.file_name,
-        }
-        for r in rows
-    ]
+    email_service = EmailService(settings)
+    company_email_from, company_name = await _resolve_company_email_ctx(db, cr.company_id)
 
-
-@router.post(
-    "/{contract_request_id}/signature-checklist/{item_id}/upload",
-    summary="Upload a signed document for the signature checklist",
-)
-async def upload_signature_document(
-    contract_request_id: UUID,
-    item_id: UUID,
-    user_id: AdvOrAdminUser,
-    db: AsyncSession = Depends(get_db),
-    file: UploadFile = File(...),
-):
-    """Upload a signed PDF for a specific checklist item. ADV/admin only."""
-    from sqlalchemy import select
-
-    from app.config import get_settings
-    from app.contract_management.infrastructure.models import SignatureUploadModel
-    from app.infrastructure.storage.s3_client import S3StorageClient
-
-    settings = get_settings()
-    result = await db.execute(
-        select(SignatureUploadModel).where(
-            SignatureUploadModel.id == item_id,
-            SignatureUploadModel.contract_request_id == contract_request_id,
-        )
-    )
-    item = result.scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Element introuvable.")
-
-    cr_repo = ContractRequestRepository(db)
-    cr = await cr_repo.get_by_id(contract_request_id)
-
-    s3 = S3StorageClient(settings)
-    content = await file.read()
-    ext = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "pdf"
-    ref = cr.display_reference if cr else str(contract_request_id)[:8]
-    s3_key = f"contracts/{ref}/signed/{item.document_kind}_{item.signer_role}_{str(item_id)[:8]}.{ext}"
-
-    await s3.upload_file(key=s3_key, content=content, content_type=file.content_type or "application/pdf")
-
-    item.s3_key = s3_key
-    item.file_name = file.filename
-    item.uploaded_at = datetime.utcnow()
-    await db.commit()
-
-    return {
-        "id": str(item.id),
-        "label": item.label,
-        "document_kind": item.document_kind,
-        "signer_role": item.signer_role,
-        "uploaded": True,
-        "file_name": item.file_name,
-    }
-
-
-async def _ensure_signature_checklist(db, cr) -> None:
-    """Create signature checklist rows if they don't exist yet (idempotent)."""
-    from sqlalchemy import func, select
-
-    from app.contract_management.infrastructure.models import (
-        CharterTemplateModel,
-        SignatureUploadModel,
+    generate_magic_link_uc = GenerateMagicLinkUseCase(
+        third_party_repository=TPRepo(db),
+        magic_link_repository=MLRepo(db),
+        email_service=email_service,
+        portal_base_url=settings.BOBBY_PORTAL_BASE_URL,
     )
 
-    # Check if already created
-    count_result = await db.execute(
-        select(func.count()).select_from(SignatureUploadModel).where(
-            SignatureUploadModel.contract_request_id == cr.id
-        )
-    )
-    if count_result.scalar() > 0:
-        return
-
-    items: list[SignatureUploadModel] = []
-
-    # 1. Always: Contrat cadre signé (partner signs)
-    items.append(SignatureUploadModel(
-        contract_request_id=cr.id,
-        document_kind="contract",
-        signer_role="partner",
-        label="Contrat cadre signe",
-    ))
-
-    # 2. Company charter documents
-    if cr.company_id:
-        result = await db.execute(
-            select(CharterTemplateModel).where(
-                CharterTemplateModel.company_id == cr.company_id,
-                CharterTemplateModel.is_active.is_(True),
-            ).order_by(CharterTemplateModel.target, CharterTemplateModel.created_at)
-        )
-        charters = result.scalars().all()
-
-        is_freelance = cr.third_party_type == "freelance"
-
-        for c in charters:
-            # Determine if this charter needs a signature
-            needs_signature = c.document_type == "engagement" or c.requires_acknowledgement
-
-            if not needs_signature:
-                continue
-
-            # Determine signer role
-            signer_role = c.target  # partner or consultant
-
-            # Check consultant scope
-            if c.target == "consultant" and c.consultant_scope != "all":
-                is_external = cr.third_party_type in ("freelance", "sous_traitant", "portage_salarial")
-                if c.consultant_scope == "external" and not is_external:
-                    continue
-                if c.consultant_scope == "internal" and is_external:
-                    continue
-
-            # Determine document kind and label
-            if c.document_type == "engagement":
-                kind = "charter_engagement"
-                label = f"{c.name} {c.version}"
-            else:
-                kind = "charter_ar"
-                label = f"AR - {c.name} {c.version}"
-
-            items.append(SignatureUploadModel(
+    try:
+        await generate_magic_link_uc.execute(
+            GenerateMagicLinkCommand(
+                third_party_id=cr.third_party_id,
+                purpose=MagicLinkPurpose.CONTRACT_REVIEW,
+                email=contact_email,
                 contract_request_id=cr.id,
-                charter_template_id=c.id,
-                document_kind=kind,
-                signer_role=signer_role,
-                label=label,
-            ))
+                from_email=company_email_from,
+                company_name=company_name,
+            )
+        )
+    except Exception as exc:
+        logger.error("resend_draft_email_failed", error=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
 
-    for item in items:
-        db.add(item)
-    await db.flush()
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
 
 
 @router.get(

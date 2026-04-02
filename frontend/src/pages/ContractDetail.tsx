@@ -380,6 +380,17 @@ export default function ContractDetail() {
     },
   });
 
+  const resendDraftEmailMutation = useMutation({
+    mutationFn: () => contractsApi.resendDraftEmail(id!),
+    onSuccess: () => {
+      toast.success('Email de relecture renvoyé.');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
   const { data: signatureChecklist, refetch: refetchChecklist } = useQuery({
     queryKey: ['signature-checklist', id],
     queryFn: () => contractsApi.getSignatureChecklist(id!),
@@ -835,15 +846,50 @@ export default function ContractDetail() {
       {/* Draft sent to partner — waiting banner */}
       {cr.status === 'draft_sent_to_partner' && (
         <Card className="mb-6 border-sky-200 dark:border-sky-800">
-          <div className="flex items-start gap-3">
-            <Clock className="h-5 w-5 text-sky-500 mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="text-sm font-semibold text-sky-800 dark:text-sky-300">
-                Brouillon envoyé au partenaire
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                En attente de la réponse du partenaire (approbation ou demande de modifications).
-              </p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <Clock className="h-5 w-5 text-sky-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="text-sm font-semibold text-sky-800 dark:text-sky-300">
+                  Brouillon envoyé au partenaire
+                </h3>
+                {cr.contractualization_contact_email && (
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    Lien envoyé à{' '}
+                    <span className="font-medium">{cr.contractualization_contact_email}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {cr.portal_url && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(cr.portal_url!);
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
+                  }}
+                >
+                  {linkCopied ? (
+                    <Check className="h-4 w-4 mr-2 text-green-500" />
+                  ) : (
+                    <Copy className="h-4 w-4 mr-2" />
+                  )}
+                  {linkCopied ? 'Copié !' : 'Copier le lien'}
+                </Button>
+              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => resendDraftEmailMutation.mutate()}
+                disabled={resendDraftEmailMutation.isPending}
+                isLoading={resendDraftEmailMutation.isPending}
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Renvoyer le lien
+              </Button>
             </div>
           </div>
         </Card>

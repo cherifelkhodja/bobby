@@ -136,6 +136,13 @@ export const contractsApi = {
     return response.data;
   },
 
+  resendDraftEmail: async (id: string): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      `/contract-requests/${id}/resend-draft-email`,
+    );
+    return response.data;
+  },
+
   getSignaturePreview: async (id: string): Promise<SignaturePreviewItem[]> => {
     const response = await apiClient.get<SignaturePreviewItem[]>(
       `/contract-requests/${id}/signature-preview`,
