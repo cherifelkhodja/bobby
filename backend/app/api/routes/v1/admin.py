@@ -1775,6 +1775,10 @@ async def update_charter(
     is_active: bool | None = None,
     name: str | None = None,
     version: str | None = None,
+    target: str | None = Query(None, pattern="^(partner|consultant)$"),
+    document_type: str | None = Query(None, pattern="^(charte|politique|document_unilateral|engagement|autre)$"),
+    requires_acknowledgement: bool | None = None,
+    consultant_scope: str | None = Query(None, pattern="^(all|external|internal)$"),
 ):
     """Update a charter template. Admin only."""
     from sqlalchemy import select as _select
@@ -1794,6 +1798,14 @@ async def update_charter(
         charter.name = name
     if version is not None:
         charter.version = version
+    if target is not None:
+        charter.target = target
+    if document_type is not None:
+        charter.document_type = document_type
+    if requires_acknowledgement is not None:
+        charter.requires_acknowledgement = requires_acknowledgement
+    if consultant_scope is not None:
+        charter.consultant_scope = consultant_scope
 
     await db.commit()
 

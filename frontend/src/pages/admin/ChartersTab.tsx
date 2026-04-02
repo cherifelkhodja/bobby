@@ -89,6 +89,25 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
     onError: (error) => toast.error(getErrorMessage(error)),
   });
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', version: '', target: '' as 'partner' | 'consultant', document_type: '' as CharterDocumentType, requires_acknowledgement: false, consultant_scope: '' as CharterConsultantScope });
+
+  const startEdit = (c: CharterTemplate) => {
+    setEditingId(c.id);
+    setEditForm({ name: c.name, version: c.version, target: c.target, document_type: c.document_type, requires_acknowledgement: c.requires_acknowledgement, consultant_scope: c.consultant_scope });
+  };
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof chartersApi.update>[1] }) =>
+      chartersApi.update(id, data),
+    onSuccess: () => {
+      toast.success('Document mis a jour.');
+      setEditingId(null);
+      queryClient.invalidateQueries({ queryKey: ['admin-charters', companyId] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
   const toggleMutation = useMutation({
     mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
       chartersApi.update(id, { is_active }),
@@ -140,87 +159,168 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
     </span>
   );
 
-  const renderCharter = (charter: CharterTemplate) => (
-    <div
-      key={charter.id}
-      className={`flex items-center justify-between p-2.5 rounded-lg border ${
-        charter.is_active
-          ? 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700'
-          : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 opacity-60'
-      }`}
-    >
-      <div className="flex items-center gap-2.5 min-w-0">
-        <FileText className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <p className="text-xs font-medium text-gray-900 dark:text-white truncate">
-              {charter.name}
-            </p>
-            <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded px-1 py-0.5">
-              {charter.version}
-            </span>
-            <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded px-1 py-0.5">
-              {DOCUMENT_TYPE_LABELS[charter.document_type] || charter.document_type}
-            </span>
-            {(charter.requires_acknowledgement || charter.document_type === 'engagement') && (
-              <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded px-1 py-0.5 flex items-center gap-0.5">
-                <FileCheck className="h-2.5 w-2.5" />
-                {charter.document_type === 'engagement' ? 'Signature' : 'AR'}
-              </span>
-            )}
-            {charter.target === 'consultant' && charter.consultant_scope !== 'all' && (
-              <span className="text-[10px] bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded px-1 py-0.5">
-                {CONSULTANT_SCOPE_LABELS[charter.consultant_scope]}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 mt-0.5">
-            <FileLink
-              label={charter.file_name}
-              onDownload={async () => {
-                try { const { url } = await chartersApi.getDownloadUrl(charter.id); window.open(url, '_blank'); }
-                catch { toast.error('Impossible de telecharger.'); }
-              }}
-              onReplace={(file) => replaceMutation.mutate({ id: charter.id, file })}
-            />
-            {charter.ar_file_name && (
-              <>
-                <span className="text-[10px] text-gray-300">|</span>
+  const INPUT_SM = 'text-xs border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300';
+
+  const renderCharter = (charter: CharterTemplate) => {
+    const isEditing = editingId === charter.id;
+    const editIsEngagement = editForm.document_type === 'engagement';
+
+    return (
+      <div
+        key={charter.id}
+        className={`rounded-lg border overflow-hidden ${
+          charter.is_active
+            ? 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+            : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 opacity-60'
+        }`}
+      >
+        {/* Display row */}
+        <div className="flex items-center justify-between p-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <FileText className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  onClick={() => isEditing ? setEditingId(null) : startEdit(charter)}
+                  className="text-xs font-medium text-gray-900 dark:text-white truncate hover:text-primary hover:underline"
+                  title="Modifier"
+                >
+                  {charter.name}
+                </button>
+                <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded px-1 py-0.5">
+                  {charter.version}
+                </span>
+                <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded px-1 py-0.5">
+                  {DOCUMENT_TYPE_LABELS[charter.document_type] || charter.document_type}
+                </span>
+                {(charter.requires_acknowledgement || charter.document_type === 'engagement') && (
+                  <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded px-1 py-0.5 flex items-center gap-0.5">
+                    <FileCheck className="h-2.5 w-2.5" />
+                    {charter.document_type === 'engagement' ? 'Signature' : 'AR'}
+                  </span>
+                )}
+                {charter.target === 'consultant' && charter.consultant_scope !== 'all' && (
+                  <span className="text-[10px] bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded px-1 py-0.5">
+                    {CONSULTANT_SCOPE_LABELS[charter.consultant_scope]}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
                 <FileLink
-                  label={charter.ar_file_name}
+                  label={charter.file_name}
                   onDownload={async () => {
-                    try { const { url } = await chartersApi.getArDownloadUrl(charter.id); window.open(url, '_blank'); }
+                    try { const { url } = await chartersApi.getDownloadUrl(charter.id); window.open(url, '_blank'); }
                     catch { toast.error('Impossible de telecharger.'); }
                   }}
-                  onReplace={(file) => replaceArMutation.mutate({ id: charter.id, file })}
+                  onReplace={(file) => replaceMutation.mutate({ id: charter.id, file })}
                 />
-              </>
-            )}
+                {charter.ar_file_name && (
+                  <>
+                    <span className="text-[10px] text-gray-300">|</span>
+                    <FileLink
+                      label={charter.ar_file_name}
+                      onDownload={async () => {
+                        try { const { url } = await chartersApi.getArDownloadUrl(charter.id); window.open(url, '_blank'); }
+                        catch { toast.error('Impossible de telecharger.'); }
+                      }}
+                      onReplace={(file) => replaceArMutation.mutate({ id: charter.id, file })}
+                    />
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-0.5 shrink-0 ml-2">
+            <button
+              onClick={() => toggleMutation.mutate({ id: charter.id, is_active: !charter.is_active })}
+              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 transition-colors"
+              title={charter.is_active ? 'Desactiver' : 'Activer'}
+            >
+              {charter.is_active ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            </button>
+            <button
+              onClick={() => {
+                if (confirm(`Supprimer "${charter.name} ${charter.version}" ?`)) {
+                  deleteMutation.mutate(charter.id);
+                }
+              }}
+              className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-colors"
+              title="Supprimer"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
+
+        {/* Edit form (inline) */}
+        {isEditing && (
+          <div className="border-t border-gray-100 dark:border-gray-700 px-3 py-2.5 bg-gray-50 dark:bg-gray-800/50">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
+              <div>
+                <label className="block text-[10px] font-medium text-gray-500 mb-0.5">Nom</label>
+                <input className={INPUT_SM} value={editForm.name} onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-500 mb-0.5">Version</label>
+                <input className={INPUT_SM} value={editForm.version} onChange={(e) => setEditForm(f => ({ ...f, version: e.target.value }))} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-500 mb-0.5">Type</label>
+                <select className={INPUT_SM} value={editForm.document_type} onChange={(e) => setEditForm(f => ({ ...f, document_type: e.target.value as CharterDocumentType }))}>
+                  {DOCUMENT_TYPE_OPTIONS.map(dt => <option key={dt} value={dt}>{DOCUMENT_TYPE_LABELS[dt]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-500 mb-0.5">Destinataire</label>
+                <select className={INPUT_SM} value={editForm.target} onChange={(e) => setEditForm(f => ({ ...f, target: e.target.value as 'partner' | 'consultant' }))}>
+                  <option value="partner">Partenaire</option>
+                  <option value="consultant">Collaborateur</option>
+                </select>
+              </div>
+              {editForm.target === 'consultant' && (
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-500 mb-0.5">Scope</label>
+                  <select className={INPUT_SM} value={editForm.consultant_scope} onChange={(e) => setEditForm(f => ({ ...f, consultant_scope: e.target.value as CharterConsultantScope }))}>
+                    <option value="all">Tous</option>
+                    <option value="external">Externes</option>
+                    <option value="internal">Internes</option>
+                  </select>
+                </div>
+              )}
+              {!editIsEngagement && (
+                <div className="flex items-end pb-1">
+                  <label className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <input type="checkbox" checked={editForm.requires_acknowledgement} onChange={(e) => setEditForm(f => ({ ...f, requires_acknowledgement: e.target.checked }))} className="rounded border-gray-300" />
+                    AR requis
+                  </label>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setEditingId(null)} className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1">Annuler</button>
+              <button
+                onClick={() => updateMutation.mutate({
+                  id: charter.id,
+                  data: {
+                    name: editForm.name,
+                    version: editForm.version,
+                    target: editForm.target,
+                    document_type: editForm.document_type,
+                    requires_acknowledgement: editIsEngagement ? false : editForm.requires_acknowledgement,
+                    consultant_scope: editForm.target === 'consultant' ? editForm.consultant_scope : 'all',
+                  },
+                })}
+                disabled={updateMutation.isPending}
+                className="text-xs font-medium text-white bg-primary-600 rounded px-3 py-1 hover:bg-primary-700 disabled:opacity-50"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-      <div className="flex items-center gap-0.5 shrink-0 ml-2">
-        <button
-          onClick={() => toggleMutation.mutate({ id: charter.id, is_active: !charter.is_active })}
-          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 transition-colors"
-          title={charter.is_active ? 'Desactiver' : 'Activer'}
-        >
-          {charter.is_active ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-        </button>
-        <button
-          onClick={() => {
-            if (confirm(`Supprimer "${charter.name} ${charter.version}" ?`)) {
-              deleteMutation.mutate(charter.id);
-            }
-          }}
-          className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-colors"
-          title="Supprimer"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   if (isLoading) return <div className="text-xs text-gray-500 py-2">Chargement...</div>;
 

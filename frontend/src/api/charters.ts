@@ -72,7 +72,15 @@ export const chartersApi = {
     return charter;
   },
 
-  update: async (id: string, data: { is_active?: boolean; name?: string; version?: string }): Promise<CharterTemplate> => {
+  update: async (id: string, data: {
+    is_active?: boolean;
+    name?: string;
+    version?: string;
+    target?: string;
+    document_type?: string;
+    requires_acknowledgement?: boolean;
+    consultant_scope?: string;
+  }): Promise<CharterTemplate> => {
     const response = await apiClient.patch<CharterTemplate>(`/admin/charters/${id}`, null, { params: data });
     return response.data;
   },
