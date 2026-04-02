@@ -571,6 +571,15 @@ export default function ContractDetail() {
                 {actionMutation.isPending ? 'En cours...' : actionConfig.label}
               </Button>
             )}
+            {cr.status === 'partner_approved' && isAdv && (
+              <Button
+                onClick={() => setShowSignaturePreview(true)}
+                disabled={showSignaturePreview}
+              >
+                <PenTool className="h-4 w-4 mr-2" />
+                Envoyer en signature
+              </Button>
+            )}
             {canRollback && (
               <Button
                 variant="secondary"
@@ -932,15 +941,7 @@ export default function ContractDetail() {
         </Card>
       )}
 
-      {/* Partner approved — show "Envoyer en signature" button (opens preview) */}
-      {cr.status === 'partner_approved' && isAdv && !showSignaturePreview && (
-        <div className="mb-6 flex justify-end">
-          <Button onClick={() => setShowSignaturePreview(true)}>
-            <PenTool className="h-4 w-4 mr-2" />
-            Envoyer en signature
-          </Button>
-        </div>
-      )}
+      {/* Partner approved — preview panel shown below */}
 
       {/* Sent for signature — checklist */}
       {cr.status === 'sent_for_signature' && (
