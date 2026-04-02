@@ -1350,7 +1350,7 @@ async def send_for_signature(
     contract_request_id: UUID,
     user_id: AdvOrAdminUser,
     db: AsyncSession = Depends(get_db),
-    excluded_charter_ids: list[str] | None = None,
+    body: dict | None = None,
 ):
     """Transition CR to SENT_FOR_SIGNATURE status. ADV/admin only.
 
@@ -1373,7 +1373,8 @@ async def send_for_signature(
         raise HTTPException(status_code=400, detail=str(exc))
 
     # Create the signature checklist with exclusions
-    excluded = set(excluded_charter_ids or [])
+    excluded_charter_ids = (body or {}).get("excluded_charter_ids", [])
+    excluded = set(excluded_charter_ids)
     await _ensure_signature_checklist(db, cr, excluded_charter_ids=excluded)
 
     name = await _resolve_commercial_name(db, cr.commercial_email)
