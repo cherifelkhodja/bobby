@@ -973,28 +973,44 @@ async def purge_contract_request(
             detail="Seules les demandes annulées peuvent être supprimées définitivement.",
         )
 
-    # Delete related data
+    # Delete related data (respect FK order)
     from app.contract_management.infrastructure.models import (
+        CharterAcknowledgementModel,
         ContractConsultantModel,
         ContractModel,
         ContractRequestModel,
     )
+    from app.third_party.infrastructure.models import MagicLinkModel
 
-    # Delete consultants
+    # Charter acknowledgements (FK → contract_requests)
+    await db.execute(
+        sa_delete(CharterAcknowledgementModel).where(
+            CharterAcknowledgementModel.contract_request_id == contract_request_id
+        )
+    )
+
+    # Consultants (FK → contract_requests)
     await db.execute(
         sa_delete(ContractConsultantModel).where(
             ContractConsultantModel.contract_request_id == contract_request_id
         )
     )
 
-    # Delete generated contracts
+    # Generated contracts (FK → contract_requests)
     await db.execute(
         sa_delete(ContractModel).where(
             ContractModel.contract_request_id == contract_request_id
         )
     )
 
-    # Delete webhook events
+    # Magic links (FK → contract_requests)
+    await db.execute(
+        sa_delete(MagicLinkModel).where(
+            MagicLinkModel.contract_request_id == contract_request_id
+        )
+    )
+
+    # Webhook events
     webhook_repo = WebhookEventRepository(db)
     if cr.boond_positioning_id:
         await webhook_repo.delete_by_prefix(f"positioning_update_{cr.boond_positioning_id}_")
