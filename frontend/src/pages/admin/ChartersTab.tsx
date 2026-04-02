@@ -4,7 +4,7 @@ import { Upload, Trash2, Eye, EyeOff, FileText, FileCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { chartersApi } from '../../api/charters';
-import type { CharterTemplate, CharterDocumentType } from '../../api/charters';
+import type { CharterTemplate, CharterDocumentType, CharterConsultantScope } from '../../api/charters';
 import { Button } from '../../components/ui/Button';
 import { getErrorMessage } from '../../api/client';
 
@@ -25,6 +25,12 @@ const DOCUMENT_TYPE_OPTIONS: CharterDocumentType[] = [
   'charte', 'politique', 'document_unilateral', 'engagement', 'autre',
 ];
 
+const CONSULTANT_SCOPE_LABELS: Record<CharterConsultantScope, string> = {
+  all: 'Tous',
+  external: 'Externes',
+  internal: 'Internes',
+};
+
 interface ChartersTabProps {
   companyId: string;
 }
@@ -40,6 +46,7 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
   const [uploadTarget, setUploadTarget] = useState<'partner' | 'consultant'>('partner');
   const [uploadDocumentType, setUploadDocumentType] = useState<CharterDocumentType>('charte');
   const [uploadRequiresAr, setUploadRequiresAr] = useState(false);
+  const [uploadConsultantScope, setUploadConsultantScope] = useState<CharterConsultantScope>('all');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadArFile, setUploadArFile] = useState<File | null>(null);
 
@@ -48,12 +55,15 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
     queryFn: () => chartersApi.list(companyId),
   });
 
+  const isEngagement = uploadDocumentType === 'engagement';
+
   const resetForm = () => {
     setShowUpload(false);
     setUploadName('');
     setUploadVersion('');
     setUploadDocumentType('charte');
     setUploadRequiresAr(false);
+    setUploadConsultantScope('all');
     setUploadFile(null);
     setUploadArFile(null);
   };
@@ -66,9 +76,10 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
         target: uploadTarget,
         companyId,
         documentType: uploadDocumentType,
-        requiresAcknowledgement: uploadRequiresAr,
+        requiresAcknowledgement: isEngagement ? false : uploadRequiresAr,
+        consultantScope: uploadTarget === 'consultant' ? uploadConsultantScope : 'all',
         file: uploadFile!,
-        arFile: uploadRequiresAr ? uploadArFile ?? undefined : undefined,
+        arFile: !isEngagement && uploadRequiresAr ? uploadArFile ?? undefined : undefined,
       }),
     onSuccess: () => {
       toast.success('Document uploade.');
@@ -151,10 +162,15 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
             <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded px-1 py-0.5">
               {DOCUMENT_TYPE_LABELS[charter.document_type] || charter.document_type}
             </span>
-            {charter.requires_acknowledgement && (
+            {(charter.requires_acknowledgement || charter.document_type === 'engagement') && (
               <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded px-1 py-0.5 flex items-center gap-0.5">
                 <FileCheck className="h-2.5 w-2.5" />
-                AR
+                {charter.document_type === 'engagement' ? 'Signature' : 'AR'}
+              </span>
+            )}
+            {charter.target === 'consultant' && charter.consultant_scope !== 'all' && (
+              <span className="text-[10px] bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded px-1 py-0.5">
+                {CONSULTANT_SCOPE_LABELS[charter.consultant_scope]}
               </span>
             )}
           </div>
@@ -258,7 +274,27 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
                 <option value="consultant">Collaborateur (consultant)</option>
               </select>
             </div>
+            {uploadTarget === 'consultant' && (
+              <div>
+                <label className="block text-[10px] font-medium text-gray-700 dark:text-gray-300 mb-1">Consultants concernes *</label>
+                <select
+                  value={uploadConsultantScope}
+                  onChange={(e) => setUploadConsultantScope(e.target.value as CharterConsultantScope)}
+                  className="w-full text-xs border border-gray-300 dark:border-gray-600 rounded-md px-2.5 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                >
+                  <option value="all">Tous les consultants</option>
+                  <option value="external">Externes uniquement</option>
+                  <option value="internal">Internes uniquement</option>
+                </select>
+              </div>
+            )}
           </div>
+
+          {isEngagement && (
+            <p className="mb-3 text-[10px] text-amber-600 dark:text-amber-400">
+              Les engagements sont signes directement (pas d'accuse de reception).
+            </p>
+          )}
 
           {/* Document file */}
           <div className="mb-3">
@@ -279,24 +315,26 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
             </button>
           </div>
 
-          {/* AR checkbox */}
-          <div className="mb-3">
-            <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
-              <input
-                type="checkbox"
-                checked={uploadRequiresAr}
-                onChange={(e) => {
-                  setUploadRequiresAr(e.target.checked);
-                  if (!e.target.checked) setUploadArFile(null);
-                }}
-                className="rounded border-gray-300"
-              />
-              Accuse de reception requis
-            </label>
-          </div>
+          {/* AR checkbox (hidden for engagements) */}
+          {!isEngagement && (
+            <div className="mb-3">
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={uploadRequiresAr}
+                  onChange={(e) => {
+                    setUploadRequiresAr(e.target.checked);
+                    if (!e.target.checked) setUploadArFile(null);
+                  }}
+                  className="rounded border-gray-300"
+                />
+                Accuse de reception requis
+              </label>
+            </div>
+          )}
 
           {/* AR file */}
-          {uploadRequiresAr && (
+          {!isEngagement && uploadRequiresAr && (
             <div className="mb-3">
               <label className="block text-[10px] font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Accuse de reception (PDF)

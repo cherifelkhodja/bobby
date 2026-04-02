@@ -1632,6 +1632,7 @@ def _charter_to_response(c) -> dict:
         "target": c.target,
         "document_type": c.document_type,
         "requires_acknowledgement": c.requires_acknowledgement,
+        "consultant_scope": c.consultant_scope,
         "file_name": c.file_name,
         "ar_file_name": c.ar_file_name,
         "is_active": c.is_active,
@@ -1677,6 +1678,7 @@ async def create_charter(
     company_id: UUID = Query(..., description="Company ID"),
     document_type: str = Query("charte", pattern="^(charte|politique|document_unilateral|engagement|autre)$"),
     requires_acknowledgement: bool = Query(False),
+    consultant_scope: str = Query("all", pattern="^(all|external|internal)$"),
     file: UploadFile = File(...),
 ):
     """Upload a new charter template PDF. Admin only."""
@@ -1706,6 +1708,7 @@ async def create_charter(
         company_id=company_id,
         document_type=document_type,
         requires_acknowledgement=requires_acknowledgement,
+        consultant_scope=consultant_scope,
         file_s3_key=s3_key,
         file_name=file.filename or f"{name}_{version}.{extension}",
         is_active=True,

@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 
 export type CharterDocumentType = 'charte' | 'politique' | 'document_unilateral' | 'engagement' | 'autre';
+export type CharterConsultantScope = 'all' | 'external' | 'internal';
 
 export interface CharterTemplate {
   id: string;
@@ -9,6 +10,7 @@ export interface CharterTemplate {
   target: 'partner' | 'consultant';
   document_type: CharterDocumentType;
   requires_acknowledgement: boolean;
+  consultant_scope: CharterConsultantScope;
   file_name: string;
   ar_file_name: string | null;
   is_active: boolean;
@@ -23,6 +25,7 @@ export interface CharterUploadParams {
   companyId: string;
   documentType: CharterDocumentType;
   requiresAcknowledgement: boolean;
+  consultantScope: CharterConsultantScope;
   file: File;
   arFile?: File;
 }
@@ -49,6 +52,7 @@ export const chartersApi = {
           company_id: params.companyId,
           document_type: params.documentType,
           requires_acknowledgement: params.requiresAcknowledgement,
+          consultant_scope: params.consultantScope,
         },
       },
     );

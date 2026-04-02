@@ -194,6 +194,7 @@ docker-compose up # Start all services
 - **Chartes** liées aux sociétés via `company_id` (FK), affichées dans chaque carte de société (migration 068)
 - **Chartes enrichies** (migration 069) : `document_type` (charte/politique/document_unilateral/engagement/autre), `requires_acknowledgement` + upload AR optionnel (`ar_file_s3_key`, `ar_file_name`)
 - **Emails contrat** : les emails liés aux contrats/BDC utilisent le `email_from` de la société, les autres emails (auth, annonces) via `noreply@b0bby.fr`
+- **Documents société — circuit de signature** (migration 070) : `consultant_scope` (all/external/internal) pour cibler les docs collaborateur. Engagements signés directement (pas d'AR). Deux circuits : freelance (1 signataire, 2 qualités) vs sous-traitance/portage (2 signataires distincts)
 - **BoondManager** supprimé du menu admin (onglet retiré)
 - **RAZ** fusionné dans l'onglet **Contrats** (sous-onglet Articles / Annexes / RAZ)
 - **Contrat AT** renommé en **Contrats**

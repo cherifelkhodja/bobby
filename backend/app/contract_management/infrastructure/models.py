@@ -333,6 +333,10 @@ class CharterTemplateModel(Base):
         comment="charte, politique, document_unilateral, engagement, autre",
     )
     requires_acknowledgement: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    consultant_scope: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="all",
+        comment="all, external, internal — only relevant when target=consultant",
+    )
     file_s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     ar_file_s3_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
