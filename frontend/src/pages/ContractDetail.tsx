@@ -273,6 +273,14 @@ export default function ContractDetail() {
     onError: (error) => toast.error(getErrorMessage(error)),
   });
 
+  const boondUploadDocsMutation = useMutation({
+    mutationFn: () => contractsApi.boondUploadSignedDocs(id!),
+    onSuccess: (data) => {
+      toast.success(data.message);
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
   const overrideMutation = useMutation({
     mutationFn: () => contractsApi.complianceOverride(id!, overrideReason),
     onSuccess: () => {
@@ -1158,6 +1166,26 @@ export default function ContractDetail() {
                 </Button>
               </div>
             )}
+
+            {/* Action 3 — upload docs signés */}
+            <div className="flex flex-col gap-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                3 · Upload documents signes
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Televerse les documents signes sur les fiches Boond (societe + ressource).
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-1 self-start"
+                disabled={boondUploadDocsMutation.isPending}
+                onClick={() => boondUploadDocsMutation.mutate()}
+              >
+                <RotateCcw className={`h-3.5 w-3.5 mr-1 ${boondUploadDocsMutation.isPending ? 'animate-spin' : ''}`} />
+                {boondUploadDocsMutation.isPending ? 'En cours...' : 'Executer'}
+              </Button>
+            </div>
           </div>
 
           {/* Tout relancer */}

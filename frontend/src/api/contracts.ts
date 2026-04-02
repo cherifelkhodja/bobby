@@ -136,6 +136,11 @@ export const contractsApi = {
     return response.data;
   },
 
+  boondUploadSignedDocs: async (id: string): Promise<{ status: string; message: string }> => {
+    const response = await apiClient.post(`/contract-requests/${id}/boond/upload-signed-documents`);
+    return response.data;
+  },
+
   resendDraftEmail: async (id: string): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
       `/contract-requests/${id}/resend-draft-email`,

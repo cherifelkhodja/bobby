@@ -1751,10 +1751,11 @@ async def _upload_signed_docs_to_boond(db, cr) -> None:
                 )
             elif item.signer_role == "consultant" and boond_resource_id:
                 await boond.upload_document(
-                    parent_type="resourceResume",
+                    parent_type="resource",
                     parent_id=boond_resource_id,
                     filename=filename,
                     file_content=content,
+                    qualify=True,
                 )
 
             logger.info(
@@ -1770,6 +1771,32 @@ async def _upload_signed_docs_to_boond(db, cr) -> None:
                 label=item.label,
                 error=str(exc),
             )
+
+
+@router.post(
+    "/{contract_request_id}/boond/upload-signed-documents",
+    summary="Upload signed documents to BoondManager",
+)
+async def boond_upload_signed_documents(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload all signed checklist documents to BoondManager. ADV/admin only.
+
+    Partner docs → company, consultant docs → resource.
+    """
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
+
+    try:
+        await _upload_signed_docs_to_boond(db, cr)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return {"status": "ok", "message": "Documents televersés vers BoondManager."}
 
 
 @router.post(
