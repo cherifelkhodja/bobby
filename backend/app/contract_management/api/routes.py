@@ -1770,13 +1770,22 @@ async def _upload_signed_docs_to_boond(db, cr) -> dict:
                 uploaded.append(f"{item.label} → societe #{boond_company_id}")
             elif item.signer_role == "consultant" and boond_resource_id:
                 content = await s3.download_file(item.s3_key)
-                await boond.upload_document(
-                    parent_type="resource",
-                    parent_id=boond_resource_id,
-                    filename=filename,
-                    file_content=content,
-                    qualify=True,
-                )
+                # Try resource first, fallback to candidate if 422
+                try:
+                    await boond.upload_document(
+                        parent_type="resource",
+                        parent_id=boond_resource_id,
+                        filename=filename,
+                        file_content=content,
+                        qualify=True,
+                    )
+                except Exception:
+                    await boond.upload_document(
+                        parent_type="candidateResume",
+                        parent_id=boond_resource_id,
+                        filename=filename,
+                        file_content=content,
+                    )
                 uploaded.append(f"{item.label} → ressource #{boond_resource_id}")
             else:
                 target = "societe" if item.signer_role == "partner" else "ressource"
