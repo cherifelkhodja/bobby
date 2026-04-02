@@ -850,7 +850,7 @@ export default function ContractDetail() {
       )}
 
       {/* Partner approved — signature preview panel */}
-      {cr.status === 'partner_approved' && isAdv && showSignaturePreview && signaturePreview && (
+      {cr.status === 'partner_approved' && isAdv && showSignaturePreview && (
         <Card className="mb-6 border-violet-200 dark:border-violet-800">
           <div className="flex items-start gap-3">
             <PenTool className="h-5 w-5 text-violet-500 mt-0.5 flex-shrink-0" />
@@ -870,12 +870,16 @@ export default function ContractDetail() {
                   <span className="text-[10px] text-gray-400 ml-1">(obligatoire)</span>
                 </div>
 
-                {signaturePreview.length === 0 && (
+                {!signaturePreview && (
+                  <p className="text-xs text-gray-400 py-2 text-center">Chargement...</p>
+                )}
+
+                {signaturePreview && signaturePreview.length === 0 && (
                   <p className="text-xs text-gray-400 py-2 text-center">Aucun document supplementaire configure pour cette societe.</p>
                 )}
 
                 {/* Partner documents */}
-                {signaturePreview.filter(i => i.signer_role === 'partner').length > 0 && (
+                {signaturePreview && signaturePreview.filter(i => i.signer_role === 'partner').length > 0 && (
                   <div className="mt-2">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-1">Partenaire</p>
                     {signaturePreview.filter(i => i.signer_role === 'partner').map(item => (
@@ -898,7 +902,7 @@ export default function ContractDetail() {
                 )}
 
                 {/* Consultant documents */}
-                {signaturePreview.filter(i => i.signer_role === 'consultant').length > 0 && (
+                {signaturePreview && signaturePreview.filter(i => i.signer_role === 'consultant').length > 0 && (
                   <div className="mt-2">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-purple-600 dark:text-purple-400 mb-1">Collaborateur</p>
                     {signaturePreview.filter(i => i.signer_role === 'consultant').map(item => (
