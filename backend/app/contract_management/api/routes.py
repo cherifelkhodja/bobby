@@ -1696,7 +1696,7 @@ async def mark_as_signed(
     return _cr_to_response(saved, commercial_name=name)
 
 
-async def _upload_signed_docs_to_boond(db, cr) -> None:
+async def _upload_signed_docs_to_boond(db, cr) -> dict:
     """Upload signed documents to BoondManager entities (best-effort).
 
     - Contract + partner docs → company (boond_provider_id)
@@ -1715,11 +1715,27 @@ async def _upload_signed_docs_to_boond(db, cr) -> None:
     tp_repo = ThirdPartyRepository(db)
     tp = await tp_repo.get_by_id(cr.third_party_id) if cr.third_party_id else None
     boond_company_id = tp.boond_provider_id if tp else None
+    # Refresh CR from DB to get latest Boond IDs (sync may have updated them)
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        ContractRequestRepository as _CRRepo,
+    )
+    cr_repo = _CRRepo(db)
+    cr = await cr_repo.get_by_id(cr.id) or cr
+
     boond_resource_id = cr.boond_resource_id or cr.boond_candidate_id
+
+    logger.info(
+        "boond_doc_upload_ids",
+        cr_id=str(cr.id),
+        boond_company_id=boond_company_id,
+        boond_resource_id=boond_resource_id,
+        cr_boond_resource_id=cr.boond_resource_id,
+        cr_boond_candidate_id=cr.boond_candidate_id,
+    )
 
     if not boond_company_id and not boond_resource_id:
         logger.info("boond_doc_upload_skipped_no_ids", cr_id=str(cr.id))
-        return
+        return {"status": "skipped", "message": "Aucun ID Boond disponible (societe ou ressource)."}
 
     # Get all uploaded signature items
     result = await db.execute(
@@ -1730,26 +1746,29 @@ async def _upload_signed_docs_to_boond(db, cr) -> None:
     )
     items = result.scalars().all()
     if not items:
-        return
+        return {"status": "skipped", "message": "Aucun document signe a televerse."}
 
+    uploaded = []
+    skipped = []
+    errors = []
     boond = BoondClient(settings)
     s3 = S3StorageClient(settings)
 
     for item in items:
         try:
-            # Download from S3
-            content = await s3.download_file(item.s3_key)
             filename = item.file_name or f"{item.label}.pdf"
 
-            # Determine Boond target
             if item.signer_role == "partner" and boond_company_id:
+                content = await s3.download_file(item.s3_key)
                 await boond.upload_document(
                     parent_type="company",
                     parent_id=boond_company_id,
                     filename=filename,
                     file_content=content,
                 )
+                uploaded.append(f"{item.label} → societe #{boond_company_id}")
             elif item.signer_role == "consultant" and boond_resource_id:
+                content = await s3.download_file(item.s3_key)
                 await boond.upload_document(
                     parent_type="resource",
                     parent_id=boond_resource_id,
@@ -1757,20 +1776,31 @@ async def _upload_signed_docs_to_boond(db, cr) -> None:
                     file_content=content,
                     qualify=True,
                 )
+                uploaded.append(f"{item.label} → ressource #{boond_resource_id}")
+            else:
+                target = "societe" if item.signer_role == "partner" else "ressource"
+                skipped.append(f"{item.label} (pas d'ID Boond {target})")
 
-            logger.info(
-                "boond_doc_uploaded",
-                item_id=str(item.id),
-                label=item.label,
-                role=item.signer_role,
-            )
+            logger.info("boond_doc_uploaded", label=item.label, role=item.signer_role)
         except Exception as exc:
-            logger.warning(
-                "boond_doc_upload_item_failed",
-                item_id=str(item.id),
-                label=item.label,
-                error=str(exc),
-            )
+            errors.append(f"{item.label}: {exc}")
+            logger.warning("boond_doc_upload_item_failed", label=item.label, error=str(exc))
+
+    msg_parts = []
+    if uploaded:
+        msg_parts.append(f"{len(uploaded)} doc(s) televerse(s)")
+    if skipped:
+        msg_parts.append(f"{len(skipped)} ignore(s)")
+    if errors:
+        msg_parts.append(f"{len(errors)} erreur(s)")
+
+    return {
+        "status": "ok" if not errors else "partial",
+        "message": " · ".join(msg_parts) if msg_parts else "Rien a televerse.",
+        "uploaded": uploaded,
+        "skipped": skipped,
+        "errors": errors,
+    }
 
 
 @router.post(
@@ -1791,12 +1821,8 @@ async def boond_upload_signed_documents(
     if not cr:
         raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
 
-    try:
-        await _upload_signed_docs_to_boond(db, cr)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-    return {"status": "ok", "message": "Documents televersés vers BoondManager."}
+    result = await _upload_signed_docs_to_boond(db, cr)
+    return result
 
 
 @router.post(
