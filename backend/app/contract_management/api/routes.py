@@ -1715,9 +1715,9 @@ async def _upload_signed_docs_to_boond(db, cr) -> dict:
     tp_repo = ThirdPartyRepository(db)
     tp = await tp_repo.get_by_id(cr.third_party_id) if cr.third_party_id else None
     boond_company_id = tp.boond_provider_id if tp else None
-    # Refresh ThirdParty to get latest Boond IDs (sync may have updated them)
-    if tp:
-        await db.refresh(tp)
+    # Re-fetch ThirdParty to get latest Boond IDs (sync may have updated them)
+    if cr.third_party_id:
+        tp = await tp_repo.get_by_id(cr.third_party_id)
     boond_resource_id = (tp.boond_resource_id if tp else None) or cr.boond_resource_id or cr.boond_candidate_id
 
     logger.info(
