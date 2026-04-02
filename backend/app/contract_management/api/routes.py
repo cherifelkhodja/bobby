@@ -1934,6 +1934,13 @@ async def retry_boond_sync(
         raise HTTPException(status_code=400, detail=str(exc))
 
     logger.info("retry_boond_sync_complete", cr_id=str(saved.id))
+
+    # Also upload signed documents
+    try:
+        await _upload_signed_docs_to_boond(db, saved)
+    except Exception as exc:
+        logger.warning("retry_boond_doc_upload_failed", error=str(exc))
+
     name = await _resolve_commercial_name(db, saved.commercial_email)
     return _cr_to_response(saved, commercial_name=name)
 
