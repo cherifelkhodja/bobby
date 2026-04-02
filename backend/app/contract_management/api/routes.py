@@ -1715,22 +1715,17 @@ async def _upload_signed_docs_to_boond(db, cr) -> dict:
     tp_repo = ThirdPartyRepository(db)
     tp = await tp_repo.get_by_id(cr.third_party_id) if cr.third_party_id else None
     boond_company_id = tp.boond_provider_id if tp else None
-    # Refresh CR from DB to get latest Boond IDs (sync may have updated them)
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-        ContractRequestRepository as _CRRepo,
-    )
-    cr_repo = _CRRepo(db)
-    cr = await cr_repo.get_by_id(cr.id) or cr
-
-    boond_resource_id = cr.boond_resource_id or cr.boond_candidate_id
+    # Refresh ThirdParty to get latest Boond IDs (sync may have updated them)
+    if tp:
+        await db.refresh(tp)
+    boond_resource_id = (tp.boond_resource_id if tp else None) or cr.boond_resource_id or cr.boond_candidate_id
 
     logger.info(
         "boond_doc_upload_ids",
         cr_id=str(cr.id),
         boond_company_id=boond_company_id,
         boond_resource_id=boond_resource_id,
-        cr_boond_resource_id=cr.boond_resource_id,
-        cr_boond_candidate_id=cr.boond_candidate_id,
+        tp_boond_resource_id=tp.boond_resource_id if tp else None,
     )
 
     if not boond_company_id and not boond_resource_id:

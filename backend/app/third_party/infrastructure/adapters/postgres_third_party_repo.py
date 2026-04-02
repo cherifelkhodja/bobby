@@ -179,6 +179,7 @@ class ThirdPartyRepository:
         return ThirdParty(
             id=model.id,
             boond_provider_id=model.boond_provider_id,
+            boond_resource_id=model.boond_resource_id,
             boond_signatory_contact_id=model.boond_signatory_contact_id,
             boond_adv_contact_id=model.boond_adv_contact_id,
             boond_commercial_contact_id=model.boond_commercial_contact_id,
@@ -233,6 +234,7 @@ class ThirdPartyRepository:
         return ThirdPartyModel(
             id=entity.id,
             boond_provider_id=entity.boond_provider_id,
+            boond_resource_id=entity.boond_resource_id,
             boond_signatory_contact_id=entity.boond_signatory_contact_id,
             boond_adv_contact_id=entity.boond_adv_contact_id,
             boond_commercial_contact_id=entity.boond_commercial_contact_id,

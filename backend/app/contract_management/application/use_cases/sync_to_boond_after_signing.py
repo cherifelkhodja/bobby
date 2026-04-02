@@ -334,6 +334,9 @@ class SyncToBoondAfterSigningUseCase:
                     resource_id = new_resource_id
                     cr.boond_candidate_id = new_resource_id
                 cr.boond_consultant_type = "resource"
+                # Store resource ID on ThirdParty for document uploads
+                if tp and resource_id:
+                    tp.boond_resource_id = resource_id
             except Exception as exc:
                 logger.warning(
                     "sync_boond_convert_candidate_failed",
@@ -348,6 +351,8 @@ class SyncToBoondAfterSigningUseCase:
                 cr_id=str(cr.id),
                 resource_id=resource_id,
             )
+            if tp and resource_id:
+                tp.boond_resource_id = resource_id
 
         # ── Étape 4a : Lien fournisseur → ressource (administrative) ───────
         # Link the resource to the provider company and commercial contact.
