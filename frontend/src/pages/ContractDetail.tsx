@@ -238,43 +238,6 @@ export default function ContractDetail() {
     },
   });
 
-  const retryBoondSyncMutation = useMutation({
-    mutationFn: () => contractsApi.retryBoondSync(id!),
-    onSuccess: () => {
-      toast.success('Synchronisation Boond relancée.');
-      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
-      queryClient.invalidateQueries({ queryKey: ['contracts', id] });
-    },
-    onError: (error) => {
-      toast.error(getErrorMessage(error));
-    },
-  });
-
-  const boondConvertMutation = useMutation({
-    mutationFn: () => contractsApi.boondConvertCandidate(id!),
-    onSuccess: (data) => {
-      if (data.already_resource) {
-        toast.info(`Candidat #${data.boond_candidate_id} est déjà une ressource.`);
-      } else {
-        toast.success(`Candidat converti en ressource #${data.new_resource_id}.`);
-      }
-      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
-    },
-    onError: (error) => toast.error(getErrorMessage(error)),
-  });
-
-  const boondCompanyMutation = useMutation({
-    mutationFn: () => contractsApi.boondCreateCompany(id!),
-    onSuccess: (data) => {
-      const msg = data.created_company
-        ? `Société créée (ID ${data.boond_provider_id}), ${data.contacts_created.length} contact(s).`
-        : `Société déjà existante (ID ${data.boond_provider_id}), ${data.contacts_created.length} contact(s) ajouté(s).`;
-      toast.success(msg);
-      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
-    },
-    onError: (error) => toast.error(getErrorMessage(error)),
-  });
-
   const deleteContractMutation = useMutation({
     mutationFn: ({ contractId }: { contractId: string }) =>
       contractsApi.deleteContract(id!, contractId),
@@ -283,14 +246,6 @@ export default function ContractDetail() {
       setDeleteContractTarget(null);
       setDeleteContractConfirmText('');
       queryClient.invalidateQueries({ queryKey: ['contracts', id] });
-    },
-    onError: (error) => toast.error(getErrorMessage(error)),
-  });
-
-  const boondUploadDocsMutation = useMutation({
-    mutationFn: () => contractsApi.boondUploadSignedDocs(id!),
-    onSuccess: (data) => {
-      toast.success(data.message);
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
