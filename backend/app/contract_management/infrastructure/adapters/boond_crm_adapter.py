@@ -372,6 +372,28 @@ class BoondCrmAdapter:
         )
         return int(result_id) if result_id else 0
 
+    async def resolve_resource_id(self, candidate_id: int) -> int | None:
+        """Resolve the Boond resource ID from a candidate ID.
+
+        Fetches /candidates/{id}/information and returns
+        relationships.resource.data.id if present.
+        """
+        try:
+            response = await self._boond._make_request(
+                "GET", f"/candidates/{candidate_id}/information"
+            )
+            resource_data = (
+                response.get("data", {})
+                .get("relationships", {})
+                .get("resource", {})
+                .get("data")
+            )
+            if resource_data and resource_data.get("id"):
+                return int(resource_data["id"])
+        except Exception:
+            pass
+        return None
+
     async def convert_candidate_to_resource(
         self,
         candidate_id: int,

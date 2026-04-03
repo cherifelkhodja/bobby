@@ -351,6 +351,20 @@ class SyncToBoondAfterSigningUseCase:
                 cr_id=str(cr.id),
                 resource_id=resource_id,
             )
+            # Resolve actual resource ID from Boond candidate relationships
+            try:
+                resolved = await self._crm.resolve_resource_id(resource_id)
+                if resolved and resolved != resource_id:
+                    logger.info(
+                        "sync_boond_resolved_resource_id",
+                        cr_id=str(cr.id),
+                        candidate_id=resource_id,
+                        resolved_resource_id=resolved,
+                    )
+                    resource_id = resolved
+                    cr.boond_resource_id = resolved
+            except Exception:
+                pass  # Best effort
             if tp and resource_id:
                 tp.boond_resource_id = resource_id
 
