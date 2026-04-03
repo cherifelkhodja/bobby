@@ -43,9 +43,8 @@ def upgrade() -> None:
     # Fix: restore archived CRs that should be active
     op.execute(sa.text("""
         UPDATE cm_contract_requests
-        SET status = 'active',
-            status_history = status_history || '[{"status": "active", "entered_at": "' || now()::text || '"}]'::jsonb
-        WHERE reference IN ('GEM-CC-001')
+        SET status = 'active'
+        WHERE reference = 'GEM-CC-001'
         AND status = 'archived'
     """))
 
