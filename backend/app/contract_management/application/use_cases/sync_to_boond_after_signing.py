@@ -384,6 +384,10 @@ class SyncToBoondAfterSigningUseCase:
                     error=str(exc),
                 )
 
+        # Persist boond_resource_id on ThirdParty
+        if tp and tp.boond_resource_id:
+            await self._tp_repo.save(tp)
+
         # ── Étapes 4b/5 (Contrat Boond + BDC) → gérées par le workflow BDC ──
         # Le contrat cadre ne crée pas de contrat Boond ni de bon de commande.
         # Ces étapes seront effectuées lors de la création du BDC.
