@@ -1911,6 +1911,21 @@ async def delete_contract(
     await db.execute(
         sa_delete(ContractModel).where(ContractModel.id == contract_id)
     )
+
+    # Reset CR reference if no more contracts with this reference
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if cr and cr.reference == ref:
+        remaining = await db.execute(
+            sa_select(ContractModel).where(
+                ContractModel.contract_request_id == contract_request_id,
+                ContractModel.reference == ref,
+            )
+        )
+        if not remaining.scalars().first():
+            cr.reference = None
+            await cr_repo.save(cr)
+
     await db.commit()
 
     audit_logger.log(
