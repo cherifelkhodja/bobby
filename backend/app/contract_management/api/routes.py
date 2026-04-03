@@ -1941,6 +1941,9 @@ async def retry_boond_sync(
 
     logger.info("retry_boond_sync_complete", cr_id=str(saved.id))
 
+    # Commit sync changes (boond_resource_id etc.) before uploading docs
+    await db.commit()
+
     # Also upload signed documents
     try:
         await _upload_signed_docs_to_boond(db, saved)
