@@ -398,8 +398,9 @@ class SyncToBoondAfterSigningUseCase:
                     error=str(exc),
                 )
 
-        # Persist boond_resource_id on ThirdParty
-        if tp and tp.boond_resource_id:
+        # Persist resource_id on ThirdParty (always use the resolved local variable)
+        if tp and resource_id:
+            tp.boond_resource_id = resource_id
             await self._tp_repo.save(tp)
 
         # ── Étapes 4b/5 (Contrat Boond + BDC) → gérées par le workflow BDC ──
