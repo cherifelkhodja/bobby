@@ -462,8 +462,8 @@ export default function ContractDetail() {
     validationForm.third_party_type !== '' &&
     validationForm.contact_email !== '';
 
-  const canCancel = cr && isAdv && cr.status !== 'cancelled' && cr.status !== 'signed' && cr.status !== 'archived' && cr.status !== 'redirected_payfit';
-  const canRollback = cr && isAdv && cr.status !== 'pending_commercial_validation' && cr.status !== 'cancelled' && cr.status !== 'archived';
+  const canCancel = cr && isAdv && cr.status !== 'cancelled' && cr.status !== 'signed' && cr.status !== 'active' && cr.status !== 'archived' && cr.status !== 'redirected_payfit';
+  const canRollback = cr && isAdv && cr.status !== 'pending_commercial_validation' && cr.status !== 'cancelled' && cr.status !== 'archived' && cr.status !== 'active';
 
   const prePartnerStatuses = new Set([
     'reviewing_compliance',
