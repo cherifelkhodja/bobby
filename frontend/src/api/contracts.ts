@@ -136,6 +136,16 @@ export const contractsApi = {
     return response.data;
   },
 
+  deleteContract: async (crId: string, contractId: string): Promise<{ status: string; message: string }> => {
+    const response = await apiClient.delete(`/contract-requests/${crId}/contracts/${contractId}`);
+    return response.data;
+  },
+
+  deleteFrameworkContract: async (crId: string, fcId: string): Promise<{ status: string; message: string }> => {
+    const response = await apiClient.delete(`/contract-requests/${crId}/framework-contracts/${fcId}`);
+    return response.data;
+  },
+
   boondUploadSignedDocs: async (id: string): Promise<{ status: string; message: string }> => {
     const response = await apiClient.post(`/contract-requests/${id}/boond/upload-signed-documents`);
     return response.data;

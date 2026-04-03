@@ -109,6 +109,8 @@ export default function ContractDetail() {
   const [overrideReason, setOverrideReason] = useState('');
   const [showOverride, setShowOverride] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [deleteContractTarget, setDeleteContractTarget] = useState<{ id: string; reference: string } | null>(null);
+  const [deleteContractConfirmText, setDeleteContractConfirmText] = useState('');
   const [linkCopied, setLinkCopied] = useState(false);
 
   const [tempValidatingDocId, setTempValidatingDocId] = useState<string | null>(null);
@@ -269,6 +271,18 @@ export default function ContractDetail() {
         : `Société déjà existante (ID ${data.boond_provider_id}), ${data.contacts_created.length} contact(s) ajouté(s).`;
       toast.success(msg);
       queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const deleteContractMutation = useMutation({
+    mutationFn: ({ contractId }: { contractId: string }) =>
+      contractsApi.deleteContract(id!, contractId),
+    onSuccess: (data) => {
+      toast.success(data.message);
+      setDeleteContractTarget(null);
+      setDeleteContractConfirmText('');
+      queryClient.invalidateQueries({ queryKey: ['contracts', id] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -1877,6 +1891,15 @@ export default function ContractDetail() {
                         {isProvisional ? `${c.reference} v${c.version}.pdf` : `${c.reference}.pdf`}
                       </button>
                     )}
+                    {user?.role === 'admin' && (
+                      <button
+                        onClick={() => setDeleteContractTarget({ id: c.id, reference: c.reference })}
+                        className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        title="Supprimer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -1884,6 +1907,52 @@ export default function ContractDetail() {
           </div>
         </Card>
       )}
+
+      {/* Delete contract confirmation modal (double verification) */}
+      <Modal
+        isOpen={!!deleteContractTarget}
+        onClose={() => { setDeleteContractTarget(null); setDeleteContractConfirmText(''); }}
+        title="Supprimer le contrat"
+      >
+        {deleteContractTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Supprimer definitivement le contrat <strong>{deleteContractTarget.reference}</strong> ?
+            </p>
+            <p className="text-sm text-red-600 dark:text-red-400">
+              Cette action est irreversible. Les fichiers PDF associes seront aussi supprimes.
+            </p>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">
+                Tapez <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-red-600 font-mono">{deleteContractTarget.reference}</code> pour confirmer
+              </label>
+              <input
+                type="text"
+                value={deleteContractConfirmText}
+                onChange={(e) => setDeleteContractConfirmText(e.target.value)}
+                placeholder={deleteContractTarget.reference}
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-mono"
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+              <Button variant="secondary" size="sm" onClick={() => { setDeleteContractTarget(null); setDeleteContractConfirmText(''); }}>
+                Annuler
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                disabled={deleteContractConfirmText !== deleteContractTarget.reference || deleteContractMutation.isPending}
+                isLoading={deleteContractMutation.isPending}
+                onClick={() => deleteContractMutation.mutate({ contractId: deleteContractTarget.id })}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Supprimer
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Metadata */}
       <Card>

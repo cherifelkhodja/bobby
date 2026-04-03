@@ -1826,6 +1826,104 @@ async def boond_upload_signed_documents(
     return result
 
 
+@router.delete(
+    "/{contract_request_id}/framework-contracts/{fc_id}",
+    summary="Delete a framework contract (admin only)",
+)
+async def delete_framework_contract(
+    contract_request_id: UUID,
+    fc_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Permanently delete a framework contract. Admin only."""
+    from sqlalchemy import delete as sa_delete, select as sa_select
+
+    from app.contract_management.infrastructure.models import FrameworkContractModel
+
+    result = await db.execute(
+        sa_select(FrameworkContractModel).where(
+            FrameworkContractModel.id == fc_id,
+        )
+    )
+    fc = result.scalar_one_or_none()
+    if not fc:
+        raise HTTPException(status_code=404, detail="Contrat cadre introuvable.")
+
+    ref = fc.reference
+    await db.execute(
+        sa_delete(FrameworkContractModel).where(FrameworkContractModel.id == fc_id)
+    )
+    await db.commit()
+
+    audit_logger.log(
+        AuditAction.CONTRACT_REQUEST_CANCELLED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(fc_id),
+        details={"action": "delete_framework_contract", "reference": ref},
+    )
+
+    return {"status": "ok", "message": f"Contrat cadre {ref} supprime."}
+
+
+@router.delete(
+    "/{contract_request_id}/contracts/{contract_id}",
+    summary="Delete a contract document (admin only)",
+)
+async def delete_contract(
+    contract_request_id: UUID,
+    contract_id: UUID,
+    user_id: AdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Permanently delete a contract document. Admin only."""
+    from sqlalchemy import delete as sa_delete, select as sa_select
+
+    from app.contract_management.infrastructure.models import ContractModel
+
+    result = await db.execute(
+        sa_select(ContractModel).where(
+            ContractModel.id == contract_id,
+            ContractModel.contract_request_id == contract_request_id,
+        )
+    )
+    contract = result.scalar_one_or_none()
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contrat introuvable.")
+
+    ref = contract.reference
+
+    # Delete S3 files (best-effort)
+    try:
+        from app.config import get_settings
+        from app.infrastructure.storage.s3_client import S3StorageClient
+
+        settings = get_settings()
+        s3 = S3StorageClient(settings)
+        if contract.s3_key_draft:
+            await s3.delete_file(contract.s3_key_draft)
+        if contract.s3_key_signed:
+            await s3.delete_file(contract.s3_key_signed)
+    except Exception:
+        pass
+
+    await db.execute(
+        sa_delete(ContractModel).where(ContractModel.id == contract_id)
+    )
+    await db.commit()
+
+    audit_logger.log(
+        AuditAction.CONTRACT_REQUEST_CANCELLED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(contract_id),
+        details={"action": "delete_contract", "reference": ref},
+    )
+
+    return {"status": "ok", "message": f"Contrat {ref} supprime."}
+
+
 @router.post(
     "/{contract_request_id}/push-to-crm",
     response_model=ContractRequestResponse,
