@@ -45,6 +45,7 @@ class ThirdPartyRepository:
 
         if model:
             model.boond_provider_id = third_party.boond_provider_id
+            model.boond_resource_id = third_party.boond_resource_id
             model.boond_signatory_contact_id = third_party.boond_signatory_contact_id
             model.boond_adv_contact_id = third_party.boond_adv_contact_id
             model.boond_commercial_contact_id = third_party.boond_commercial_contact_id
