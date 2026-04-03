@@ -8,7 +8,7 @@ import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import AdvOrAdminUser, ContractAccessUser
+from app.api.dependencies import AdminUser, AdvOrAdminUser, ContractAccessUser
 from app.config import get_settings
 from app.contract_management.api.schemas import (
     ArticleOverridesRequest,
