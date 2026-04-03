@@ -40,6 +40,15 @@ def upgrade() -> None:
         WHERE reference = 'CRA-CC-002'
     """))
 
+    # Fix: restore archived CRs that should be active
+    op.execute(sa.text("""
+        UPDATE cm_contract_requests
+        SET status = 'active',
+            status_history = status_history || '[{"status": "active", "entered_at": "' || now()::text || '"}]'::jsonb
+        WHERE reference IN ('GEM-CC-001')
+        AND status = 'archived'
+    """))
+
 
 def downgrade() -> None:
     # No safe downgrade for data fixes

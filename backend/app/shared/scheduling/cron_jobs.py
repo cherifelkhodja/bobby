@@ -207,10 +207,11 @@ async def archive_inactive_contract_requests():
 
             fc = await fc_repo.get_active_by_third_party(cr.third_party_id)
             if not fc:
-                # No FC → archive the CR
-                cr.transition_to(ContractRequestStatus.ARCHIVED)
-                await cr_repo.save(cr)
-                archived_count += 1
+                # No FC → only archive if the CR is old (> 6 months)
+                if cr.updated_at and cr.updated_at < six_months_ago:
+                    cr.transition_to(ContractRequestStatus.ARCHIVED)
+                    await cr_repo.save(cr)
+                    archived_count += 1
                 continue
 
             # Check if any PO is still active
