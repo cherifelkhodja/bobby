@@ -188,6 +188,20 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-06-09 (fix: génération devis Thales — erreur Boond 422 schéma)
+
+**Problème** : Toutes les lignes de la génération de devis Thales échouaient avec une erreur BoondManager `422 — code 1000 (Incorrect request / JSON schema)` sur `POST /apps/quotations/quotations`.
+
+**Cause** : Le payload ne respectait pas le schéma `schemas/apps/quotations/quotations` sur 3 points :
+1. Relation `billingDetail` envoyée avec `type: "detail"` → le schéma exige l'enum `"billingdetail"`.
+2. Chaque `quotationRecords[]` doit porter un `id` (string `^[1-9][0-9]*$`) — champ requis, manquant.
+3. `turnoverExcludingTax` / `turnoverIncludingTax` doivent être des **strings** (alors que `amountExcludingTax` reste un `number`) — on envoyait des floats.
+
+**Correctifs** :
+- `quotation_line.py::to_boond_record()` : ajout de `id` (défaut `"1"`), `turnover*` sérialisés en strings `f"{x:.2f}"`.
+- `quotation.py::to_boond_payload()` : `billingDetail.data.type` → `"billingdetail"`.
+- `boond_adapter.py::create_quotation()` : log du body complet de la réponse Boond + extraction du `errors[].source.pointer` dans le message d'erreur (plus de troncature à 500 car. qui masquait le champ fautif).
+
 ### 2026-04-01 (refactor: réorganisation onglets admin)
 
 - **Invitations** fusionné dans l'onglet **Utilisateurs** (InvitationsTab rendu dans UsersTab)

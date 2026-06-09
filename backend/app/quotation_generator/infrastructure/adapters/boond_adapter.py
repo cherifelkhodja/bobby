@@ -36,6 +36,42 @@ class BoondManagerAdapter(ERPPort):
         """Create HTTP client with auth and timeout."""
         return httpx.AsyncClient(timeout=self.timeout)
 
+    @staticmethod
+    def _format_boond_errors(response: httpx.Response) -> str:
+        """Extract a readable message from a BoondManager error response.
+
+        BoondManager returns JSON:API style errors with a ``source.pointer``
+        that designates the exact invalid field. We surface that pointer so the
+        failure is actionable instead of a generic "schema error".
+
+        Args:
+            response: The failed HTTP response.
+
+        Returns:
+            A human-readable error message including the offending field(s).
+        """
+        try:
+            body = response.json()
+        except ValueError:
+            return response.text[:500]
+
+        errors = body.get("errors")
+        if not errors:
+            return response.text[:500]
+
+        parts = []
+        for err in errors:
+            detail = err.get("detail", "")
+            pointer = err.get("source", {}).get("pointer", "")
+            parameter = err.get("source", {}).get("parameter", "")
+            location = pointer or parameter
+            if location:
+                parts.append(f"{detail} (champ: {location})")
+            else:
+                parts.append(detail)
+
+        return "; ".join(p for p in parts if p) or response.text[:500]
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=4),
@@ -76,10 +112,21 @@ class BoondManagerAdapter(ERPPort):
                     )
 
                 if response.status_code >= 400:
-                    error_text = response.text[:500]
+                    # Log the full response body so the BoondManager schema error
+                    # (errors[].source.pointer) is never truncated away.
+                    logger.error(
+                        "BoondManager rejected quotation creation (status %s). "
+                        "Payload sent: %s\nResponse body: %s",
+                        response.status_code,
+                        payload,
+                        response.text,
+                    )
                     raise BoondManagerAPIError(
                         status_code=response.status_code,
-                        message=f"Failed to create quotation: {error_text}",
+                        message=(
+                            "Failed to create quotation: "
+                            f"{self._format_boond_errors(response)}"
+                        ),
                     )
 
                 data = response.json()

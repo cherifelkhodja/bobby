@@ -76,20 +76,29 @@ class QuotationLine:
         """
         return int(self.tax_rate * 100)
 
-    def to_boond_record(self) -> dict:
+    def to_boond_record(self, record_id: str = "1") -> dict:
         """Convert to BoondManager quotation record format.
+
+        The BoondManager schema (``schemas/apps/quotations/quotations``) requires
+        each record to carry an ``id`` (string matching ``^[1-9][0-9]*$``) and
+        expects ``turnoverExcludingTax`` / ``turnoverIncludingTax`` to be sent as
+        strings, while ``amountExcludingTax`` stays a number.
+
+        Args:
+            record_id: Temporary record id used by BoondManager to track the line.
 
         Returns:
             Dictionary in BoondManager API format.
         """
         return {
+            "id": record_id,
             "description": self.description,
             "taxRate": self.tax_rate_percent,
             "taxRates": [self.tax_rate_percent],
             "quantity": self.quantity,
             "amountExcludingTax": self.unit_price_ht.to_float(),
-            "turnoverExcludingTax": self.total_ht.to_float(),
-            "turnoverIncludingTax": self.total_ttc.to_float(),
+            "turnoverExcludingTax": f"{self.total_ht.to_float():.2f}",
+            "turnoverIncludingTax": f"{self.total_ttc.to_float():.2f}",
         }
 
     def __str__(self) -> str:
