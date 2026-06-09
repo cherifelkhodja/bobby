@@ -1243,7 +1243,7 @@ async def get_portal_charters(
 
     ml_repo = MagicLinkRepository(db)
     link = await ml_repo.get_by_token(token)
-    if not link or not link.is_valid:
+    if not link or not link.is_valid():
         raise HTTPException(status_code=404, detail="Lien invalide ou expire.")
 
     # Resolve company_id from contract request
@@ -1311,7 +1311,7 @@ async def acknowledge_charter(
 
     ml_repo = MagicLinkRepository(db)
     link = await ml_repo.get_by_token(token)
-    if not link or not link.is_valid:
+    if not link or not link.is_valid():
         raise HTTPException(status_code=404, detail="Lien invalide ou expire.")
 
     # Verify charter exists and is active
@@ -1368,7 +1368,7 @@ async def download_portal_charter(
 
     ml_repo = MagicLinkRepository(db)
     link = await ml_repo.get_by_token(token)
-    if not link or not link.is_valid:
+    if not link or not link.is_valid():
         raise HTTPException(status_code=404, detail="Lien invalide ou expire.")
 
     result = await db.execute(

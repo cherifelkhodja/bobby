@@ -1639,7 +1639,7 @@ async def mark_as_signed(
         .select_from(SignatureUploadModel)
         .where(SignatureUploadModel.contract_request_id == contract_request_id)
     )
-    total = total_result.scalar()
+    total = total_result.scalar() or 0
 
     uploaded_result = await db.execute(
         select(func.count())
@@ -1649,7 +1649,7 @@ async def mark_as_signed(
             SignatureUploadModel.s3_key.isnot(None),
         )
     )
-    uploaded = uploaded_result.scalar()
+    uploaded = uploaded_result.scalar() or 0
 
     if total == 0 or uploaded < total:
         missing = total - uploaded

@@ -437,6 +437,8 @@ class InpiClient:
                 logger.error("inpi_api_request_error", siren=siren, error=str(exc))
                 return None
 
+        return None
+
     def _parse_company(self, siren: str, data: dict) -> InpiCompanyInfo:
         """Extract relevant fields from INPI RNE JSON response.
 
