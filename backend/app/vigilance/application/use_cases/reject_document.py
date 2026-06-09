@@ -70,7 +70,9 @@ class RejectDocumentUseCase:
         _from_email, _company_name = None, None
         if self._company_email_resolver:
             try:
-                _from_email, _company_name = await self._company_email_resolver(document.third_party_id)
+                _from_email, _company_name = await self._company_email_resolver(
+                    document.third_party_id
+                )
             except Exception:
                 pass
 

@@ -163,7 +163,11 @@ class SyncToBoondAfterSigningUseCase:
                 doc_repo = _DocRepo(self._db)
                 rib_docs = await doc_repo.list_by_third_party(tp.id)
                 rib_doc = next(
-                    (d for d in rib_docs if d.document_type.value == "rib" and d.auto_check_results),
+                    (
+                        d
+                        for d in rib_docs
+                        if d.document_type.value == "rib" and d.auto_check_results
+                    ),
                     None,
                 )
                 if rib_doc and rib_doc.auto_check_results:
@@ -211,18 +215,36 @@ class SyncToBoondAfterSigningUseCase:
                 signatory_types.append(7)
 
             role_entries: list[tuple] = [
-                (tp.signatory_civility or tp.representative_civility,
-                 tp.signatory_first_name or tp.representative_first_name,
-                 tp.signatory_last_name or tp.representative_last_name,
-                 tp.signatory_email or tp.representative_email,
-                 tp.signatory_phone or tp.representative_phone,
-                 tp.representative_title, signatory_types, "signataire"),
-                (tp.adv_contact_civility, tp.adv_contact_first_name,
-                 tp.adv_contact_last_name, tp.adv_contact_email,
-                 tp.adv_contact_phone, "ADV", [9], "adv"),
-                (tp.billing_contact_civility, tp.billing_contact_first_name,
-                 tp.billing_contact_last_name, tp.billing_contact_email,
-                 tp.billing_contact_phone, "Commercial", [8], "commercial"),
+                (
+                    tp.signatory_civility or tp.representative_civility,
+                    tp.signatory_first_name or tp.representative_first_name,
+                    tp.signatory_last_name or tp.representative_last_name,
+                    tp.signatory_email or tp.representative_email,
+                    tp.signatory_phone or tp.representative_phone,
+                    tp.representative_title,
+                    signatory_types,
+                    "signataire",
+                ),
+                (
+                    tp.adv_contact_civility,
+                    tp.adv_contact_first_name,
+                    tp.adv_contact_last_name,
+                    tp.adv_contact_email,
+                    tp.adv_contact_phone,
+                    "ADV",
+                    [9],
+                    "adv",
+                ),
+                (
+                    tp.billing_contact_civility,
+                    tp.billing_contact_first_name,
+                    tp.billing_contact_last_name,
+                    tp.billing_contact_email,
+                    tp.billing_contact_phone,
+                    "Commercial",
+                    [8],
+                    "commercial",
+                ),
             ]
 
             # Merge contacts with same identity
@@ -238,9 +260,14 @@ class SyncToBoondAfterSigningUseCase:
                         merged[key]["job_title"] = job_title
                 else:
                     merged[key] = {
-                        "civility": civ, "first_name": fn, "last_name": ln,
-                        "email": email, "phone": phone, "job_title": job_title,
-                        "types_of": list(types_of_list), "labels": [label],
+                        "civility": civ,
+                        "first_name": fn,
+                        "last_name": ln,
+                        "email": email,
+                        "phone": phone,
+                        "job_title": job_title,
+                        "types_of": list(types_of_list),
+                        "labels": [label],
                     }
 
             agency_id = company.boond_agency_id if company else None
@@ -375,7 +402,9 @@ class SyncToBoondAfterSigningUseCase:
         # be a resource in Boond (trigger ressource_4/5) or become one later.
         is_external = cr.third_party_type != "salarie"
         if resource_id and is_external and tp and tp.boond_provider_id:
-            commercial_contact_id = tp.boond_commercial_contact_id or boond_contact_ids.get("commercial")
+            commercial_contact_id = tp.boond_commercial_contact_id or boond_contact_ids.get(
+                "commercial"
+            )
             logger.info(
                 "sync_boond_link_provider_to_resource",
                 cr_id=str(cr.id),
@@ -431,6 +460,7 @@ class SyncToBoondAfterSigningUseCase:
                     )
 
                     now = datetime.utcnow()
+                    contract = await self._contract_repo.get_by_request_id(cr.id)
                     fc = FrameworkContract(
                         third_party_id=tp.id,
                         company_id=company.id,

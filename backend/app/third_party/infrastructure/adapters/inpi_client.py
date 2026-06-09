@@ -160,22 +160,22 @@ FORME_JURIDIQUE_LABELS: dict[str, str] = {
 # =============================================================================
 DEPT_TO_GREFFE: dict[str, str] = {
     "01": "Bourg-en-Bresse",
-    "02": "Saint-Quentin",          # Aussi: Soissons
-    "03": "Cusset",                 # Aussi: Montluçon
+    "02": "Saint-Quentin",  # Aussi: Soissons
+    "03": "Cusset",  # Aussi: Montluçon
     "04": "Manosque",
     "05": "Gap",
-    "06": "Nice",                   # Aussi: Antibes, Cannes, Grasse
+    "06": "Nice",  # Aussi: Antibes, Cannes, Grasse
     "07": "Aubenas",
     "08": "Sedan",
     "09": "Foix",
     "10": "Troyes",
-    "11": "Carcassonne",            # Aussi: Narbonne
+    "11": "Carcassonne",  # Aussi: Narbonne
     "12": "Rodez",
-    "13": "Marseille",              # Aussi: Aix-en-Provence, Salon-de-Provence, Tarascon
-    "14": "Caen",                   # Aussi: Lisieux
+    "13": "Marseille",  # Aussi: Aix-en-Provence, Salon-de-Provence, Tarascon
+    "14": "Caen",  # Aussi: Lisieux
     "15": "Aurillac",
     "16": "Angoulême",
-    "17": "La Rochelle",            # Aussi: Saintes
+    "17": "La Rochelle",  # Aussi: Saintes
     "18": "Bourges",
     "19": "Brive-la-Gaillarde",
     # 2A et 2B (Corse) gérés dans derive_greffe_city() via le code postal 20xxx
@@ -184,72 +184,72 @@ DEPT_TO_GREFFE: dict[str, str] = {
     "21": "Dijon",
     "22": "Saint-Brieuc",
     "23": "Guéret",
-    "24": "Périgueux",              # Aussi: Bergerac
+    "24": "Périgueux",  # Aussi: Bergerac
     "25": "Besançon",
     "26": "Romans-sur-Isère",
-    "27": "Evreux",                 # Aussi: Bernay
+    "27": "Evreux",  # Aussi: Bernay
     "28": "Chartres",
-    "29": "Brest",                  # Aussi: Quimper
+    "29": "Brest",  # Aussi: Quimper
     "30": "Nîmes",
     "31": "Toulouse",
     "32": "Auch",
-    "33": "Bordeaux",               # Aussi: Libourne
-    "34": "Montpellier",            # Aussi: Béziers
-    "35": "Rennes",                 # Aussi: Saint-Malo
+    "33": "Bordeaux",  # Aussi: Libourne
+    "34": "Montpellier",  # Aussi: Béziers
+    "35": "Rennes",  # Aussi: Saint-Malo
     "36": "Châteauroux",
     "37": "Tours",
-    "38": "Grenoble",               # Aussi: Vienne
+    "38": "Grenoble",  # Aussi: Vienne
     "39": "Lons-le-Saunier",
-    "40": "Mont-de-Marsan",         # Aussi: Dax
+    "40": "Mont-de-Marsan",  # Aussi: Dax
     "41": "Blois",
-    "42": "Saint-Etienne",          # Aussi: Roanne
+    "42": "Saint-Etienne",  # Aussi: Roanne
     "43": "Le Puy-en-Velay",
-    "44": "Nantes",                 # Aussi: Saint-Nazaire
+    "44": "Nantes",  # Aussi: Saint-Nazaire
     "45": "Orléans",
     "46": "Cahors",
     "47": "Agen",
     "48": "Mende",
     "49": "Angers",
-    "50": "Cherbourg-Octeville",    # Aussi: Coutances
-    "51": "Reims",                  # Aussi: Châlons-en-Champagne
+    "50": "Cherbourg-Octeville",  # Aussi: Coutances
+    "51": "Reims",  # Aussi: Châlons-en-Champagne
     "52": "Chaumont",
     "53": "Laval",
-    "54": "Nancy",                  # Aussi: Briey
+    "54": "Nancy",  # Aussi: Briey
     "55": "Bar-le-Duc",
-    "56": "Vannes",                 # Aussi: Lorient
-    "57": "Metz",                   # TJ Alsace-Moselle (pas de TC) — Aussi: Sarreguemines, Thionville
+    "56": "Vannes",  # Aussi: Lorient
+    "57": "Metz",  # TJ Alsace-Moselle (pas de TC) — Aussi: Sarreguemines, Thionville
     "58": "Nevers",
-    "59": "Lille Métropole",        # Aussi: Douai, Dunkerque, Valenciennes
-    "60": "Beauvais",               # Aussi: Compiègne
+    "59": "Lille Métropole",  # Aussi: Douai, Dunkerque, Valenciennes
+    "60": "Beauvais",  # Aussi: Compiègne
     "61": "Alençon",
-    "62": "Arras",                  # Aussi: Boulogne-sur-Mer
+    "62": "Arras",  # Aussi: Boulogne-sur-Mer
     "63": "Clermont-Ferrand",
-    "64": "Pau",                    # Aussi: Bayonne
+    "64": "Pau",  # Aussi: Bayonne
     "65": "Tarbes",
     "66": "Perpignan",
-    "67": "Strasbourg",             # TJ Alsace-Moselle (pas de TC) — Aussi: Saverne
-    "68": "Colmar",                 # TJ Alsace-Moselle (pas de TC) — Aussi: Mulhouse
-    "69": "Lyon",                   # Aussi: Villefranche-Tarare
+    "67": "Strasbourg",  # TJ Alsace-Moselle (pas de TC) — Aussi: Saverne
+    "68": "Colmar",  # TJ Alsace-Moselle (pas de TC) — Aussi: Mulhouse
+    "69": "Lyon",  # Aussi: Villefranche-Tarare
     "70": "Vesoul",
-    "71": "Chalon-sur-Saône",       # Aussi: Mâcon
+    "71": "Chalon-sur-Saône",  # Aussi: Mâcon
     "72": "Le Mans",
     "73": "Chambéry",
-    "74": "Annecy",                 # Aussi: Thonon-les-Bains
+    "74": "Annecy",  # Aussi: Thonon-les-Bains
     "75": "Paris",
-    "76": "Rouen",                  # Aussi: Le Havre, Dieppe
-    "77": "Meaux",                  # Aussi: Melun
+    "76": "Rouen",  # Aussi: Le Havre, Dieppe
+    "77": "Meaux",  # Aussi: Melun
     "78": "Versailles",
     "79": "Niort",
     "80": "Amiens",
-    "81": "Albi",                   # Aussi: Castres
+    "81": "Albi",  # Aussi: Castres
     "82": "Montauban",
-    "83": "Toulon",                 # Aussi: Draguignan, Fréjus
+    "83": "Toulon",  # Aussi: Draguignan, Fréjus
     "84": "Avignon",
     "85": "La Roche-sur-Yon",
     "86": "Poitiers",
     "87": "Limoges",
     "88": "Epinal",
-    "89": "Auxerre",                # Aussi: Sens
+    "89": "Auxerre",  # Aussi: Sens
     "90": "Belfort",
     "91": "Evry",
     "92": "Nanterre",
@@ -257,7 +257,7 @@ DEPT_TO_GREFFE: dict[str, str] = {
     "94": "Créteil",
     "95": "Pontoise",
     # DOM-TOM
-    "971": "Pointe-à-Pitre",        # Aussi: Basse-Terre
+    "971": "Pointe-à-Pitre",  # Aussi: Basse-Terre
     "972": "Fort-de-France",
     "973": "Cayenne",
     "974": "Saint-Denis",
@@ -319,12 +319,12 @@ class InpiCompanyInfo:
 
     siren: str
     company_name: str
-    legal_form_code: str | None       # INSEE code e.g. "5710"
-    legal_form_label: str | None      # Human-readable e.g. "SAS"
+    legal_form_code: str | None  # INSEE code e.g. "5710"
+    legal_form_label: str | None  # Human-readable e.g. "SAS"
     capital_amount: float | None
     capital_currency: str | None
     capital_variable: bool
-    greffe_city: str | None           # Derived from postal code
+    greffe_city: str | None  # Derived from postal code
 
 
 import time as _time
@@ -414,13 +414,17 @@ class InpiClient:
                     # Token expired — force refresh and retry once
                     logger.warning("inpi_token_expired_refreshing", siren=siren)
                     _token_cache = None
-                    token = await _get_inpi_token(self._username, self._password, self._static_token)
+                    token = await _get_inpi_token(
+                        self._username, self._password, self._static_token
+                    )
                     if not token:
                         return None
                     continue
 
                 if response.status_code in (401, 403):
-                    logger.error("inpi_token_rejected", status_code=response.status_code, siren=siren)
+                    logger.error(
+                        "inpi_token_rejected", status_code=response.status_code, siren=siren
+                    )
                     return None
 
                 response.raise_for_status()

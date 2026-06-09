@@ -102,6 +102,7 @@ class ArticleTemplateRepository:
     async def delete(self, article_key: str) -> bool:
         """Delete an article template. Returns True if deleted, False if not found."""
         from sqlalchemy import delete as _delete
+
         result = await self._db.execute(
             _delete(ContractArticleTemplateModel).where(
                 ContractArticleTemplateModel.article_key == article_key

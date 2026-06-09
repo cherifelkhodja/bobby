@@ -19,29 +19,29 @@ depends_on = None
 
 _COLS = [
     # Représentant légal (structured)
-    ("representative_civility",      sa.String(10)),
-    ("representative_first_name",    sa.String(100)),
-    ("representative_last_name",     sa.String(100)),
-    ("representative_email",         sa.String(255)),
-    ("representative_phone",         sa.String(50)),
+    ("representative_civility", sa.String(10)),
+    ("representative_first_name", sa.String(100)),
+    ("representative_last_name", sa.String(100)),
+    ("representative_email", sa.String(255)),
+    ("representative_phone", sa.String(50)),
     # Signataire du contrat
-    ("signatory_civility",           sa.String(10)),
-    ("signatory_first_name",         sa.String(100)),
-    ("signatory_last_name",          sa.String(100)),
-    ("signatory_email",              sa.String(255)),
-    ("signatory_phone",              sa.String(50)),
+    ("signatory_civility", sa.String(10)),
+    ("signatory_first_name", sa.String(100)),
+    ("signatory_last_name", sa.String(100)),
+    ("signatory_email", sa.String(255)),
+    ("signatory_phone", sa.String(50)),
     # Contact ADV
-    ("adv_contact_civility",         sa.String(10)),
-    ("adv_contact_first_name",       sa.String(100)),
-    ("adv_contact_last_name",        sa.String(100)),
-    ("adv_contact_email",            sa.String(255)),
-    ("adv_contact_phone",            sa.String(50)),
+    ("adv_contact_civility", sa.String(10)),
+    ("adv_contact_first_name", sa.String(100)),
+    ("adv_contact_last_name", sa.String(100)),
+    ("adv_contact_email", sa.String(255)),
+    ("adv_contact_phone", sa.String(50)),
     # Contact facturation
-    ("billing_contact_civility",     sa.String(10)),
-    ("billing_contact_first_name",   sa.String(100)),
-    ("billing_contact_last_name",    sa.String(100)),
-    ("billing_contact_email",        sa.String(255)),
-    ("billing_contact_phone",        sa.String(50)),
+    ("billing_contact_civility", sa.String(10)),
+    ("billing_contact_first_name", sa.String(100)),
+    ("billing_contact_last_name", sa.String(100)),
+    ("billing_contact_email", sa.String(255)),
+    ("billing_contact_phone", sa.String(50)),
 ]
 
 

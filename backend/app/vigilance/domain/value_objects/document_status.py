@@ -17,10 +17,12 @@ class DocumentStatus(str, Enum):
     def allowed_transitions(self) -> frozenset["DocumentStatus"]:
         """Return the set of statuses this status can transition to."""
         transitions: dict[DocumentStatus, frozenset[DocumentStatus]] = {
-            DocumentStatus.REQUESTED: frozenset({
-                DocumentStatus.RECEIVED,
-                DocumentStatus.VALIDATED,  # ADV temporary validation (contract context)
-            }),
+            DocumentStatus.REQUESTED: frozenset(
+                {
+                    DocumentStatus.RECEIVED,
+                    DocumentStatus.VALIDATED,  # ADV temporary validation (contract context)
+                }
+            ),
             DocumentStatus.RECEIVED: frozenset(
                 {
                     DocumentStatus.VALIDATED,

@@ -32,9 +32,7 @@ def _purge_s3_contracts() -> None:
 
         settings = get_settings()
         s3 = S3StorageClient(settings)
-        deleted = asyncio.get_event_loop().run_until_complete(
-            s3.delete_prefix("contracts/")
-        )
+        deleted = asyncio.get_event_loop().run_until_complete(s3.delete_prefix("contracts/"))
         logger.info(f"S3 cleanup: deleted {deleted} contract files")
     except Exception as exc:
         logger.warning(f"S3 cleanup skipped (non-blocking): {exc}")

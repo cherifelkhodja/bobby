@@ -94,7 +94,12 @@ async def error_handler_middleware(
     except Exception as e:
         logger.exception(f"Unhandled exception: {e}")
         import os
-        detail = f"{type(e).__name__}: {e}" if os.getenv("ENV", "dev") != "prod" else "Internal server error"
+
+        detail = (
+            f"{type(e).__name__}: {e}"
+            if os.getenv("ENV", "dev") != "prod"
+            else "Internal server error"
+        )
         return JSONResponse(
             status_code=500,
             content={"detail": detail},

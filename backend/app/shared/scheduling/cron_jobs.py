@@ -38,10 +38,12 @@ async def check_document_expirations():
         async def _resolve_company_email_for_tp(third_party_id):
             """Resolve company email_from from a third_party_id via its most recent CR."""
             from sqlalchemy import select
+
             from app.contract_management.infrastructure.models import (
                 ContractCompanyModel,
                 ContractRequestModel,
             )
+
             cr_result = await session.execute(
                 select(ContractRequestModel.company_id)
                 .where(ContractRequestModel.third_party_id == third_party_id)
@@ -52,8 +54,9 @@ async def check_document_expirations():
             if not company_id:
                 return None, None
             c_result = await session.execute(
-                select(ContractCompanyModel.email_from, ContractCompanyModel.name)
-                .where(ContractCompanyModel.id == company_id)
+                select(ContractCompanyModel.email_from, ContractCompanyModel.name).where(
+                    ContractCompanyModel.id == company_id
+                )
             )
             row = c_result.first()
             return (row.email_from, row.name) if row else (None, None)
@@ -178,7 +181,6 @@ async def archive_inactive_contract_requests():
     )
     from app.contract_management.infrastructure.models import (
         ContractRequestModel,
-        FrameworkContractModel,
     )
     from app.infrastructure.database.connection import async_session_factory
 

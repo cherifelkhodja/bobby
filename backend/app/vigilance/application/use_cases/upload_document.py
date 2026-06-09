@@ -11,12 +11,12 @@ from app.vigilance.domain.exceptions import (
     DocumentNotFoundError,
     ExpiredDocumentError,
 )
-from app.vigilance.domain.value_objects.document_status import DocumentStatus
 from app.vigilance.domain.services.vigilance_requirements import (
     ALLOWED_EXTENSIONS,
     ALLOWED_MIME_TYPES,
     MAX_FILE_SIZE_BYTES,
 )
+from app.vigilance.domain.value_objects.document_status import DocumentStatus
 from app.vigilance.domain.value_objects.document_type import (
     FORBIDDEN_DOCUMENT_TYPES,
 )
@@ -88,11 +88,14 @@ class UploadDocumentUseCase:
         extracted: dict = {}
         if self._extractor is not None:
             try:
-                extracted = await self._extractor.extract(
-                    document_type=document.document_type.value,
-                    file_content=command.file_content,
-                    content_type=command.content_type,
-                ) or {}
+                extracted = (
+                    await self._extractor.extract(
+                        document_type=document.document_type.value,
+                        file_content=command.file_content,
+                        content_type=command.content_type,
+                    )
+                    or {}
+                )
             except Exception:
                 extracted = {}
 

@@ -4,7 +4,7 @@ Computes the ComplianceStatus of a third party based on its documents
 vs the requirements defined in vigilance_requirements.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import structlog
 
@@ -69,7 +69,7 @@ def compute_compliance_status(
         if existing is None or doc.created_at > existing.created_at:
             doc_by_type[doc.document_type.value] = doc
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expiring_threshold = now + timedelta(days=_EXPIRING_SOON_DAYS)
 
     has_expiring = False
@@ -87,7 +87,9 @@ def compute_compliance_status(
         if doc.status == DocumentStatus.VALIDATED:
             # Check expiry in real-time from stored expires_at (don't wait for cron)
             if doc.expires_at is not None:
-                expires = doc.expires_at if doc.expires_at.tzinfo else doc.expires_at.replace(tzinfo=timezone.utc)
+                expires = (
+                    doc.expires_at if doc.expires_at.tzinfo else doc.expires_at.replace(tzinfo=UTC)
+                )
                 if expires <= now:
                     has_missing_or_invalid = True
                 elif expires <= expiring_threshold:

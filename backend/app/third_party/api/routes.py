@@ -4,7 +4,7 @@ from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
-from sqlalchemy import text, update
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db
@@ -14,8 +14,8 @@ from app.third_party.api.schemas import (
     CompanyInfoRequest,
     ContractReviewRequest,
     ContractReviewResponse,
-    DocumentUploadResponse,
     DocumentsSubmittedResponse,
+    DocumentUploadResponse,
     MagicLinkPortalResponse,
     PortalDocumentResponse,
     PortalDocumentsListResponse,
@@ -31,18 +31,18 @@ from app.third_party.domain.exceptions import (
     MagicLinkNotFoundError,
     MagicLinkRevokedError,
 )
-from app.vigilance.domain.exceptions import (
-    DocumentNotAllowedError,
-    DocumentNotFoundError,
-    ExpiredDocumentError,
-    InvalidDocumentTransitionError,
-)
 from app.third_party.domain.value_objects.magic_link_purpose import MagicLinkPurpose
 from app.third_party.infrastructure.adapters.postgres_magic_link_repo import (
     MagicLinkRepository,
 )
 from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
     ThirdPartyRepository,
+)
+from app.vigilance.domain.exceptions import (
+    DocumentNotAllowedError,
+    DocumentNotFoundError,
+    ExpiredDocumentError,
+    InvalidDocumentTransitionError,
 )
 from app.vigilance.infrastructure.adapters.gemini_document_extractor import (
     GeminiDocumentExtractor,
@@ -448,9 +448,9 @@ async def submit_portal_documents(
     Never blocks on email failure.
     """
     from app.config import get_settings
+    from app.domain.value_objects import UserRole
     from app.infrastructure.database.repositories.user_repository import UserRepository
     from app.infrastructure.email.sender import EmailService as EmailSender
-    from app.domain.value_objects import UserRole
     from app.third_party.infrastructure.models import ThirdPartyModel
 
     result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
@@ -459,8 +459,7 @@ async def submit_portal_documents(
     documents = await doc_repo.list_by_third_party(result.third_party.id)
 
     uploaded_count = sum(
-        1 for d in documents
-        if d.status.value in ("received", "validated", "expiring_soon")
+        1 for d in documents if d.status.value in ("received", "validated", "expiring_soon")
     )
     total_count = len(documents)
 
@@ -480,11 +479,11 @@ async def submit_portal_documents(
     # Transition contract request from COLLECTING_DOCUMENTS → REVIEWING_COMPLIANCE (best-effort)
     if result.contract_request_id:
         try:
-            from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-                ContractRequestRepository,
-            )
             from app.contract_management.domain.value_objects.contract_request_status import (
                 ContractRequestStatus,
+            )
+            from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+                ContractRequestRepository,
             )
 
             cr_repo = ContractRequestRepository(db)
@@ -589,8 +588,9 @@ async def get_contract_draft(
     # Generate presigned S3 URL so the portal can display the PDF inline
     download_url = None
     if contract.s3_key_draft:
-        from app.infrastructure.storage.s3_client import S3StorageClient
         from app.config import get_settings
+        from app.infrastructure.storage.s3_client import S3StorageClient
+
         s3 = S3StorageClient(get_settings())
         download_url = await s3.get_presigned_url(contract.s3_key_draft, expires_in=1800)
 
@@ -664,8 +664,14 @@ async def submit_contract_review(
     # Resolve company email context
     async def _resolve_company_email_for_cr(company_id):
         from sqlalchemy import select as _sel
+
         from app.contract_management.infrastructure.models import ContractCompanyModel
-        r = await db.execute(_sel(ContractCompanyModel.email_from, ContractCompanyModel.name).where(ContractCompanyModel.id == company_id))
+
+        r = await db.execute(
+            _sel(ContractCompanyModel.email_from, ContractCompanyModel.name).where(
+                ContractCompanyModel.id == company_id
+            )
+        )
         row = r.first()
         return (row.email_from, row.name) if row else (None, None)
 
@@ -995,7 +1001,9 @@ async def save_company_info_draft(
         "representative_civility": body.representative_civility,
         "representative_first_name": body.representative_first_name,
         "representative_last_name": body.representative_last_name,
-        "representative_email": str(body.representative_email) if body.representative_email else None,
+        "representative_email": str(body.representative_email)
+        if body.representative_email
+        else None,
         "representative_phone": body.representative_phone,
         "signatory_civility": body.signatory_civility,
         "signatory_first_name": body.signatory_first_name,
@@ -1011,7 +1019,9 @@ async def save_company_info_draft(
         "billing_contact_civility": body.billing_contact_civility,
         "billing_contact_first_name": body.billing_contact_first_name,
         "billing_contact_last_name": body.billing_contact_last_name,
-        "billing_contact_email": str(body.billing_contact_email) if body.billing_contact_email else None,
+        "billing_contact_email": str(body.billing_contact_email)
+        if body.billing_contact_email
+        else None,
         "billing_contact_phone": body.billing_contact_phone,
     }
 
@@ -1034,12 +1044,12 @@ async def save_company_info_draft(
     from app.third_party.infrastructure.models import ThirdPartyModel
 
     await db.execute(
-        update(ThirdPartyModel)
-        .where(ThirdPartyModel.id == third_party_id)
-        .values(**updates)
+        update(ThirdPartyModel).where(ThirdPartyModel.id == third_party_id).values(**updates)
     )
 
-    logger.info("company_info_draft_saved", third_party_id=str(third_party_id), fields=list(updates.keys()))
+    logger.info(
+        "company_info_draft_saved", third_party_id=str(third_party_id), fields=list(updates.keys())
+    )
     return {"message": "Brouillon enregistré."}
 
 
@@ -1160,9 +1170,12 @@ async def lookup_siret(
     # Enrich with INPI RNE data (forme juridique, capital, greffe) — uses SIREN (first 9 digits)
     capital_str: str | None = None
     rcs_city: str | None = None
-    inpi_configured = bool(settings.INPI_USERNAME and settings.INPI_PASSWORD) or bool(settings.INPI_TOKEN)
+    inpi_configured = bool(settings.INPI_USERNAME and settings.INPI_PASSWORD) or bool(
+        settings.INPI_TOKEN
+    )
     if siren and inpi_configured:
         from app.third_party.infrastructure.adapters.inpi_client import InpiClient
+
         try:
             inpi = InpiClient(
                 username=settings.INPI_USERNAME,
@@ -1180,10 +1193,16 @@ async def lookup_siret(
                     capital_str = f"{inpi_info.capital_amount:,.0f}".replace(",", " ")
                 rcs_city = inpi_info.greffe_city
         except Exception as exc:
-            logger.warning("inpi_enrich_failed", siren=siren, error=str(exc), error_type=type(exc).__name__)
+            logger.warning(
+                "inpi_enrich_failed", siren=siren, error=str(exc), error_type=type(exc).__name__
+            )
 
     # APE/NAF code from INSEE
-    ape_code = _clean(etab.get("periodesEtablissement", [{}])[0].get("activitePrincipaleEtablissement")) if etab.get("periodesEtablissement") else None
+    ape_code = (
+        _clean(etab.get("periodesEtablissement", [{}])[0].get("activitePrincipaleEtablissement"))
+        if etab.get("periodesEtablissement")
+        else None
+    )
     if not ape_code:
         ape_code = _clean(unite.get("activitePrincipaleUniteLegale"))
 
@@ -1218,10 +1237,9 @@ async def get_portal_charters(
     from app.contract_management.infrastructure.models import (
         CharterAcknowledgementModel,
         CharterTemplateModel,
+        ContractRequestModel,
     )
     from app.third_party.infrastructure.adapters.postgres_magic_link_repo import MagicLinkRepository
-
-    from app.contract_management.infrastructure.models import ContractRequestModel
 
     ml_repo = MagicLinkRepository(db)
     link = await ml_repo.get_by_token(token)
@@ -1239,10 +1257,14 @@ async def get_portal_charters(
         company_id = cr_result.scalar_one_or_none()
 
     # Get active partner charters for this company
-    stmt = select(CharterTemplateModel).where(
-        CharterTemplateModel.target == "partner",
-        CharterTemplateModel.is_active.is_(True),
-    ).order_by(CharterTemplateModel.created_at)
+    stmt = (
+        select(CharterTemplateModel)
+        .where(
+            CharterTemplateModel.target == "partner",
+            CharterTemplateModel.is_active.is_(True),
+        )
+        .order_by(CharterTemplateModel.created_at)
+    )
     if company_id:
         stmt = stmt.where(CharterTemplateModel.company_id == company_id)
     result = await db.execute(stmt)
@@ -1279,7 +1301,6 @@ async def acknowledge_charter(
     db: AsyncSession = Depends(get_db),
 ):
     """Record acknowledgement of a partner charter. Public (magic link)."""
-    from fastapi import Request as _Req
     from sqlalchemy import select
 
     from app.contract_management.infrastructure.models import (

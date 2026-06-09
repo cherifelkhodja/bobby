@@ -58,7 +58,10 @@ class BoondCrmAdapter:
             candidate_id_str = str(candidate_id) if candidate_id else ""
             for included in response.get("included", []):
                 inc_type = included.get("type", "")
-                if inc_type in ("resource", "candidate") and str(included.get("id", "")) == candidate_id_str:
+                if (
+                    inc_type in ("resource", "candidate")
+                    and str(included.get("id", "")) == candidate_id_str
+                ):
                     consultant_type = inc_type
                     inc_attrs = included.get("attributes", {})
                     consultant_first_name = inc_attrs.get("firstName", "")
@@ -383,10 +386,7 @@ class BoondCrmAdapter:
                 "GET", f"/candidates/{candidate_id}/information"
             )
             resource_data = (
-                response.get("data", {})
-                .get("relationships", {})
-                .get("resource", {})
-                .get("data")
+                response.get("data", {}).get("relationships", {}).get("resource", {}).get("data")
             )
             if resource_data and resource_data.get("id"):
                 return int(resource_data["id"])
@@ -428,9 +428,7 @@ class BoondCrmAdapter:
 
         if manager_id is not None:
             data_payload["relationships"] = {
-                "dependsOn": {
-                    "data": {"type": "resource", "id": str(manager_id)}
-                }
+                "dependsOn": {"data": {"type": "resource", "id": str(manager_id)}}
             }
 
         payload = {"data": data_payload}
@@ -442,18 +440,13 @@ class BoondCrmAdapter:
             # data.relationships.resource.data.id (NOT data.id which
             # remains the candidate ID).
             resource_rel = (
-                response.get("data", {})
-                .get("relationships", {})
-                .get("resource", {})
-                .get("data")
+                response.get("data", {}).get("relationships", {}).get("resource", {}).get("data")
             )
             if resource_rel and resource_rel.get("id"):
                 new_resource_id = int(resource_rel["id"])
             else:
                 # Fallback: use data.id (shouldn't happen for state=3)
-                new_resource_id = int(
-                    response.get("data", {}).get("id", candidate_id)
-                )
+                new_resource_id = int(response.get("data", {}).get("id", candidate_id))
             logger.info(
                 "boond_candidate_converted_to_resource",
                 candidate_id=candidate_id,
@@ -617,9 +610,7 @@ class BoondCrmAdapter:
             company_id=company_id,
             fields=list(attributes.keys()),
         )
-        await self._boond._make_request(
-            "PUT", f"/companies/{company_id}/information", json=payload
-        )
+        await self._boond._make_request("PUT", f"/companies/{company_id}/information", json=payload)
         logger.info("boond_company_information_updated", company_id=company_id)
 
     async def create_contact(
@@ -768,17 +759,11 @@ class BoondCrmAdapter:
             attributes["endDate"] = end_date
 
         relationships: dict[str, Any] = {
-            "dependsOn": {
-                "data": {"type": "resource", "id": str(resource_id)}
-            },
-            "positioning": {
-                "data": {"type": "positioning", "id": str(positioning_id)}
-            },
+            "dependsOn": {"data": {"type": "resource", "id": str(resource_id)}},
+            "positioning": {"data": {"type": "positioning", "id": str(positioning_id)}},
         }
         if agency_id:
-            relationships["agency"] = {
-                "data": {"type": "agency", "id": str(agency_id)}
-            }
+            relationships["agency"] = {"data": {"type": "agency", "id": str(agency_id)}}
 
         payload = {
             "data": {
@@ -818,9 +803,7 @@ class BoondCrmAdapter:
             provider_contact_id: Boond contact ID of the main provider contact.
         """
         relationships: dict[str, Any] = {
-            "providerCompany": {
-                "data": {"type": "company", "id": str(provider_company_id)}
-            }
+            "providerCompany": {"data": {"type": "company", "id": str(provider_company_id)}}
         }
         if provider_contact_id:
             relationships["providerContact"] = {
@@ -882,9 +865,7 @@ class BoondCrmAdapter:
             }
         }
 
-        await self._boond._make_request(
-            "PUT", f"/apps/sepa/companies/{company_id}", json=payload
-        )
+        await self._boond._make_request("PUT", f"/apps/sepa/companies/{company_id}", json=payload)
         logger.info(
             "boond_company_bank_details_updated",
             company_id=company_id,

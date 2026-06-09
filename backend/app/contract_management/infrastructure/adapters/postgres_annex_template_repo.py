@@ -41,9 +41,7 @@ class AnnexTemplateRepository:
         created_by: UUID | None = None,
     ) -> AnnexTemplate:
         """Create a new annex template at the end of the list."""
-        result = await self._db.execute(
-            select(func.max(ContractAnnexTemplateModel.annexe_number))
-        )
+        result = await self._db.execute(select(func.max(ContractAnnexTemplateModel.annexe_number)))
         max_num = result.scalar() or 0
         model = ContractAnnexTemplateModel(
             annexe_key=annexe_key,
@@ -61,9 +59,7 @@ class AnnexTemplateRepository:
     async def get_all(self) -> list[AnnexTemplate]:
         """Return all annexes ordered by annexe_number."""
         result = await self._db.execute(
-            select(ContractAnnexTemplateModel).order_by(
-                ContractAnnexTemplateModel.annexe_number
-            )
+            select(ContractAnnexTemplateModel).order_by(ContractAnnexTemplateModel.annexe_number)
         )
         return [self._to_domain(m) for m in result.scalars().all()]
 
@@ -98,6 +94,7 @@ class AnnexTemplateRepository:
     async def delete(self, annexe_key: str) -> bool:
         """Delete an annexe template. Returns True if deleted, False if not found."""
         from sqlalchemy import delete as _delete
+
         result = await self._db.execute(
             _delete(ContractAnnexTemplateModel).where(
                 ContractAnnexTemplateModel.annexe_key == annexe_key

@@ -80,7 +80,9 @@ class EmailService:
         else:
             return await self._send_via_smtp(to, subject, html_body, sender)
 
-    async def _send_via_resend(self, to: str, subject: str, html_body: str, sender: str | None = None) -> bool:
+    async def _send_via_resend(
+        self, to: str, subject: str, html_body: str, sender: str | None = None
+    ) -> bool:
         """Send email via Resend API."""
         try:
             params = {
@@ -98,7 +100,9 @@ class EmailService:
             logger.error(f"Failed to send email via Resend to {to}: {e}")
             return False
 
-    async def _send_via_smtp(self, to: str, subject: str, html_body: str, sender: str | None = None) -> bool:
+    async def _send_via_smtp(
+        self, to: str, subject: str, html_body: str, sender: str | None = None
+    ) -> bool:
         """Send email via SMTP."""
         try:
             message = MIMEMultipart("alternative")
@@ -435,7 +439,9 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body, from_email=from_email, company_name=company_name)
+        return await self._send_email(
+            to, subject, html_body, from_email=from_email, company_name=company_name
+        )
 
     async def send_document_collection_request(
         self,
@@ -467,7 +473,9 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body, from_email=from_email, company_name=company_name)
+        return await self._send_email(
+            to, subject, html_body, from_email=from_email, company_name=company_name
+        )
 
     async def send_document_reminder(
         self,
@@ -537,7 +545,9 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body, from_email=from_email, company_name=company_name)
+        return await self._send_email(
+            to, subject, html_body, from_email=from_email, company_name=company_name
+        )
 
     async def send_contract_draft_review(
         self,
@@ -622,7 +632,9 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body, from_email=from_email, company_name=company_name)
+        return await self._send_email(
+            to, subject, html_body, from_email=from_email, company_name=company_name
+        )
 
     async def send_document_expiring(
         self,
@@ -630,6 +642,8 @@ class EmailService:
         third_party_name: str,
         doc_type: str,
         days_left: int,
+        from_email: str | None = None,
+        company_name: str | None = None,
     ) -> bool:
         """Notify that a document is expiring soon."""
         subject = f"Document expirant bientôt : {doc_type} ({days_left}j) - Bobby"
@@ -646,7 +660,9 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body, from_email=from_email, company_name=company_name)
+        return await self._send_email(
+            to, subject, html_body, from_email=from_email, company_name=company_name
+        )
 
     async def send_documents_submitted_notification(
         self,
@@ -705,7 +721,9 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body, from_email=from_email, company_name=company_name)
+        return await self._send_email(
+            to, subject, html_body, from_email=from_email, company_name=company_name
+        )
 
     async def send_document_expiration_summary(
         self,
@@ -751,7 +769,9 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body, from_email=from_email, company_name=company_name)
+        return await self._send_email(
+            to, subject, html_body, from_email=from_email, company_name=company_name
+        )
 
     async def send_document_expired(
         self,

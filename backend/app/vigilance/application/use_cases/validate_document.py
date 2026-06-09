@@ -61,7 +61,9 @@ class ValidateDocumentUseCase:
         elif document_date:
             expires_at = self._compute_expiration_from_date(document.document_type, document_date)
         elif document.document_date:
-            expires_at = self._compute_expiration_from_date(document.document_type, document.document_date)
+            expires_at = self._compute_expiration_from_date(
+                document.document_type, document.document_date
+            )
         else:
             expires_at = self._compute_expiration(document.document_type)
 

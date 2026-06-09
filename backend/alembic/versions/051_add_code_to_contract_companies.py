@@ -8,8 +8,9 @@ Adds a 3-letter code (e.g. "GEM") used to build contract references
 in the format XXX-YYYY-NNN, with numbering independent per company.
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "051"
 down_revision = "050"

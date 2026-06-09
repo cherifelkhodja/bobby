@@ -5,9 +5,10 @@ Revises: 033
 Create Date: 2026-03-05
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
+
+from alembic import op
 
 revision = "034_contract_articles"
 down_revision = "033_add_doc_unavailability"
@@ -109,7 +110,9 @@ DEFAULT_ARTICLES = [
 def upgrade() -> None:
     op.create_table(
         "cm_contract_article_templates",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")
+        ),
         sa.Column("article_key", sa.String(50), nullable=False, unique=True),
         sa.Column("article_number", sa.Integer, nullable=False),
         sa.Column("title", sa.String(200), nullable=False),

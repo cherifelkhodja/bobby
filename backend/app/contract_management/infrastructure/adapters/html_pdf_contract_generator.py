@@ -21,7 +21,7 @@ _KNOWN_LOGOS = {
 
 def _md_inline(text: str) -> str:
     """Convert inline markdown to HTML (bold only)."""
-    return re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text, flags=re.DOTALL)
+    return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text, flags=re.DOTALL)
 
 
 def _format_capital(value: str) -> str:
@@ -90,7 +90,7 @@ def _expand_civility_in_name(value: str) -> str:
     for abbr, full in _CIVILITY_MAP.items():
         prefix = abbr + " "
         if value.startswith(prefix):
-            return full + " " + value[len(prefix):]
+            return full + " " + value[len(prefix) :]
     return value
 
 

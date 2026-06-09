@@ -2,6 +2,7 @@
 
 import re
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import structlog
@@ -54,7 +55,11 @@ from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
 from app.vigilance.application.use_cases.request_documents import RequestDocumentsUseCase
 from app.vigilance.infrastructure.adapters.postgres_document_repo import DocumentRepository
 
+if TYPE_CHECKING:
+    from app.contract_management.api.schemas import PurchaseOrderRequestResponse
+
 logger = structlog.get_logger()
+
 
 def _format_siren(siren: str) -> str:
     """Format a SIREN number with spaces every 3 digits (e.g. '894213669' → '894 213 669')."""
@@ -265,9 +270,13 @@ async def list_contract_requests(
     tp_name_map: dict = {}
     if tp_ids:
         from sqlalchemy import select as _sel
+
         from app.third_party.infrastructure.models import ThirdPartyModel
+
         result = await db.execute(
-            _sel(ThirdPartyModel.id, ThirdPartyModel.company_name).where(ThirdPartyModel.id.in_(tp_ids))
+            _sel(ThirdPartyModel.id, ThirdPartyModel.company_name).where(
+                ThirdPartyModel.id.in_(tp_ids)
+            )
         )
         tp_name_map = {row[0]: row[1] for row in result.all() if row[1]}
 
@@ -277,7 +286,8 @@ async def list_contract_requests(
                 cr,
                 commercial_name=name_map.get(cr.commercial_email),
                 third_party_name=tp_name_map.get(cr.third_party_id),
-            ) for cr in items
+            )
+            for cr in items
         ],
         total=total,
         skip=skip,
@@ -603,7 +613,11 @@ async def resend_collection_email(
     if not cr:
         raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
 
-    allowed = {CRStatus.COLLECTING_DOCUMENTS, CRStatus.REVIEWING_COMPLIANCE, CRStatus.COMPLIANCE_BLOCKED}
+    allowed = {
+        CRStatus.COLLECTING_DOCUMENTS,
+        CRStatus.REVIEWING_COMPLIANCE,
+        CRStatus.COMPLIANCE_BLOCKED,
+    }
     if cr.status not in allowed:
         raise HTTPException(
             status_code=400,
@@ -673,7 +687,7 @@ async def configure_contract(
     use_case = ConfigureContractUseCase(contract_request_repository=cr_repo)
 
     try:
-        cr = await use_case.execute(contract_request_id, body.model_dump(mode='json'))
+        cr = await use_case.execute(contract_request_id, body.model_dump(mode="json"))
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -915,7 +929,9 @@ async def cancel_contract_request(
     webhook_repo = WebhookEventRepository(db)
     deleted = 0
     if cr.boond_positioning_id:
-        deleted = await webhook_repo.delete_by_prefix(f"positioning_update_{cr.boond_positioning_id}_")
+        deleted = await webhook_repo.delete_by_prefix(
+            f"positioning_update_{cr.boond_positioning_id}_"
+        )
 
     audit_logger.log(
         AuditAction.CONTRACT_REQUEST_CANCELLED,
@@ -967,7 +983,7 @@ async def purge_contract_request(
     Only allowed when the contract request is in CANCELLED status.
     ADV/admin only.
     """
-    from sqlalchemy import delete as sa_delete, select as sa_select
+    from sqlalchemy import delete as sa_delete
 
     from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
         WebhookEventRepository,
@@ -1017,16 +1033,12 @@ async def purge_contract_request(
 
     # Generated contracts (FK → contract_requests)
     await db.execute(
-        sa_delete(ContractModel).where(
-            ContractModel.contract_request_id == contract_request_id
-        )
+        sa_delete(ContractModel).where(ContractModel.contract_request_id == contract_request_id)
     )
 
     # Magic links (FK → contract_requests)
     await db.execute(
-        sa_delete(MagicLinkModel).where(
-            MagicLinkModel.contract_request_id == contract_request_id
-        )
+        sa_delete(MagicLinkModel).where(MagicLinkModel.contract_request_id == contract_request_id)
     )
 
     # Webhook events
@@ -1036,9 +1048,7 @@ async def purge_contract_request(
 
     # Delete the contract request itself
     await db.execute(
-        sa_delete(ContractRequestModel).where(
-            ContractRequestModel.id == contract_request_id
-        )
+        sa_delete(ContractRequestModel).where(ContractRequestModel.id == contract_request_id)
     )
 
     await db.commit()
@@ -1191,7 +1201,9 @@ async def send_draft_to_partner(
     )
 
     try:
-        cr = await use_case.execute(contract_request_id, from_email=company_email_from, company_name=company_name)
+        cr = await use_case.execute(
+            contract_request_id, from_email=company_email_from, company_name=company_name
+        )
     except Exception as exc:
         logger.error("send_draft_to_partner_failed", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
@@ -1246,6 +1258,8 @@ async def resend_draft_email(
     contact_email = cr.contractualization_contact_email
     if not contact_email:
         raise HTTPException(status_code=400, detail="Email de contact non renseigné.")
+
+    from app.third_party.domain.value_objects.magic_link_purpose import MagicLinkPurpose
 
     email_service = EmailService(settings)
     company_email_from, company_name = await _resolve_company_email_ctx(db, cr.company_id)
@@ -1303,10 +1317,12 @@ async def get_signature_preview(
         return []
 
     result = await db.execute(
-        select(CharterTemplateModel).where(
+        select(CharterTemplateModel)
+        .where(
             CharterTemplateModel.company_id == cr.company_id,
             CharterTemplateModel.is_active.is_(True),
-        ).order_by(CharterTemplateModel.target, CharterTemplateModel.created_at)
+        )
+        .order_by(CharterTemplateModel.target, CharterTemplateModel.created_at)
     )
     charters = result.scalars().all()
 
@@ -1331,12 +1347,14 @@ async def get_signature_preview(
             kind = "charter_ar"
             label = f"AR - {c.name} {c.version}"
 
-        items.append({
-            "charter_template_id": str(c.id),
-            "label": label,
-            "document_kind": kind,
-            "signer_role": c.target,
-        })
+        items.append(
+            {
+                "charter_template_id": str(c.id),
+                "label": label,
+                "document_kind": kind,
+                "signer_role": c.target,
+            }
+        )
 
     return items
 
@@ -1374,7 +1392,9 @@ async def send_for_signature(
 
     # Delete any existing checklist and recreate with exclusions
     from sqlalchemy import delete as sa_delete
+
     from app.contract_management.infrastructure.models import SignatureUploadModel
+
     await db.execute(
         sa_delete(SignatureUploadModel).where(
             SignatureUploadModel.contract_request_id == contract_request_id
@@ -1410,7 +1430,11 @@ async def get_signature_checklist(
     result = await db.execute(
         select(SignatureUploadModel)
         .where(SignatureUploadModel.contract_request_id == contract_request_id)
-        .order_by(SignatureUploadModel.signer_role, SignatureUploadModel.document_kind, SignatureUploadModel.created_at)
+        .order_by(
+            SignatureUploadModel.signer_role,
+            SignatureUploadModel.document_kind,
+            SignatureUploadModel.created_at,
+        )
     )
     rows = result.scalars().all()
 
@@ -1462,11 +1486,19 @@ async def upload_signature_document(
 
     s3 = S3StorageClient(settings)
     content = await file.read()
-    ext = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "pdf"
+    ext = (
+        file.filename.rsplit(".", 1)[-1].lower()
+        if file.filename and "." in file.filename
+        else "pdf"
+    )
     ref = cr.display_reference if cr else str(contract_request_id)[:8]
-    s3_key = f"contracts/{ref}/signed/{item.document_kind}_{item.signer_role}_{str(item_id)[:8]}.{ext}"
+    s3_key = (
+        f"contracts/{ref}/signed/{item.document_kind}_{item.signer_role}_{str(item_id)[:8]}.{ext}"
+    )
 
-    await s3.upload_file(key=s3_key, content=content, content_type=file.content_type or "application/pdf")
+    await s3.upload_file(
+        key=s3_key, content=content, content_type=file.content_type or "application/pdf"
+    )
 
     item.s3_key = s3_key
     item.file_name = file.filename
@@ -1496,9 +1528,9 @@ async def _ensure_signature_checklist(db, cr, excluded_charter_ids: set | None =
 
     # Check if already created
     count_result = await db.execute(
-        select(func.count()).select_from(SignatureUploadModel).where(
-            SignatureUploadModel.contract_request_id == cr.id
-        )
+        select(func.count())
+        .select_from(SignatureUploadModel)
+        .where(SignatureUploadModel.contract_request_id == cr.id)
     )
     if count_result.scalar() > 0:
         return
@@ -1506,20 +1538,24 @@ async def _ensure_signature_checklist(db, cr, excluded_charter_ids: set | None =
     items: list[SignatureUploadModel] = []
 
     # 1. Always: Contrat cadre signé (partner signs)
-    items.append(SignatureUploadModel(
-        contract_request_id=cr.id,
-        document_kind="contract",
-        signer_role="partner",
-        label="Contrat cadre signe",
-    ))
+    items.append(
+        SignatureUploadModel(
+            contract_request_id=cr.id,
+            document_kind="contract",
+            signer_role="partner",
+            label="Contrat cadre signe",
+        )
+    )
 
     # 2. Company charter documents
     if cr.company_id:
         result = await db.execute(
-            select(CharterTemplateModel).where(
+            select(CharterTemplateModel)
+            .where(
                 CharterTemplateModel.company_id == cr.company_id,
                 CharterTemplateModel.is_active.is_(True),
-            ).order_by(CharterTemplateModel.target, CharterTemplateModel.created_at)
+            )
+            .order_by(CharterTemplateModel.target, CharterTemplateModel.created_at)
         )
         charters = result.scalars().all()
 
@@ -1536,7 +1572,11 @@ async def _ensure_signature_checklist(db, cr, excluded_charter_ids: set | None =
 
             # Check consultant scope
             if c.target == "consultant" and c.consultant_scope != "all":
-                is_external = cr.third_party_type in ("freelance", "sous_traitant", "portage_salarial")
+                is_external = cr.third_party_type in (
+                    "freelance",
+                    "sous_traitant",
+                    "portage_salarial",
+                )
                 if c.consultant_scope == "external" and not is_external:
                     continue
                 if c.consultant_scope == "internal" and is_external:
@@ -1549,13 +1589,15 @@ async def _ensure_signature_checklist(db, cr, excluded_charter_ids: set | None =
                 kind = "charter_ar"
                 label = f"AR - {c.name} {c.version}"
 
-            items.append(SignatureUploadModel(
-                contract_request_id=cr.id,
-                charter_template_id=c.id,
-                document_kind=kind,
-                signer_role=signer_role,
-                label=label,
-            ))
+            items.append(
+                SignatureUploadModel(
+                    contract_request_id=cr.id,
+                    charter_template_id=c.id,
+                    document_kind=kind,
+                    signer_role=signer_role,
+                    label=label,
+                )
+            )
 
     for item in items:
         db.add(item)
@@ -1593,14 +1635,16 @@ async def mark_as_signed(
 
     # Check all checklist items are uploaded
     total_result = await db.execute(
-        select(func.count()).select_from(SignatureUploadModel).where(
-            SignatureUploadModel.contract_request_id == contract_request_id
-        )
+        select(func.count())
+        .select_from(SignatureUploadModel)
+        .where(SignatureUploadModel.contract_request_id == contract_request_id)
     )
     total = total_result.scalar()
 
     uploaded_result = await db.execute(
-        select(func.count()).select_from(SignatureUploadModel).where(
+        select(func.count())
+        .select_from(SignatureUploadModel)
+        .where(
             SignatureUploadModel.contract_request_id == contract_request_id,
             SignatureUploadModel.s3_key.isnot(None),
         )
@@ -1719,10 +1763,13 @@ async def _upload_signed_docs_to_boond(db, cr) -> dict:
     from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
         ContractRequestRepository as _CRRepo,
     )
+
     cr = await _CRRepo(db).get_by_id(cr.id) or cr
     if cr.third_party_id:
         tp = await tp_repo.get_by_id(cr.third_party_id)
-    boond_resource_id = (tp.boond_resource_id if tp else None) or cr.boond_resource_id or cr.boond_candidate_id
+    boond_resource_id = (
+        (tp.boond_resource_id if tp else None) or cr.boond_resource_id or cr.boond_candidate_id
+    )
 
     logger.info(
         "boond_doc_upload_ids",
@@ -1837,7 +1884,8 @@ async def delete_framework_contract(
     db: AsyncSession = Depends(get_db),
 ):
     """Permanently delete a framework contract. Admin only."""
-    from sqlalchemy import delete as sa_delete, select as sa_select
+    from sqlalchemy import delete as sa_delete
+    from sqlalchemy import select as sa_select
 
     from app.contract_management.infrastructure.models import FrameworkContractModel
 
@@ -1851,9 +1899,7 @@ async def delete_framework_contract(
         raise HTTPException(status_code=404, detail="Contrat cadre introuvable.")
 
     ref = fc.reference
-    await db.execute(
-        sa_delete(FrameworkContractModel).where(FrameworkContractModel.id == fc_id)
-    )
+    await db.execute(sa_delete(FrameworkContractModel).where(FrameworkContractModel.id == fc_id))
     await db.commit()
 
     audit_logger.log(
@@ -1878,7 +1924,8 @@ async def delete_contract(
     db: AsyncSession = Depends(get_db),
 ):
     """Permanently delete a contract document. Admin only."""
-    from sqlalchemy import delete as sa_delete, select as sa_select
+    from sqlalchemy import delete as sa_delete
+    from sqlalchemy import select as sa_select
 
     from app.contract_management.infrastructure.models import ContractModel
 
@@ -1908,9 +1955,7 @@ async def delete_contract(
     except Exception:
         pass
 
-    await db.execute(
-        sa_delete(ContractModel).where(ContractModel.id == contract_id)
-    )
+    await db.execute(sa_delete(ContractModel).where(ContractModel.id == contract_id))
 
     # Reset CR reference to the previous contract's reference (or None if no more)
     cr_repo = ContractRequestRepository(db)
@@ -2068,10 +2113,13 @@ async def retry_boond_sync(
 
 # ── Actions Boond individuelles ────────────────────────────────────────────────
 
+
 def _boond_deps(db: AsyncSession, settings):
     """Build shared adapters for individual Boond action routes."""
     from app.contract_management.infrastructure.adapters.boond_crm_adapter import BoondCrmAdapter
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import ContractRepository
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        ContractRepository,
+    )
     from app.infrastructure.boond.client import BoondClient
 
     cr_repo = ContractRequestRepository(db)
@@ -2111,7 +2159,12 @@ async def boond_convert_candidate(
         raise HTTPException(status_code=400, detail="Pas de boond_candidate_id sur cette demande.")
 
     if cr.boond_consultant_type == "resource":
-        return {"ok": True, "boond_candidate_id": cr.boond_candidate_id, "converted": False, "already_resource": True}
+        return {
+            "ok": True,
+            "boond_candidate_id": cr.boond_candidate_id,
+            "converted": False,
+            "already_resource": True,
+        }
 
     # Determine state_reason_type_of: 0 = salarié, 1 = externe
     state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
@@ -2157,8 +2210,8 @@ async def boond_convert_candidate(
         raise
     except Exception as exc:
         detail = str(exc)
-        cause = exc.__cause__ or (getattr(exc, '__context__', None))
-        if hasattr(cause, 'response'):
+        cause = exc.__cause__ or (getattr(exc, "__context__", None))
+        if hasattr(cause, "response"):
             detail = f"Boond HTTP {cause.response.status_code}: {cause.response.text[:2000]}"
         logger.error("boond_convert_candidate_failed", error=detail, cr_id=str(contract_request_id))
         raise HTTPException(status_code=400, detail=f"Erreur Boond: {detail}")
@@ -2179,11 +2232,12 @@ async def boond_create_contract(
     Args:
         resource_id: Override Boond resource ID (query param). Falls back to cr.boond_candidate_id.
     """
+    from sqlalchemy import select as _select
+
     from app.contract_management.application.use_cases.sync_to_boond_after_signing import (
         _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE,
     )
     from app.contract_management.infrastructure.models import ContractCompanyModel
-    from sqlalchemy import select as _select
 
     settings = get_settings()
     cr_repo, _cr2, tp_repo, crm = _boond_deps(db, settings)
@@ -2193,11 +2247,18 @@ async def boond_create_contract(
 
     effective_resource_id = resource_id or cr.boond_candidate_id
     if not effective_resource_id:
-        raise HTTPException(status_code=400, detail="Pas de resource_id fourni et pas de boond_candidate_id sur cette demande.")
+        raise HTTPException(
+            status_code=400,
+            detail="Pas de resource_id fourni et pas de boond_candidate_id sur cette demande.",
+        )
 
     is_external = cr.third_party_type != "salarie"
     if not is_external:
-        return {"ok": True, "contract_created": False, "reason": "Type salarié, pas de contrat Boond."}
+        return {
+            "ok": True,
+            "contract_created": False,
+            "reason": "Type salarié, pas de contrat Boond.",
+        }
 
     if not cr.daily_rate:
         raise HTTPException(status_code=400, detail="TJM manquant sur la demande.")
@@ -2225,10 +2286,18 @@ async def boond_create_contract(
     contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(cr.third_party_type or "", 3)
     start_date_str = None
     if cr.start_date:
-        start_date_str = cr.start_date.strftime("%Y-%m-%d") if hasattr(cr.start_date, "strftime") else str(cr.start_date)
+        start_date_str = (
+            cr.start_date.strftime("%Y-%m-%d")
+            if hasattr(cr.start_date, "strftime")
+            else str(cr.start_date)
+        )
     end_date_str = None
     if cr.end_date:
-        end_date_str = cr.end_date.strftime("%Y-%m-%d") if hasattr(cr.end_date, "strftime") else str(cr.end_date)
+        end_date_str = (
+            cr.end_date.strftime("%Y-%m-%d")
+            if hasattr(cr.end_date, "strftime")
+            else str(cr.end_date)
+        )
     agency_id = company.boond_agency_id if company else None
 
     try:
@@ -2269,8 +2338,8 @@ async def boond_create_contract(
         raise
     except Exception as exc:
         detail = str(exc)
-        cause = exc.__cause__ or (getattr(exc, '__context__', None))
-        if hasattr(cause, 'response'):
+        cause = exc.__cause__ or (getattr(exc, "__context__", None))
+        if hasattr(cause, "response"):
             detail = f"Boond HTTP {cause.response.status_code}: {cause.response.text[:2000]}"
         logger.error("boond_create_contract_failed", error=detail, cr_id=str(contract_request_id))
         raise HTTPException(status_code=400, detail=f"Erreur Boond: {detail}")
@@ -2287,6 +2356,7 @@ async def boond_create_company(
 ):
     """Crée la société et les 3 contacts (dirigeant, ADV, facturation) dans Boond. ADV/admin only."""
     from app.contract_management.infrastructure.models import ContractCompanyModel
+
     settings = get_settings()
     cr_repo, _cr2, tp_repo, crm = _boond_deps(db, settings)
 
@@ -2299,13 +2369,16 @@ async def boond_create_company(
     try:
         tp = await tp_repo.get_by_id(cr.third_party_id)
     except Exception as exc:
-        logger.error("boond_create_company_get_tp_failed", error=str(exc), cr_id=str(contract_request_id))
+        logger.error(
+            "boond_create_company_get_tp_failed", error=str(exc), cr_id=str(contract_request_id)
+        )
         raise HTTPException(status_code=500, detail=f"Erreur chargement tiers: {exc}")
     if not tp:
         raise HTTPException(status_code=404, detail="Tiers introuvable.")
 
     # Fetch issuing company for agency_id
     from sqlalchemy import select as _select
+
     company = None
     if cr.company_id:
         result = await db.execute(
@@ -2384,16 +2457,36 @@ async def boond_create_company(
             signatory_types.append(7)  # dirigeant
 
         role_entries: list[tuple] = [
-            (tp.signatory_civility or tp.representative_civility,
-             tp.signatory_first_name or tp.representative_first_name,
-             tp.signatory_last_name or tp.representative_last_name,
-             tp.signatory_email or tp.representative_email,
-             tp.signatory_phone or tp.representative_phone,
-             tp.representative_title, signatory_types, "signataire"),
-            (tp.adv_contact_civility, tp.adv_contact_first_name, tp.adv_contact_last_name,
-             tp.adv_contact_email, tp.adv_contact_phone, "ADV", [9], "adv"),
-            (tp.billing_contact_civility, tp.billing_contact_first_name, tp.billing_contact_last_name,
-             tp.billing_contact_email, tp.billing_contact_phone, "Commercial", [8], "commercial"),
+            (
+                tp.signatory_civility or tp.representative_civility,
+                tp.signatory_first_name or tp.representative_first_name,
+                tp.signatory_last_name or tp.representative_last_name,
+                tp.signatory_email or tp.representative_email,
+                tp.signatory_phone or tp.representative_phone,
+                tp.representative_title,
+                signatory_types,
+                "signataire",
+            ),
+            (
+                tp.adv_contact_civility,
+                tp.adv_contact_first_name,
+                tp.adv_contact_last_name,
+                tp.adv_contact_email,
+                tp.adv_contact_phone,
+                "ADV",
+                [9],
+                "adv",
+            ),
+            (
+                tp.billing_contact_civility,
+                tp.billing_contact_first_name,
+                tp.billing_contact_last_name,
+                tp.billing_contact_email,
+                tp.billing_contact_phone,
+                "Commercial",
+                [8],
+                "commercial",
+            ),
         ]
 
         # Group by identity key (normalized first_name + last_name + email)
@@ -2409,9 +2502,14 @@ async def boond_create_company(
                     merged[key]["job_title"] = job_title
             else:
                 merged[key] = {
-                    "civility": civ, "first_name": fn, "last_name": ln,
-                    "email": email, "phone": phone, "job_title": job_title,
-                    "types_of": list(types_of_list), "labels": [label],
+                    "civility": civ,
+                    "first_name": fn,
+                    "last_name": ln,
+                    "email": email,
+                    "phone": phone,
+                    "job_title": job_title,
+                    "types_of": list(types_of_list),
+                    "labels": [label],
                 }
 
         agency_id = company.boond_agency_id if company else None
@@ -2434,10 +2532,12 @@ async def boond_create_company(
                 town=tp.head_office_city,
                 agency_id=agency_id,
             )
-            contacts_created.append({
-                "label": " + ".join(entry["labels"]),
-                "boond_contact_id": contact_id,
-            })
+            contacts_created.append(
+                {
+                    "label": " + ".join(entry["labels"]),
+                    "boond_contact_id": contact_id,
+                }
+            )
             for lbl in entry["labels"]:
                 label_to_contact_id[lbl] = contact_id
 
@@ -2462,12 +2562,12 @@ async def boond_create_company(
     except Exception as exc:
         # Extract the real Boond error from RetryError / HTTPStatusError chain
         detail = str(exc)
-        cause = exc.__cause__ or (getattr(exc, '__context__', None))
-        if hasattr(cause, 'response'):
+        cause = exc.__cause__ or (getattr(exc, "__context__", None))
+        if hasattr(cause, "response"):
             detail = f"Boond HTTP {cause.response.status_code}: {cause.response.text[:2000]}"
-        elif hasattr(exc, 'last_attempt'):
+        elif hasattr(exc, "last_attempt"):
             inner = exc.last_attempt.exception()
-            if inner and hasattr(inner, 'response'):
+            if inner and hasattr(inner, "response"):
                 detail = f"Boond HTTP {inner.response.status_code}: {inner.response.text[:2000]}"
             elif inner:
                 detail = str(inner)
@@ -2485,7 +2585,6 @@ async def boond_create_purchase_order(
     db: AsyncSession = Depends(get_db),
 ):
     """Crée le bon de commande dans Boond et enregistre l'ID sur le contrat. ADV/admin only."""
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import ContractRepository
     settings = get_settings()
     cr_repo, contract_repo, tp_repo, crm = _boond_deps(db, settings)
 
@@ -2524,12 +2623,12 @@ async def boond_create_purchase_order(
         raise
     except Exception as exc:
         detail = str(exc)
-        cause = exc.__cause__ or (getattr(exc, '__context__', None))
-        if hasattr(cause, 'response'):
+        cause = exc.__cause__ or (getattr(exc, "__context__", None))
+        if hasattr(cause, "response"):
             detail = f"Boond HTTP {cause.response.status_code}: {cause.response.text[:2000]}"
-        elif hasattr(exc, 'last_attempt'):
+        elif hasattr(exc, "last_attempt"):
             inner = exc.last_attempt.exception()
-            if inner and hasattr(inner, 'response'):
+            if inner and hasattr(inner, "response"):
                 detail = f"Boond HTTP {inner.response.status_code}: {inner.response.text[:2000]}"
             elif inner:
                 detail = str(inner)
@@ -2613,7 +2712,11 @@ async def download_contract(
     if not contract or contract.contract_request_id != contract_request_id:
         raise HTTPException(status_code=404, detail="Document contractuel non trouvé.")
 
-    s3_key = contract.s3_key_signed if (which == "signed" and contract.s3_key_signed) else contract.s3_key_draft
+    s3_key = (
+        contract.s3_key_signed
+        if (which == "signed" and contract.s3_key_signed)
+        else contract.s3_key_draft
+    )
     s3 = S3StorageClient(settings)
     url = await s3.get_presigned_url(s3_key, expires_in=600)
     return {"url": url}
@@ -2716,11 +2819,11 @@ async def list_purchase_order_requests(
 ):
     """List purchase order requests. Commercial sees own, ADV/admin see all."""
     from app.contract_management.api.schemas import PurchaseOrderRequestListResponse
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-        PurchaseOrderRequestRepository,
-    )
     from app.contract_management.domain.value_objects.purchase_order_request_status import (
         PurchaseOrderRequestStatus,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        PurchaseOrderRequestRepository,
     )
 
     _user_id, role, email = auth
@@ -2729,7 +2832,9 @@ async def list_purchase_order_requests(
     status = PurchaseOrderRequestStatus(status_filter) if status_filter else None
 
     if role == "commercial":
-        items = await por_repo.list_by_commercial_email(email, skip=skip, limit=limit, status=status)
+        items = await por_repo.list_by_commercial_email(
+            email, skip=skip, limit=limit, status=status
+        )
         total = await por_repo.count_by_commercial_email(email, status=status)
     else:
         items = await por_repo.list_all(skip=skip, limit=limit, status=status)
@@ -2791,7 +2896,6 @@ async def validate_purchase_order_request(
     db: AsyncSession = Depends(get_db),
 ):
     """Apply commercial validation to a purchase order request."""
-    from app.contract_management.api.schemas import PurchaseOrderRequestValidationRequest
     from app.contract_management.application.use_cases.validate_purchase_order_request import (
         ValidatePurchaseOrderRequestCommand,
         ValidatePurchaseOrderRequestUseCase,

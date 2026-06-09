@@ -22,8 +22,8 @@ from app.api.schemas.admin import (
     GeminiSetModelRequest,
     GeminiSettingsResponse,
     GeminiTestResponse,
-    MessageResponse,
     InpiTestResponse,
+    MessageResponse,
     SireneTestResponse,
     SyncResponse,
     TestConnectionResponse,
@@ -54,6 +54,11 @@ from app.application.use_cases.admin.users import (
     UpdateUserCommand,
     UserNotFoundError,
 )
+from app.contract_management.api.schemas import (
+    ContractCompanyRequest,
+    ContractCompanyResponse,
+)
+from app.contract_management.infrastructure.models import ContractCompanyModel
 from app.dependencies import AppSettings, AppSettingsSvc, DbSession
 from app.infrastructure.anonymizer.gemini_anonymizer import GeminiAnonymizer
 from app.infrastructure.anonymizer.job_posting_anonymizer import SKILLS_SYNC_INTERVAL
@@ -67,11 +72,6 @@ from app.infrastructure.settings import (
     AVAILABLE_GEMINI_MODELS,
 )
 from app.infrastructure.turnoverit.client import TurnoverITClient
-from app.contract_management.api.schemas import (
-    ContractCompanyRequest,
-    ContractCompanyResponse,
-)
-from app.contract_management.infrastructure.models import ContractCompanyModel
 
 router = APIRouter()
 
@@ -941,7 +941,9 @@ async def test_inpi_connection(
 
     from app.third_party.infrastructure.adapters.inpi_client import InpiClient
 
-    configured = bool(settings.INPI_USERNAME and settings.INPI_PASSWORD) or bool(settings.INPI_TOKEN)
+    configured = bool(settings.INPI_USERNAME and settings.INPI_PASSWORD) or bool(
+        settings.INPI_TOKEN
+    )
 
     if not configured:
         return InpiTestResponse(
@@ -969,7 +971,9 @@ async def test_inpi_connection(
             if result.legal_form_label:
                 details.append(f"Forme: {result.legal_form_label}")
             if result.capital_amount is not None:
-                details.append(f"Capital: {result.capital_amount:,.0f} {result.capital_currency or 'EUR'}")
+                details.append(
+                    f"Capital: {result.capital_amount:,.0f} {result.capital_currency or 'EUR'}"
+                )
             if result.greffe_city:
                 details.append(f"Greffe: {result.greffe_city}")
             detail_str = " | ".join(details) if details else "données récupérées"
@@ -982,6 +986,7 @@ async def test_inpi_connection(
         else:
             # result is None : soit SIREN non trouvé, soit token non obtenu
             from app.third_party.infrastructure.adapters.inpi_client import _get_inpi_token
+
             token_check = await _get_inpi_token(
                 settings.INPI_USERNAME, settings.INPI_PASSWORD, settings.INPI_TOKEN
             )
@@ -1013,6 +1018,7 @@ async def test_inpi_connection(
 
 from pydantic import BaseModel as _PydanticBase
 from sqlalchemy.ext.asyncio import AsyncSession as _AsyncSession
+
 from app.dependencies import get_db as _get_db
 
 
@@ -1062,10 +1068,13 @@ async def create_contract_article(
     from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
         ArticleTemplateRepository,
     )
+
     repo = ArticleTemplateRepository(db)
     existing = await repo.get_by_key(body.article_key)
     if existing:
-        raise HTTPException(status_code=409, detail=f"La clé '{body.article_key}' est déjà utilisée")
+        raise HTTPException(
+            status_code=409, detail=f"La clé '{body.article_key}' est déjà utilisée"
+        )
     created = await repo.create(
         article_key=body.article_key,
         title=body.title,
@@ -1100,6 +1109,7 @@ async def list_contract_articles(
     from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
         ArticleTemplateRepository,
     )
+
     articles = await ArticleTemplateRepository(db).get_all()
     return [
         ArticleTemplateResponse(
@@ -1129,6 +1139,7 @@ async def reorder_contract_articles(
     from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
         ArticleTemplateRepository,
     )
+
     await ArticleTemplateRepository(db).reorder(body.ordered_keys)
     await db.commit()
 
@@ -1147,6 +1158,7 @@ async def delete_contract_article(
     from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
         ArticleTemplateRepository,
     )
+
     deleted = await ArticleTemplateRepository(db).delete(article_key)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Article '{article_key}' introuvable")
@@ -1168,6 +1180,7 @@ async def update_contract_article(
     from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
         ArticleTemplateRepository,
     )
+
     updated = await ArticleTemplateRepository(db).update(
         article_key,
         content=body.content,
@@ -1231,6 +1244,7 @@ async def create_contract_annex(
     from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
         AnnexTemplateRepository,
     )
+
     repo = AnnexTemplateRepository(db)
     existing = await repo.get_by_key(body.annexe_key)
     if existing:
@@ -1267,6 +1281,7 @@ async def list_contract_annexes(
     from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
         AnnexTemplateRepository,
     )
+
     annexes = await AnnexTemplateRepository(db).get_all()
     return [
         AnnexTemplateResponse(
@@ -1296,6 +1311,7 @@ async def reorder_contract_annexes(
     from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
         AnnexTemplateRepository,
     )
+
     await AnnexTemplateRepository(db).reorder(body.ordered_keys)
     await db.commit()
 
@@ -1314,6 +1330,7 @@ async def delete_contract_annex(
     from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
         AnnexTemplateRepository,
     )
+
     deleted = await AnnexTemplateRepository(db).delete(annexe_key)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Annexe '{annexe_key}' introuvable")
@@ -1335,6 +1352,7 @@ async def update_contract_annex(
     from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
         AnnexTemplateRepository,
     )
+
     updated = await AnnexTemplateRepository(db).update(
         annexe_key,
         content=body.content,
@@ -1357,6 +1375,7 @@ async def update_contract_annex(
 
 
 # ── Contract companies (sociétés émettrices) ──────────────────────────────────
+
 
 def _company_to_response(m: ContractCompanyModel) -> ContractCompanyResponse:
     return ContractCompanyResponse(
@@ -1396,7 +1415,10 @@ async def list_contract_companies(
 ):
     """List all contract issuing companies. Admin only."""
     from sqlalchemy import select as _select
-    result = await db.execute(_select(ContractCompanyModel).order_by(ContractCompanyModel.created_at))
+
+    result = await db.execute(
+        _select(ContractCompanyModel).order_by(ContractCompanyModel.created_at)
+    )
     return [_company_to_response(m) for m in result.scalars().all()]
 
 
@@ -1412,13 +1434,12 @@ async def create_contract_company(
     db: _AsyncSession = Depends(_get_db),
 ):
     """Create a new contract issuing company. Admin only."""
-    from uuid import uuid4 as _uuid4
     from datetime import datetime as _dt
+    from uuid import uuid4 as _uuid4
+
     # If this one is set as default, unset the others
     if body.is_default:
-        await db.execute(
-            ContractCompanyModel.__table__.update().values(is_default=False)
-        )
+        await db.execute(ContractCompanyModel.__table__.update().values(is_default=False))
     m = ContractCompanyModel(
         id=_uuid4(),
         name=body.name,
@@ -1460,16 +1481,18 @@ async def update_contract_company(
     db: _AsyncSession = Depends(_get_db),
 ):
     """Update an issuing company. Admin only."""
-    from sqlalchemy import select as _select
     from datetime import datetime as _dt
-    result = await db.execute(_select(ContractCompanyModel).where(ContractCompanyModel.id == company_id))
+
+    from sqlalchemy import select as _select
+
+    result = await db.execute(
+        _select(ContractCompanyModel).where(ContractCompanyModel.id == company_id)
+    )
     m = result.scalar_one_or_none()
     if not m:
         raise HTTPException(status_code=404, detail="Société introuvable")
     if body.is_default and not m.is_default:
-        await db.execute(
-            ContractCompanyModel.__table__.update().values(is_default=False)
-        )
+        await db.execute(ContractCompanyModel.__table__.update().values(is_default=False))
     m.name = body.name
     m.code = body.code.upper()
     m.legal_form = body.legal_form
@@ -1505,8 +1528,12 @@ async def delete_contract_company(
     db: _AsyncSession = Depends(_get_db),
 ):
     """Delete an issuing company. Admin only."""
-    from sqlalchemy import select as _select, delete as _delete
-    result = await db.execute(_select(ContractCompanyModel).where(ContractCompanyModel.id == company_id))
+    from sqlalchemy import delete as _delete
+    from sqlalchemy import select as _select
+
+    result = await db.execute(
+        _select(ContractCompanyModel).where(ContractCompanyModel.id == company_id)
+    )
     m = result.scalar_one_or_none()
     if not m:
         raise HTTPException(status_code=404, detail="Société introuvable")
@@ -1676,13 +1703,14 @@ async def create_charter(
     version: str = Query(..., description="Version label (e.g. V1, V2)"),
     target: str = Query(..., pattern="^(partner|consultant)$", description="partner or consultant"),
     company_id: UUID = Query(..., description="Company ID"),
-    document_type: str = Query("charte", pattern="^(charte|politique|document_unilateral|engagement|autre)$"),
+    document_type: str = Query(
+        "charte", pattern="^(charte|politique|document_unilateral|engagement|autre)$"
+    ),
     requires_acknowledgement: bool = Query(False),
     consultant_scope: str = Query("all", pattern="^(all|external|internal)$"),
     file: UploadFile = File(...),
 ):
     """Upload a new charter template PDF. Admin only."""
-    from app.config import get_settings
     from app.config import get_settings
     from app.contract_management.infrastructure.models import CharterTemplateModel
     from app.infrastructure.storage.s3_client import S3StorageClient
@@ -1691,8 +1719,12 @@ async def create_charter(
     s3 = S3StorageClient(settings)
 
     content = await file.read()
-    extension = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "pdf"
-    slug = name.lower().replace(' ', '_')
+    extension = (
+        file.filename.rsplit(".", 1)[-1].lower()
+        if file.filename and "." in file.filename
+        else "pdf"
+    )
+    slug = name.lower().replace(" ", "_")
     s3_key = f"charters/{company_id}/{target}/{slug}_{version}.{extension}"
 
     await s3.upload_file(
@@ -1747,9 +1779,15 @@ async def upload_charter_ar(
 
     s3 = S3StorageClient(settings)
     content = await file.read()
-    extension = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "pdf"
-    slug = charter.name.lower().replace(' ', '_')
-    ar_s3_key = f"charters/{charter.company_id}/{charter.target}/{slug}_{charter.version}_AR.{extension}"
+    extension = (
+        file.filename.rsplit(".", 1)[-1].lower()
+        if file.filename and "." in file.filename
+        else "pdf"
+    )
+    slug = charter.name.lower().replace(" ", "_")
+    ar_s3_key = (
+        f"charters/{charter.company_id}/{charter.target}/{slug}_{charter.version}_AR.{extension}"
+    )
 
     await s3.upload_file(
         key=ar_s3_key,
@@ -1776,7 +1814,9 @@ async def update_charter(
     name: str | None = None,
     version: str | None = None,
     target: str | None = Query(None, pattern="^(partner|consultant)$"),
-    document_type: str | None = Query(None, pattern="^(charte|politique|document_unilateral|engagement|autre)$"),
+    document_type: str | None = Query(
+        None, pattern="^(charte|politique|document_unilateral|engagement|autre)$"
+    ),
     requires_acknowledgement: bool | None = None,
     consultant_scope: str | None = Query(None, pattern="^(all|external|internal)$"),
 ):
@@ -1822,7 +1862,8 @@ async def delete_charter(
     db: _AsyncSession = Depends(_get_db),
 ):
     """Delete a charter template and its S3 file. Admin only."""
-    from sqlalchemy import select as _select, delete as _delete
+    from sqlalchemy import delete as _delete
+    from sqlalchemy import select as _select
 
     from app.config import get_settings
     from app.contract_management.infrastructure.models import CharterTemplateModel
@@ -1845,9 +1886,7 @@ async def delete_charter(
     except Exception:
         pass
 
-    await db.execute(
-        _delete(CharterTemplateModel).where(CharterTemplateModel.id == charter_id)
-    )
+    await db.execute(_delete(CharterTemplateModel).where(CharterTemplateModel.id == charter_id))
     await db.commit()
 
 
@@ -1948,8 +1987,12 @@ async def replace_charter_file(
     # Upload new file
     content = await file.read()
     new_version = version or charter.version
-    extension = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "pdf"
-    slug = charter.name.lower().replace(' ', '_')
+    extension = (
+        file.filename.rsplit(".", 1)[-1].lower()
+        if file.filename and "." in file.filename
+        else "pdf"
+    )
+    slug = charter.name.lower().replace(" ", "_")
     s3_key = f"charters/{charter.company_id}/{charter.target}/{slug}_{new_version}.{extension}"
 
     await s3.upload_file(
@@ -1965,4 +2008,3 @@ async def replace_charter_file(
     await db.commit()
 
     return _charter_to_response(charter)
-

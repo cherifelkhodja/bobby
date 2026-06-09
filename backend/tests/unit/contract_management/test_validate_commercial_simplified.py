@@ -249,22 +249,29 @@ class TestCommandValidation:
     def test_command_has_no_daily_rate(self):
         """Command should not accept daily_rate."""
         import inspect
+
         params = inspect.signature(ValidateCommercialCommand.__init__).parameters
         assert "daily_rate" not in params
 
     def test_command_has_no_start_date(self):
         """Command should not accept start_date."""
         import inspect
+
         params = inspect.signature(ValidateCommercialCommand.__init__).parameters
         assert "start_date" not in params
 
     def test_command_has_no_mission_fields(self):
         """Command should not accept mission-specific fields."""
         import inspect
+
         params = inspect.signature(ValidateCommercialCommand.__init__).parameters
         mission_fields = [
-            "mission_title", "mission_description", "mission_site_name",
-            "mission_address", "mission_postal_code", "mission_city",
+            "mission_title",
+            "mission_description",
+            "mission_site_name",
+            "mission_address",
+            "mission_postal_code",
+            "mission_city",
         ]
         for field in mission_fields:
             assert field not in params, f"{field} should not be in command"
@@ -272,6 +279,7 @@ class TestCommandValidation:
     def test_command_accepts_required_fields(self):
         """Command should accept type tiers and contact email."""
         import inspect
+
         params = inspect.signature(ValidateCommercialCommand.__init__).parameters
         assert "third_party_type" in params
         assert "contact_email" in params

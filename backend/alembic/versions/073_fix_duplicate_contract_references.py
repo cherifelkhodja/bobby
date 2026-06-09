@@ -16,37 +16,47 @@ depends_on = None
 
 def upgrade() -> None:
     # Delete contract documents with the -002 references
-    op.execute(sa.text("""
+    op.execute(
+        sa.text("""
         DELETE FROM cm_contracts
         WHERE reference IN ('GEM-CC-002', 'CRA-CC-002')
-    """))
+    """)
+    )
 
     # Delete framework contracts with the -002 references
-    op.execute(sa.text("""
+    op.execute(
+        sa.text("""
         DELETE FROM cm_framework_contracts
         WHERE reference IN ('GEM-CC-002', 'CRA-CC-002')
-    """))
+    """)
+    )
 
     # Reset contract request references from -002 to -001
-    op.execute(sa.text("""
+    op.execute(
+        sa.text("""
         UPDATE cm_contract_requests
         SET reference = 'GEM-CC-001'
         WHERE reference = 'GEM-CC-002'
-    """))
+    """)
+    )
 
-    op.execute(sa.text("""
+    op.execute(
+        sa.text("""
         UPDATE cm_contract_requests
         SET reference = 'CRA-CC-001'
         WHERE reference = 'CRA-CC-002'
-    """))
+    """)
+    )
 
     # Fix: restore archived CRs that should be active
-    op.execute(sa.text("""
+    op.execute(
+        sa.text("""
         UPDATE cm_contract_requests
         SET status = 'active'
         WHERE reference = 'GEM-CC-001'
         AND status = 'archived'
-    """))
+    """)
+    )
 
 
 def downgrade() -> None:

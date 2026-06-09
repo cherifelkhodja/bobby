@@ -8,8 +8,9 @@ Create Date: 2026-03-10
 - cm_contract_companies.boond_agency_id: ID de l'agence Boond associée à la société émettrice
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "053"
 down_revision = "052"

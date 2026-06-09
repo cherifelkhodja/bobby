@@ -373,7 +373,9 @@ export default function Portal() {
                         try {
                           const { url } = await portalApi.getCharterDownloadUrl(token!, charter.id);
                           window.open(url, '_blank');
-                        } catch {}
+                        } catch {
+                          /* ignore */
+                        }
                       }}
                       className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
                     >
@@ -387,7 +389,9 @@ export default function Portal() {
                         try {
                           await portalApi.acknowledgeCharter(token!, charter.id);
                           queryClient.invalidateQueries({ queryKey: ['portal-charters', token] });
-                        } catch {}
+                        } catch {
+                          /* ignore */
+                        }
                       }}
                       className="mt-2 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-400 transition-colors"
                     >

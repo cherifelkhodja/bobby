@@ -10,6 +10,7 @@ from app.api.dependencies import AdvOrAdminUser
 from app.config import get_settings
 from app.dependencies import get_db
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
+from app.infrastructure.storage.s3_client import S3StorageClient
 from app.third_party.api.schemas import (
     ThirdPartyListResponse,
     ThirdPartyResponse,
@@ -23,7 +24,6 @@ from app.vigilance.api.schemas import (
     ThirdPartyWithDocumentsResponse,
     ValidateDocumentRequest,
 )
-from app.infrastructure.storage.s3_client import S3StorageClient
 from app.vigilance.application.use_cases.reject_document import RejectDocumentUseCase
 from app.vigilance.application.use_cases.request_documents import RequestDocumentsUseCase
 from app.vigilance.application.use_cases.validate_document import ValidateDocumentUseCase
@@ -309,10 +309,12 @@ async def reject_document(
 
     async def _resolve_company_email_for_tp(third_party_id):
         from sqlalchemy import select
+
         from app.contract_management.infrastructure.models import (
             ContractCompanyModel,
             ContractRequestModel,
         )
+
         cr_result = await db.execute(
             select(ContractRequestModel.company_id)
             .where(ContractRequestModel.third_party_id == third_party_id)
@@ -323,8 +325,9 @@ async def reject_document(
         if not company_id:
             return None, None
         c_result = await db.execute(
-            select(ContractCompanyModel.email_from, ContractCompanyModel.name)
-            .where(ContractCompanyModel.id == company_id)
+            select(ContractCompanyModel.email_from, ContractCompanyModel.name).where(
+                ContractCompanyModel.id == company_id
+            )
         )
         row = c_result.first()
         return (row.email_from, row.name) if row else (None, None)

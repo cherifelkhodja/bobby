@@ -11,10 +11,10 @@ from app.third_party.infrastructure.adapters.inpi_client import (
     _login_inpi,
 )
 
-
 # =============================================================================
 # Helpers
 # =============================================================================
+
 
 def _mock_response(status_code: int, json_data: dict) -> MagicMock:
     resp = MagicMock()
@@ -22,7 +22,8 @@ def _mock_response(status_code: int, json_data: dict) -> MagicMock:
     resp.json.return_value = json_data
     resp.raise_for_status = MagicMock()
     if status_code >= 400:
-        from httpx import HTTPStatusError, Request, Response
+        from httpx import HTTPStatusError
+
         resp.raise_for_status.side_effect = HTTPStatusError(
             "error", request=MagicMock(), response=MagicMock(status_code=status_code)
         )
@@ -126,6 +127,7 @@ class TestGetInpiToken:
     @pytest.mark.asyncio
     async def test_returns_cached_token(self):
         import time
+
         inpi_module._token_cache = ("cached-token", time.monotonic() + 3600)
 
         result = await _get_inpi_token("user", "pass", "static")
@@ -232,11 +234,14 @@ class TestInpiClientGetCompany:
                 return MagicMock(status_code=401)
             return success_resp
 
-        with patch(
-            "app.third_party.infrastructure.adapters.inpi_client.httpx.AsyncClient"
-        ) as mock_cls, patch(
-            "app.third_party.infrastructure.adapters.inpi_client._get_inpi_token",
-            new=AsyncMock(return_value="new-token"),
+        with (
+            patch(
+                "app.third_party.infrastructure.adapters.inpi_client.httpx.AsyncClient"
+            ) as mock_cls,
+            patch(
+                "app.third_party.infrastructure.adapters.inpi_client._get_inpi_token",
+                new=AsyncMock(return_value="new-token"),
+            ),
         ):
             mock_http = AsyncMock()
             mock_http.get.side_effect = mock_get

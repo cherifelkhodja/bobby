@@ -118,7 +118,9 @@ class CreateContractRequestFromEntityUseCase:
                 continue
 
             # Determine actual state: prefer API state, fallback to webhook diff
-            new_state = entity_info.get("state") if entity_info.get("state") is not None else webhook_state
+            new_state = (
+                entity_info.get("state") if entity_info.get("state") is not None else webhook_state
+            )
 
             logger.info(
                 "webhook_entity_state_resolved",
@@ -192,7 +194,9 @@ class CreateContractRequestFromEntityUseCase:
                     _from_email, _company_name = None, None
                     if self._company_email_resolver and cr.company_id:
                         try:
-                            _from_email, _company_name = await self._company_email_resolver(cr.company_id)
+                            _from_email, _company_name = await self._company_email_resolver(
+                                cr.company_id
+                            )
                         except Exception:
                             pass
                     await self._email_service.send_commercial_validation_request(

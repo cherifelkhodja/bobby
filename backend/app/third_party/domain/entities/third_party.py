@@ -64,7 +64,9 @@ class ThirdParty:
     boond_adv_contact_id: int | None = None
     boond_commercial_contact_id: int | None = None
     capital: str | None = None
-    entity_category: str | None = None  # "ei" or "societe", set when portal company-info is submitted
+    entity_category: str | None = (
+        None  # "ei" or "societe", set when portal company-info is submitted
+    )
     company_info_submitted: bool = False  # True only after full POST submit (not draft PATCH)
     compliance_status: ComplianceStatus = ComplianceStatus.PENDING
     last_expiration_alert_at: datetime | None = None
@@ -89,7 +91,9 @@ class ThirdParty:
     def full_legal_identity(self) -> str:
         """Return formatted legal identity string."""
         parts = [
-            f"{self.legal_form} {self.company_name}" if self.legal_form and self.company_name else None,
+            f"{self.legal_form} {self.company_name}"
+            if self.legal_form and self.company_name
+            else None,
             f"au capital de {self.capital} euros" if self.capital else None,
             f"Siège social : {self.head_office_address}" if self.head_office_address else None,
             f"RCS {self.rcs_city} {self.rcs_number}" if self.rcs_city and self.rcs_number else None,

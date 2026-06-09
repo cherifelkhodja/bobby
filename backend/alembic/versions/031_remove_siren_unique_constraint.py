@@ -8,8 +8,9 @@ Revises: 030_tp_contact_fields
 Create Date: 2026-03-04
 """
 
-from alembic import op
 from sqlalchemy import text
+
+from alembic import op
 
 revision = "031_remove_siren_unique"
 down_revision = "030_tp_contact_fields"
@@ -19,7 +20,8 @@ depends_on = None
 
 def upgrade() -> None:
     # Drop any unique index or constraint on siren, regardless of name
-    op.execute(text("""
+    op.execute(
+        text("""
         DO $$
         DECLARE
             idx_name TEXT;
@@ -51,16 +53,21 @@ def upgrade() -> None:
                 EXECUTE format('ALTER TABLE tp_third_parties DROP CONSTRAINT IF EXISTS %I', idx_name);
             END LOOP;
         END $$;
-    """))
+    """)
+    )
 
     # Create a non-unique index for query performance
-    op.execute(text("""
+    op.execute(
+        text("""
         CREATE INDEX IF NOT EXISTS ix_tp_third_parties_siren ON tp_third_parties (siren)
-    """))
+    """)
+    )
 
 
 def downgrade() -> None:
     op.execute(text("DROP INDEX IF EXISTS ix_tp_third_parties_siren"))
-    op.execute(text("""
+    op.execute(
+        text("""
         CREATE UNIQUE INDEX ix_tp_third_parties_siren ON tp_third_parties (siren)
-    """))
+    """)
+    )

@@ -132,6 +132,7 @@ class GenerateDraftUseCase:
             raw = cr.contract_config.get("company_id")
             if raw:
                 from uuid import UUID as _UUID
+
                 try:
                     company_id = _UUID(str(raw))
                 except (ValueError, AttributeError):
@@ -141,7 +142,9 @@ class GenerateDraftUseCase:
         if not company_id:
             # Fall back to default company
             from sqlalchemy import select as _select
+
             from app.contract_management.infrastructure.models import ContractCompanyModel
+
             result = await self._db.execute(
                 _select(ContractCompanyModel)
                 .where(ContractCompanyModel.is_default.is_(True))
@@ -149,7 +152,9 @@ class GenerateDraftUseCase:
             )
             return result.scalar_one_or_none()
         from sqlalchemy import select as _select
+
         from app.contract_management.infrastructure.models import ContractCompanyModel
+
         result = await self._db.execute(
             _select(ContractCompanyModel).where(ContractCompanyModel.id == company_id)
         )
@@ -161,16 +166,29 @@ class GenerateDraftUseCase:
             return None
         try:
             import base64 as _b64
+
             content = await self._s3.download_file(company.logo_s3_key)
-            ext = company.logo_s3_key.rsplit(".", 1)[-1].lower() if "." in company.logo_s3_key else "png"
-            mime_map = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "svg": "image/svg+xml", "webp": "image/webp"}
+            ext = (
+                company.logo_s3_key.rsplit(".", 1)[-1].lower()
+                if "." in company.logo_s3_key
+                else "png"
+            )
+            mime_map = {
+                "png": "image/png",
+                "jpg": "image/jpeg",
+                "jpeg": "image/jpeg",
+                "svg": "image/svg+xml",
+                "webp": "image/webp",
+            }
             mime = mime_map.get(ext, "image/png")
             return _b64.b64encode(content).decode(), mime
         except Exception:
             logger.warning("company_logo_load_failed", s3_key=company.logo_s3_key)
             return None
 
-    def _build_context(self, cr, tp, articles: list, company=None, annexes: list | None = None) -> dict:
+    def _build_context(
+        self, cr, tp, articles: list, company=None, annexes: list | None = None
+    ) -> dict:
         """Build template context from contract request and third party."""
         # ── Issuing company info (from DB or settings fallback) ──
         if company:
@@ -321,7 +339,6 @@ class GenerateDraftUseCase:
 
         # Resolve human-readable display values for payment config
         from app.contract_management.domain.value_objects.payment_terms import (
-            InvoiceSubmissionMethod,
             PaymentTerms,
         )
 
@@ -372,33 +389,35 @@ class GenerateDraftUseCase:
             annex_order = cr.contract_config.get("annex_order") or []
 
         selected_articles = [
-            a for a in articles
+            a
+            for a in articles
             if not (a.is_optional and a.article_key in excluded_keys)
             and a.article_key not in deleted_article_keys
         ]
 
         # Merge custom articles (per-contract) into the list
         from uuid import UUID as _UUID
+
         for ca in custom_articles_data:
             if ca.get("key") in deleted_article_keys:
                 continue
-            selected_articles.append(dc_replace(
-                selected_articles[0] if selected_articles else articles[0],
-                id=_UUID(int=0),
-                article_key=ca["key"],
-                article_number=9999,
-                title=ca.get("title", ""),
-                content=ca.get("content", ""),
-                is_editable=True,
-                is_optional=False,
-            ))
+            selected_articles.append(
+                dc_replace(
+                    selected_articles[0] if selected_articles else articles[0],
+                    id=_UUID(int=0),
+                    article_key=ca["key"],
+                    article_number=9999,
+                    title=ca.get("title", ""),
+                    content=ca.get("content", ""),
+                    is_editable=True,
+                    is_optional=False,
+                )
+            )
 
         # Apply custom ordering if provided
         if article_order:
             order_map = {key: idx for idx, key in enumerate(article_order)}
-            selected_articles.sort(
-                key=lambda a: order_map.get(a.article_key, 9999)
-            )
+            selected_articles.sort(key=lambda a: order_map.get(a.article_key, 9999))
 
         # Re-number sequentially after filtering
         rendered_articles = []
@@ -419,7 +438,7 @@ class GenerateDraftUseCase:
 
         # Pre-render active annexes, filtering conditionals based on contract config
         active_annexes = []
-        for annexe in (annexes or []):
+        for annexe in annexes or []:
             if annexe.annexe_key in deleted_annex_keys:
                 continue
             if annexe.is_conditional and annexe.condition_field:
@@ -430,28 +449,29 @@ class GenerateDraftUseCase:
 
         # Merge custom annexes
         from dataclasses import replace as _dc_replace
+
         for ca in custom_annexes_data:
             if ca.get("key") in deleted_annex_keys:
                 continue
             base = active_annexes[0] if active_annexes else (annexes[0] if annexes else None)
             if base:
-                active_annexes.append(_dc_replace(
-                    base,
-                    id=_UUID(int=0),
-                    annexe_key=ca["key"],
-                    annexe_number=9999,
-                    title=ca.get("title", ""),
-                    content=ca.get("content", ""),
-                    is_conditional=False,
-                    condition_field=None,
-                ))
+                active_annexes.append(
+                    _dc_replace(
+                        base,
+                        id=_UUID(int=0),
+                        annexe_key=ca["key"],
+                        annexe_number=9999,
+                        title=ca.get("title", ""),
+                        content=ca.get("content", ""),
+                        is_conditional=False,
+                        condition_field=None,
+                    )
+                )
 
         # Apply custom annex ordering if provided
         if annex_order:
             order_map = {key: idx for idx, key in enumerate(annex_order)}
-            active_annexes.sort(
-                key=lambda a: order_map.get(a.annexe_key, 9999)
-            )
+            active_annexes.sort(key=lambda a: order_map.get(a.annexe_key, 9999))
 
         rendered_annexes = []
         for annexe in active_annexes:

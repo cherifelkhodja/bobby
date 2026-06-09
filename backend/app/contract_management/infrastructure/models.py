@@ -18,19 +18,26 @@ class ContractRequestModel(Base):
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     provisional_reference: Mapped[str] = mapped_column(
-        String(20), nullable=False, unique=True,
+        String(20),
+        nullable=False,
+        unique=True,
         comment="Référence provisoire (PROV-YYYY-NNNN), générée à la création",
     )
     reference: Mapped[str | None] = mapped_column(
-        String(20), nullable=True, unique=True,
+        String(20),
+        nullable=True,
+        unique=True,
         comment="Référence définitive (XXX-CC-NNNN), assignée à l'état PARTNER_APPROVED",
     )
     trigger_type: Mapped[str | None] = mapped_column(
-        String(30), nullable=True,
+        String(30),
+        nullable=True,
         comment="What triggered this CR: positioning_7, candidat_11, ressource_4, ressource_5",
     )
     previous_contract_request_id: Mapped[UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("cm_contract_requests.id"), nullable=True,
+        UUID(as_uuid=True),
+        ForeignKey("cm_contract_requests.id"),
+        nullable=True,
         comment="Link to previous CR for re-contractualization",
     )
     boond_positioning_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -38,7 +45,8 @@ class ContractRequestModel(Base):
     boond_consultant_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     boond_need_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     boond_resource_id: Mapped[int | None] = mapped_column(
-        Integer, nullable=True,
+        Integer,
+        nullable=True,
         comment="Boond resource ID for resource-triggered workflows",
     )
     third_party_id: Mapped[UUID | None] = mapped_column(
@@ -149,7 +157,8 @@ class ContractCompanyModel(Base):
     # Facturation
     invoices_company_mail: Mapped[str | None] = mapped_column(String(255), nullable=True)
     email_from: Mapped[str | None] = mapped_column(
-        String(255), nullable=True,
+        String(255),
+        nullable=True,
         comment="Email expediteur pour les mails lies a cette societe (ex: noreply@geminiconsulting.fr)",
     )
     tva_number: Mapped[str | None] = mapped_column(String(30), nullable=True)
@@ -210,9 +219,7 @@ class PurchaseOrderRequestModel(Base):
     )
     reference: Mapped[str] = mapped_column(String(30), nullable=False, unique=True)
     commercial_email: Mapped[str] = mapped_column(String(255), nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(30), nullable=False, default="pending_validation"
-    )
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending_validation")
     daily_rate: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     quantity_sold: Mapped[int | None] = mapped_column(Integer, nullable=True)
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
@@ -325,16 +332,21 @@ class CharterTemplateModel(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     version: Mapped[str] = mapped_column(String(50), nullable=False)
     target: Mapped[str] = mapped_column(
-        String(20), nullable=False,
+        String(20),
+        nullable=False,
         comment="partner or consultant",
     )
     document_type: Mapped[str] = mapped_column(
-        String(30), nullable=False, default="charte",
+        String(30),
+        nullable=False,
+        default="charte",
         comment="charte, politique, document_unilateral, engagement, autre",
     )
     requires_acknowledgement: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     consultant_scope: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="all",
+        String(20),
+        nullable=False,
+        default="all",
         comment="all, external, internal — only relevant when target=consultant",
     )
     file_s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -355,16 +367,24 @@ class SignatureUploadModel(Base):
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     contract_request_id: Mapped[UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("cm_contract_requests.id", ondelete="CASCADE"), nullable=False,
+        UUID(as_uuid=True),
+        ForeignKey("cm_contract_requests.id", ondelete="CASCADE"),
+        nullable=False,
     )
     charter_template_id: Mapped[UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("cm_charter_templates.id", ondelete="SET NULL"), nullable=True,
+        UUID(as_uuid=True),
+        ForeignKey("cm_charter_templates.id", ondelete="SET NULL"),
+        nullable=True,
     )
     document_kind: Mapped[str] = mapped_column(
-        String(30), nullable=False, comment="contract, charter_ar, charter_engagement",
+        String(30),
+        nullable=False,
+        comment="contract, charter_ar, charter_engagement",
     )
     signer_role: Mapped[str] = mapped_column(
-        String(20), nullable=False, comment="partner or consultant",
+        String(20),
+        nullable=False,
+        comment="partner or consultant",
     )
     label: Mapped[str] = mapped_column(String(255), nullable=False)
     s3_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -413,7 +433,9 @@ class ContractConsultantModel(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     charter_status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="pending",
+        String(20),
+        nullable=False,
+        default="pending",
         comment="pending, sent, signed",
     )
     yousign_envelope_id: Mapped[str | None] = mapped_column(String(100), nullable=True)

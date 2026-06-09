@@ -239,9 +239,9 @@ class SiretLookupResponse(BaseModel):
     head_office_street: str | None = None
     head_office_postal_code: str | None = None
     head_office_city: str | None = None
-    capital: str | None = None       # From INPI RNE (e.g. "10 000 EUR")
-    rcs_city: str | None = None      # From INPI RNE (ville du greffe)
-    ape_code: str | None = None      # From INSEE (activité principale)
+    capital: str | None = None  # From INPI RNE (e.g. "10 000 EUR")
+    rcs_city: str | None = None  # From INPI RNE (ville du greffe)
+    ape_code: str | None = None  # From INSEE (activité principale)
 
 
 class CompanyInfoRequest(BaseModel):
@@ -252,7 +252,9 @@ class CompanyInfoRequest(BaseModel):
     legal_form: str = Field(..., max_length=100)
     capital: str | None = Field(None, max_length=50)
     siret: str = Field(..., min_length=14, max_length=14, pattern=r"^\d{14}$")
-    vat_number: str | None = Field(None, max_length=50, description="Numéro de TVA intracommunautaire")
+    vat_number: str | None = Field(
+        None, max_length=50, description="Numéro de TVA intracommunautaire"
+    )
     ape_code: str | None = Field(None, max_length=10, description="Code APE/NAF")
     head_office_street: str = Field(..., max_length=255)
     head_office_postal_code: str = Field(..., min_length=5, max_length=5, pattern=r"^\d{5}$")

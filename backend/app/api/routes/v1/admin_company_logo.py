@@ -39,7 +39,9 @@ async def upload_company_logo(
     if len(content) > 2 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Logo trop volumineux (max 2 Mo).")
 
-    result = await db.execute(select(ContractCompanyModel).where(ContractCompanyModel.id == company_id))
+    result = await db.execute(
+        select(ContractCompanyModel).where(ContractCompanyModel.id == company_id)
+    )
     m = result.scalar_one_or_none()
     if not m:
         raise HTTPException(status_code=404, detail="Société introuvable")
@@ -73,7 +75,9 @@ async def get_company_logo_url(
     from app.config import get_settings as _get_settings
     from app.infrastructure.storage.s3_client import S3StorageClient
 
-    result = await db.execute(select(ContractCompanyModel).where(ContractCompanyModel.id == company_id))
+    result = await db.execute(
+        select(ContractCompanyModel).where(ContractCompanyModel.id == company_id)
+    )
     m = result.scalar_one_or_none()
     if not m or not m.logo_s3_key:
         raise HTTPException(status_code=404, detail="Aucun logo pour cette société")
@@ -100,7 +104,9 @@ async def delete_company_logo(
     from app.config import get_settings as _get_settings
     from app.infrastructure.storage.s3_client import S3StorageClient
 
-    result = await db.execute(select(ContractCompanyModel).where(ContractCompanyModel.id == company_id))
+    result = await db.execute(
+        select(ContractCompanyModel).where(ContractCompanyModel.id == company_id)
+    )
     m = result.scalar_one_or_none()
     if not m:
         raise HTTPException(status_code=404, detail="Société introuvable")

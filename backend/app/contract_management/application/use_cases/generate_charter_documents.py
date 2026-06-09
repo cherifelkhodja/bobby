@@ -48,7 +48,6 @@ class GenerateCharterDocumentsUseCase:
         Returns:
             Dict with s3 keys: {"ar_s3_key": ..., "engagement_s3_key": ...}
         """
-        from jinja2 import Template
 
         cr = await self._cr_repo.get_by_id(contract_request_id)
         if not cr:
@@ -100,7 +99,9 @@ class GenerateCharterDocumentsUseCase:
         # Generate engagement de confidentialité
         eng_html = self._render_template("engagement_confidentialite.html", context)
         eng_pdf = await self._html_to_pdf(eng_html)
-        eng_key = f"charters/consultants/{ref}/Engagement_confidentialite_{consultant_last_name}.pdf"
+        eng_key = (
+            f"charters/consultants/{ref}/Engagement_confidentialite_{consultant_last_name}.pdf"
+        )
         await self._s3.upload_file(key=eng_key, content=eng_pdf, content_type="application/pdf")
         results["engagement_s3_key"] = eng_key
 

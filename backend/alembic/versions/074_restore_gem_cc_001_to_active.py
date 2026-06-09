@@ -15,12 +15,14 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute(sa.text("""
+    op.execute(
+        sa.text("""
         UPDATE cm_contract_requests
         SET status = 'active'
         WHERE reference = 'GEM-CC-001'
         AND status = 'archived'
-    """))
+    """)
+    )
 
 
 def downgrade() -> None:

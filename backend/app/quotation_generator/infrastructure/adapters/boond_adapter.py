@@ -124,8 +124,7 @@ class BoondManagerAdapter(ERPPort):
                     raise BoondManagerAPIError(
                         status_code=response.status_code,
                         message=(
-                            "Failed to create quotation: "
-                            f"{self._format_boond_errors(response)}"
+                            f"Failed to create quotation: {self._format_boond_errors(response)}"
                         ),
                     )
 

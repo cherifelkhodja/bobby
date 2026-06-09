@@ -178,19 +178,19 @@ NEW_ARTICLES = [
 
 # Final ordered sequence of all 13 article_keys (determines article_number)
 ORDERED_KEYS = [
-    "preambule",          # 1
-    "definitions",        # 2
-    "objet",              # 3
-    "duree",              # 4
-    "personnel",          # 5
-    "facturation",        # 6
-    "confidentialite",    # 7
+    "preambule",  # 1
+    "definitions",  # 2
+    "objet",  # 3
+    "duree",  # 4
+    "personnel",  # 5
+    "facturation",  # 6
+    "confidentialite",  # 7
     "propriete_intellectuelle",  # 8
-    "responsabilite",     # 9
-    "rgpd",               # 10
-    "resiliation",        # 11
+    "responsabilite",  # 9
+    "rgpd",  # 10
+    "resiliation",  # 11
     "non_sollicitation",  # 12
-    "dispositions_generales",    # 13
+    "dispositions_generales",  # 13
 ]
 
 OBJET_CONTENT = (
@@ -239,9 +239,7 @@ RESILIATION_CONTENT = (
 def upgrade() -> None:
     # 1. Delete removed articles
     keys_list = ", ".join(f"'{k}'" for k in DELETED_KEYS)
-    op.execute(
-        f"DELETE FROM cm_contract_article_templates WHERE article_key IN ({keys_list})"
-    )
+    op.execute(f"DELETE FROM cm_contract_article_templates WHERE article_key IN ({keys_list})")
 
     # 2. Update existing articles (objet, duree, facturation, resiliation)
     op.execute(

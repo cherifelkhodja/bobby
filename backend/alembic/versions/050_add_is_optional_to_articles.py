@@ -5,8 +5,9 @@ Revises: 049
 Create Date: 2026-03-10
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "050"
 down_revision = "049"
@@ -33,7 +34,7 @@ def upgrade() -> None:
         f"""
         UPDATE cm_contract_article_templates
         SET is_optional = true
-        WHERE article_key IN ({', '.join(f"'{k}'" for k in OPTIONAL_ARTICLE_KEYS)})
+        WHERE article_key IN ({", ".join(f"'{k}'" for k in OPTIONAL_ARTICLE_KEYS)})
         """
     )
 

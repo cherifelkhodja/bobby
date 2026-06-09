@@ -54,15 +54,17 @@ def _make_use_case(entity_state: int = 11, **overrides) -> CreateContractRequest
     webhook_repo.save = AsyncMock()
 
     crm_service = AsyncMock()
-    crm_service.get_candidate_info = AsyncMock(return_value={
-        "id": 123,
-        "civility": "M.",
-        "first_name": "Jean",
-        "last_name": "Dupont",
-        "email": "jean.dupont@example.com",
-        "phone": "+33 6 12 34 56 78",
-        "state": entity_state,
-    })
+    crm_service.get_candidate_info = AsyncMock(
+        return_value={
+            "id": 123,
+            "civility": "M.",
+            "first_name": "Jean",
+            "last_name": "Dupont",
+            "email": "jean.dupont@example.com",
+            "phone": "+33 6 12 34 56 78",
+            "state": entity_state,
+        }
+    )
 
     email_service = AsyncMock()
     email_service.send_commercial_validation_request = AsyncMock(return_value=True)

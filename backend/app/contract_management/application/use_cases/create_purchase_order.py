@@ -59,15 +59,11 @@ class CreatePurchaseOrderUseCase:
             raise ContractRequestNotFoundError(str(command.contract_request_id))
 
         if not cr.is_purchase_order_only or not cr.framework_contract_id:
-            raise ValueError(
-                "Cette demande n'est pas de type bon de commande uniquement."
-            )
+            raise ValueError("Cette demande n'est pas de type bon de commande uniquement.")
 
         fc = await self._fc_repo.get_by_id(cr.framework_contract_id)
         if not fc or not fc.is_usable:
-            raise ValueError(
-                "Le contrat cadre associé n'est pas actif."
-            )
+            raise ValueError("Le contrat cadre associé n'est pas actif.")
 
         # Generate purchase order reference
         po_ref = await self._po_repo.get_next_reference(fc.reference)

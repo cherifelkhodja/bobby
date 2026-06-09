@@ -69,7 +69,9 @@ class CommercialValidationRequest(BaseModel):
     Mission-specific fields (TJM, dates, address) belong to BDC.
     """
 
-    third_party_type: str = Field(..., pattern=r"^(freelance|sous_traitant|salarie|portage_salarial)$")
+    third_party_type: str = Field(
+        ..., pattern=r"^(freelance|sous_traitant|salarie|portage_salarial)$"
+    )
     contact_email: EmailStr
     company_id: UUID | None = None
     consultant_civility: str | None = Field(None, max_length=10)
@@ -95,18 +97,29 @@ class ContractConfigRequest(BaseModel):
     payment_terms: str = "net_30"
     invoice_submission_method: str = "email"
     invoice_email: str = ""
-    tacit_renewal_months: int | None = Field(None, ge=1, le=24, description="Nombre de mois pour la tacite reconduction (annexe)")
-    excluded_optional_article_keys: list[str] = Field(default_factory=list, description="Clés des articles optionnels à exclure du contrat")
+    tacit_renewal_months: int | None = Field(
+        None, ge=1, le=24, description="Nombre de mois pour la tacite reconduction (annexe)"
+    )
+    excluded_optional_article_keys: list[str] = Field(
+        default_factory=list, description="Clés des articles optionnels à exclure du contrat"
+    )
     special_conditions: str = ""
 
 
 # ── Contract companies ────────────────────────────────────────────────────────
 
+
 class ContractCompanyRequest(BaseModel):
     """Create or update an issuing company."""
 
     name: str = Field(..., max_length=255)
-    code: str = Field(..., min_length=3, max_length=3, pattern=r"^[A-Z0-9]{3}$", description="3-letter code used in contract references (e.g. GEM, GCI)")
+    code: str = Field(
+        ...,
+        min_length=3,
+        max_length=3,
+        pattern=r"^[A-Z0-9]{3}$",
+        description="3-letter code used in contract references (e.g. GEM, GCI)",
+    )
     legal_form: str = Field(..., max_length=50)
     capital: str = Field(..., max_length=100)
     head_office: str = Field(..., max_length=500)
@@ -119,9 +132,13 @@ class ContractCompanyRequest(BaseModel):
     representative_sub_quality: str | None = Field(None, max_length=255)
     signatory_name: str = Field(..., max_length=255)
     invoices_company_mail: str | None = Field(None, max_length=255)
-    email_from: str | None = Field(None, max_length=255, description="Email expediteur (ex: noreply@geminiconsulting.fr)")
+    email_from: str | None = Field(
+        None, max_length=255, description="Email expediteur (ex: noreply@geminiconsulting.fr)"
+    )
     color_code: str = Field("#4BBEA8", pattern=r"^#[0-9A-Fa-f]{6}$")
-    boond_agency_id: int | None = Field(None, description="ID de l'agence Boond associée à cette société émettrice")
+    boond_agency_id: int | None = Field(
+        None, description="ID de l'agence Boond associée à cette société émettrice"
+    )
     is_default: bool = False
     is_active: bool = True
 

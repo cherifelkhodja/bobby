@@ -9,8 +9,9 @@ contract request, allowing the commercial to record and sync contact
 details from BoondManager.
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "052"
 down_revision = "051"

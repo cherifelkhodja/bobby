@@ -6,6 +6,7 @@ Create Date: 2026-03-05
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "035_add_entity_category"

@@ -909,7 +909,11 @@ export default function ContractDetail() {
                     checked={!excludedCharterIds.has(item.charter_template_id)}
                     onChange={(e) => {
                       const next = new Set(excludedCharterIds);
-                      e.target.checked ? next.delete(item.charter_template_id) : next.add(item.charter_template_id);
+                      if (e.target.checked) {
+                        next.delete(item.charter_template_id);
+                      } else {
+                        next.add(item.charter_template_id);
+                      }
                       setExcludedCharterIds(next);
                     }}
                     className="rounded border-gray-300"
@@ -932,7 +936,11 @@ export default function ContractDetail() {
                     checked={!excludedCharterIds.has(item.charter_template_id)}
                     onChange={(e) => {
                       const next = new Set(excludedCharterIds);
-                      e.target.checked ? next.delete(item.charter_template_id) : next.add(item.charter_template_id);
+                      if (e.target.checked) {
+                        next.delete(item.charter_template_id);
+                      } else {
+                        next.add(item.charter_template_id);
+                      }
                       setExcludedCharterIds(next);
                     }}
                     className="rounded border-gray-300"
@@ -2410,7 +2418,11 @@ function HistoryTimeline({
   const toggleComment = (idx: number) => {
     setExpandedComments((prev) => {
       const next = new Set(prev);
-      next.has(idx) ? next.delete(idx) : next.add(idx);
+      if (next.has(idx)) {
+        next.delete(idx);
+      } else {
+        next.add(idx);
+      }
       return next;
     });
   };

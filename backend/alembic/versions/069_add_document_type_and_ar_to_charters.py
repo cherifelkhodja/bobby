@@ -21,7 +21,12 @@ def upgrade() -> None:
     )
     op.add_column(
         "cm_charter_templates",
-        sa.Column("requires_acknowledgement", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column(
+            "requires_acknowledgement",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
     )
     op.add_column(
         "cm_charter_templates",

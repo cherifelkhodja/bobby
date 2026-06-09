@@ -5,17 +5,17 @@ from uuid import UUID
 
 import structlog
 from sqlalchemy import func, select
-from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.contract_management.domain.entities.contract import Contract
 from app.contract_management.domain.entities.contract_request import ContractRequest
-from app.contract_management.domain.value_objects.contract_request_status import (
-    ContractRequestStatus,
-)
 from app.contract_management.domain.entities.framework_contract import FrameworkContract
 from app.contract_management.domain.entities.purchase_order import PurchaseOrder
 from app.contract_management.domain.entities.purchase_order_request import PurchaseOrderRequest
+from app.contract_management.domain.value_objects.contract_request_status import (
+    ContractRequestStatus,
+)
 from app.contract_management.domain.value_objects.framework_contract_status import (
     FrameworkContractStatus,
 )
@@ -215,10 +215,12 @@ class ContractRequestRepository:
     async def get_company_by_boond_agency_id(self, agency_id: int) -> UUID | None:
         """Return the company_id matching a Boond agency ID, or None."""
         result = await self.session.execute(
-            select(ContractCompanyModel.id).where(
+            select(ContractCompanyModel.id)
+            .where(
                 ContractCompanyModel.boond_agency_id == agency_id,
                 ContractCompanyModel.is_active.is_(True),
-            ).limit(1)
+            )
+            .limit(1)
         )
         return result.scalar_one_or_none()
 
@@ -241,10 +243,12 @@ class ContractRequestRepository:
         if company_code is None:
             # Fetch the default company's code
             result = await self.session.execute(
-                select(ContractCompanyModel.code).where(
+                select(ContractCompanyModel.code)
+                .where(
                     ContractCompanyModel.is_default.is_(True),
                     ContractCompanyModel.is_active.is_(True),
-                ).limit(1)
+                )
+                .limit(1)
             )
             code = result.scalar_one_or_none() or "GEN"
         else:
@@ -767,7 +771,9 @@ class PurchaseOrderRequestRepository:
         query = select(PurchaseOrderRequestModel)
         if status:
             query = query.where(PurchaseOrderRequestModel.status == status.value)
-        query = query.order_by(PurchaseOrderRequestModel.created_at.desc()).offset(skip).limit(limit)
+        query = (
+            query.order_by(PurchaseOrderRequestModel.created_at.desc()).offset(skip).limit(limit)
+        )
         result = await self.session.execute(query)
         return [self._to_entity(m) for m in result.scalars().all()]
 
@@ -790,7 +796,9 @@ class PurchaseOrderRequestRepository:
         )
         if status:
             query = query.where(PurchaseOrderRequestModel.status == status.value)
-        query = query.order_by(PurchaseOrderRequestModel.created_at.desc()).offset(skip).limit(limit)
+        query = (
+            query.order_by(PurchaseOrderRequestModel.created_at.desc()).offset(skip).limit(limit)
+        )
         result = await self.session.execute(query)
         return [self._to_entity(m) for m in result.scalars().all()]
 

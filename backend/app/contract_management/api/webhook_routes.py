@@ -27,15 +27,20 @@ router = APIRouter(tags=["Webhooks"])
 
 def _make_company_email_resolver(db):
     """Create a company email resolver closure bound to the given DB session."""
+
     async def resolver(company_id):
         from sqlalchemy import select as _sel
+
         from app.contract_management.infrastructure.models import ContractCompanyModel
+
         r = await db.execute(
-            _sel(ContractCompanyModel.email_from, ContractCompanyModel.name)
-            .where(ContractCompanyModel.id == company_id)
+            _sel(ContractCompanyModel.email_from, ContractCompanyModel.name).where(
+                ContractCompanyModel.id == company_id
+            )
         )
         row = r.first()
         return (row.email_from, row.name) if row else (None, None)
+
     return resolver
 
 

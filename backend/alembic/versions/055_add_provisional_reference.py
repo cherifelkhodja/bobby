@@ -40,9 +40,7 @@ def upgrade() -> None:
     )
 
     # 2. Peupler avec la valeur actuelle de reference pour les enregistrements existants
-    op.execute(
-        "UPDATE cm_contract_requests SET provisional_reference = reference"
-    )
+    op.execute("UPDATE cm_contract_requests SET provisional_reference = reference")
 
     # 3. Rendre provisional_reference NOT NULL et unique
     op.alter_column("cm_contract_requests", "provisional_reference", nullable=False)

@@ -18,10 +18,27 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "cm_signature_uploads",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("contract_request_id", UUID(as_uuid=True), sa.ForeignKey("cm_contract_requests.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("charter_template_id", UUID(as_uuid=True), sa.ForeignKey("cm_charter_templates.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("document_kind", sa.String(30), nullable=False, comment="contract, charter_ar, charter_engagement"),
+        sa.Column(
+            "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")
+        ),
+        sa.Column(
+            "contract_request_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("cm_contract_requests.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "charter_template_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("cm_charter_templates.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        sa.Column(
+            "document_kind",
+            sa.String(30),
+            nullable=False,
+            comment="contract, charter_ar, charter_engagement",
+        ),
         sa.Column("signer_role", sa.String(20), nullable=False, comment="partner or consultant"),
         sa.Column("label", sa.String(255), nullable=False),
         sa.Column("s3_key", sa.String(500), nullable=True),
@@ -29,7 +46,9 @@ def upgrade() -> None:
         sa.Column("uploaded_at", sa.DateTime(), nullable=True),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()")),
     )
-    op.create_index("ix_cm_signature_uploads_cr_id", "cm_signature_uploads", ["contract_request_id"])
+    op.create_index(
+        "ix_cm_signature_uploads_cr_id", "cm_signature_uploads", ["contract_request_id"]
+    )
 
 
 def downgrade() -> None:

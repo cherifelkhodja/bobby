@@ -5,8 +5,6 @@ Revises: 028_cr_consultant_address
 Create Date: 2026-03-03
 """
 
-import sqlalchemy as sa
-
 from alembic import op
 
 revision = "029_tp_nullable_identity"

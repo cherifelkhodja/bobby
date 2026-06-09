@@ -9,6 +9,7 @@ Create Date: 2026-03-05
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "040"
@@ -23,7 +24,9 @@ def upgrade() -> None:
         sa.Column("status_history", sa.JSON(), nullable=True),
     )
     # Initialise existing rows with an empty list
-    op.execute("UPDATE cm_contract_requests SET status_history = '[]'::jsonb WHERE status_history IS NULL")
+    op.execute(
+        "UPDATE cm_contract_requests SET status_history = '[]'::jsonb WHERE status_history IS NULL"
+    )
 
 
 def downgrade() -> None:

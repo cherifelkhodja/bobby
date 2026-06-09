@@ -5,9 +5,10 @@ Revises: 041
 Create Date: 2026-03-05
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
+
+from alembic import op
 
 revision = "042"
 down_revision = "041"
@@ -54,6 +55,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_cm_contract_requests_company_id", "cm_contract_requests", type_="foreignkey")
+    op.drop_constraint(
+        "fk_cm_contract_requests_company_id", "cm_contract_requests", type_="foreignkey"
+    )
     op.drop_column("cm_contract_requests", "company_id")
     op.drop_table("cm_contract_companies")

@@ -174,9 +174,7 @@ class InitiateDocumentCollectionUseCase:
         )
 
         # Transition to COLLECTING_DOCUMENTS if not already there
-        if cr.status not in (
-            ContractRequestStatus.COLLECTING_DOCUMENTS,
-        ):
+        if cr.status not in (ContractRequestStatus.COLLECTING_DOCUMENTS,):
             cr.transition_to(ContractRequestStatus.COLLECTING_DOCUMENTS)
 
         saved = await self._cr_repo.save(cr)

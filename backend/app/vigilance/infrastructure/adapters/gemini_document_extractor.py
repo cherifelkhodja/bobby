@@ -4,12 +4,13 @@ Adapté du script d'extraction GEMINI. Utilise PyMuPDF (fitz) pour
 l'extraction texte et des patterns regex pour l'identification des dates.
 Aucune dépendance à un LLM externe — extraction déterministe et sans coût API.
 """
+
 from __future__ import annotations
 
 import calendar
 import logging
 import re
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 
 import fitz  # PyMuPDF
@@ -36,12 +37,22 @@ _EXPIRY_DATE_TYPES: set[str] = {"attestation_assurance_rc_pro", "garantie_financ
 # ── Mapping mois français ────────────────────────────────────────────────────
 
 _MONTHS_FR: dict[str, int] = {
-    "janvier": 1, "février": 2, "mars": 3, "avril": 4,
-    "mai": 5, "juin": 6, "juillet": 7, "août": 8,
-    "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12,
+    "janvier": 1,
+    "février": 2,
+    "mars": 3,
+    "avril": 4,
+    "mai": 5,
+    "juin": 6,
+    "juillet": 7,
+    "août": 8,
+    "septembre": 9,
+    "octobre": 10,
+    "novembre": 11,
+    "décembre": 12,
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _add_months(d: date, months: int) -> date:
     """Ajoute N mois à une date, en clampant au dernier jour du mois résultant."""
@@ -71,24 +82,26 @@ def _find_all_dates(text: str) -> list[dict[str, Any]]:
     found: list[dict[str, Any]] = []
 
     # Format JJ/MM/AAAA
-    for match in re.finditer(r'\b(\d{2}/\d{2}/\d{4})\b', text):
+    for match in re.finditer(r"\b(\d{2}/\d{2}/\d{4})\b", text):
         try:
             parsed = datetime.strptime(match.group(1), "%d/%m/%Y").date()
         except ValueError:
             continue
         start = max(0, match.start() - 80)
         end = min(len(text), match.end() + 40)
-        found.append({
-            "date_str": match.group(1),
-            "parsed": parsed,
-            "context": text[start:end].replace("\n", " ").strip(),
-        })
+        found.append(
+            {
+                "date_str": match.group(1),
+                "parsed": parsed,
+                "context": text[start:end].replace("\n", " ").strip(),
+            }
+        )
 
     # Format "JJ mois AAAA" (ex: "26 juin 2025")
     pattern_mois = (
-        r'\b(\d{1,2})\s+'
-        r'(janvier|février|mars|avril|mai|juin|juillet|août'
-        r'|septembre|octobre|novembre|décembre)\s+(\d{4})\b'
+        r"\b(\d{1,2})\s+"
+        r"(janvier|février|mars|avril|mai|juin|juillet|août"
+        r"|septembre|octobre|novembre|décembre)\s+(\d{4})\b"
     )
     for match in re.finditer(pattern_mois, text, re.IGNORECASE):
         jour, mois_str, annee = match.groups()
@@ -101,11 +114,13 @@ def _find_all_dates(text: str) -> list[dict[str, Any]]:
             continue
         start = max(0, match.start() - 80)
         end = min(len(text), match.end() + 40)
-        found.append({
-            "date_str": match.group(0),
-            "parsed": parsed,
-            "context": text[start:end].replace("\n", " ").strip(),
-        })
+        found.append(
+            {
+                "date_str": match.group(0),
+                "parsed": parsed,
+                "context": text[start:end].replace("\n", " ").strip(),
+            }
+        )
 
     return found
 
@@ -133,7 +148,7 @@ def _pick_emission_date(dates: list[dict[str, Any]]) -> date | None:
             if _classify_date(d["context"]) == label:
                 return d["parsed"]
     # Fallback : date passée la plus récente
-    today = datetime.now(tz=timezone.utc).date()
+    today = datetime.now(tz=UTC).date()
     past_dates = [d["parsed"] for d in dates if d["parsed"] <= today]
     return max(past_dates) if past_dates else None
 
@@ -144,12 +159,13 @@ def _pick_expiry_date(dates: list[dict[str, Any]]) -> date | None:
         if _classify_date(d["context"]) == "validity_end":
             return d["parsed"]
     # Fallback : date future la plus lointaine
-    today = datetime.now(tz=timezone.utc).date()
+    today = datetime.now(tz=UTC).date()
     future_dates = [d["parsed"] for d in dates if d["parsed"] > today]
     return max(future_dates) if future_dates else None
 
 
 # ── Extracteur principal ──────────────────────────────────────────────────────
+
 
 class DocumentExtractor:
     """Extracteur déterministe pour les documents de vigilance.
@@ -199,7 +215,7 @@ class DocumentExtractor:
         text = _extract_pdf_text(file_content)
         dates = _find_all_dates(text)
         emission = _pick_emission_date(dates)
-        today = datetime.now(tz=timezone.utc).date()
+        today = datetime.now(tz=UTC).date()
         expiry_date: date | None = None
         is_valid: bool | None = None
 
@@ -219,7 +235,7 @@ class DocumentExtractor:
         text = _extract_pdf_text(file_content)
         dates = _find_all_dates(text)
         expiry = _pick_expiry_date(dates)
-        today = datetime.now(tz=timezone.utc).date()
+        today = datetime.now(tz=UTC).date()
         is_valid: bool | None = None
 
         if expiry:
@@ -240,33 +256,37 @@ class DocumentExtractor:
         beneficiaire: str | None = None
 
         iban_match = re.search(
-            r'\b([A-Z]{2}\d{2}(?:\s?\d{4}){4,7}(?:\s?[A-Z0-9]{1,4})?)\b',
-            text, re.IGNORECASE,
+            r"\b([A-Z]{2}\d{2}(?:\s?\d{4}){4,7}(?:\s?[A-Z0-9]{1,4})?)\b",
+            text,
+            re.IGNORECASE,
         )
         if iban_match:
-            iban = re.sub(r'\s+', ' ', iban_match.group(1)).upper().strip()
+            iban = re.sub(r"\s+", " ", iban_match.group(1)).upper().strip()
 
         # BIC: search after BIC/SWIFT marker first, then fallback to standalone pattern
-        bic_pattern = r'[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?'
+        bic_pattern = r"[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?"
         # Try to find BIC after a label (BIC, SWIFT, BIC-ADRESSE SWIFT, Code BIC)
         bic_labeled = re.search(
-            r'(?:BIC[\s\-]*(?:ADRESSE\s+)?SWIFT|SWIFT|BIC|Code\s+BIC)\s*[:\s]\s*(' + bic_pattern + r')\b',
-            text, re.IGNORECASE,
+            r"(?:BIC[\s\-]*(?:ADRESSE\s+)?SWIFT|SWIFT|BIC|Code\s+BIC)\s*[:\s]\s*("
+            + bic_pattern
+            + r")\b",
+            text,
+            re.IGNORECASE,
         )
         if bic_labeled:
             bic = bic_labeled.group(1).upper()
         else:
             # Fallback: standalone BIC pattern (8 or 11 chars, must not be common words)
             _common_words = {"IDENTITE", "BANCAIRE", "RELEVE", "BRETEUIL", "NATIONAL", "DOMICILI"}
-            for m in re.finditer(r'\b(' + bic_pattern + r')\b', text):
+            for m in re.finditer(r"\b(" + bic_pattern + r")\b", text):
                 candidate = m.group(1).upper()
                 if candidate not in _common_words:
                     bic = candidate
                     break
 
         for pattern in (
-            r'(?:titulaire|bénéficiaire|nom du compte)[^\n:]*[:\s]+([A-ZÉÈÀÂÊÎÔÛÙÄËÏÖÜ][^\n]{2,50})',
-            r'([A-Z][A-Z\s\-]{4,40})\s*\n.*?IBAN',
+            r"(?:titulaire|bénéficiaire|nom du compte)[^\n:]*[:\s]+([A-ZÉÈÀÂÊÎÔÛÙÄËÏÖÜ][^\n]{2,50})",
+            r"([A-Z][A-Z\s\-]{4,40})\s*\n.*?IBAN",
         ):
             m = re.search(pattern, text, re.IGNORECASE)
             if m:

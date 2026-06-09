@@ -28,4 +28,8 @@ class ThirdPartyType(str, Enum):
     @property
     def requires_contract(self) -> bool:
         """Check if this type requires a contract in Bobby."""
-        return self in (ThirdPartyType.FREELANCE, ThirdPartyType.SOUS_TRAITANT, ThirdPartyType.PORTAGE_SALARIAL)
+        return self in (
+            ThirdPartyType.FREELANCE,
+            ThirdPartyType.SOUS_TRAITANT,
+            ThirdPartyType.PORTAGE_SALARIAL,
+        )

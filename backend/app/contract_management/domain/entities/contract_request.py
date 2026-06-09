@@ -163,9 +163,7 @@ class ContractRequest:
             InvalidContractStatusError: If there is no previous status.
         """
         if len(self.status_history) < 2:
-            raise InvalidContractStatusError(
-                self.status.value, "no previous status in history"
-            )
+            raise InvalidContractStatusError(self.status.value, "no previous status in history")
         # Remove current status entry
         self.status_history.pop()
         # Restore the previous status

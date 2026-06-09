@@ -234,9 +234,7 @@ class S3StorageClient:
         try:
             async with self._session.client("s3", **self._get_client_kwargs()) as s3:
                 paginator = s3.get_paginator("list_objects_v2")
-                async for page in paginator.paginate(
-                    Bucket=self.bucket_name, Prefix=prefix
-                ):
+                async for page in paginator.paginate(Bucket=self.bucket_name, Prefix=prefix):
                     objects = page.get("Contents", [])
                     if not objects:
                         continue

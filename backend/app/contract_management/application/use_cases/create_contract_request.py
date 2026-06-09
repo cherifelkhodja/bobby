@@ -181,7 +181,9 @@ class CreateContractRequestUseCase:
                     # Resolve société émettrice from the need's agency
                     agency_id = need_data.get("agency_id")
                     if agency_id and self._company_repo:
-                        company_id = await self._company_repo.get_company_by_boond_agency_id(agency_id)
+                        company_id = await self._company_repo.get_company_by_boond_agency_id(
+                            agency_id
+                        )
                         if company_id:
                             logger.info(
                                 "company_resolved_from_agency",
@@ -267,7 +269,9 @@ class CreateContractRequestUseCase:
                 candidate_info = await self._crm.get_candidate_info(candidate_id, consultant_type)
                 if candidate_info:
                     consultant_civility = candidate_info.get("civility") or None
-                    consultant_first_name = candidate_info.get("first_name") or consultant_first_name
+                    consultant_first_name = (
+                        candidate_info.get("first_name") or consultant_first_name
+                    )
                     consultant_last_name = candidate_info.get("last_name") or consultant_last_name
                     consultant_email = candidate_info.get("email") or None
                     consultant_phone = candidate_info.get("phone") or None
@@ -321,7 +325,9 @@ class CreateContractRequestUseCase:
                     _from_email, _company_name = None, None
                     if self._company_email_resolver and company_id:
                         try:
-                            _from_email, _company_name = await self._company_email_resolver(company_id)
+                            _from_email, _company_name = await self._company_email_resolver(
+                                company_id
+                            )
                         except Exception:
                             pass
                     email_sent = await self._email_service.send_commercial_validation_request(
