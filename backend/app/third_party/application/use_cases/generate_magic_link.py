@@ -4,11 +4,27 @@ from uuid import UUID
 
 import structlog
 
+from app.domain.exceptions import DomainError
 from app.third_party.domain.entities.magic_link import MagicLink
 from app.third_party.domain.exceptions import ThirdPartyNotFoundError
 from app.third_party.domain.value_objects.magic_link_purpose import MagicLinkPurpose
 
 logger = structlog.get_logger()
+
+
+class MagicLinkEmailNotSentError(DomainError):
+    """Levée quand l'email contenant le lien du portail n'a pas pu être envoyé.
+
+    La ligne magic link est annulée avec la transaction englobante : l'appelant
+    peut donc relancer l'envoi sans laisser de lien orphelin jamais délivré.
+    """
+
+    def __init__(self, email: str = "") -> None:
+        target = f" à {email}" if email else ""
+        super().__init__(
+            f"L'email contenant le lien du portail n'a pas pu être envoyé{target}. "
+            "Veuillez réessayer ou relancer l'envoi."
+        )
 
 
 class GenerateMagicLinkCommand:
@@ -89,25 +105,54 @@ class GenerateMagicLinkUseCase:
 
         saved = await self._magic_link_repo.save(magic_link)
 
-        # Send email with portal link
+        # Envoi de l'email contenant le lien du portail.
+        # Un échec ici ne doit JAMAIS être silencieux : sinon le tiers ne reçoit
+        # jamais son lien et le workflow reste bloqué (ex. COLLECTING_DOCUMENTS)
+        # sans aucune trace. On le remonte pour que la route retourne une erreur
+        # exploitable et que la transaction soit annulée (lien non délivré = pas
+        # de lien persisté).
         portal_url = f"{self._portal_base_url}/{saved.token}"
-        if command.purpose == MagicLinkPurpose.DOCUMENT_UPLOAD:
-            await self._email_service.send_document_collection_request(
-                to=command.email,
-                third_party_name=third_party.company_name or third_party.contact_email,
-                portal_link=portal_url,
-                from_email=command.from_email,
-                company_name=command.company_name,
+        try:
+            if command.purpose == MagicLinkPurpose.DOCUMENT_UPLOAD:
+                email_sent = await self._email_service.send_document_collection_request(
+                    to=command.email,
+                    third_party_name=third_party.company_name or third_party.contact_email,
+                    portal_link=portal_url,
+                    from_email=command.from_email,
+                    company_name=command.company_name,
+                )
+            elif command.purpose == MagicLinkPurpose.CONTRACT_REVIEW:
+                email_sent = await self._email_service.send_contract_draft_review(
+                    to=command.email,
+                    third_party_name=third_party.company_name,
+                    contract_ref="",
+                    portal_link=portal_url,
+                    from_email=command.from_email,
+                    company_name=command.company_name,
+                )
+            else:
+                # Aucun email associé aux autres finalités : rien à envoyer.
+                email_sent = True
+        except Exception as exc:
+            logger.error(
+                "magic_link_email_error",
+                magic_link_id=str(saved.id),
+                third_party_id=str(command.third_party_id),
+                purpose=command.purpose.value,
+                email=command.email,
+                error=str(exc),
             )
-        elif command.purpose == MagicLinkPurpose.CONTRACT_REVIEW:
-            await self._email_service.send_contract_draft_review(
-                to=command.email,
-                third_party_name=third_party.company_name,
-                contract_ref="",
-                portal_link=portal_url,
-                from_email=command.from_email,
-                company_name=command.company_name,
+            raise MagicLinkEmailNotSentError(command.email) from exc
+
+        if not email_sent:
+            logger.error(
+                "magic_link_email_not_sent",
+                magic_link_id=str(saved.id),
+                third_party_id=str(command.third_party_id),
+                purpose=command.purpose.value,
+                email=command.email,
             )
+            raise MagicLinkEmailNotSentError(command.email)
 
         logger.info(
             "magic_link_generated",

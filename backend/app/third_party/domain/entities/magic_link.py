@@ -49,6 +49,16 @@ class MagicLink:
         if self.accessed_at is None:
             self.accessed_at = datetime.utcnow()
 
+    def mark_used(self) -> None:
+        """Invalidate this link after a terminal, single-use action.
+
+        Réutilise le drapeau ``is_revoked`` déjà persisté (aucun changement de
+        schéma requis) : une fois qu'un lien a rempli son rôle terminal (dépôt
+        de documents validé, décision de contrat enregistrée), il ne doit plus
+        pouvoir être rejoué.
+        """
+        self.is_revoked = True
+
     @property
     def is_expired(self) -> bool:
         """Check if the magic link has expired."""

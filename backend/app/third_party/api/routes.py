@@ -1,5 +1,6 @@
 """Portal routes for third party magic link access."""
 
+import os
 from uuid import UUID
 
 import structlog
@@ -8,6 +9,7 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db
+from app.domain.exceptions import DomainError
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
 from app.third_party.api.schemas import (
     CompanyInfoDraftRequest,
@@ -199,6 +201,57 @@ async def _verify_portal_token(
     return result
 
 
+def _domain_error_to_http(exc: DomainError) -> HTTPException:
+    """Traduit une erreur métier en réponse HTTP 4xx propre (message FR).
+
+    Garantit que le portail public ne renvoie jamais un 500 pour une violation
+    de règle métier : une transition d'état invalide devient 409, une ressource
+    manquante 404, toute autre erreur métier 400.
+    """
+    from app.contract_management.domain.exceptions import (
+        ContractNotFoundError,
+        ContractRequestNotFoundError,
+        InvalidContractStatusError,
+    )
+    from app.third_party.domain.exceptions import ThirdPartyNotFoundError
+
+    if isinstance(exc, InvalidContractStatusError):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cette action n'est plus possible dans l'état actuel du dossier.",
+        )
+    if isinstance(
+        exc, ContractRequestNotFoundError | ContractNotFoundError | ThirdPartyNotFoundError
+    ):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message)
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)
+
+
+async def _revoke_portal_link(db: AsyncSession, result) -> None:
+    """Invalide le magic link après une action terminale (usage unique).
+
+    Empêche tout rejeu du lien (double dépôt, double décision de contrat).
+    """
+    result.magic_link.mark_used()
+    await MagicLinkRepository(db).save(result.magic_link)
+
+
+async def _resolve_portal_company_id(db: AsyncSession, contract_request_id) -> UUID | None:
+    """Retourne le company_id propriétaire de la demande de contrat (scoping chartes)."""
+    if not contract_request_id:
+        return None
+    from sqlalchemy import select
+
+    from app.contract_management.infrastructure.models import ContractRequestModel
+
+    row = await db.execute(
+        select(ContractRequestModel.company_id).where(
+            ContractRequestModel.id == contract_request_id
+        )
+    )
+    return row.scalar_one_or_none()
+
+
 @router.get(
     "/portal/{token}/documents",
     response_model=PortalDocumentsListResponse,
@@ -251,73 +304,111 @@ async def upload_portal_document(
     db: AsyncSession = Depends(get_db),
 ):
     """Upload a document file via the portal magic link."""
-    result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
-
-    from app.config import get_settings
-    from app.infrastructure.storage.s3_client import S3StorageClient
-    from app.vigilance.application.use_cases.upload_document import (
-        UploadDocumentCommand,
-        UploadDocumentUseCase,
-    )
-
-    doc_repo = DocumentRepository(db)
-    s3_client = S3StorageClient(get_settings())
-    storage = VigilanceDocumentStorage(s3_client)
-    extractor = GeminiDocumentExtractor(get_settings())
-
-    # Verify the document belongs to this third party
-    doc = await doc_repo.get_by_id(document_id)
-    if not doc or doc.third_party_id != result.third_party.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document introuvable.",
-        )
-
-    file_content = await file.read()
-    use_case = UploadDocumentUseCase(
-        document_repository=doc_repo,
-        document_storage=storage,
-        document_extractor=extractor,
-    )
-
     try:
-        updated = await use_case.execute(
-            UploadDocumentCommand(
-                document_id=document_id,
-                file_content=file_content,
-                file_name=file.filename or "document.pdf",
-                content_type=file.content_type or "application/octet-stream",
-            )
+        result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
+
+        from app.config import get_settings
+        from app.infrastructure.storage.s3_client import S3StorageClient
+        from app.vigilance.application.use_cases.upload_document import (
+            UploadDocumentCommand,
+            UploadDocumentUseCase,
         )
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except DocumentNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except DocumentNotAllowedError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except ExpiredDocumentError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
-    except InvalidDocumentTransitionError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+        from app.vigilance.domain.services.vigilance_requirements import (
+            ALLOWED_EXTENSIONS,
+            ALLOWED_MIME_TYPES,
+            MAX_FILE_SIZE_BYTES,
+        )
 
-    audit_logger.log(
-        AuditAction.DOCUMENT_UPLOADED,
-        AuditResource.VIGILANCE_DOCUMENT,
-        resource_id=str(updated.id),
-        details={
-            "third_party_id": str(result.third_party.id),
-            "document_type": updated.document_type.value,
-            "file_name": file.filename,
-            "via": "portal",
-        },
-    )
+        doc_repo = DocumentRepository(db)
 
-    return DocumentUploadResponse(
-        document_id=updated.id,
-        document_type=updated.document_type.value,
-        status=updated.status.value,
-        file_name=updated.file_name or "",
-    )
+        # Verify the document belongs to this third party
+        doc = await doc_repo.get_by_id(document_id)
+        if not doc or doc.third_party_id != result.third_party.id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document introuvable.",
+            )
+
+        # Durcissement endpoint public : allowlist type/extension + taille max,
+        # AVANT tout traitement lourd (lecture complète, upload S3, extraction Gemini).
+        content_type = (file.content_type or "").lower()
+        if content_type not in ALLOWED_MIME_TYPES:
+            raise HTTPException(
+                status_code=415,
+                detail="Format de fichier non autorisé. Formats acceptés : PDF, JPG, PNG.",
+            )
+        _, ext = os.path.splitext(file.filename or "")
+        if ext.lower() not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=415,
+                detail="Extension de fichier non autorisée. Extensions acceptées : .pdf, .jpg, .jpeg, .png.",
+            )
+
+        file_content = await file.read()
+        if len(file_content) > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Fichier trop volumineux (maximum {MAX_FILE_SIZE_BYTES // (1024 * 1024)} Mo).",
+            )
+
+        s3_client = S3StorageClient(get_settings())
+        storage = VigilanceDocumentStorage(s3_client)
+        extractor = GeminiDocumentExtractor(get_settings())
+        use_case = UploadDocumentUseCase(
+            document_repository=doc_repo,
+            document_storage=storage,
+            document_extractor=extractor,
+        )
+
+        try:
+            updated = await use_case.execute(
+                UploadDocumentCommand(
+                    document_id=document_id,
+                    file_content=file_content,
+                    file_name=file.filename or "document.pdf",
+                    content_type=file.content_type or "application/octet-stream",
+                )
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        except DocumentNotFoundError as e:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        except DocumentNotAllowedError as e:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        except ExpiredDocumentError as e:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+        except InvalidDocumentTransitionError as e:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+        audit_logger.log(
+            AuditAction.DOCUMENT_UPLOADED,
+            AuditResource.VIGILANCE_DOCUMENT,
+            resource_id=str(updated.id),
+            details={
+                "third_party_id": str(result.third_party.id),
+                "document_type": updated.document_type.value,
+                "file_name": file.filename,
+                "via": "portal",
+            },
+        )
+
+        return DocumentUploadResponse(
+            document_id=updated.id,
+            document_type=updated.document_type.value,
+            status=updated.status.value,
+            file_name=updated.file_name or "",
+        )
+    except HTTPException:
+        raise
+    except DomainError as exc:
+        logger.warning("portal_upload_refused", token_prefix=token[:8], error=str(exc))
+        raise _domain_error_to_http(exc)
+    except Exception:
+        logger.exception("portal_upload_error", token_prefix=token[:8])
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Une erreur inattendue est survenue. Veuillez réessayer plus tard.",
+        )
 
 
 # ── Portal Document Availability ────────────────────────────────
@@ -453,96 +544,112 @@ async def submit_portal_documents(
     from app.infrastructure.email.sender import EmailService as EmailSender
     from app.third_party.infrastructure.models import ThirdPartyModel
 
-    result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
-
-    doc_repo = DocumentRepository(db)
-    documents = await doc_repo.list_by_third_party(result.third_party.id)
-
-    uploaded_count = sum(
-        1 for d in documents if d.status.value in ("received", "validated", "expiring_soon")
-    )
-    total_count = len(documents)
-
-    # Update compliance status to "En cours de vérification" (best-effort)
     try:
-        tp_model = await db.get(ThirdPartyModel, result.third_party.id)
-        if tp_model:
-            tp_model.compliance_status = "under_review"
-            await db.flush()
-    except Exception as exc:
-        logger.warning(
-            "compliance_status_update_failed",
-            third_party_id=str(result.third_party.id),
-            error=str(exc),
+        result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
+
+        doc_repo = DocumentRepository(db)
+        documents = await doc_repo.list_by_third_party(result.third_party.id)
+
+        uploaded_count = sum(
+            1 for d in documents if d.status.value in ("received", "validated", "expiring_soon")
+        )
+        total_count = len(documents)
+
+        # Update compliance status to "En cours de vérification" (best-effort)
+        try:
+            tp_model = await db.get(ThirdPartyModel, result.third_party.id)
+            if tp_model:
+                tp_model.compliance_status = "under_review"
+                await db.flush()
+        except Exception as exc:
+            logger.warning(
+                "compliance_status_update_failed",
+                third_party_id=str(result.third_party.id),
+                error=str(exc),
+            )
+
+        # Transition contract request from COLLECTING_DOCUMENTS → REVIEWING_COMPLIANCE (best-effort)
+        if result.contract_request_id:
+            try:
+                from app.contract_management.domain.value_objects.contract_request_status import (
+                    ContractRequestStatus,
+                )
+                from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+                    ContractRequestRepository,
+                )
+
+                cr_repo = ContractRequestRepository(db)
+                cr = await cr_repo.get_by_id(result.contract_request_id)
+                if cr and cr.status == ContractRequestStatus.COLLECTING_DOCUMENTS:
+                    cr.transition_to(ContractRequestStatus.REVIEWING_COMPLIANCE)
+                    await cr_repo.save(cr)
+            except Exception as exc:
+                logger.warning(
+                    "contract_request_status_update_failed",
+                    contract_request_id=str(result.contract_request_id),
+                    error=str(exc),
+                )
+
+        # Collect recipients: ADV and admin users in Bobby
+        settings = get_settings()
+        email_sender = EmailSender(settings)
+        frontend_url = settings.FRONTEND_URL.rstrip("/")
+        compliance_url = f"{frontend_url}/compliance"
+        third_party_name = result.third_party.company_name or result.third_party.contact_email
+
+        user_repo = UserRepository(db)
+        internal_users = await user_repo.list_by_roles([UserRole.ADV, UserRole.ADMIN])
+        recipients: list[str] = []
+        for u in internal_users:
+            email = str(u.email)
+            if email and email not in recipients:
+                recipients.append(email)
+
+        for recipient in recipients:
+            try:
+                await email_sender.send_documents_submitted_notification(
+                    to=recipient,
+                    third_party_name=third_party_name,
+                    uploaded_count=uploaded_count,
+                    total_count=total_count,
+                    compliance_url=compliance_url,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "submit_notification_email_failed",
+                    third_party_id=str(result.third_party.id),
+                    recipient=recipient,
+                    error=str(exc),
+                )
+
+        audit_logger.log(
+            AuditAction.PORTAL_ACCESSED,
+            AuditResource.MAGIC_LINK,
+            resource_id=str(result.magic_link.id),
+            details={
+                "action": "documents_submitted",
+                "third_party_id": str(result.third_party.id),
+                "uploaded_count": uploaded_count,
+                "total_count": total_count,
+            },
         )
 
-    # Transition contract request from COLLECTING_DOCUMENTS → REVIEWING_COMPLIANCE (best-effort)
-    if result.contract_request_id:
-        try:
-            from app.contract_management.domain.value_objects.contract_request_status import (
-                ContractRequestStatus,
-            )
-            from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-                ContractRequestRepository,
-            )
+        # Action terminale → lien à usage unique : on invalide le magic link pour
+        # empêcher tout nouveau dépôt / rejeu sur ce lien.
+        await _revoke_portal_link(db, result)
 
-            cr_repo = ContractRequestRepository(db)
-            cr = await cr_repo.get_by_id(result.contract_request_id)
-            if cr and cr.status == ContractRequestStatus.COLLECTING_DOCUMENTS:
-                cr.transition_to(ContractRequestStatus.REVIEWING_COMPLIANCE)
-                await cr_repo.save(cr)
-        except Exception as exc:
-            logger.warning(
-                "contract_request_status_update_failed",
-                contract_request_id=str(result.contract_request_id),
-                error=str(exc),
-            )
-
-    # Collect recipients: ADV and admin users in Bobby
-    settings = get_settings()
-    email_sender = EmailSender(settings)
-    frontend_url = settings.FRONTEND_URL.rstrip("/")
-    compliance_url = f"{frontend_url}/compliance"
-    third_party_name = result.third_party.company_name or result.third_party.contact_email
-
-    user_repo = UserRepository(db)
-    internal_users = await user_repo.list_by_roles([UserRole.ADV, UserRole.ADMIN])
-    recipients: list[str] = []
-    for u in internal_users:
-        email = str(u.email)
-        if email and email not in recipients:
-            recipients.append(email)
-
-    for recipient in recipients:
-        try:
-            await email_sender.send_documents_submitted_notification(
-                to=recipient,
-                third_party_name=third_party_name,
-                uploaded_count=uploaded_count,
-                total_count=total_count,
-                compliance_url=compliance_url,
-            )
-        except Exception as exc:
-            logger.warning(
-                "submit_notification_email_failed",
-                third_party_id=str(result.third_party.id),
-                recipient=recipient,
-                error=str(exc),
-            )
-
-    audit_logger.log(
-        AuditAction.PORTAL_ACCESSED,
-        AuditResource.MAGIC_LINK,
-        resource_id=str(result.magic_link.id),
-        details={
-            "action": "documents_submitted",
-            "third_party_id": str(result.third_party.id),
-            "uploaded_count": uploaded_count,
-            "total_count": total_count,
-        },
-    )
-
-    return DocumentsSubmittedResponse()
+        return DocumentsSubmittedResponse()
+    except HTTPException:
+        raise
+    except DomainError as exc:
+        logger.warning("portal_submit_documents_refused", token_prefix=token[:8], error=str(exc))
+        raise _domain_error_to_http(exc)
+    except Exception:
+        logger.exception("portal_submit_documents_error", token_prefix=token[:8])
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Une erreur inattendue est survenue. Veuillez réessayer plus tard.",
+        )
 
 
 # ── Portal Contract Review Routes ───────────────────────────────
@@ -613,102 +720,120 @@ async def submit_contract_review(
     db: AsyncSession = Depends(get_db),
 ):
     """Partner approves or requests changes on the contract draft."""
-    result = await _verify_portal_token(token, db, MagicLinkPurpose.CONTRACT_REVIEW)
+    try:
+        result = await _verify_portal_token(token, db, MagicLinkPurpose.CONTRACT_REVIEW)
 
-    if not result.contract_request_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Aucune demande de contrat associée.",
-        )
-
-    from app.config import get_settings
-    from app.contract_management.application.use_cases.process_partner_review import (
-        ProcessPartnerReviewUseCase,
-    )
-    from app.contract_management.application.use_cases.regenerate_draft import (
-        DraftRegenerator,
-    )
-    from app.contract_management.infrastructure.adapters.html_pdf_contract_generator import (
-        HtmlPdfContractGenerator,
-    )
-    from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
-        AnnexTemplateRepository,
-    )
-    from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
-        ArticleTemplateRepository,
-    )
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-        ContractRepository,
-        ContractRequestRepository,
-    )
-    from app.infrastructure.email.sender import EmailService
-    from app.infrastructure.storage.s3_client import S3StorageClient
-
-    settings = get_settings()
-    cr_repo = ContractRequestRepository(db)
-    contract_repo = ContractRepository(db)
-    email_service = EmailService(settings)
-
-    draft_regenerator = DraftRegenerator(
-        contract_request_repository=cr_repo,
-        contract_repository=contract_repo,
-        third_party_repository=ThirdPartyRepository(db),
-        contract_generator=HtmlPdfContractGenerator(),
-        article_template_repository=ArticleTemplateRepository(db),
-        annex_template_repository=AnnexTemplateRepository(db),
-        s3_service=S3StorageClient(settings),
-        settings=settings,
-        db=db,
-    )
-
-    # Resolve company email context
-    async def _resolve_company_email_for_cr(company_id):
-        from sqlalchemy import select as _sel
-
-        from app.contract_management.infrastructure.models import ContractCompanyModel
-
-        r = await db.execute(
-            _sel(ContractCompanyModel.email_from, ContractCompanyModel.name).where(
-                ContractCompanyModel.id == company_id
+        if not result.contract_request_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Aucune demande de contrat associée.",
             )
+
+        from app.config import get_settings
+        from app.contract_management.application.use_cases.process_partner_review import (
+            ProcessPartnerReviewUseCase,
         )
-        row = r.first()
-        return (row.email_from, row.name) if row else (None, None)
+        from app.contract_management.application.use_cases.regenerate_draft import (
+            DraftRegenerator,
+        )
+        from app.contract_management.infrastructure.adapters.html_pdf_contract_generator import (
+            HtmlPdfContractGenerator,
+        )
+        from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
+            AnnexTemplateRepository,
+        )
+        from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
+            ArticleTemplateRepository,
+        )
+        from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+            ContractRepository,
+            ContractRequestRepository,
+        )
+        from app.infrastructure.email.sender import EmailService
+        from app.infrastructure.storage.s3_client import S3StorageClient
 
-    use_case = ProcessPartnerReviewUseCase(
-        contract_request_repository=cr_repo,
-        contract_repository=contract_repo,
-        email_service=email_service,
-        draft_regenerator=draft_regenerator,
-        company_email_resolver=_resolve_company_email_for_cr,
-    )
+        settings = get_settings()
+        cr_repo = ContractRequestRepository(db)
+        contract_repo = ContractRepository(db)
+        email_service = EmailService(settings)
 
-    updated = await use_case.execute(
-        contract_request_id=result.contract_request_id,
-        approved=body.decision == "approved",
-        comments=body.comments,
-    )
+        draft_regenerator = DraftRegenerator(
+            contract_request_repository=cr_repo,
+            contract_repository=contract_repo,
+            third_party_repository=ThirdPartyRepository(db),
+            contract_generator=HtmlPdfContractGenerator(),
+            article_template_repository=ArticleTemplateRepository(db),
+            annex_template_repository=AnnexTemplateRepository(db),
+            s3_service=S3StorageClient(settings),
+            settings=settings,
+            db=db,
+        )
 
-    audit_logger.log(
-        AuditAction.PORTAL_ACCESSED,
-        AuditResource.CONTRACT_REQUEST,
-        resource_id=str(result.contract_request_id),
-        details={
-            "action": "contract_review",
-            "decision": body.decision,
-            "third_party_id": str(result.third_party.id),
-        },
-    )
+        # Resolve company email context
+        async def _resolve_company_email_for_cr(company_id):
+            from sqlalchemy import select as _sel
 
-    decision_msg = (
-        "Contrat approuvé." if body.decision == "approved" else "Demande de modifications envoyée."
-    )
+            from app.contract_management.infrastructure.models import ContractCompanyModel
 
-    return ContractReviewResponse(
-        contract_request_id=result.contract_request_id,
-        decision=body.decision,
-        message=decision_msg,
-    )
+            r = await db.execute(
+                _sel(ContractCompanyModel.email_from, ContractCompanyModel.name).where(
+                    ContractCompanyModel.id == company_id
+                )
+            )
+            row = r.first()
+            return (row.email_from, row.name) if row else (None, None)
+
+        use_case = ProcessPartnerReviewUseCase(
+            contract_request_repository=cr_repo,
+            contract_repository=contract_repo,
+            email_service=email_service,
+            draft_regenerator=draft_regenerator,
+            company_email_resolver=_resolve_company_email_for_cr,
+        )
+
+        updated = await use_case.execute(
+            contract_request_id=result.contract_request_id,
+            approved=body.decision == "approved",
+            comments=body.comments,
+        )
+
+        # Action terminale → lien à usage unique : on invalide le lien après une
+        # décision valide pour empêcher toute double soumission via ce lien.
+        await _revoke_portal_link(db, result)
+
+        audit_logger.log(
+            AuditAction.PORTAL_ACCESSED,
+            AuditResource.CONTRACT_REQUEST,
+            resource_id=str(result.contract_request_id),
+            details={
+                "action": "contract_review",
+                "decision": body.decision,
+                "third_party_id": str(result.third_party.id),
+            },
+        )
+
+        decision_msg = (
+            "Contrat approuvé."
+            if body.decision == "approved"
+            else "Demande de modifications envoyée."
+        )
+
+        return ContractReviewResponse(
+            contract_request_id=result.contract_request_id,
+            decision=body.decision,
+            message=decision_msg,
+        )
+    except HTTPException:
+        raise
+    except DomainError as exc:
+        logger.warning("portal_contract_review_refused", token_prefix=token[:8], error=str(exc))
+        raise _domain_error_to_http(exc)
+    except Exception:
+        logger.exception("portal_contract_review_error", token_prefix=token[:8])
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Une erreur inattendue est survenue. Veuillez réessayer plus tard.",
+        )
 
 
 # ── Portal Company Info ─────────────────────────────────────────
@@ -730,106 +855,160 @@ async def check_siren_for_framework_contract(
     PurchaseOrderRequest instead. Returns the result so the portal frontend
     can redirect accordingly.
     """
-    siret = body.get("siret", "")
-    if not siret or len(siret) < 9:
-        raise HTTPException(status_code=400, detail="SIRET invalide (14 chiffres requis).")
+    try:
+        siret = body.get("siret", "")
+        if not siret or len(siret) < 9:
+            raise HTTPException(status_code=400, detail="SIRET invalide (14 chiffres requis).")
 
-    result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
-    siren = siret[:9]
+        result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
+        siren = siret[:9]
 
-    # Check for existing framework contract
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-        FrameworkContractRepository,
-    )
-
-    fc_repo = FrameworkContractRepository(db)
-    fc = await fc_repo.get_by_third_party_siren(siren)
-
-    if fc and fc.is_usable and result.contract_request_id:
-        from app.contract_management.domain.entities.purchase_order_request import (
-            PurchaseOrderRequest,
-        )
-        from app.contract_management.domain.value_objects.contract_request_status import (
-            ContractRequestStatus,
-        )
+        # Check for existing framework contract
         from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-            ContractRequestRepository,
-            PurchaseOrderRequestRepository,
+            FrameworkContractRepository,
         )
 
-        cr_repo = ContractRequestRepository(db)
-        cr = await cr_repo.get_by_id(result.contract_request_id)
+        fc_repo = FrameworkContractRepository(db)
+        fc = await fc_repo.get_by_third_party_siren(siren)
 
-        if cr and cr.status != ContractRequestStatus.CANCELLED:
-            # Cancel the ContractRequest
-            cr.transition_to(ContractRequestStatus.CANCELLED)
-            await cr_repo.save(cr)
-
-            # Create a PurchaseOrderRequest
-            por_repo = PurchaseOrderRequestRepository(db)
-            por_ref = await por_repo.get_next_reference()
-            por = PurchaseOrderRequest(
-                framework_contract_id=fc.id,
-                boond_positioning_id=cr.boond_positioning_id,
-                boond_candidate_id=cr.boond_candidate_id,
-                boond_consultant_type=cr.boond_consultant_type,
-                boond_need_id=cr.boond_need_id,
-                third_party_id=fc.third_party_id,
-                reference=por_ref,
-                commercial_email=cr.commercial_email,
-                daily_rate=cr.daily_rate,
-                start_date=cr.start_date,
-                end_date=cr.end_date,
-                client_name=cr.client_name,
-                mission_title=cr.mission_title,
-                consultant_civility=cr.consultant_civility,
-                consultant_first_name=cr.consultant_first_name,
-                consultant_last_name=cr.consultant_last_name,
-                consultant_email=cr.consultant_email,
-                consultant_phone=cr.consultant_phone,
-                original_contract_request_id=cr.id,
+        if fc and fc.is_usable and result.contract_request_id:
+            from app.contract_management.domain.entities.purchase_order_request import (
+                PurchaseOrderRequest,
             )
-            saved_por = await por_repo.save(por)
-
-            logger.info(
-                "siren_check_framework_contract_found",
-                siren=siren,
-                cr_id=str(cr.id),
-                por_id=str(saved_por.id),
-                fc_reference=fc.reference,
+            from app.contract_management.domain.value_objects.contract_request_status import (
+                ContractRequestStatus,
+            )
+            from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+                ContractRequestRepository,
+                PurchaseOrderRequestRepository,
             )
 
-            audit_logger.log(
-                AuditAction.PORTAL_ACCESSED,
-                AuditResource.MAGIC_LINK,
-                resource_id=str(result.magic_link.id),
-                details={
-                    "action": "siren_check_redirected_to_bdc",
-                    "siren": siren,
-                    "framework_contract_id": str(fc.id),
-                    "purchase_order_request_id": str(saved_por.id),
-                },
-            )
+            cr_repo = ContractRequestRepository(db)
+            cr = await cr_repo.get_by_id(result.contract_request_id)
 
-            return {
-                "has_framework_contract": True,
-                "framework_contract": {
-                    "id": str(fc.id),
-                    "reference": fc.reference,
-                    "signed_at": fc.signed_at.isoformat() if fc.signed_at else None,
-                },
-                "purchase_order_request_id": str(saved_por.id),
-                "message": (
-                    f"Un contrat cadre actif a été détecté (réf. {fc.reference}). "
-                    "Un bon de commande a été créé automatiquement. "
-                    "Vous n'avez pas besoin de remplir les informations de contact."
-                ),
+            fc_payload = {
+                "id": str(fc.id),
+                "reference": fc.reference,
+                "signed_at": fc.signed_at.isoformat() if fc.signed_at else None,
             }
 
-    return {
-        "has_framework_contract": False,
-        "message": "Aucun contrat cadre trouvé pour ce SIREN. Veuillez continuer avec les informations de contact.",
-    }
+            if cr:
+                # Ne pas tenter d'annuler une demande déjà avancée (SIGNED/ACTIVE/
+                # ARCHIVED/…) : la transition serait illégale → 500. On informe
+                # simplement le tiers.
+                if not cr.status.can_transition_to(ContractRequestStatus.CANCELLED):
+                    logger.info(
+                        "siren_check_cr_not_cancellable",
+                        cr_id=str(cr.id),
+                        status=cr.status.value,
+                    )
+                    return {
+                        "has_framework_contract": True,
+                        "framework_contract": fc_payload,
+                        "purchase_order_request_id": None,
+                        "message": (
+                            f"Un contrat cadre actif a été détecté (réf. {fc.reference}), mais "
+                            "votre demande est déjà à un stade trop avancé pour être convertie "
+                            "automatiquement en bon de commande. Notre équipe va prendre le relais."
+                        ),
+                    }
+
+                # Le bon de commande exige un identifiant de positionnement Boond
+                # (colonne NOT NULL). Sur certains déclencheurs (candidat/ressource)
+                # il peut être absent → on évite l'IntegrityError et on informe.
+                if cr.boond_positioning_id is None:
+                    logger.warning(
+                        "siren_check_missing_positioning_id",
+                        cr_id=str(cr.id),
+                    )
+                    return {
+                        "has_framework_contract": True,
+                        "framework_contract": fc_payload,
+                        "purchase_order_request_id": None,
+                        "message": (
+                            f"Un contrat cadre actif a été détecté (réf. {fc.reference}). La "
+                            "création automatique du bon de commande n'a pas pu aboutir "
+                            "(référence de positionnement manquante). Notre équipe va prendre "
+                            "le relais."
+                        ),
+                    }
+
+                # Cancel the ContractRequest (transition validée ci-dessus)
+                cr.transition_to(ContractRequestStatus.CANCELLED)
+                await cr_repo.save(cr)
+
+                # Create a PurchaseOrderRequest
+                por_repo = PurchaseOrderRequestRepository(db)
+                por_ref = await por_repo.get_next_reference()
+                por = PurchaseOrderRequest(
+                    framework_contract_id=fc.id,
+                    boond_positioning_id=cr.boond_positioning_id,
+                    boond_candidate_id=cr.boond_candidate_id,
+                    boond_consultant_type=cr.boond_consultant_type,
+                    boond_need_id=cr.boond_need_id,
+                    third_party_id=fc.third_party_id,
+                    reference=por_ref,
+                    commercial_email=cr.commercial_email,
+                    daily_rate=cr.daily_rate,
+                    start_date=cr.start_date,
+                    end_date=cr.end_date,
+                    client_name=cr.client_name,
+                    mission_title=cr.mission_title,
+                    consultant_civility=cr.consultant_civility,
+                    consultant_first_name=cr.consultant_first_name,
+                    consultant_last_name=cr.consultant_last_name,
+                    consultant_email=cr.consultant_email,
+                    consultant_phone=cr.consultant_phone,
+                    original_contract_request_id=cr.id,
+                )
+                saved_por = await por_repo.save(por)
+
+                logger.info(
+                    "siren_check_framework_contract_found",
+                    siren=siren,
+                    cr_id=str(cr.id),
+                    por_id=str(saved_por.id),
+                    fc_reference=fc.reference,
+                )
+
+                audit_logger.log(
+                    AuditAction.PORTAL_ACCESSED,
+                    AuditResource.MAGIC_LINK,
+                    resource_id=str(result.magic_link.id),
+                    details={
+                        "action": "siren_check_redirected_to_bdc",
+                        "siren": siren,
+                        "framework_contract_id": str(fc.id),
+                        "purchase_order_request_id": str(saved_por.id),
+                    },
+                )
+
+                return {
+                    "has_framework_contract": True,
+                    "framework_contract": fc_payload,
+                    "purchase_order_request_id": str(saved_por.id),
+                    "message": (
+                        f"Un contrat cadre actif a été détecté (réf. {fc.reference}). "
+                        "Un bon de commande a été créé automatiquement. "
+                        "Vous n'avez pas besoin de remplir les informations de contact."
+                    ),
+                }
+
+        return {
+            "has_framework_contract": False,
+            "message": "Aucun contrat cadre trouvé pour ce SIREN. Veuillez continuer avec les informations de contact.",
+        }
+    except HTTPException:
+        raise
+    except DomainError as exc:
+        logger.warning("portal_check_siren_refused", token_prefix=token[:8], error=str(exc))
+        raise _domain_error_to_http(exc)
+    except Exception:
+        logger.exception("portal_check_siren_error", token_prefix=token[:8])
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Une erreur inattendue est survenue. Veuillez réessayer plus tard.",
+        )
 
 
 @router.post(
@@ -1237,43 +1416,30 @@ async def get_portal_charters(
     from app.contract_management.infrastructure.models import (
         CharterAcknowledgementModel,
         CharterTemplateModel,
-        ContractRequestModel,
     )
-    from app.third_party.infrastructure.adapters.postgres_magic_link_repo import MagicLinkRepository
 
-    ml_repo = MagicLinkRepository(db)
-    link = await ml_repo.get_by_token(token)
-    if not link or not link.is_valid():
-        raise HTTPException(status_code=404, detail="Lien invalide ou expire.")
+    # Vérifie le token ET la finalité (portail de collecte de documents).
+    result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
+    company_id = await _resolve_portal_company_id(db, result.contract_request_id)
 
-    # Resolve company_id from contract request
-    company_id = None
-    if link.contract_request_id:
-        cr_result = await db.execute(
-            select(ContractRequestModel.company_id).where(
-                ContractRequestModel.id == link.contract_request_id
-            )
-        )
-        company_id = cr_result.scalar_one_or_none()
-
-    # Get active partner charters for this company
+    # Chartes partenaires actives, restreintes à la société de la demande.
+    # ``== company_id`` couvre aussi le cas None → IS NULL (charte globale).
     stmt = (
         select(CharterTemplateModel)
         .where(
             CharterTemplateModel.target == "partner",
             CharterTemplateModel.is_active.is_(True),
+            CharterTemplateModel.company_id == company_id,
         )
         .order_by(CharterTemplateModel.created_at)
     )
-    if company_id:
-        stmt = stmt.where(CharterTemplateModel.company_id == company_id)
-    result = await db.execute(stmt)
-    charters = result.scalars().all()
+    charters_result = await db.execute(stmt)
+    charters = charters_result.scalars().all()
 
     # Get existing acknowledgements for this third party
     ack_result = await db.execute(
         select(CharterAcknowledgementModel.charter_template_id).where(
-            CharterAcknowledgementModel.third_party_id == link.third_party_id,
+            CharterAcknowledgementModel.third_party_id == result.third_party.id,
         )
     )
     acknowledged_ids = {row[0] for row in ack_result.all()}
@@ -1307,21 +1473,20 @@ async def acknowledge_charter(
         CharterAcknowledgementModel,
         CharterTemplateModel,
     )
-    from app.third_party.infrastructure.adapters.postgres_magic_link_repo import MagicLinkRepository
 
-    ml_repo = MagicLinkRepository(db)
-    link = await ml_repo.get_by_token(token)
-    if not link or not link.is_valid():
-        raise HTTPException(status_code=404, detail="Lien invalide ou expire.")
+    result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
+    company_id = await _resolve_portal_company_id(db, result.contract_request_id)
 
-    # Verify charter exists and is active
-    result = await db.execute(
+    # Charte active ET restreinte à la société de la demande (anti-IDOR inter-société).
+    charter_result = await db.execute(
         select(CharterTemplateModel).where(
             CharterTemplateModel.id == charter_id,
+            CharterTemplateModel.target == "partner",
             CharterTemplateModel.is_active.is_(True),
+            CharterTemplateModel.company_id == company_id,
         )
     )
-    charter = result.scalar_one_or_none()
+    charter = charter_result.scalar_one_or_none()
     if not charter:
         raise HTTPException(status_code=404, detail="Charte introuvable.")
 
@@ -1329,25 +1494,25 @@ async def acknowledge_charter(
     existing = await db.execute(
         select(CharterAcknowledgementModel).where(
             CharterAcknowledgementModel.charter_template_id == charter_id,
-            CharterAcknowledgementModel.third_party_id == link.third_party_id,
+            CharterAcknowledgementModel.third_party_id == result.third_party.id,
         )
     )
     if existing.scalar_one_or_none():
-        return {"status": "ok", "message": "Deja acceptee."}
+        return {"status": "ok", "message": "Déjà acceptée."}
 
     # Create acknowledgement
     ip = request.client.host if request.client else None
     ack = CharterAcknowledgementModel(
         charter_template_id=charter_id,
-        third_party_id=link.third_party_id,
-        contract_request_id=link.contract_request_id,
+        third_party_id=result.third_party.id,
+        contract_request_id=result.contract_request_id,
         method="checkbox",
         ip_address=ip,
     )
     db.add(ack)
     await db.commit()
 
-    return {"status": "ok", "message": "Charte acceptee."}
+    return {"status": "ok", "message": "Charte acceptée."}
 
 
 @router.get(
@@ -1364,17 +1529,19 @@ async def download_portal_charter(
 
     from app.contract_management.infrastructure.models import CharterTemplateModel
     from app.infrastructure.storage.s3_client import S3StorageClient
-    from app.third_party.infrastructure.adapters.postgres_magic_link_repo import MagicLinkRepository
 
-    ml_repo = MagicLinkRepository(db)
-    link = await ml_repo.get_by_token(token)
-    if not link or not link.is_valid():
-        raise HTTPException(status_code=404, detail="Lien invalide ou expire.")
+    result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
+    company_id = await _resolve_portal_company_id(db, result.contract_request_id)
 
-    result = await db.execute(
-        select(CharterTemplateModel).where(CharterTemplateModel.id == charter_id)
+    # Charte partenaire restreinte à la société de la demande (anti-IDOR inter-société).
+    charter_result = await db.execute(
+        select(CharterTemplateModel).where(
+            CharterTemplateModel.id == charter_id,
+            CharterTemplateModel.target == "partner",
+            CharterTemplateModel.company_id == company_id,
+        )
     )
-    charter = result.scalar_one_or_none()
+    charter = charter_result.scalar_one_or_none()
     if not charter:
         raise HTTPException(status_code=404, detail="Charte introuvable.")
 
