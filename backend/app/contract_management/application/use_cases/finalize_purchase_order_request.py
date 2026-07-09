@@ -51,14 +51,16 @@ class FinalizePurchaseOrderRequestUseCase:
         if not fc or not fc.is_usable:
             raise ValueError("Le contrat cadre associé n'est pas actif.")
 
-        # Check compliance
+        # Conformité : PAS de blocage au stade BDC pour le moment (décision
+        # produit). On journalise simplement un avertissement si les documents
+        # du fournisseur ne sont pas à jour, sans empêcher la finalisation.
         tp = await self._tp_repo.get_by_id(fc.third_party_id)
         if tp and tp.compliance_status not in ("compliant", "expiring_soon"):
-            por.transition_to(PurchaseOrderRequestStatus.COMPLIANCE_EXPIRED)
-            await self._por_repo.save(por)
-            raise ValueError(
-                "Les documents de conformité du fournisseur ne sont pas à jour. "
-                "Veuillez les mettre à jour avant de finaliser le bon de commande."
+            logger.warning(
+                "purchase_order_finalized_with_stale_compliance",
+                por_id=str(por.id),
+                third_party_id=str(tp.id),
+                compliance_status=tp.compliance_status,
             )
 
         cr_id_for_po = por.original_contract_request_id or por.id
@@ -87,13 +89,17 @@ class FinalizePurchaseOrderRequestUseCase:
         boond_sync_ok = (not boond_required) or (po.boond_purchase_order_id is not None)
         if boond_required and not po.boond_purchase_order_id:
             try:
+                # Montant du bon de commande = total engagé = TJM × nombre de
+                # jours vendus (fallback sur le TJM seul si la quantité est
+                # absente). Boond attend le montant total de la commande.
+                po_amount = float(por.daily_rate)
+                if por.quantity_sold:
+                    po_amount = float(por.daily_rate) * por.quantity_sold
                 boond_po_id = await self._crm.create_purchase_order(
                     provider_id=tp.boond_provider_id,
                     positioning_id=por.boond_positioning_id,
                     reference=po_ref,
-                    # NEEDS-CONFIRMATION: montant = TJM seul (cf. note dans
-                    # BoondCrmAdapter.create_purchase_order).
-                    amount=float(por.daily_rate),
+                    amount=po_amount,
                 )
                 po.boond_purchase_order_id = boond_po_id
                 boond_sync_ok = True

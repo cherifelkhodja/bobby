@@ -206,8 +206,10 @@ docker-compose up # Start all services
 - **Briques ajoutées** : `BoondCrmAdapter.get_resource_provider_company_id`, `ThirdPartyRepository.get_by_boond_provider_id`, `PurchaseOrderRequestRepository.list_locked_by_candidate_id`.
 - **Portail SIRET** (`third_party/api/routes.py`) : la création de BDC à l'étape SIRET (redondante) est supprimée — le portail informe seulement de l'existence du contrat cadre (le BDC vient du webhook).
 - **Frontend** : bandeau « En attente du contrat cadre » + formulaire d'édition masqué tant que verrouillé (`PurchaseOrderRequestDetail.tsx`) ; statut ajouté à `POR_STATUS_CONFIG` et `framework_contract_id` typé nullable.
-- **Conformité** : pas de blocage sur la conformité au stade BDC pour l'instant (décision produit).
-- **Tests** : `test_create_purchase_order_request_from_positioning.py` (filtrage état 7, création éditable/verrouillée, idempotence) + `test_purchase_order_request_unlock.py`. 546 tests unitaires verts.
+- **Conformité** : pas de blocage sur la conformité au stade BDC (décision produit). `FinalizePurchaseOrderRequestUseCase` ne bloque plus si les documents du fournisseur sont périmés — il journalise un warning et poursuit.
+- **Montant Boond** : le bon de commande envoie désormais le **total HT** = `TJM × quantité de jours` (fallback TJM seul si quantité absente), au lieu du TJM seul. `NEEDS-CONFIRMATION` levé.
+- **Endpoint de debug** : `GET /webhooks/boondmanager/debug-resource/{id}` (désactivé en prod) pour inspecter la relation `providerCompany` d'une ressource Boond. La lecture de `providerCompany` interroge `/resources/{id}/administrative` en priorité + logs de diagnostic (`boond_resource_provider_resolved` / `_not_found`, `bdc_no_third_party_for_provider`, `bdc_no_active_framework_for_supplier`).
+- **Tests** : `test_create_purchase_order_request_from_positioning.py` (filtrage état 7, création éditable/verrouillée, idempotence), `test_purchase_order_request_unlock.py`, `test_finalize_purchase_order_request.py` (pas de blocage conformité, montant total). 549 tests unitaires verts.
 
 ### 2026-07-09 (améliorations module contrats de sous-traitance — emails, conformité, notifications)
 
