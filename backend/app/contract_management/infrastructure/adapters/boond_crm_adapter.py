@@ -2,9 +2,14 @@
 
 from typing import Any
 
+import httpx
 import structlog
 
 logger = structlog.get_logger()
+
+
+class BoondCrmError(RuntimeError):
+    """Erreur d'une opération CRM BoondManager (réponse 2xx sans identifiant…)."""
 
 
 class BoondCrmAdapter:
@@ -16,6 +21,20 @@ class BoondCrmAdapter:
 
     def __init__(self, boond_client) -> None:
         self._boond = boond_client
+
+    @staticmethod
+    def _require_created_id(response: dict[str, Any], entity: str) -> int:
+        """Extrait ``data.id`` d'une réponse de création Boond.
+
+        Lève ``BoondCrmError`` si Boond répond en 2xx sans identifiant, au lieu
+        de retourner 0 (qui serait ensuite persisté comme un faux ID Boond).
+        """
+        result_id = response.get("data", {}).get("id")
+        if not result_id:
+            raise BoondCrmError(
+                f"BoondManager a répondu sans identifiant lors de la création : {entity}."
+            )
+        return int(result_id)
 
     async def get_positioning(self, positioning_id: int) -> dict[str, Any] | None:
         """Fetch a positioning from BoondManager.
@@ -326,13 +345,13 @@ class BoondCrmAdapter:
         }
 
         response = await self._boond._make_request("POST", "/companies", json=payload)
-        result_id = response.get("data", {}).get("id")
+        provider_id = self._require_created_id(response, "société fournisseur")
         logger.info(
             "boond_provider_created",
-            provider_id=result_id,
+            provider_id=provider_id,
             company_name=company_name,
         )
-        return int(result_id) if result_id else 0
+        return provider_id
 
     async def create_purchase_order(
         self,
@@ -347,7 +366,7 @@ class BoondCrmAdapter:
             provider_id: Boond provider ID.
             positioning_id: Boond positioning ID.
             reference: Contract reference.
-            amount: Order amount.
+            amount: Order amount (voir NEEDS-CONFIRMATION ci-dessous).
 
         Returns:
             Boond purchase order ID.
@@ -357,6 +376,13 @@ class BoondCrmAdapter:
                 "type": "purchaseorder",
                 "attributes": {
                     "reference": reference,
+                    # NEEDS-CONFIRMATION: `amount` reçu = TJM (prix unitaire) des
+                    # appelants. Dans le schéma Boond des devis, `amountExcludingTax`
+                    # est le prix UNITAIRE (cf. quotation_line.to_boond_record), le
+                    # total étant `turnoverExcludingTax` = TJM × quantité. Ce BDC
+                    # n'envoie ni quantité ni total : à confirmer si Boond attend ici
+                    # un TOTAL (TJM × quantity_sold) ou le TJM seul. Maths d'argent
+                    # laissées inchangées faute de certitude.
                     "amountExcludingTax": amount,
                 },
                 "relationships": {
@@ -367,13 +393,13 @@ class BoondCrmAdapter:
         }
 
         response = await self._boond._make_request("POST", "/purchase-orders", json=payload)
-        result_id = response.get("data", {}).get("id")
+        purchase_order_id = self._require_created_id(response, "bon de commande")
         logger.info(
             "boond_purchase_order_created",
-            purchase_order_id=result_id,
+            purchase_order_id=purchase_order_id,
             reference=reference,
         )
-        return int(result_id) if result_id else 0
+        return purchase_order_id
 
     async def resolve_resource_id(self, candidate_id: int) -> int | None:
         """Resolve the Boond resource ID from a candidate ID.
@@ -470,17 +496,25 @@ class BoondCrmAdapter:
             company_id: Boond company ID.
 
         Returns:
-            True if the company exists, False otherwise.
+            True si la société existe, False uniquement sur un vrai 404.
+
+        Raises:
+            httpx.HTTPStatusError / autre: sur toute autre erreur (timeout, 5xx,
+                réseau). On PROPAGE volontairement pour que l'appelant ne
+                conclue pas à l'absence de la société et ne recrée pas un
+                doublon sur une panne transitoire.
         """
         try:
             await self._boond._make_request("GET", f"/companies/{company_id}")
             return True
-        except Exception:
-            logger.warning(
-                "boond_company_not_found",
-                company_id=company_id,
-            )
-            return False
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                logger.warning(
+                    "boond_company_not_found",
+                    company_id=company_id,
+                )
+                return False
+            raise
 
     async def create_company_full(  # noqa: PLR0913
         self,
@@ -560,13 +594,13 @@ class BoondCrmAdapter:
         )
 
         response = await self._boond._make_request("POST", "/companies", json=payload)
-        result_id = response.get("data", {}).get("id")
+        company_id = self._require_created_id(response, "société fournisseur")
         logger.info(
             "boond_company_full_created",
-            company_id=result_id,
+            company_id=company_id,
             company_name=company_name,
         )
-        return int(result_id) if result_id else 0
+        return company_id
 
     async def update_company_information(  # noqa: PLR0913
         self,
@@ -688,14 +722,14 @@ class BoondCrmAdapter:
         }
 
         response = await self._boond._make_request("POST", "/contacts", json=payload)
-        result_id = response.get("data", {}).get("id")
+        contact_id = self._require_created_id(response, "contact")
         logger.info(
             "boond_contact_created",
-            contact_id=result_id,
+            contact_id=contact_id,
             company_id=company_id,
             types_of=types_of,
         )
-        return int(result_id) if result_id else 0
+        return contact_id
 
     async def get_resource_type_of(self, resource_id: int) -> int | None:
         """Fetch the typeOf attribute of a resource.
@@ -780,14 +814,14 @@ class BoondCrmAdapter:
             payload=payload,
         )
         response = await self._boond._make_request("POST", "/contracts", json=payload)
-        result_id = response.get("data", {}).get("id")
+        contract_id = self._require_created_id(response, "contrat")
         logger.info(
             "boond_contract_created",
-            contract_id=result_id,
+            contract_id=contract_id,
             resource_id=resource_id,
             positioning_id=positioning_id,
         )
-        return int(result_id) if result_id else 0
+        return contract_id
 
     async def update_resource_administrative(
         self,

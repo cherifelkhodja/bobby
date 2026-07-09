@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     BOOND_PASSWORD: str = ""
     BOOND_CANDIDATE_STATE_ID: int = 1
     BOOND_POSITIONING_STATE_ID: int = 1
+    # Secret partagé des webhooks BoondManager (header X-Webhook-Token).
+    # Vide = pas de vérification (rétrocompatibilité).
+    BOOND_WEBHOOK_SECRET: str = ""
 
     # Email
     SMTP_HOST: str = "mailhog"

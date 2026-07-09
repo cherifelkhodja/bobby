@@ -6,6 +6,9 @@ import structlog
 
 from app.contract_management.domain.entities.contract_request import ContractRequest
 from app.contract_management.domain.exceptions import WebhookDuplicateError
+from app.contract_management.domain.value_objects.contract_request_status import (
+    ContractRequestStatus,
+)
 
 logger = structlog.get_logger()
 
@@ -146,11 +149,50 @@ class CreateContractRequestFromEntityUseCase:
             # Determine trigger type
             trigger_type = self._resolve_trigger_type(entity_type, new_state)
 
-            # Idempotence check
+            # Idempotence check (aligné sur CreateContractRequestUseCase).
+            # On récupère le dernier CR de cette entité Boond pour (a) purger une
+            # entrée de dedup obsolète quand le CR précédent a été annulé — afin de
+            # pouvoir le recréer — et (b) éviter de créer un 2e CR actif pour le même
+            # consultant.
+            # NOTE : `get_latest_by_resource_id` ne résout que les CR côté ressource
+            # (`boond_resource_id`) et les candidats déjà convertis en ressource. Les
+            # CR candidat_11 « purs » ne sont pas indexés par `boond_candidate_id`,
+            # donc la purge/garde reste best-effort pour ce trigger.
+            # NEEDS-CONFIRMATION : un repo `get_latest_by_candidate_id` couvrirait
+            # pleinement candidat_11 (hors fichiers possédés).
             event_id = f"{entity_type}_state_{entity_id}_{new_state}"
+            latest_cr = await self._cr_repo.get_latest_by_resource_id(entity_id)
+
             if await self._webhook_repo.exists(event_id):
-                logger.info("webhook_duplicate_event", event_id=event_id)
-                raise WebhookDuplicateError(event_id)
+                if latest_cr is not None and latest_cr.status == ContractRequestStatus.CANCELLED:
+                    # CR précédent annulé → purge de l'entrée de dedup obsolète pour
+                    # autoriser la recréation d'un nouveau CR pour cette entité.
+                    await self._webhook_repo.delete_by_prefix(f"{entity_type}_state_{entity_id}_")
+                    logger.info(
+                        "webhook_dedup_cleared_after_cancel",
+                        event_id=event_id,
+                        entity_type=entity_type,
+                        entity_id=entity_id,
+                    )
+                else:
+                    logger.info("webhook_duplicate_event", event_id=event_id)
+                    raise WebhookDuplicateError(event_id)
+            elif (
+                trigger_type == "candidat_11"
+                and latest_cr is not None
+                and latest_cr.status != ContractRequestStatus.CANCELLED
+            ):
+                # Garde : un nouveau consultant (candidat_11) possède déjà un CR actif
+                # → ne pas créer de doublon. La recontractualisation (ressource_4/5)
+                # est exclue : elle crée volontairement un nouveau CR référençant le
+                # précédent.
+                logger.info(
+                    "contract_request_already_exists",
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    cr_id=str(latest_cr.id),
+                )
+                return latest_cr
 
             # Generate provisional reference
             reference = await self._cr_repo.get_next_provisional_reference()
@@ -169,14 +211,36 @@ class CreateContractRequestFromEntityUseCase:
                 consultant_phone=entity_info.get("phone"),
             )
 
-            # For re-contractualization, find previous contract request
-            if trigger_type in ("ressource_4", "ressource_5"):
-                previous_cr = await self._cr_repo.get_latest_by_resource_id(entity_id)
-                if previous_cr:
-                    cr.previous_contract_request_id = previous_cr.id
-                    # Pre-fill commercial email from previous CR
-                    if previous_cr.commercial_email:
-                        cr.commercial_email = previous_cr.commercial_email
+            # For re-contractualization, link the previous contract request
+            # (already fetched above as latest_cr).
+            if trigger_type in ("ressource_4", "ressource_5") and latest_cr is not None:
+                cr.previous_contract_request_id = latest_cr.id
+                # Pre-fill commercial email from previous CR
+                if latest_cr.commercial_email:
+                    cr.commercial_email = latest_cr.commercial_email
+
+            # Résoudre le commercial via le manager Boond si toujours inconnu.
+            # Les CR candidat_11 n'ont pas de CR précédent d'où hériter le
+            # commercial_email → sans cette résolution le workflow serait mort-né.
+            # (Mimique le lookup DB Bobby de CreateContractRequestUseCase.)
+            if not cr.commercial_email:
+                manager_id = entity_info.get("manager_id")
+                if manager_id and self._user_repo:
+                    bobby_user = await self._user_repo.get_by_boond_resource_id(str(manager_id))
+                    if bobby_user:
+                        cr.commercial_email = str(bobby_user.email)
+                        logger.info(
+                            "commercial_found_in_bobby",
+                            boond_resource_id=manager_id,
+                            email=cr.commercial_email,
+                        )
+                if not cr.commercial_email:
+                    logger.warning(
+                        "no_commercial_resolved_for_entity",
+                        entity_type=entity_type,
+                        entity_id=entity_id,
+                        manager_id=manager_id,
+                    )
 
             saved = await self._cr_repo.save(cr)
 

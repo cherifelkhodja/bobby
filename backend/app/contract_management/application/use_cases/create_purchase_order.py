@@ -65,34 +65,41 @@ class CreatePurchaseOrderUseCase:
         if not fc or not fc.is_usable:
             raise ValueError("Le contrat cadre associé n'est pas actif.")
 
-        # Generate purchase order reference
-        po_ref = await self._po_repo.get_next_reference(fc.reference)
+        # Idempotence : réutiliser un BDC déjà créé pour cette demande, sinon en
+        # créer un nouveau (évite les doublons lors d'un rejeu).
+        po = await self._po_repo.get_by_contract_request_id(cr.id)
+        if po is None:
+            po_ref = await self._po_repo.get_next_reference(fc.reference)
+            po = PurchaseOrder(
+                framework_contract_id=fc.id,
+                contract_request_id=cr.id,
+                reference=po_ref,
+                boond_positioning_id=cr.boond_positioning_id,
+                consultant_first_name=cr.consultant_first_name,
+                consultant_last_name=cr.consultant_last_name,
+                daily_rate=cr.daily_rate,
+                start_date=cr.start_date,
+                end_date=cr.end_date,
+                quantity=cr.quantity_sold,
+            )
+        po_ref = po.reference
 
-        po = PurchaseOrder(
-            framework_contract_id=fc.id,
-            contract_request_id=cr.id,
-            reference=po_ref,
-            boond_positioning_id=cr.boond_positioning_id,
-            consultant_first_name=cr.consultant_first_name,
-            consultant_last_name=cr.consultant_last_name,
-            daily_rate=cr.daily_rate,
-            start_date=cr.start_date,
-            end_date=cr.end_date,
-            quantity=cr.quantity_sold,
-        )
-
-        # Create in Boond if CRM service is available
+        # Créer dans Boond uniquement si requis ET pas déjà synchronisé.
         tp = await self._tp_repo.get_by_id(fc.third_party_id)
-        if self._crm and tp and tp.boond_provider_id and cr.daily_rate:
+        boond_required = bool(self._crm and tp and tp.boond_provider_id and cr.daily_rate)
+        boond_sync_ok = (not boond_required) or (po.boond_purchase_order_id is not None)
+        if boond_required and not po.boond_purchase_order_id:
             try:
                 boond_po_id = await self._crm.create_purchase_order(
                     provider_id=tp.boond_provider_id,
                     positioning_id=cr.boond_positioning_id,
                     reference=po_ref,
+                    # NEEDS-CONFIRMATION: montant = TJM seul (cf. note dans
+                    # BoondCrmAdapter.create_purchase_order).
                     amount=float(cr.daily_rate),
                 )
                 po.boond_purchase_order_id = boond_po_id
-                po.mark_active()
+                boond_sync_ok = True
                 logger.info(
                     "purchase_order_created_in_boond",
                     cr_id=str(cr.id),
@@ -100,18 +107,22 @@ class CreatePurchaseOrderUseCase:
                     boond_po_id=boond_po_id,
                 )
             except Exception as exc:
+                boond_sync_ok = False
                 logger.warning(
                     "purchase_order_boond_creation_failed",
                     cr_id=str(cr.id),
                     error=str(exc),
                 )
-        else:
+
+        # Ne marquer actif qu'après une synchro Boond réussie (ou non requise).
+        if boond_sync_ok:
             po.mark_active()
 
         saved_po = await self._po_repo.save(po)
 
-        # Transition contract request to ARCHIVED
-        if cr.status != ContractRequestStatus.ARCHIVED:
+        # N'archiver le CR que si le BDC est bien actif : si la synchro Boond a
+        # échoué, laisser le CR dans son état courant pour permettre un retry.
+        if boond_sync_ok and cr.status != ContractRequestStatus.ARCHIVED:
             cr.transition_to(ContractRequestStatus.ARCHIVED)
             await self._cr_repo.save(cr)
 

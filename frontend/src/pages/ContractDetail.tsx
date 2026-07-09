@@ -66,6 +66,13 @@ function hasReachedStatus(current: ContractRequestStatus, target: ContractReques
 const ACTION_CONFIG: Partial<
   Record<ContractRequestStatus, { label: string; action: string; icon: typeof Send; variant: 'primary' | 'secondary' }>
 > = {
+  // Legacy status: same affordance as reviewing_compliance so a legacy CR isn't stuck.
+  configuring_contract: {
+    label: 'Générer le brouillon',
+    action: 'generate-draft',
+    icon: FileSignature,
+    variant: 'primary',
+  },
   reviewing_compliance: {
     label: 'Générer le brouillon',
     action: 'generate-draft',
@@ -178,7 +185,8 @@ export default function ContractDetail() {
   const { data: complianceDocs } = useQuery({
     queryKey: ['compliance-docs', cr?.third_party_id],
     queryFn: () => vigilanceApi.getThirdPartyDocuments(cr!.third_party_id!),
-    enabled: !!cr?.third_party_id && isCommercialOrAdmin,
+    // GET /vigilance/.../documents is ADV/admin only — restrict to avoid a silent 403 for commercials.
+    enabled: !!cr?.third_party_id && isAdv,
   });
 
 
@@ -232,6 +240,7 @@ export default function ContractDetail() {
       toast.success('Action effectuée avec succès.');
       queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
       queryClient.invalidateQueries({ queryKey: ['contracts', id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -264,7 +273,7 @@ export default function ContractDetail() {
   });
 
   const tempValidateMutation = useMutation({
-    mutationFn: (docId: string) => vigilanceApi.validateDocument(docId),
+    mutationFn: (docId: string) => vigilanceApi.tempValidateDocument(docId),
     onSuccess: () => {
       toast.success('Document validé temporairement.');
       setTempValidatingDocId(null);
@@ -371,7 +380,8 @@ export default function ContractDetail() {
   const { data: signatureChecklist, refetch: refetchChecklist } = useQuery({
     queryKey: ['signature-checklist', id],
     queryFn: () => contractsApi.getSignatureChecklist(id!),
-    enabled: !!id && cr?.status === 'sent_for_signature',
+    // ADV/admin-only endpoint — gate to avoid a 403 for commercials.
+    enabled: !!id && isAdv && cr?.status === 'sent_for_signature',
   });
 
   const uploadSignatureDocMutation = useMutation({
@@ -387,7 +397,8 @@ export default function ContractDetail() {
   const { data: signaturePreview } = useQuery({
     queryKey: ['signature-preview', id],
     queryFn: () => contractsApi.getSignaturePreview(id!),
-    enabled: !!id && cr?.status === 'partner_approved',
+    // ADV/admin-only endpoint — gate to avoid a 403 for commercials.
+    enabled: !!id && isAdv && cr?.status === 'partner_approved',
   });
 
   const sendForSignatureMutation = useMutation({
@@ -397,6 +408,7 @@ export default function ContractDetail() {
       setShowSignaturePreview(false);
       setExcludedCharterIds(new Set());
       queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -407,12 +419,27 @@ export default function ContractDetail() {
       toast.success('Contrat marqué comme signé.');
       queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
       queryClient.invalidateQueries({ queryKey: ['contracts', id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
 
   const configureMutation = useMutation({
     mutationFn: async () => {
+      // Defense-in-depth: re-persist the current article/annex editor state (stored
+      // in contract_config) BEFORE configure, so a config write can't drop these keys
+      // and the regenerated PDF reflects the edits.
+      const cfg = (cr?.contract_config as Record<string, unknown>) ?? {};
+      await contractsApi.saveArticleOverrides(id!, {
+        article_overrides: cfg.article_overrides as Record<string, string> | undefined,
+        annex_overrides: cfg.annex_overrides as Record<string, string> | undefined,
+        deleted_article_keys: cfg.deleted_article_keys as string[] | undefined,
+        deleted_annex_keys: cfg.deleted_annex_keys as string[] | undefined,
+        custom_articles: cfg.custom_articles as CustomArticleItem[] | undefined,
+        custom_annexes: cfg.custom_annexes as CustomAnnexItem[] | undefined,
+        article_order: cfg.article_order as string[] | undefined,
+        annex_order: cfg.annex_order as string[] | undefined,
+      });
       // Auto-save config before generating draft
       await contractsApi.configure(id!, {
         company_id: configForm.company_id || null,
@@ -430,6 +457,21 @@ export default function ContractDetail() {
       toast.success('Brouillon généré avec succès.');
       queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
       queryClient.invalidateQueries({ queryKey: ['contracts', id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  // Recovery UI: a CR stays "signed" (not "active") when the BoondManager sync failed.
+  const retryBoondSyncMutation = useMutation({
+    mutationFn: () => contractsApi.retryBoondSync(id!),
+    onSuccess: () => {
+      toast.success('Synchronisation BoondManager relancée.');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['contracts', id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -468,6 +510,7 @@ export default function ContractDetail() {
   const prePartnerStatuses = new Set([
     'reviewing_compliance',
     'compliance_blocked',
+    'configuring_contract', // Legacy status — allow a legacy CR to reach the config/draft form.
     'draft_generated',
     'partner_requested_changes',
   ]);
@@ -820,8 +863,8 @@ export default function ContractDetail() {
       )}
 
 
-      {/* Draft sent to partner — waiting banner */}
-      {cr.status === 'draft_sent_to_partner' && (
+      {/* Draft sent to partner — waiting banner (ADV/admin only: resend + portal endpoints are ADV-scoped) */}
+      {isAdv && cr.status === 'draft_sent_to_partner' && (
         <Card className="mb-6 border-sky-200 dark:border-sky-800">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">
@@ -1087,6 +1130,37 @@ export default function ContractDetail() {
         </Card>
       )}
 
+      {/* Signed but not active — BoondManager sync failed/pending: allow a retry */}
+      {isAdv && cr.status === 'signed' && (
+        <Card className="mb-6 border-amber-200 dark:border-amber-800">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                  Synchronisation BoondManager en attente
+                </h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Le contrat est signé mais n'a pas encore été synchronisé dans BoondManager.
+                  Relancez la synchronisation pour finaliser la mise en actif.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => retryBoondSyncMutation.mutate()}
+              disabled={retryBoondSyncMutation.isPending}
+              isLoading={retryBoondSyncMutation.isPending}
+              className="flex-shrink-0"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Relancer la synchronisation
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {/* Consultants section — visible after signing */}
       {isAdv && hasReachedStatus(cr.status, 'signed') && (
         <ConsultantsSection contractRequestId={cr.id} cr={cr} />
@@ -1323,8 +1397,8 @@ export default function ContractDetail() {
         </Card>
       )}
 
-      {/* Third-party company info — visible after document collection starts */}
-      {isCommercialOrAdmin && complianceDocs && hasReachedStatus(cr.status, 'collecting_documents') && (
+      {/* Third-party company info — visible after document collection starts (ADV/admin only) */}
+      {isAdv && complianceDocs && hasReachedStatus(cr.status, 'collecting_documents') && (
         <Card className="mb-6">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
             Informations société
@@ -1477,8 +1551,8 @@ export default function ContractDetail() {
         </Card>
       )}
 
-      {/* Compliance documents — visible to ADV + commercial after document collection starts */}
-      {isCommercialOrAdmin && complianceDocs && complianceDocs.documents.length > 0 && hasReachedStatus(cr.status, 'collecting_documents') && (
+      {/* Compliance documents — ADV/admin only (GET /vigilance/.../documents is ADV-scoped) */}
+      {isAdv && complianceDocs && complianceDocs.documents.length > 0 && hasReachedStatus(cr.status, 'collecting_documents') && (
         <Card className="mb-6">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
             <CheckCircle className="h-4 w-4 text-gray-400" />

@@ -497,7 +497,7 @@ async def validate_commercial(
     """Apply commercial validation to a contract request. Commercial/ADV/admin."""
     from app.infrastructure.email.sender import EmailService
 
-    user_id, _role, _email = access
+    user_id, role, email = access
     settings = get_settings()
     cr_repo = ContractRequestRepository(db)
     tp_repo = ThirdPartyRepository(db)
@@ -527,8 +527,12 @@ async def validate_commercial(
 
     # Resolve company email context for emails sent during validation
     cr_for_company = await cr_repo.get_by_id(contract_request_id)
+    if not cr_for_company:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+    if role == "commercial" and cr_for_company.commercial_email != email:
+        raise HTTPException(status_code=403, detail="Accès non autorisé.")
     company_email_from, company_name = await _resolve_company_email_ctx(
-        db, cr_for_company.company_id if cr_for_company else None
+        db, cr_for_company.company_id
     )
 
     try:
@@ -547,7 +551,8 @@ async def validate_commercial(
         cmd.company_name = company_name
         cr = await use_case.execute(cmd)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.error("validate_commercial_failed", error=str(exc), cr_id=str(contract_request_id))
+        raise HTTPException(status_code=400, detail="La validation commerciale a échoué.")
 
     audit_logger.log(
         AuditAction.COMMERCIAL_VALIDATED,
@@ -656,7 +661,7 @@ async def resend_collection_email(
         )
     except Exception as exc:
         logger.error("resend_collection_email_failed", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail="Le renvoi de l'email de collecte a échoué.")
 
     audit_logger.log(
         AuditAction.DOCUMENT_COLLECTION_INITIATED,
@@ -689,7 +694,8 @@ async def configure_contract(
     try:
         cr = await use_case.execute(contract_request_id, body.model_dump(mode="json"))
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.error("configure_contract_failed", error=str(exc), cr_id=str(contract_request_id))
+        raise HTTPException(status_code=400, detail="La configuration du contrat a échoué.")
 
     name = await _resolve_commercial_name(db, cr.commercial_email)
     return _cr_to_response(cr, commercial_name=name)
@@ -817,7 +823,12 @@ async def start_compliance_review(
     try:
         cr = await use_case.execute(contract_request_id)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.error(
+            "start_compliance_review_failed", error=str(exc), cr_id=str(contract_request_id)
+        )
+        raise HTTPException(
+            status_code=400, detail="Le démarrage de la revue de conformité a échoué."
+        )
 
     audit_logger.log(
         AuditAction.COMPLIANCE_OVERRIDDEN,
@@ -852,7 +863,8 @@ async def block_compliance(
     try:
         cr = await use_case.execute(contract_request_id, body.reason)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.error("block_compliance_failed", error=str(exc), cr_id=str(contract_request_id))
+        raise HTTPException(status_code=400, detail="Le blocage de la conformité a échoué.")
 
     audit_logger.log(
         AuditAction.COMPLIANCE_OVERRIDDEN,
@@ -1130,7 +1142,7 @@ async def generate_draft(
         contract = await use_case.execute(contract_request_id)
     except Exception as exc:
         logger.error("generate_draft_failed", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail="La génération du projet de contrat a échoué.")
 
     audit_logger.log(
         AuditAction.DRAFT_GENERATED,
@@ -1206,7 +1218,9 @@ async def send_draft_to_partner(
         )
     except Exception as exc:
         logger.error("send_draft_to_partner_failed", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(
+            status_code=400, detail="L'envoi du projet de contrat au partenaire a échoué."
+        )
 
     client_label = f" pour <strong>{cr.client_name}</strong>" if cr.client_name else ""
     await _notify_commercial(
@@ -1284,7 +1298,7 @@ async def resend_draft_email(
         )
     except Exception as exc:
         logger.error("resend_draft_email_failed", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail="Le renvoi de l'email de relecture a échoué.")
 
     name = await _resolve_commercial_name(db, cr.commercial_email)
     return _cr_to_response(cr, commercial_name=name)
@@ -1388,7 +1402,7 @@ async def send_for_signature(
         cr = await use_case.execute(contract_request_id)
     except Exception as exc:
         logger.error("send_for_signature_failed", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail="Le passage en signature a échoué.")
 
     # Delete any existing checklist and recreate with exclusions
     from sqlalchemy import delete as sa_delete
@@ -1679,7 +1693,8 @@ async def mark_as_signed(
     try:
         cr.transition_to(ContractRequestStatus.SIGNED)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.error("mark_as_signed_failed", error=str(exc), cr_id=str(contract_request_id))
+        raise HTTPException(status_code=400, detail="La validation de la signature a échoué.")
 
     saved = await cr_repo.save(cr)
     await db.commit()  # Commit SIGNED status before attempting Boond sync
@@ -2022,7 +2037,9 @@ async def push_to_crm(
         cr = await use_case.execute(contract_request_id)
     except Exception as exc:
         logger.error("push_to_crm_failed", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(
+            status_code=400, detail="L'envoi du contrat vers BoondManager a échoué."
+        )
 
     client_label = f" pour <strong>{cr.client_name}</strong>" if cr.client_name else ""
     _c_email, _c_name = await _resolve_company_email_ctx(db, cr.company_id)
@@ -2094,7 +2111,9 @@ async def retry_boond_sync(
         saved = await use_case.execute(contract_request_id)
     except Exception as exc:
         logger.error("retry_boond_sync_failed", cr_id=str(contract_request_id), error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(
+            status_code=400, detail="La synchronisation avec BoondManager a échoué."
+        )
 
     logger.info("retry_boond_sync_complete", cr_id=str(saved.id))
 
@@ -2214,7 +2233,9 @@ async def boond_convert_candidate(
         if hasattr(cause, "response"):
             detail = f"Boond HTTP {cause.response.status_code}: {cause.response.text[:2000]}"
         logger.error("boond_convert_candidate_failed", error=detail, cr_id=str(contract_request_id))
-        raise HTTPException(status_code=400, detail=f"Erreur Boond: {detail}")
+        raise HTTPException(
+            status_code=400, detail="Erreur lors de la synchronisation avec BoondManager."
+        )
 
 
 @router.post(
@@ -2342,7 +2363,9 @@ async def boond_create_contract(
         if hasattr(cause, "response"):
             detail = f"Boond HTTP {cause.response.status_code}: {cause.response.text[:2000]}"
         logger.error("boond_create_contract_failed", error=detail, cr_id=str(contract_request_id))
-        raise HTTPException(status_code=400, detail=f"Erreur Boond: {detail}")
+        raise HTTPException(
+            status_code=400, detail="Erreur lors de la synchronisation avec BoondManager."
+        )
 
 
 @router.post(
@@ -2372,7 +2395,7 @@ async def boond_create_company(
         logger.error(
             "boond_create_company_get_tp_failed", error=str(exc), cr_id=str(contract_request_id)
         )
-        raise HTTPException(status_code=500, detail=f"Erreur chargement tiers: {exc}")
+        raise HTTPException(status_code=500, detail="Erreur lors du chargement du tiers.")
     if not tp:
         raise HTTPException(status_code=404, detail="Tiers introuvable.")
 
@@ -2572,7 +2595,9 @@ async def boond_create_company(
             elif inner:
                 detail = str(inner)
         logger.error("boond_create_company_failed", error=detail, cr_id=str(contract_request_id))
-        raise HTTPException(status_code=400, detail=f"Erreur Boond: {detail}")
+        raise HTTPException(
+            status_code=400, detail="Erreur lors de la synchronisation avec BoondManager."
+        )
 
 
 @router.post(
@@ -2633,7 +2658,9 @@ async def boond_create_purchase_order(
             elif inner:
                 detail = str(inner)
         logger.error("boond_create_po_failed", error=detail, cr_id=str(contract_request_id))
-        raise HTTPException(status_code=400, detail=f"Erreur Boond: {detail}")
+        raise HTTPException(
+            status_code=400, detail="Erreur lors de la synchronisation avec BoondManager."
+        )
 
 
 @router.get(
@@ -2734,8 +2761,11 @@ async def rollback_status(
 ):
     """Rollback a contract request to its previous status.
 
-    Admin/ADV only — intended for testing purposes.
+    Admin/ADV only — intended for testing purposes. Disabled in production.
     """
+    if get_settings().is_production:
+        raise HTTPException(status_code=404, detail="Not found")
+
     cr_repo = ContractRequestRepository(db)
     cr = await cr_repo.get_by_id(contract_request_id)
     if not cr:
@@ -2744,7 +2774,8 @@ async def rollback_status(
     try:
         cr.rollback_to_previous_status()
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.error("rollback_status_failed", error=str(exc), cr_id=str(contract_request_id))
+        raise HTTPException(status_code=400, detail="Le retour au statut précédent a échoué.")
 
     saved = await cr_repo.save(cr)
 
@@ -2929,7 +2960,8 @@ async def validate_purchase_order_request(
             )
         )
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.error("validate_purchase_order_request_failed", error=str(exc), por_id=str(por_id))
+        raise HTTPException(status_code=400, detail="La validation du bon de commande a échoué.")
 
     audit_logger.log(
         AuditAction.COMMERCIAL_VALIDATED,
@@ -2992,7 +3024,8 @@ async def finalize_purchase_order_request(
     try:
         po = await use_case.execute(por_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.error("finalize_purchase_order_request_failed", error=str(exc), por_id=str(por_id))
+        raise HTTPException(status_code=400, detail="La finalisation du bon de commande a échoué.")
 
     audit_logger.log(
         AuditAction.COMMERCIAL_VALIDATED,
@@ -3052,7 +3085,8 @@ async def cancel_purchase_order_request(
     try:
         por.transition_to(PurchaseOrderRequestStatus.CANCELLED)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.error("cancel_purchase_order_request_failed", error=str(exc), por_id=str(por_id))
+        raise HTTPException(status_code=400, detail="L'annulation du bon de commande a échoué.")
 
     saved = await por_repo.save(por)
 
@@ -3077,13 +3111,20 @@ async def cancel_purchase_order_request(
 )
 async def list_consultants(
     contract_request_id: UUID,
-    _auth: ContractAccessUser,
+    auth: ContractAccessUser,
     db: AsyncSession = Depends(get_db),
 ):
     """List consultants linked to a contract for charter tracking."""
     from sqlalchemy import select
 
     from app.contract_management.infrastructure.models import ContractConsultantModel
+
+    _user_id, role, email = auth
+    cr = await ContractRequestRepository(db).get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
+    if role == "commercial" and cr.commercial_email != email:
+        raise HTTPException(status_code=403, detail="Accès non autorisé.")
 
     result = await db.execute(
         select(ContractConsultantModel)
@@ -3221,7 +3262,12 @@ async def send_consultant_charters(
             consultant_phone=consultant.phone or "",
         )
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.error(
+            "send_consultant_charters_failed",
+            error=str(exc),
+            cr_id=str(contract_request_id),
+        )
+        raise HTTPException(status_code=400, detail="L'envoi des chartes au consultant a échoué.")
 
     consultant.charter_status = "sent"
     await db.commit()

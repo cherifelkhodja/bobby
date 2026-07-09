@@ -1,4 +1,11 @@
-"""Dynamic article numbering for contract generation."""
+"""Dynamic article numbering for contract generation.
+
+# NEEDS-CONFIRMATION : ce module n'est plus utilisé par le code de production
+# (son seul appelant, ``DocxContractGenerator``, a été supprimé). Il reste
+# toutefois importé par ``tests/unit/contract_management/test_article_numbering.py``
+# (hors périmètre modifiable), donc il ne peut PAS être supprimé sans casser
+# ce test. Conservé en l'état ; suppression à confirmer après retrait du test.
+"""
 
 from typing import Any
 

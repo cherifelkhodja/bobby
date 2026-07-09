@@ -35,38 +35,13 @@ class HandleSignatureCompletedUseCase:
         self._email_service = email_service
         self._company_email_resolver = company_email_resolver
 
-    async def execute(self, procedure_id: str):
-        """Execute the use case.
-
-        Args:
-            procedure_id: YouSign procedure/signature request ID.
-
-        Returns:
-            The updated contract.
-
-        Raises:
-            ContractNotFoundError: If no contract matches the procedure ID.
-        """
-        # Find the contract by YouSign procedure ID
-        # This requires a custom query — for now iterate
-        # In production, add an index on yousign_procedure_id
-
-        # Download signed PDF
-        signed_pdf = await self._signature_service.get_signed_document(procedure_id)
-
-        # Find contract by procedure ID (through repository)
-        # For now, we pass the contract_request_id from the webhook payload
-        # This will be resolved via the webhook handler
-        logger.info(
-            "signature_completed",
-            procedure_id=procedure_id,
-            pdf_size=len(signed_pdf),
-        )
-
-        return signed_pdf
-
     async def execute_for_contract(self, contract_id: UUID):
         """Execute for a known contract ID.
+
+        Télécharge le PDF signé, l'archive sur S3 et fait passer la demande
+        de contrat en SIGNED. Idempotent : ne fait rien si la signature a déjà
+        été enregistrée (via ce webhook ou via le flux manuel mark-as-signed),
+        afin de ne pas entrer en conflit avec ce dernier.
 
         Args:
             contract_id: ID of the contract.
@@ -77,6 +52,28 @@ class HandleSignatureCompletedUseCase:
 
         if not contract.yousign_procedure_id:
             raise ValueError("Aucune procédure YouSign associée à ce contrat.")
+
+        cr = await self._cr_repo.get_by_id(contract.contract_request_id)
+
+        # Idempotence : si la signature est déjà enregistrée (contrat déjà signé
+        # ou demande déjà en SIGNED), on ne fait rien (no-op).
+        if contract.is_signed or (cr is not None and cr.status == ContractRequestStatus.SIGNED):
+            logger.info(
+                "signature_already_processed",
+                contract_id=str(contract.id),
+                cr_status=cr.status.value if cr else None,
+            )
+            return contract
+
+        # Sécurité : ne transitionne que depuis un état valide (SENT_FOR_SIGNATURE).
+        # Tout autre état (ex. brouillon, déjà ACTIVE) est ignoré sans erreur.
+        if cr is not None and not cr.status.can_transition_to(ContractRequestStatus.SIGNED):
+            logger.warning(
+                "signature_unexpected_cr_status",
+                contract_id=str(contract.id),
+                cr_status=cr.status.value,
+            )
+            return contract
 
         # Download signed PDF
         signed_pdf = await self._signature_service.get_signed_document(
@@ -95,8 +92,7 @@ class HandleSignatureCompletedUseCase:
         contract.mark_signed(s3_key_signed)
         await self._contract_repo.save(contract)
 
-        # Transition CR to SIGNED
-        cr = await self._cr_repo.get_by_id(contract.contract_request_id)
+        # Transition CR to SIGNED (cr déjà chargée plus haut)
         if cr:
             cr.transition_to(ContractRequestStatus.SIGNED)
             await self._cr_repo.save(cr)

@@ -83,6 +83,7 @@ export default function PurchaseOrderRequestDetail() {
     onSuccess: () => {
       toast.success('BDC validé et en vérification de conformité.');
       queryClient.invalidateQueries({ queryKey: ['purchase-order-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-order-requests'] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -92,6 +93,7 @@ export default function PurchaseOrderRequestDetail() {
     onSuccess: () => {
       toast.success('Bon de commande créé avec succès.');
       queryClient.invalidateQueries({ queryKey: ['purchase-order-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-order-requests'] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -101,6 +103,7 @@ export default function PurchaseOrderRequestDetail() {
     onSuccess: () => {
       toast.success('Demande de BDC annulée.');
       setShowCancelModal(false);
+      queryClient.invalidateQueries({ queryKey: ['purchase-order-requests'] });
       navigate('/contracts');
     },
     onError: (error) => toast.error(getErrorMessage(error)),

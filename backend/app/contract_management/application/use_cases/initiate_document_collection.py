@@ -148,6 +148,9 @@ class InitiateDocumentCollectionUseCase:
         # Link the third party to the CR
         if cr.third_party_id != third_party.id:
             cr.third_party_id = third_party.id
+            # NEEDS-CONFIRMATION: `datetime.utcnow()` (naïf) conservé — `updated_at`
+            # est persisté en colonne TIMESTAMP sans fuseau (asyncpg refuse un
+            # datetime tz-aware) et comparé par le CRON d'archivage.
             cr.updated_at = datetime.utcnow()
 
         # Create required document stubs (idempotent — skips already active docs)

@@ -4,7 +4,10 @@ from uuid import UUID
 
 import structlog
 
-from app.contract_management.domain.exceptions import ContractRequestNotFoundError
+from app.contract_management.domain.exceptions import (
+    ContractRequestNotFoundError,
+    InvalidContractStatusError,
+)
 from app.contract_management.domain.value_objects.contract_request_status import (
     ContractRequestStatus,
 )
@@ -56,6 +59,26 @@ class ProcessPartnerReviewUseCase:
         cr = await self._cr_repo.get_by_id(contract_request_id)
         if not cr:
             raise ContractRequestNotFoundError(str(contract_request_id))
+
+        # Garde d'idempotence : une décision de relecture ne peut être enregistrée
+        # qu'une seule fois, tant que la demande est en attente du partenaire. Tout
+        # autre état (déjà approuvée, modifications déjà demandées, annulée, signée…)
+        # signifie qu'il s'agit d'un rejeu → on refuse proprement au lieu de tenter
+        # une transition illégale (qui remonterait en 500).
+        if cr.status != ContractRequestStatus.DRAFT_SENT_TO_PARTNER:
+            logger.warning(
+                "partner_review_already_processed",
+                cr_id=str(cr.id),
+                current_status=cr.status.value,
+            )
+            raise InvalidContractStatusError(
+                cr.status.value,
+                (
+                    ContractRequestStatus.PARTNER_APPROVED.value
+                    if approved
+                    else ContractRequestStatus.PARTNER_REQUESTED_CHANGES.value
+                ),
+            )
 
         # Resolve company email context
         _from_email, _company_name = None, None

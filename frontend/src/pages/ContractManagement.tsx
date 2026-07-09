@@ -37,16 +37,22 @@ export function ContractManagement() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [cancelTarget, setCancelTarget] = useState<{ id: string; reference: string; type: MainTab } | null>(null);
   const pageSize = 20;
+  // The group tabs (Tous / En cours / Finalisés) span several statuses, and the API
+  // status_filter only accepts a single status — so group filtering, counts and
+  // pagination are done client-side over the full list, loaded in one request (capped
+  // at FETCH_LIMIT). Limitation: beyond FETCH_LIMIT rows, counts/pages are capped;
+  // a server-side group-aware filter would be needed to lift the cap.
+  const FETCH_LIMIT = 500;
 
   const isAdv = user?.role === 'adv' || user?.role === 'admin';
 
   // Contract requests query
   const { data: crData, isLoading: crLoading } = useQuery({
-    queryKey: ['contract-requests', page, statusFilter],
+    queryKey: ['contract-requests', statusFilter],
     queryFn: () =>
       contractsApi.list({
-        skip: page * pageSize,
-        limit: pageSize,
+        skip: 0,
+        limit: FETCH_LIMIT,
         ...(statusFilter ? { status_filter: statusFilter as ContractRequestStatus } : {}),
       }),
     enabled: mainTab === 'contracts',
@@ -54,11 +60,11 @@ export function ContractManagement() {
 
   // Purchase order requests query
   const { data: porData, isLoading: porLoading } = useQuery({
-    queryKey: ['purchase-order-requests', page, statusFilter],
+    queryKey: ['purchase-order-requests', statusFilter],
     queryFn: () =>
       purchaseOrderRequestsApi.list({
-        skip: page * pageSize,
-        limit: pageSize,
+        skip: 0,
+        limit: FETCH_LIMIT,
         ...(statusFilter ? { status_filter: statusFilter as PurchaseOrderRequestStatus } : {}),
       }),
     enabled: mainTab === 'bdc',
@@ -126,6 +132,8 @@ export function ContractManagement() {
       done: items.filter((cr) => CONTRACT_STATUS_CONFIG[cr.status]?.group === 'done').length,
     };
 
+    const paged = filtered.slice(page * pageSize, page * pageSize + pageSize);
+
     return (
       <>
         {renderFilterTabs(counts, CONTRACT_STATUS_CONFIG)}
@@ -136,7 +144,7 @@ export function ContractManagement() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {filtered.map((cr) => {
+            {paged.map((cr) => {
               const config = CONTRACT_STATUS_CONFIG[cr.status];
               const consultantName = [cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ');
               const thirdPartyLabel = cr.third_party_type ? (THIRD_PARTY_TYPE_LABELS[cr.third_party_type] ?? cr.third_party_type) : null;
@@ -222,7 +230,7 @@ export function ContractManagement() {
             })}
           </div>
         )}
-        {renderPagination(crData?.total ?? 0)}
+        {renderPagination(filtered.length)}
       </>
     );
   };
@@ -243,6 +251,8 @@ export function ContractManagement() {
       done: items.filter((p) => POR_STATUS_CONFIG[p.status]?.group === 'done').length,
     };
 
+    const paged = filtered.slice(page * pageSize, page * pageSize + pageSize);
+
     return (
       <>
         {renderFilterTabs(counts, POR_STATUS_CONFIG)}
@@ -253,7 +263,7 @@ export function ContractManagement() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {filtered.map((por) => {
+            {paged.map((por) => {
               const config = POR_STATUS_CONFIG[por.status];
               return (
                 <Card key={por.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/contracts/po/${por.id}`)}>
@@ -295,7 +305,7 @@ export function ContractManagement() {
             })}
           </div>
         )}
-        {renderPagination(porData?.total ?? 0)}
+        {renderPagination(filtered.length)}
       </>
     );
   };
@@ -311,7 +321,7 @@ export function ContractManagement() {
         ]).map(({ key, label }) => (
           <button
             key={key}
-            onClick={() => { setFilterTab(key); setStatusFilter(''); }}
+            onClick={() => { setFilterTab(key); setStatusFilter(''); setPage(0); }}
             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
               filterTab === key
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'

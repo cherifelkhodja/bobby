@@ -219,8 +219,9 @@ class ValidateCommercialUseCase:
             third_party_id=str(previous_cr.third_party_id),
         )
 
-        # Check if there are expired/rejected documents that need re-requesting
+        # Check if there are expired/rejected/missing documents that need re-requesting
         has_missing_docs = False
+        docs: list = []
         if self._doc_repo:
             from datetime import datetime
 
@@ -235,29 +236,41 @@ class ValidateCommercialUseCase:
                 ):
                     has_missing_docs = True
                     break
+                # NEEDS-CONFIRMATION: `datetime.utcnow()` (naïf) conservé — comparé à
+                # `doc.expires_at`, supposé naïf lui aussi. Passer à `datetime.now(UTC)`
+                # risquerait une comparaison naïf/aware.
                 if doc.expires_at and doc.expires_at <= datetime.utcnow():
                     has_missing_docs = True
                     break
 
-        if has_missing_docs and self._generate_magic_link_uc:
-            # Send magic link to collect missing/expired documents
-            await self._generate_magic_link_uc.execute(
-                GenerateMagicLinkCommand(
-                    third_party_id=cr.third_party_id,
-                    purpose=MagicLinkPurpose.DOCUMENT_UPLOAD,
-                    email=command.contact_email,
-                    contract_request_id=cr.id,
-                    from_email=command.from_email,
-                    company_name=command.company_name,
+        # Aucun document rattaché au tiers (liste vide, ou repo indisponible) : la
+        # vigilance n'a jamais été satisfaite. Il faut repasser par la collecte —
+        # une liste vide ne doit JAMAIS auto-valider la conformité vers
+        # REVIEWING_COMPLIANCE (cela sauterait la vigilance).
+        if not docs:
+            has_missing_docs = True
+
+        if has_missing_docs:
+            # (Re)collecte nécessaire : envoi du magic link si disponible, puis
+            # passage en COLLECTING_DOCUMENTS (jamais d'auto-validation conformité).
+            if self._generate_magic_link_uc:
+                await self._generate_magic_link_uc.execute(
+                    GenerateMagicLinkCommand(
+                        third_party_id=cr.third_party_id,
+                        purpose=MagicLinkPurpose.DOCUMENT_UPLOAD,
+                        email=command.contact_email,
+                        contract_request_id=cr.id,
+                        from_email=command.from_email,
+                        company_name=command.company_name,
+                    )
                 )
-            )
             cr.transition_to(ContractRequestStatus.COLLECTING_DOCUMENTS)
             logger.info(
-                "recontractualization_collecting_expired_docs",
+                "recontractualization_collecting_documents",
                 cr_id=str(cr.id),
             )
         else:
-            # All documents still valid → skip to reviewing compliance
+            # All existing documents still valid → skip to reviewing compliance
             cr.transition_to(ContractRequestStatus.COLLECTING_DOCUMENTS)
             cr.transition_to(ContractRequestStatus.REVIEWING_COMPLIANCE)
             logger.info(

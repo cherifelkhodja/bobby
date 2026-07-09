@@ -65,10 +65,39 @@ class ContractRequest:
     company_id: UUID | None = None
     commercial_validated_at: datetime | None = None
     compliance_override: bool = False
+    # Double usage assumé (aucune colonne dédiée en base) : ce champ contient
+    # SOIT le motif de blocage conformité (écrit par `block_compliance`), SOIT
+    # la justification d'un passage en force (écrit par `override_compliance`).
+    # Le booléen `compliance_override` ci-dessus lève l'ambiguïté :
+    #   - True  -> `compliance_override_reason` = justification de l'override
+    #   - False -> `compliance_override_reason` = motif de blocage (COMPLIANCE_BLOCKED)
     compliance_override_reason: str | None = None
     status_history: list[dict[str, Any]] = field(default_factory=list)
+    # NEEDS-CONFIRMATION: `datetime.utcnow()` est déprécié mais conservé
+    # volontairement. Les colonnes DB correspondantes sont de type
+    # TIMESTAMP WITHOUT TIME ZONE (naïf) ; asyncpg refuse un datetime tz-aware
+    # sur ces colonnes. Migrer vers `datetime.now(UTC)` imposerait de basculer
+    # d'abord ces colonnes en `timezone=True` (changement de schéma, hors scope).
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+
+    def __post_init__(self) -> None:
+        """Amorce l'historique avec le statut initial.
+
+        Garantit que `status_history` n'est jamais vide : la timeline dispose
+        d'un point de départ et `rollback_to_previous_status` retrouve le
+        statut précédent dès la première transition. N'ajoute rien si
+        l'historique est déjà renseigné (entité rechargée depuis la base),
+        afin de ne pas dupliquer d'entrées.
+        """
+        if not self.status_history:
+            self.status_history.append(
+                {
+                    "status": self.status.value,
+                    "entered_at": self.created_at.isoformat(),
+                    "initial": True,
+                }
+            )
 
     @property
     def display_reference(self) -> str:
@@ -129,6 +158,11 @@ class ContractRequest:
 
         Args:
             reason: Optional explanation of what is blocking compliance.
+
+        Note:
+            `reason` est stocké dans le champ partagé `compliance_override_reason`.
+            Comme `compliance_override` reste False, la lecture sait qu'il s'agit
+            d'un motif de blocage et non d'une justification d'override.
         """
         if reason:
             self.compliance_override_reason = reason
@@ -151,6 +185,11 @@ class ContractRequest:
 
         Args:
             reason: Justification for the override.
+
+        Note:
+            Positionne `compliance_override=True` puis stocke `reason` dans le
+            champ partagé `compliance_override_reason` (ici : justification de
+            l'override ; cf. `block_compliance` pour l'usage « motif de blocage »).
         """
         self.compliance_override = True
         self.compliance_override_reason = reason
@@ -159,14 +198,33 @@ class ContractRequest:
     def rollback_to_previous_status(self) -> None:
         """Rollback to the previous status in history (admin/testing only).
 
+        Non destructif : plutôt que de supprimer l'entrée courante, on recherche
+        le dernier statut distinct dans l'historique et on ajoute une nouvelle
+        entrée traçant le rollback (clé ``rollback``). La timeline conserve ainsi
+        l'intégralité des transitions à des fins d'audit, et la dernière entrée
+        reflète toujours le statut courant.
+
         Raises:
             InvalidContractStatusError: If there is no previous status.
         """
-        if len(self.status_history) < 2:
+        previous_status: ContractRequestStatus | None = None
+        for entry in reversed(self.status_history):
+            entry_status = entry.get("status")
+            if entry_status and entry_status != self.status.value:
+                previous_status = ContractRequestStatus(entry_status)
+                break
+
+        if previous_status is None:
             raise InvalidContractStatusError(self.status.value, "no previous status in history")
-        # Remove current status entry
-        self.status_history.pop()
-        # Restore the previous status
-        previous = self.status_history[-1]
-        self.status = ContractRequestStatus(previous["status"])
-        self.updated_at = datetime.utcnow()
+
+        now = datetime.utcnow()
+        self.status_history.append(
+            {
+                "status": previous_status.value,
+                "entered_at": now.isoformat(),
+                "rollback": True,
+                "rolled_back_from": self.status.value,
+            }
+        )
+        self.status = previous_status
+        self.updated_at = now

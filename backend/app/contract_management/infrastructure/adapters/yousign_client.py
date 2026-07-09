@@ -31,6 +31,7 @@ class YouSignClient:
         signer_name: str,
         signer_email: str,
         signer_phone: str | None = None,
+        signer_country_code: str = "+33",
     ) -> str:
         """Create a full signature procedure.
 
@@ -40,6 +41,9 @@ class YouSignClient:
             signer_name: Name of the signer.
             signer_email: Email of the signer.
             signer_phone: Phone of the signer.
+            signer_country_code: Indicatif téléphonique du signataire
+                (par défaut "+33" / France ; à dériver du pays du signataire
+                lorsque l'information est disponible côté appelant).
 
         Returns:
             Signature request ID.
@@ -78,10 +82,17 @@ class YouSignClient:
             doc_id = doc_data["id"]
 
             # Step 3: Add signer
+            # YouSign exige un first_name ET un last_name non vides. Si le nom
+            # ne contient pas d'espace, on réutilise le nom complet pour les deux
+            # champs plutôt que de laisser last_name vide (ce qui ferait échouer
+            # la validation de l'API).
+            name_parts = signer_name.strip().split(" ", 1)
+            signer_first_name = name_parts[0]
+            signer_last_name = name_parts[1] if len(name_parts) > 1 else name_parts[0]
             signer_payload = {
                 "info": {
-                    "first_name": signer_name.split(" ")[0] if " " in signer_name else signer_name,
-                    "last_name": signer_name.split(" ", 1)[1] if " " in signer_name else "",
+                    "first_name": signer_first_name,
+                    "last_name": signer_last_name,
                     "email": signer_email,
                     "locale": "fr",
                 },
@@ -100,21 +111,24 @@ class YouSignClient:
             }
             if signer_phone:
                 signer_payload["info"]["phone_number"] = {
-                    "country_code": "+33",
+                    # Indicatif désormais paramétrable (défaut FR "+33").
+                    "country_code": signer_country_code,
                     "number": signer_phone,
                 }
 
-            await client.post(
+            signer_response = await client.post(
                 f"{self._base_url}/signature_requests/{sr_id}/signers",
                 headers=self._headers(),
                 json=signer_payload,
             )
+            signer_response.raise_for_status()
 
             # Step 4: Activate the procedure
-            await client.post(
+            activate_response = await client.post(
                 f"{self._base_url}/signature_requests/{sr_id}/activate",
                 headers=self._headers(),
             )
+            activate_response.raise_for_status()
 
             logger.info(
                 "yousign_procedure_created",

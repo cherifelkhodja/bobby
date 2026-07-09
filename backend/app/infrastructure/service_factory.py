@@ -528,12 +528,17 @@ class ServiceFactory:
     # =========================================================================
 
     def create_generate_draft_use_case(self):
-        """Create GenerateDraftUseCase."""
+        """Create GenerateDraftUseCase.
+
+        Utilise le générateur HTML → PDF (``HtmlPdfContractGenerator``), qui a
+        remplacé l'ancien ``DocxContractGenerator`` (supprimé). C'est le même
+        générateur que celui câblé dans la route de production.
+        """
         from app.contract_management.application.use_cases.generate_draft import (
             GenerateDraftUseCase,
         )
-        from app.contract_management.infrastructure.adapters.docx_contract_generator import (
-            DocxContractGenerator,
+        from app.contract_management.infrastructure.adapters.html_pdf_contract_generator import (
+            HtmlPdfContractGenerator,
         )
         from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
             AnnexTemplateRepository,
@@ -546,11 +551,12 @@ class ServiceFactory:
             contract_request_repository=self.contract_request_repository,
             contract_repository=self.contract_repository,
             third_party_repository=self.third_party_repository,
-            contract_generator=DocxContractGenerator(),
+            contract_generator=HtmlPdfContractGenerator(),
             article_template_repository=ArticleTemplateRepository(self._db),
             annex_template_repository=AnnexTemplateRepository(self._db),
             s3_service=self.s3_service,
             settings=self._settings,
+            db=self._db,
         )
 
     def create_send_draft_to_partner_use_case(self):
@@ -566,18 +572,20 @@ class ServiceFactory:
         )
 
     def create_send_for_signature_use_case(self):
-        """Create SendForSignatureUseCase."""
+        """Create SendForSignatureUseCase.
+
+        Ce use case marque simplement la demande comme envoyée pour signature
+        (flux manuel) : il n'attend que ``contract_request_repository``. Les
+        anciens kwargs (contract_repository, third_party_repository, s3_service,
+        signature_service, settings) provoquaient un ``TypeError`` et ont été
+        retirés.
+        """
         from app.contract_management.application.use_cases.send_for_signature import (
             SendForSignatureUseCase,
         )
 
         return SendForSignatureUseCase(
             contract_request_repository=self.contract_request_repository,
-            contract_repository=self.contract_repository,
-            third_party_repository=self.third_party_repository,
-            s3_service=self.s3_service,
-            signature_service=self.yousign_client,
-            settings=self._settings,
         )
 
     def create_handle_signature_completed_use_case(self):
