@@ -124,6 +124,19 @@ class CreatePurchaseOrderRequestFromPositioningUseCase:
                         if fc:
                             framework_contract_id = fc.id
                             third_party_id = tp.id
+                        else:
+                            logger.info(
+                                "bdc_no_active_framework_for_supplier",
+                                positioning_id=positioning_id,
+                                third_party_id=str(tp.id),
+                                company_id=str(company_id) if company_id else None,
+                            )
+                    else:
+                        logger.info(
+                            "bdc_no_third_party_for_provider",
+                            positioning_id=positioning_id,
+                            provider_company_id=provider_company_id,
+                        )
 
             locked = framework_contract_id is None
             status = (

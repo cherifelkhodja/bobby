@@ -405,24 +405,32 @@ class BoondCrmAdapter:
         """Resolve the Boond provider company ID a resource is attached to.
 
         A sub-contracted consultant (resource) is linked to its employer via the
-        ``providerCompany`` relationship (set through
-        ``update_resource_administrative``). We read it to know whether the
-        consultant belongs to a supplier that already has a framework contract.
+        ``providerCompany`` relationship, written through
+        ``PUT /resources/{id}/administrative`` (see update_resource_administrative).
+        We read it to know whether the consultant belongs to a supplier that
+        already has a framework contract.
 
-        Tries the base resource endpoint first, then the administrative sub-view.
+        Reads the administrative sub-view first (authoritative for providerCompany),
+        then falls back to the base resource endpoint.
 
         Returns:
             The Boond company ID of the provider, or None if not attached / error.
         """
         for endpoint in (
-            f"/resources/{resource_id}",
             f"/resources/{resource_id}/administrative",
+            f"/resources/{resource_id}",
         ):
             try:
                 response = await self._boond._make_request("GET", endpoint)
                 relationships = response.get("data", {}).get("relationships", {})
                 provider_id = self._extract_relationship_id(relationships, "providerCompany")
                 if provider_id:
+                    logger.info(
+                        "boond_resource_provider_resolved",
+                        resource_id=resource_id,
+                        endpoint=endpoint,
+                        provider_company_id=provider_id,
+                    )
                     return provider_id
             except Exception as exc:
                 logger.warning(
@@ -431,6 +439,10 @@ class BoondCrmAdapter:
                     endpoint=endpoint,
                     error=str(exc),
                 )
+        logger.info(
+            "boond_resource_provider_not_found",
+            resource_id=resource_id,
+        )
         return None
 
     async def resolve_resource_id(self, candidate_id: int) -> int | None:
