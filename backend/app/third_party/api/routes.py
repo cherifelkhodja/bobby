@@ -882,127 +882,36 @@ async def check_siren_for_framework_contract(
         fc = await fc_repo.get_by_third_party_siren(siren)
 
         if fc and fc.is_usable and result.contract_request_id:
-            from app.contract_management.domain.entities.purchase_order_request import (
-                PurchaseOrderRequest,
-            )
-            from app.contract_management.domain.value_objects.contract_request_status import (
-                ContractRequestStatus,
-            )
-            from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-                ContractRequestRepository,
-                PurchaseOrderRequestRepository,
-            )
-
-            cr_repo = ContractRequestRepository(db)
-            cr = await cr_repo.get_by_id(result.contract_request_id)
-
+            # Un contrat cadre actif existe déjà pour ce fournisseur. Depuis la
+            # refonte BDC, la création du bon de commande n'est PLUS pilotée ici :
+            # elle est déclenchée par le webhook positionnement (state 7), qui crée
+            # le BDC directement (verrouillé tant que le consultant n'est pas une
+            # ressource rattachée au contrat cadre, déverrouillé à la signature).
+            # On se contente donc d'informer le portail, sans créer de POR
+            # (éviterait un doublon avec le BDC issu du webhook).
             fc_payload = {
                 "id": str(fc.id),
                 "reference": fc.reference,
                 "signed_at": fc.signed_at.isoformat() if fc.signed_at else None,
             }
 
-            if cr:
-                # Ne pas tenter d'annuler une demande déjà avancée (SIGNED/ACTIVE/
-                # ARCHIVED/…) : la transition serait illégale → 500. On informe
-                # simplement le tiers.
-                if not cr.status.can_transition_to(ContractRequestStatus.CANCELLED):
-                    logger.info(
-                        "siren_check_cr_not_cancellable",
-                        cr_id=str(cr.id),
-                        status=cr.status.value,
-                    )
-                    return {
-                        "has_framework_contract": True,
-                        "framework_contract": fc_payload,
-                        "purchase_order_request_id": None,
-                        "message": (
-                            f"Un contrat cadre actif a été détecté (réf. {fc.reference}), mais "
-                            "votre demande est déjà à un stade trop avancé pour être convertie "
-                            "automatiquement en bon de commande. Notre équipe va prendre le relais."
-                        ),
-                    }
+            logger.info(
+                "siren_check_framework_contract_found",
+                siren=siren,
+                contract_request_id=str(result.contract_request_id),
+                fc_reference=fc.reference,
+            )
 
-                # Le bon de commande exige un identifiant de positionnement Boond
-                # (colonne NOT NULL). Sur certains déclencheurs (candidat/ressource)
-                # il peut être absent → on évite l'IntegrityError et on informe.
-                if cr.boond_positioning_id is None:
-                    logger.warning(
-                        "siren_check_missing_positioning_id",
-                        cr_id=str(cr.id),
-                    )
-                    return {
-                        "has_framework_contract": True,
-                        "framework_contract": fc_payload,
-                        "purchase_order_request_id": None,
-                        "message": (
-                            f"Un contrat cadre actif a été détecté (réf. {fc.reference}). La "
-                            "création automatique du bon de commande n'a pas pu aboutir "
-                            "(référence de positionnement manquante). Notre équipe va prendre "
-                            "le relais."
-                        ),
-                    }
-
-                # Cancel the ContractRequest (transition validée ci-dessus)
-                cr.transition_to(ContractRequestStatus.CANCELLED)
-                await cr_repo.save(cr)
-
-                # Create a PurchaseOrderRequest
-                por_repo = PurchaseOrderRequestRepository(db)
-                por_ref = await por_repo.get_next_reference()
-                por = PurchaseOrderRequest(
-                    framework_contract_id=fc.id,
-                    boond_positioning_id=cr.boond_positioning_id,
-                    boond_candidate_id=cr.boond_candidate_id,
-                    boond_consultant_type=cr.boond_consultant_type,
-                    boond_need_id=cr.boond_need_id,
-                    third_party_id=fc.third_party_id,
-                    reference=por_ref,
-                    commercial_email=cr.commercial_email,
-                    daily_rate=cr.daily_rate,
-                    start_date=cr.start_date,
-                    end_date=cr.end_date,
-                    client_name=cr.client_name,
-                    mission_title=cr.mission_title,
-                    consultant_civility=cr.consultant_civility,
-                    consultant_first_name=cr.consultant_first_name,
-                    consultant_last_name=cr.consultant_last_name,
-                    consultant_email=cr.consultant_email,
-                    consultant_phone=cr.consultant_phone,
-                    original_contract_request_id=cr.id,
-                )
-                saved_por = await por_repo.save(por)
-
-                logger.info(
-                    "siren_check_framework_contract_found",
-                    siren=siren,
-                    cr_id=str(cr.id),
-                    por_id=str(saved_por.id),
-                    fc_reference=fc.reference,
-                )
-
-                audit_logger.log(
-                    AuditAction.PORTAL_ACCESSED,
-                    AuditResource.MAGIC_LINK,
-                    resource_id=str(result.magic_link.id),
-                    details={
-                        "action": "siren_check_redirected_to_bdc",
-                        "siren": siren,
-                        "framework_contract_id": str(fc.id),
-                        "purchase_order_request_id": str(saved_por.id),
-                    },
-                )
-
-                return {
-                    "has_framework_contract": True,
-                    "framework_contract": fc_payload,
-                    "purchase_order_request_id": str(saved_por.id),
-                    "message": (
-                        f"Un contrat cadre actif a été détecté (réf. {fc.reference}). "
-                        "Un bon de commande a été créé automatiquement. "
-                        "Vous n'avez pas besoin de remplir les informations de contact."
-                    ),
-                }
+            return {
+                "has_framework_contract": True,
+                "framework_contract": fc_payload,
+                "purchase_order_request_id": None,
+                "message": (
+                    f"Un contrat cadre actif a été détecté (réf. {fc.reference}). "
+                    "Le bon de commande de la prestation est géré automatiquement ; "
+                    "vous n'avez pas de documents à fournir ici."
+                ),
+            }
 
         return {
             "has_framework_contract": False,

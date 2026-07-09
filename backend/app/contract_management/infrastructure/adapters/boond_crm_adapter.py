@@ -401,6 +401,38 @@ class BoondCrmAdapter:
         )
         return purchase_order_id
 
+    async def get_resource_provider_company_id(self, resource_id: int) -> int | None:
+        """Resolve the Boond provider company ID a resource is attached to.
+
+        A sub-contracted consultant (resource) is linked to its employer via the
+        ``providerCompany`` relationship (set through
+        ``update_resource_administrative``). We read it to know whether the
+        consultant belongs to a supplier that already has a framework contract.
+
+        Tries the base resource endpoint first, then the administrative sub-view.
+
+        Returns:
+            The Boond company ID of the provider, or None if not attached / error.
+        """
+        for endpoint in (
+            f"/resources/{resource_id}",
+            f"/resources/{resource_id}/administrative",
+        ):
+            try:
+                response = await self._boond._make_request("GET", endpoint)
+                relationships = response.get("data", {}).get("relationships", {})
+                provider_id = self._extract_relationship_id(relationships, "providerCompany")
+                if provider_id:
+                    return provider_id
+            except Exception as exc:
+                logger.warning(
+                    "boond_get_resource_provider_failed",
+                    resource_id=resource_id,
+                    endpoint=endpoint,
+                    error=str(exc),
+                )
+        return None
+
     async def resolve_resource_id(self, candidate_id: int) -> int | None:
         """Resolve the Boond resource ID from a candidate ID.
 

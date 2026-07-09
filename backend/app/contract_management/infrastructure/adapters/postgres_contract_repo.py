@@ -802,6 +802,26 @@ class PurchaseOrderRequestRepository:
         model = result.scalars().first()
         return self._to_entity(model) if model else None
 
+    async def list_locked_by_candidate_id(
+        self, boond_candidate_id: int
+    ) -> list[PurchaseOrderRequest]:
+        """List BDC locked on the framework contract for a given Boond candidate.
+
+        Used to unlock pending BDCs once the supplier's framework contract is
+        signed (the candidate is the common key between the positioning-created
+        BDC and the framework contract flow).
+        """
+        result = await self.session.execute(
+            select(PurchaseOrderRequestModel)
+            .where(
+                PurchaseOrderRequestModel.boond_candidate_id == boond_candidate_id,
+                PurchaseOrderRequestModel.status
+                == PurchaseOrderRequestStatus.PENDING_FRAMEWORK_CONTRACT.value,
+            )
+            .order_by(PurchaseOrderRequestModel.created_at.desc())
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
     async def list_all(
         self,
         skip: int = 0,

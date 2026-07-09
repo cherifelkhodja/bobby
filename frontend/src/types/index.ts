@@ -857,6 +857,7 @@ export interface PurchaseOrder {
 
 // Purchase order requests (BDC workflow)
 export type PurchaseOrderRequestStatus =
+  | 'pending_framework_contract'
   | 'pending_validation'
   | 'validated'
   | 'checking_compliance'
@@ -866,6 +867,7 @@ export type PurchaseOrderRequestStatus =
   | 'cancelled';
 
 export const POR_STATUS_CONFIG: Record<PurchaseOrderRequestStatus, { label: string; color: string; group: 'active' | 'done' | 'blocked' }> = {
+  pending_framework_contract: { label: 'En attente contrat cadre', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300', group: 'blocked' },
   pending_validation: { label: 'Saisie commerciale', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300', group: 'active' },
   validated: { label: 'Validé', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300', group: 'active' },
   checking_compliance: { label: 'Vérification conformité', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300', group: 'active' },
@@ -877,7 +879,7 @@ export const POR_STATUS_CONFIG: Record<PurchaseOrderRequestStatus, { label: stri
 
 export interface PurchaseOrderRequestItem {
   id: string;
-  framework_contract_id: string;
+  framework_contract_id: string | null;
   framework_contract_reference: string | null;
   reference: string;
   boond_positioning_id: number;

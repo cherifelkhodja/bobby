@@ -195,6 +195,20 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-07-09 (refonte flux BDC — webhook positionnement crée le BDC)
+
+**Changement de flux majeur.** Le webhook `positioning-update` (état 7) ne crée plus une `ContractRequest` (contrat cadre) mais directement un **BDC** (`PurchaseOrderRequest`). Le contrat cadre est désormais déclenché **exclusivement** par `candidate-state-update` (candidat état 11).
+
+- **Nouveau statut BDC `PENDING_FRAMEWORK_CONTRACT`** (`purchase_order_request_status.py`) : état initial **verrouillé** (non éditable) → transition vers `PENDING_VALIDATION` (éditable). Ajout de `is_editable` sur le statut et l'entité.
+- **`framework_contract_id` rendu nullable** sur `PurchaseOrderRequest` (entité + `cm_purchase_order_requests`, **migration 075**) : un BDC verrouillé n'est rattaché à aucun contrat cadre tant que celui-ci n'est pas signé.
+- **Nouveau use case `CreatePurchaseOrderRequestFromPositioningUseCase`** : parse le positionnement, détecte si le consultant est une **ressource** (`get_positioning.consultant_type`) rattachée à un fournisseur ayant un **contrat cadre actif** (`resource → providerCompany → ThirdParty.boond_provider_id → FrameworkContract`). Si oui → BDC **éditable** (`PENDING_VALIDATION`) + email commercial ; sinon → BDC **verrouillé** (`PENDING_FRAMEWORK_CONTRACT`, pas d'email). Idempotent sur le positionnement.
+- **Déverrouillage à la signature du contrat cadre** (`sync_to_boond_after_signing.py`) : quand le `FrameworkContract` devient actif, les BDC verrouillés du consultant (matchés par `boond_candidate_id`) sont rattachés + passés en `PENDING_VALIDATION` (`PurchaseOrderRequest.unlock()`).
+- **Briques ajoutées** : `BoondCrmAdapter.get_resource_provider_company_id`, `ThirdPartyRepository.get_by_boond_provider_id`, `PurchaseOrderRequestRepository.list_locked_by_candidate_id`.
+- **Portail SIRET** (`third_party/api/routes.py`) : la création de BDC à l'étape SIRET (redondante) est supprimée — le portail informe seulement de l'existence du contrat cadre (le BDC vient du webhook).
+- **Frontend** : bandeau « En attente du contrat cadre » + formulaire d'édition masqué tant que verrouillé (`PurchaseOrderRequestDetail.tsx`) ; statut ajouté à `POR_STATUS_CONFIG` et `framework_contract_id` typé nullable.
+- **Conformité** : pas de blocage sur la conformité au stade BDC pour l'instant (décision produit).
+- **Tests** : `test_create_purchase_order_request_from_positioning.py` (filtrage état 7, création éditable/verrouillée, idempotence) + `test_purchase_order_request_unlock.py`. 546 tests unitaires verts.
+
 ### 2026-07-09 (améliorations module contrats de sous-traitance — emails, conformité, notifications)
 
 - **Emails depuis le domaine b0bby.fr** (`sender.py`, `config.py`) : l'envoi se fait désormais **toujours** depuis l'adresse du domaine b0bby.fr (`SMTP_FROM`, défaut passé de `noreply@geminiconsulting.fr` à `noreply@b0bby.fr`). Le `email_from` de la société émettrice n'est **plus utilisé comme From** (domaine non validé pour l'envoi) : il part en **Reply-To**, et le nom de la société devient le **nom d'affichage** de l'expéditeur (`Société <noreply@b0bby.fr>`). Support Reply-To ajouté aux deux transports (Resend + SMTP). Garde ajoutée : destinataire vide → envoi sauté avec warning (plus d'erreur SMTP silencieuse).

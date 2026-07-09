@@ -240,7 +240,7 @@ class PurchaseOrderRequestResponse(BaseModel):
     """Purchase order request response."""
 
     id: UUID
-    framework_contract_id: UUID
+    framework_contract_id: UUID | None = None
     framework_contract_reference: str | None = None
     reference: str
     boond_positioning_id: int

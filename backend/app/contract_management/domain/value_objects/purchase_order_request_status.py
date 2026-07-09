@@ -10,6 +10,10 @@ class PurchaseOrderRequestStatus(str, Enum):
     already exists for the supplier.
     """
 
+    # Verrouillé : le BDC existe (positionnement gagné) mais n'est pas encore
+    # éditable car le consultant n'est pas une ressource rattachée à un contrat
+    # cadre actif. Déverrouillé (→ PENDING_VALIDATION) à la signature du cadre.
+    PENDING_FRAMEWORK_CONTRACT = "pending_framework_contract"
     PENDING_VALIDATION = "pending_validation"
     VALIDATED = "validated"
     CHECKING_COMPLIANCE = "checking_compliance"
@@ -22,6 +26,12 @@ class PurchaseOrderRequestStatus(str, Enum):
     def allowed_transitions(self) -> frozenset["PurchaseOrderRequestStatus"]:
         """Return valid transitions from this status."""
         t = {
+            PurchaseOrderRequestStatus.PENDING_FRAMEWORK_CONTRACT: frozenset(
+                {
+                    PurchaseOrderRequestStatus.PENDING_VALIDATION,
+                    PurchaseOrderRequestStatus.CANCELLED,
+                }
+            ),
             PurchaseOrderRequestStatus.PENDING_VALIDATION: frozenset(
                 {
                     PurchaseOrderRequestStatus.VALIDATED,
@@ -62,9 +72,23 @@ class PurchaseOrderRequestStatus(str, Enum):
         return target in self.allowed_transitions
 
     @property
+    def is_editable(self) -> bool:
+        """Whether the BDC can be edited/validated by the commercial.
+
+        A BDC locked on the framework contract (or already terminal) is not
+        editable.
+        """
+        return self not in (
+            PurchaseOrderRequestStatus.PENDING_FRAMEWORK_CONTRACT,
+            PurchaseOrderRequestStatus.ARCHIVED,
+            PurchaseOrderRequestStatus.CANCELLED,
+        )
+
+    @property
     def display_name(self) -> str:
         """Return human-readable status label."""
         labels = {
+            "pending_framework_contract": "En attente contrat cadre",
             "pending_validation": "En attente validation",
             "validated": "Validé",
             "checking_compliance": "Vérification conformité",

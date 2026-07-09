@@ -20,10 +20,13 @@ class PurchaseOrderRequest:
     Used when a supplier already has an active framework contract (contrat cadre).
     """
 
-    framework_contract_id: UUID
     boond_positioning_id: int
     commercial_email: str
-    reference: str  # PORBDC-YYYY-NNNN
+    reference: str  # {CODE}-PO-NNN
+    # Nullable : un BDC verrouillé (consultant encore candidat) n'est rattaché à
+    # aucun contrat cadre tant que celui-ci n'est pas signé. Renseigné au
+    # déverrouillage via `unlock()`.
+    framework_contract_id: UUID | None = None
     id: UUID = field(default_factory=uuid4)
     boond_candidate_id: int | None = None
     boond_consultant_type: str | None = None
@@ -61,6 +64,23 @@ class PurchaseOrderRequest:
         self.status_history.append({"status": target.value, "entered_at": now.isoformat()})
         self.status = target
         self.updated_at = now
+
+    @property
+    def is_editable(self) -> bool:
+        """Whether the BDC can be edited/validated (not locked, not terminal)."""
+        return self.status.is_editable
+
+    def unlock(self, *, framework_contract_id: UUID, third_party_id: UUID) -> None:
+        """Unlock a BDC once its framework contract is signed.
+
+        Links the BDC to the framework contract + supplier and transitions
+        PENDING_FRAMEWORK_CONTRACT → PENDING_VALIDATION so the commercial can
+        edit it. No-op guard is the responsibility of the caller (only call on
+        a locked BDC).
+        """
+        self.framework_contract_id = framework_contract_id
+        self.third_party_id = third_party_id
+        self.transition_to(PurchaseOrderRequestStatus.PENDING_VALIDATION)
 
     def validate(
         self,

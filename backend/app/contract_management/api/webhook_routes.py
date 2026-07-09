@@ -11,9 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.contract_management.api.schemas import WebhookResponse
-from app.contract_management.application.use_cases.create_contract_request import (
-    CreateContractRequestUseCase,
-)
 from app.contract_management.domain.exceptions import WebhookDuplicateError
 from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
     ContractRequestRepository,
@@ -119,24 +116,39 @@ async def handle_boond_positioning_webhook(
 
     email_service = EmailService(settings)
 
+    from app.contract_management.application.use_cases.create_purchase_order_request_from_positioning import (  # noqa: E501
+        CreatePurchaseOrderRequestFromPositioningUseCase,
+    )
     from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
         BoondCrmAdapter,
     )
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        FrameworkContractRepository,
+        PurchaseOrderRequestRepository,
+    )
     from app.infrastructure.boond.client import BoondClient
     from app.infrastructure.database.repositories.user_repository import UserRepository
+    from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
+        ThirdPartyRepository,
+    )
 
     boond_client = BoondClient(settings)
     crm_service = BoondCrmAdapter(boond_client)
     user_repo = UserRepository(db)
 
-    use_case = CreateContractRequestUseCase(
+    # Le webhook positionnement crée désormais un BDC (verrouillé tant que le
+    # consultant n'est pas une ressource rattachée à un contrat cadre actif).
+    # Le contrat cadre est déclenché uniquement par candidate-state-update.
+    use_case = CreatePurchaseOrderRequestFromPositioningUseCase(
+        purchase_order_request_repository=PurchaseOrderRequestRepository(db),
         contract_request_repository=cr_repo,
         webhook_event_repository=webhook_repo,
+        third_party_repository=ThirdPartyRepository(db),
+        framework_contract_repository=FrameworkContractRepository(db),
         crm_service=crm_service,
         email_service=email_service,
         user_repository=user_repo,
         frontend_url=settings.frontend_url,
-        company_repository=cr_repo,
         company_email_resolver=_make_company_email_resolver(db),
     )
 
@@ -146,16 +158,15 @@ async def handle_boond_positioning_webhook(
             # Explicit commit to ensure data is persisted
             await db.commit()
             logger.info(
-                "webhook_boond_contract_created",
+                "webhook_boond_bdc_created",
                 reference=result.reference,
-                cr_id=str(result.id),
+                por_id=str(result.id),
                 status=result.status.value,
                 commercial_email=result.commercial_email,
-                frontend_url=settings.frontend_url,
             )
             return WebhookResponse(
                 status="ok",
-                message=f"Contract request {result.reference} created",
+                message=f"Purchase order request {result.reference} created",
             )
         logger.info("webhook_boond_no_action", reason="filtered_or_empty")
         return WebhookResponse(status="ok", message="No action taken")

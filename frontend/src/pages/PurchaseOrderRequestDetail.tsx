@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ShoppingCart, CheckCircle, AlertTriangle, Trash2 } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, CheckCircle, AlertTriangle, Trash2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { purchaseOrderRequestsApi } from '../api/contracts';
@@ -166,6 +166,26 @@ export default function PurchaseOrderRequestDetail() {
           </div>
         </div>
       </div>
+
+      {/* Locked: waiting for framework contract */}
+      {por.status === 'pending_framework_contract' && (
+        <Card className="mb-6 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
+          <div className="flex items-start gap-3">
+            <Lock className="h-5 w-5 text-amber-500 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                En attente du contrat cadre
+              </h3>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                Ce bon de commande a été créé depuis le positionnement, mais il ne
+                pourra être édité et validé qu'une fois le consultant devenu ressource
+                et rattaché à un contrat cadre signé avec son fournisseur. Il se
+                débloquera automatiquement à la signature du contrat cadre.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Compliance expired warning */}
       {por.status === 'compliance_expired' && (

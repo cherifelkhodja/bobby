@@ -207,8 +207,10 @@ class PurchaseOrderRequestModel(Base):
     __tablename__ = "cm_purchase_order_requests"
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
-    framework_contract_id: Mapped[UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("cm_framework_contracts.id"), nullable=False
+    # Nullable : un BDC verrouillé (en attente du contrat cadre) n'y est pas
+    # encore rattaché. Renseigné au déverrouillage (signature du cadre).
+    framework_contract_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_framework_contracts.id"), nullable=True
     )
     boond_positioning_id: Mapped[int] = mapped_column(Integer, nullable=False)
     boond_candidate_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
