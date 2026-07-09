@@ -67,18 +67,10 @@ class CreatePurchaseOrderRequestFromPositioningUseCase:
 
         for entry in entries:
             data = entry.get("data", entry)
-            positioning_id, new_state = CreateContractRequestUseCase._parse_webhook_event(data)
+            positioning_id, payload_state = CreateContractRequestUseCase._parse_webhook_event(data)
 
             if not positioning_id:
                 logger.warning("bdc_webhook_no_positioning_id")
-                continue
-
-            if new_state != BOOND_STATE_WON_AWAITING_CONTRACT:
-                logger.info(
-                    "bdc_webhook_state_filtered",
-                    positioning_id=positioning_id,
-                    state=new_state,
-                )
                 continue
 
             # Idempotence : un seul BDC actif par positionnement.
@@ -91,16 +83,32 @@ class CreatePurchaseOrderRequestFromPositioningUseCase:
                 )
                 return existing
 
-            event_id = f"positioning_bdc_{positioning_id}_{new_state}"
-            if await self._webhook_repo.exists(event_id):
-                logger.info("bdc_webhook_duplicate", event_id=event_id)
-                raise WebhookDuplicateError(event_id)
-
             # Récupérer les données Boond du positionnement.
+            # ⚠️ Le payload webhook Boond ne contient PAS le nouvel état (cf.
+            # docs/contracts/webhook-configuration.md) : le filtre "state 7" est
+            # appliqué côté Boond. On récupère donc l'état réel via l'API et on
+            # re-vérifie (le payload de test peut, lui, porter l'état).
             positioning_data = await self._crm.get_positioning(positioning_id)
             if not positioning_data:
                 logger.error("bdc_boond_positioning_not_found", positioning_id=positioning_id)
                 continue
+
+            effective_state = (
+                payload_state if payload_state is not None else positioning_data.get("state")
+            )
+            if effective_state != BOOND_STATE_WON_AWAITING_CONTRACT:
+                logger.info(
+                    "bdc_webhook_state_filtered",
+                    positioning_id=positioning_id,
+                    payload_state=payload_state,
+                    actual_state=positioning_data.get("state"),
+                )
+                continue
+
+            event_id = f"positioning_bdc_{positioning_id}_{effective_state}"
+            if await self._webhook_repo.exists(event_id):
+                logger.info("bdc_webhook_duplicate", event_id=event_id)
+                raise WebhookDuplicateError(event_id)
 
             candidate_id = positioning_data.get("candidate_id")
             consultant_type = positioning_data.get("consultant_type")

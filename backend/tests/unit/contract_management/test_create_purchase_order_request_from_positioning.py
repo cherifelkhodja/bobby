@@ -24,7 +24,7 @@ from app.contract_management.domain.value_objects.purchase_order_request_status 
 
 
 def _webhook_payload(positioning_id: int = 433, new_state: int = 7) -> list:
-    """Build a Boond positioning-update webhook payload (state change)."""
+    """Build a Boond positioning-update webhook payload with a state diff (test form)."""
     return [
         {
             "data": {
@@ -43,6 +43,28 @@ def _webhook_payload(positioning_id: int = 433, new_state: int = 7) -> list:
     ]
 
 
+def _webhook_payload_stateless(positioning_id: int = 433) -> list:
+    """Build the REAL Boond payload: webhookevent with dependsOn but NO state.
+
+    Matches docs/contracts/webhook-configuration.md — the state is not in the
+    payload and must be fetched from the API.
+    """
+    return [
+        {
+            "data": {
+                "id": "6_69cbd09b4ae56",
+                "type": "webhookevent",
+                "attributes": {"type": "update"},
+                "relationships": {
+                    "webhook": {"id": "6", "type": "webhook"},
+                    "dependsOn": {"id": str(positioning_id), "type": "positioning"},
+                    "log": {"id": "123634", "type": "log"},
+                },
+            }
+        }
+    ]
+
+
 def _make_use_case(
     *,
     consultant_type: str = "resource",
@@ -50,6 +72,7 @@ def _make_use_case(
     tp=None,
     fc=None,
     existing_por=None,
+    positioning_state: int = 7,
 ) -> CreatePurchaseOrderRequestFromPositioningUseCase:
     por_repo = AsyncMock()
     por_repo.get_by_positioning_id = AsyncMock(return_value=existing_por)
@@ -74,6 +97,7 @@ def _make_use_case(
     crm.get_positioning = AsyncMock(
         return_value={
             "id": 433,
+            "state": positioning_state,
             "candidate_id": 42,
             "consultant_type": consultant_type,
             "need_id": 99,
@@ -109,6 +133,28 @@ class TestStateFilter:
     async def test_ignores_non_state_7(self):
         uc = _make_use_case()
         result = await uc.execute(_webhook_payload(new_state=3))
+        assert result is None
+        uc._por_repo.save.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_stateless_payload_uses_api_state_7(self):
+        """Real Boond payload (no state) → state fetched from API == 7 → BDC created."""
+        tp = type("TP", (), {"id": uuid4()})()
+        fc = type("FC", (), {"id": uuid4()})()
+        uc = _make_use_case(consultant_type="resource", tp=tp, fc=fc, positioning_state=7)
+
+        result = await uc.execute(_webhook_payload_stateless())
+
+        assert result is not None
+        assert result.status == PurchaseOrderRequestStatus.PENDING_VALIDATION
+
+    @pytest.mark.asyncio
+    async def test_stateless_payload_api_state_not_7_filtered(self):
+        """Real payload but the positioning is no longer in state 7 → skipped."""
+        uc = _make_use_case(positioning_state=8)
+
+        result = await uc.execute(_webhook_payload_stateless())
+
         assert result is None
         uc._por_repo.save.assert_not_called()
 
