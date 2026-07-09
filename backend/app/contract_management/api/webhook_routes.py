@@ -477,6 +477,53 @@ async def debug_list_webhooks(
 
 
 @router.get(
+    "/boondmanager/debug-resource/{resource_id}",
+    summary="Debug: dump a Boond resource administrative payload",
+)
+async def debug_resource_provider(resource_id: int):
+    """Dump the administrative + base payload of a Boond resource.
+
+    Helps confirm the ``providerCompany`` relationship (name + endpoint) used to
+    link a consultant to its supplier for the BDC flow. Not available in
+    production.
+    """
+    settings = get_settings()
+    if settings.is_production:
+        return {"status": "error", "message": "Not available in production"}
+
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.infrastructure.boond.client import BoondClient
+
+    boond_client = BoondClient(settings)
+    crm = BoondCrmAdapter(boond_client)
+
+    result: dict = {"status": "ok", "resource_id": resource_id, "endpoints": {}}
+
+    for endpoint in (
+        f"/resources/{resource_id}/administrative",
+        f"/resources/{resource_id}",
+    ):
+        try:
+            response = await boond_client._make_request("GET", endpoint)
+            data = response.get("data", {})
+            relationships = data.get("relationships", {})
+            result["endpoints"][endpoint] = {
+                "relationship_keys": list(relationships.keys()),
+                "providerCompany": relationships.get("providerCompany"),
+            }
+        except Exception as exc:  # noqa: BLE001
+            result["endpoints"][endpoint] = {"error": str(exc)}
+
+    # Resolved value via the adapter helper (what the BDC flow actually uses)
+    result["resolved_provider_company_id"] = await crm.get_resource_provider_company_id(
+        resource_id
+    )
+    return result
+
+
+@router.get(
     "/boondmanager/debug-cr",
     summary="Debug: check contract requests in DB",
 )
