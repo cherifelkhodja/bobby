@@ -56,6 +56,21 @@ class ContractRequestRepositoryPort(Protocol):
         """
         ...
 
+    async def get_latest_by_resource_id(self, resource_id: int) -> ContractRequest | None:
+        """Get the latest contract request for a Boond resource ID.
+
+        Used for re-contractualization to pre-fill data from a previous request.
+        """
+        ...
+
+    async def get_company_by_boond_agency_id(self, agency_id: int) -> UUID | None:
+        """Return the contract company ID matching a Boond agency ID, or None."""
+        ...
+
+    async def get_company_code(self, company_id: UUID) -> str | None:
+        """Return the code of a contract company by ID, or None."""
+        ...
+
 
 class ContractRepositoryPort(Protocol):
     """Repository port for contracts."""
@@ -86,4 +101,12 @@ class WebhookEventRepositoryPort(Protocol):
 
     async def save(self, event_id: str, event_type: str, payload: dict) -> None:
         """Save a webhook event for deduplication."""
+        ...
+
+    async def delete_by_prefix(self, prefix: str) -> int:
+        """Delete webhook events whose ID starts with the given prefix.
+
+        Returns:
+            The number of deleted rows.
+        """
         ...

@@ -14,8 +14,22 @@ class CrmServicePort(Protocol):
         """Fetch a need/opportunity from the CRM."""
         ...
 
-    async def get_candidate_info(self, candidate_id: int) -> dict[str, Any] | None:
-        """Fetch candidate info from the CRM."""
+    async def get_candidate_info(
+        self,
+        candidate_id: int,
+        consultant_type: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Fetch consultant info from the CRM.
+
+        Args:
+            candidate_id: Boond candidate or resource ID.
+            consultant_type: "candidate", "resource", or None (unknown) —
+                oriente le routage vers /candidates ou /resources.
+        """
+        ...
+
+    async def resolve_resource_id(self, candidate_id: int) -> int | None:
+        """Resolve the Boond resource ID linked to a candidate ID (or None)."""
         ...
 
     async def create_provider(
@@ -121,4 +135,18 @@ class CrmServicePort(Protocol):
         provider_contact_id: int | None,
     ) -> None:
         """Link a resource to its provider company and contact."""
+        ...
+
+    async def verify_company_exists(self, company_id: int) -> bool:
+        """Check whether a company exists in the CRM."""
+        ...
+
+    async def update_company_bank_details(
+        self,
+        company_id: int,
+        iban: str,
+        bic: str,
+        description: str = "RIB Fournisseur",
+    ) -> None:
+        """Push bank details (IBAN/BIC) to a company in the CRM."""
         ...

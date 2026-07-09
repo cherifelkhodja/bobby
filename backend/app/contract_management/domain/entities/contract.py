@@ -24,6 +24,10 @@ class Contract:
     yousign_status: str | None = None
     boond_purchase_order_id: int | None = None
     partner_comments: str | None = None
+    # NEEDS-CONFIRMATION: `datetime.utcnow()` déprécié mais conservé — les
+    # colonnes DB (`created_at`, `signed_at`) sont TIMESTAMP WITHOUT TIME ZONE
+    # (naïf) ; asyncpg refuse un datetime tz-aware. Passer à `datetime.now(UTC)`
+    # exigerait de migrer ces colonnes en `timezone=True` (hors scope).
     created_at: datetime = field(default_factory=datetime.utcnow)
     signed_at: datetime | None = None
 
