@@ -167,9 +167,7 @@ class CreateContractRequestFromEntityUseCase:
                 if latest_cr is not None and latest_cr.status == ContractRequestStatus.CANCELLED:
                     # CR précédent annulé → purge de l'entrée de dedup obsolète pour
                     # autoriser la recréation d'un nouveau CR pour cette entité.
-                    await self._webhook_repo.delete_by_prefix(
-                        f"{entity_type}_state_{entity_id}_"
-                    )
+                    await self._webhook_repo.delete_by_prefix(f"{entity_type}_state_{entity_id}_")
                     logger.info(
                         "webhook_dedup_cleared_after_cancel",
                         event_id=event_id,

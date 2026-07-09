@@ -551,9 +551,7 @@ async def validate_commercial(
         cmd.company_name = company_name
         cr = await use_case.execute(cmd)
     except Exception as exc:
-        logger.error(
-            "validate_commercial_failed", error=str(exc), cr_id=str(contract_request_id)
-        )
+        logger.error("validate_commercial_failed", error=str(exc), cr_id=str(contract_request_id))
         raise HTTPException(status_code=400, detail="La validation commerciale a échoué.")
 
     audit_logger.log(
@@ -663,9 +661,7 @@ async def resend_collection_email(
         )
     except Exception as exc:
         logger.error("resend_collection_email_failed", error=str(exc))
-        raise HTTPException(
-            status_code=400, detail="Le renvoi de l'email de collecte a échoué."
-        )
+        raise HTTPException(status_code=400, detail="Le renvoi de l'email de collecte a échoué.")
 
     audit_logger.log(
         AuditAction.DOCUMENT_COLLECTION_INITIATED,
@@ -698,9 +694,7 @@ async def configure_contract(
     try:
         cr = await use_case.execute(contract_request_id, body.model_dump(mode="json"))
     except Exception as exc:
-        logger.error(
-            "configure_contract_failed", error=str(exc), cr_id=str(contract_request_id)
-        )
+        logger.error("configure_contract_failed", error=str(exc), cr_id=str(contract_request_id))
         raise HTTPException(status_code=400, detail="La configuration du contrat a échoué.")
 
     name = await _resolve_commercial_name(db, cr.commercial_email)
@@ -869,9 +863,7 @@ async def block_compliance(
     try:
         cr = await use_case.execute(contract_request_id, body.reason)
     except Exception as exc:
-        logger.error(
-            "block_compliance_failed", error=str(exc), cr_id=str(contract_request_id)
-        )
+        logger.error("block_compliance_failed", error=str(exc), cr_id=str(contract_request_id))
         raise HTTPException(status_code=400, detail="Le blocage de la conformité a échoué.")
 
     audit_logger.log(
@@ -1150,9 +1142,7 @@ async def generate_draft(
         contract = await use_case.execute(contract_request_id)
     except Exception as exc:
         logger.error("generate_draft_failed", error=str(exc))
-        raise HTTPException(
-            status_code=400, detail="La génération du projet de contrat a échoué."
-        )
+        raise HTTPException(status_code=400, detail="La génération du projet de contrat a échoué.")
 
     audit_logger.log(
         AuditAction.DRAFT_GENERATED,
@@ -1308,9 +1298,7 @@ async def resend_draft_email(
         )
     except Exception as exc:
         logger.error("resend_draft_email_failed", error=str(exc))
-        raise HTTPException(
-            status_code=400, detail="Le renvoi de l'email de relecture a échoué."
-        )
+        raise HTTPException(status_code=400, detail="Le renvoi de l'email de relecture a échoué.")
 
     name = await _resolve_commercial_name(db, cr.commercial_email)
     return _cr_to_response(cr, commercial_name=name)
@@ -2972,9 +2960,7 @@ async def validate_purchase_order_request(
             )
         )
     except Exception as exc:
-        logger.error(
-            "validate_purchase_order_request_failed", error=str(exc), por_id=str(por_id)
-        )
+        logger.error("validate_purchase_order_request_failed", error=str(exc), por_id=str(por_id))
         raise HTTPException(status_code=400, detail="La validation du bon de commande a échoué.")
 
     audit_logger.log(
@@ -3038,12 +3024,8 @@ async def finalize_purchase_order_request(
     try:
         po = await use_case.execute(por_id)
     except ValueError as exc:
-        logger.error(
-            "finalize_purchase_order_request_failed", error=str(exc), por_id=str(por_id)
-        )
-        raise HTTPException(
-            status_code=400, detail="La finalisation du bon de commande a échoué."
-        )
+        logger.error("finalize_purchase_order_request_failed", error=str(exc), por_id=str(por_id))
+        raise HTTPException(status_code=400, detail="La finalisation du bon de commande a échoué.")
 
     audit_logger.log(
         AuditAction.COMMERCIAL_VALIDATED,
@@ -3103,9 +3085,7 @@ async def cancel_purchase_order_request(
     try:
         por.transition_to(PurchaseOrderRequestStatus.CANCELLED)
     except Exception as exc:
-        logger.error(
-            "cancel_purchase_order_request_failed", error=str(exc), por_id=str(por_id)
-        )
+        logger.error("cancel_purchase_order_request_failed", error=str(exc), por_id=str(por_id))
         raise HTTPException(status_code=400, detail="L'annulation du bon de commande a échoué.")
 
     saved = await por_repo.save(por)
@@ -3287,9 +3267,7 @@ async def send_consultant_charters(
             error=str(exc),
             cr_id=str(contract_request_id),
         )
-        raise HTTPException(
-            status_code=400, detail="L'envoi des chartes au consultant a échoué."
-        )
+        raise HTTPException(status_code=400, detail="L'envoi des chartes au consultant a échoué.")
 
     consultant.charter_status = "sent"
     await db.commit()

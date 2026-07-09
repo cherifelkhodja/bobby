@@ -528,9 +528,7 @@ async def handle_yousign_webhook(
         # YouSign peut préfixer la signature par "sha256=".
         if signature.startswith("sha256="):
             signature = signature[len("sha256=") :]
-        expected = hmac.new(
-            webhook_secret.encode("utf-8"), raw_body, hashlib.sha256
-        ).hexdigest()
+        expected = hmac.new(webhook_secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
         if not signature or not hmac.compare_digest(signature, expected):
             logger.warning("yousign_webhook_invalid_signature")
             return WebhookResponse(status="ok", message="Invalid signature")
@@ -610,9 +608,7 @@ async def handle_yousign_webhook(
             # Aucun contrat associé à cette procédure. En l'état, le flux auto
             # n'assigne pas encore yousign_procedure_id (cf. send_for_signature,
             # # NEEDS-CONFIRMATION) : ce webhook reste donc un no-op sûr.
-            logger.warning(
-                "yousign_webhook_no_matching_contract", procedure_id=procedure_id
-            )
+            logger.warning("yousign_webhook_no_matching_contract", procedure_id=procedure_id)
             return WebhookResponse(status="ok", message="No matching contract")
 
         # Idempotent : no-op si déjà SIGNED (ne casse pas mark-as-signed manuel).

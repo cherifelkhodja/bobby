@@ -57,9 +57,7 @@ class HandleSignatureCompletedUseCase:
 
         # Idempotence : si la signature est déjà enregistrée (contrat déjà signé
         # ou demande déjà en SIGNED), on ne fait rien (no-op).
-        if contract.is_signed or (
-            cr is not None and cr.status == ContractRequestStatus.SIGNED
-        ):
+        if contract.is_signed or (cr is not None and cr.status == ContractRequestStatus.SIGNED):
             logger.info(
                 "signature_already_processed",
                 contract_id=str(contract.id),

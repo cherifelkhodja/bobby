@@ -68,12 +68,7 @@ class PushToCrmUseCase:
 
         # Create purchase order in Boond (idempotent : seulement si absent, pour
         # qu'un rejeu ne crée pas un second BDC côté Boond).
-        if (
-            tp
-            and tp.boond_provider_id
-            and cr.daily_rate
-            and not contract.boond_purchase_order_id
-        ):
+        if tp and tp.boond_provider_id and cr.daily_rate and not contract.boond_purchase_order_id:
             # NEEDS-CONFIRMATION: montant = TJM seul (cf. note détaillée dans
             # BoondCrmAdapter.create_purchase_order).
             amount = float(cr.daily_rate)

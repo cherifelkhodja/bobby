@@ -102,8 +102,7 @@ class TestRollback:
         audit_entry = cr.status_history[-1]
         assert audit_entry.get("rollback") is True
         assert (
-            audit_entry.get("rolled_back_from")
-            == ContractRequestStatus.COMMERCIAL_VALIDATED.value
+            audit_entry.get("rolled_back_from") == ContractRequestStatus.COMMERCIAL_VALIDATED.value
         )
         # The original initial entry is preserved at the front.
         assert cr.status_history[0].get("initial") is True
