@@ -70,6 +70,7 @@ async def _create_contract_request(db: AsyncSession, **overrides) -> ContractReq
     """Insert a contract request into the test DB."""
     defaults = {
         "id": uuid4(),
+        "provisional_reference": f"PROV-{uuid4().hex[:8].upper()}",
         "reference": f"CR-{uuid4().hex[:6].upper()}",
         "boond_positioning_id": 2000 + int(uuid4().int % 9999),
         "status": "draft_sent_to_partner",

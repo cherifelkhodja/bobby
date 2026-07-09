@@ -10,9 +10,9 @@ class TestDocumentStatusTransitions:
         """Given REQUESTED, it can transition to RECEIVED."""
         assert DocumentStatus.REQUESTED.can_transition_to(DocumentStatus.RECEIVED)
 
-    def test_requested_cannot_transition_to_validated(self):
-        """Given REQUESTED, it cannot skip to VALIDATED."""
-        assert not DocumentStatus.REQUESTED.can_transition_to(DocumentStatus.VALIDATED)
+    def test_requested_can_transition_to_validated(self):
+        """Given REQUESTED, ADV can validate directly (temporary validation, contract context)."""
+        assert DocumentStatus.REQUESTED.can_transition_to(DocumentStatus.VALIDATED)
 
     def test_received_can_transition_to_validated(self):
         """Given RECEIVED, it can transition to VALIDATED."""

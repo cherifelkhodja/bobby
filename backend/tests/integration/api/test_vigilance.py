@@ -299,6 +299,7 @@ class TestRequestDocuments:
         response = await client.post(
             f"/api/v1/vigilance/third-parties/{tp.id}/request-documents",
             headers=adv_headers,
+            params={"entity_category": "societe"},
         )
 
         # May return 200 (created) or 400 (already exist)
@@ -315,6 +316,7 @@ class TestRequestDocuments:
         response = await client.post(
             f"/api/v1/vigilance/third-parties/{uuid4()}/request-documents",
             headers=adv_headers,
+            params={"entity_category": "societe"},
         )
 
         assert response.status_code == 400
