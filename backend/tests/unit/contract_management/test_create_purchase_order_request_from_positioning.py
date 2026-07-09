@@ -137,6 +137,37 @@ class TestStateFilter:
         uc._por_repo.save.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_real_leaving_state_7_payload_filtered_without_api_call(self):
+        """Vrai payload Boond 7→0 (sortie de l'état 7) : filtré, sans appel API."""
+        uc = _make_use_case()
+        payload = [
+            {
+                "data": {
+                    "id": "8_6a4fba3bbc361",
+                    "type": "webhookevent",
+                    "attributes": {"type": "update"},
+                    "relationships": {
+                        "webhook": {"id": "8", "type": "webhook"},
+                        "dependsOn": {"id": "532", "type": "positioning"},
+                        "log": {"id": "135564", "type": "log"},
+                    },
+                    "included": [
+                        {"id": "1", "type": "resource",
+                         "attributes": {"lastName": "EL KHODJA", "firstName": "Chérif"}},
+                        {"id": "135564", "type": "log",
+                         "attributes": {"content": {"diff": {"state": {"old": 7, "new": 0}}}}},
+                    ],
+                }
+            }
+        ]
+
+        result = await uc.execute(payload)
+
+        assert result is None
+        uc._crm.get_positioning.assert_not_called()  # filtré avant tout appel API
+        uc._por_repo.save.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_stateless_payload_uses_api_state_7(self):
         """Real Boond payload (no state) → state fetched from API == 7 → BDC created."""
         tp = type("TP", (), {"id": uuid4()})()

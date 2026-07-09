@@ -73,6 +73,18 @@ class CreatePurchaseOrderRequestFromPositioningUseCase:
                 logger.warning("bdc_webhook_no_positioning_id")
                 continue
 
+            # Le webhook Boond se déclenche à CHAQUE changement d'état du
+            # positionnement (ex. 7→0), pas seulement à l'entrée en 7. Quand le
+            # payload porte l'état (via included[].log.content.diff.state.new), on
+            # filtre tôt pour éviter un appel API inutile sur les autres états.
+            if payload_state is not None and payload_state != BOOND_STATE_WON_AWAITING_CONTRACT:
+                logger.info(
+                    "bdc_webhook_state_filtered",
+                    positioning_id=positioning_id,
+                    payload_state=payload_state,
+                )
+                continue
+
             # Idempotence : un seul BDC actif par positionnement.
             existing = await self._por_repo.get_by_positioning_id(positioning_id)
             if existing:
@@ -83,11 +95,9 @@ class CreatePurchaseOrderRequestFromPositioningUseCase:
                 )
                 return existing
 
-            # Récupérer les données Boond du positionnement.
-            # ⚠️ Le payload webhook Boond ne contient PAS le nouvel état (cf.
-            # docs/contracts/webhook-configuration.md) : le filtre "state 7" est
-            # appliqué côté Boond. On récupère donc l'état réel via l'API et on
-            # re-vérifie (le payload de test peut, lui, porter l'état).
+            # Récupérer les données Boond du positionnement (consultant, besoin…).
+            # Certains payloads ne portent pas l'état (cf. webhook-configuration.md) :
+            # on récupère alors l'état réel via l'API et on re-vérifie.
             positioning_data = await self._crm.get_positioning(positioning_id)
             if not positioning_data:
                 logger.error("bdc_boond_positioning_not_found", positioning_id=positioning_id)
@@ -98,7 +108,7 @@ class CreatePurchaseOrderRequestFromPositioningUseCase:
             )
             if effective_state != BOOND_STATE_WON_AWAITING_CONTRACT:
                 logger.info(
-                    "bdc_webhook_state_filtered",
+                    "bdc_webhook_state_filtered_after_api",
                     positioning_id=positioning_id,
                     payload_state=payload_state,
                     actual_state=positioning_data.get("state"),
