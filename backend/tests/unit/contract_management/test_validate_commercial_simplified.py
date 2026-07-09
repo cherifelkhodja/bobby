@@ -162,7 +162,7 @@ class TestRecontractualization:
         cr_repo.get_by_id = AsyncMock(side_effect=lambda id_: cr if id_ == cr.id else previous_cr)
         cr_repo.save = AsyncMock(side_effect=lambda x: x)
 
-        # No expired docs → should skip to reviewing compliance
+        # ThirdParty reused but has no documents → vigilance must run (collect)
         doc_repo = AsyncMock()
         doc_repo.list_by_third_party = AsyncMock(return_value=[])
 
@@ -184,8 +184,9 @@ class TestRecontractualization:
         result = await uc.execute(command)
 
         assert result.third_party_id == previous_tp_id
-        # With no expired docs → should reach reviewing_compliance
-        assert result.status == ContractRequestStatus.REVIEWING_COMPLIANCE
+        # No documents on the reused ThirdParty → collection required
+        # (vigilance is no longer skipped on an empty document list)
+        assert result.status == ContractRequestStatus.COLLECTING_DOCUMENTS
 
     @pytest.mark.asyncio
     async def test_requests_expired_docs(self):
