@@ -374,7 +374,7 @@ export default function Portal() {
                           const { url } = await portalApi.getCharterDownloadUrl(token!, charter.id);
                           window.open(url, '_blank');
                         } catch {
-                          /* ignore */
+                          toast.error('Impossible de télécharger la charte. Veuillez réessayer.');
                         }
                       }}
                       className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
@@ -390,7 +390,7 @@ export default function Portal() {
                           await portalApi.acknowledgeCharter(token!, charter.id);
                           queryClient.invalidateQueries({ queryKey: ['portal-charters', token] });
                         } catch {
-                          /* ignore */
+                          toast.error("Impossible d'enregistrer votre acceptation. Veuillez réessayer.");
                         }
                       }}
                       className="mt-2 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-400 transition-colors"
@@ -1387,6 +1387,13 @@ function DocumentUploadCard({
   });
 
   const handleFileSelect = useCallback((file: File) => {
+    // Validate extension too (not just size) — the input `accept` attribute doesn't
+    // constrain drag-and-drop, so this also guards the handleDrop path.
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    if (!['pdf', 'jpg', 'jpeg', 'png'].includes(ext)) {
+      toast.error('Format non supporté. Formats acceptés : PDF, JPG, PNG.');
+      return;
+    }
     if (file.size > 10 * 1024 * 1024) { toast.error('Le fichier dépasse 10 Mo.'); return; }
     uploadMutation.mutate(file);
   }, [uploadMutation]);
