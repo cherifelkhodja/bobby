@@ -489,7 +489,7 @@ class EmailService:
     ) -> bool:
         """Send document collection request to a third party via portal link."""
         issuer = company_name or "Bobby"
-        subject = f"[{issuer}] Sous-traitance {third_party_name} - Documents requis pour votre référencement"
+        subject = f"[{issuer}] Sous-traitance {third_party_name} - Documents requis pour votre dossier"
         html_body = f"""
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"></head>
