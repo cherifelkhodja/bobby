@@ -38,21 +38,14 @@ async def get_current_user_id(
         raise HTTPException(status_code=401, detail=str(e))
 
 
-async def require_admin(
-    db: DbSession,
-    authorization: str = Header(default=""),
-) -> UUID:
-    """Verify user is admin and return their ID.
+async def _get_active_user(db: DbSession, authorization: str):
+    """Decode the access token, load the user and ensure the account is active.
 
-    Args:
-        db: Database session.
-        authorization: Authorization header (Bearer token).
-
-    Returns:
-        Admin user's UUID.
+    Shared loader for the role-based dependencies so the ``is_active`` check
+    lives in a single place.
 
     Raises:
-        HTTPException: If not authenticated or not admin.
+        HTTPException: 401 if not authenticated or user missing, 403 if inactive.
     """
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -70,10 +63,34 @@ async def require_admin(
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Compte désactivé")
+
+    return user
+
+
+async def require_admin(
+    db: DbSession,
+    authorization: str = Header(default=""),
+) -> UUID:
+    """Verify user is admin and return their ID.
+
+    Args:
+        db: Database session.
+        authorization: Authorization header (Bearer token).
+
+    Returns:
+        Admin user's UUID.
+
+    Raises:
+        HTTPException: If not authenticated or not admin.
+    """
+    user = await _get_active_user(db, authorization)
+
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    return user_id
+    return user.id
 
 
 async def require_admin_or_rh(
@@ -92,26 +109,12 @@ async def require_admin_or_rh(
     Raises:
         HTTPException: If not authenticated or not admin/RH.
     """
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    token = authorization[7:]
-    try:
-        payload = decode_token(token, expected_type="access")
-    except InvalidTokenError as e:
-        raise HTTPException(status_code=401, detail=str(e))
-
-    user_id = UUID(payload.sub)
-    user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(user_id)
-
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+    user = await _get_active_user(db, authorization)
 
     if user.role not in ("admin", "rh"):
         raise HTTPException(status_code=403, detail="Admin or RH access required")
 
-    return user_id
+    return user.id
 
 
 async def require_admin_or_commercial(
@@ -130,26 +133,12 @@ async def require_admin_or_commercial(
     Raises:
         HTTPException: If not authenticated or not admin/commercial.
     """
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    token = authorization[7:]
-    try:
-        payload = decode_token(token, expected_type="access")
-    except InvalidTokenError as e:
-        raise HTTPException(status_code=401, detail=str(e))
-
-    user_id = UUID(payload.sub)
-    user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(user_id)
-
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+    user = await _get_active_user(db, authorization)
 
     if user.role not in ("admin", "commercial"):
         raise HTTPException(status_code=403, detail="Admin or Commercial access required")
 
-    return user_id
+    return user.id
 
 
 async def require_adv_or_admin(
@@ -168,26 +157,12 @@ async def require_adv_or_admin(
     Raises:
         HTTPException: If not authenticated or not ADV/admin.
     """
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    token = authorization[7:]
-    try:
-        payload = decode_token(token, expected_type="access")
-    except InvalidTokenError as e:
-        raise HTTPException(status_code=401, detail=str(e))
-
-    user_id = UUID(payload.sub)
-    user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(user_id)
-
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+    user = await _get_active_user(db, authorization)
 
     if user.role not in ("admin", "adv"):
         raise HTTPException(status_code=403, detail="Admin or ADV access required")
 
-    return user_id
+    return user.id
 
 
 async def require_contract_access(
@@ -205,26 +180,12 @@ async def require_contract_access(
     Raises:
         HTTPException: If not authenticated or not authorized.
     """
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    token = authorization[7:]
-    try:
-        payload = decode_token(token, expected_type="access")
-    except InvalidTokenError as e:
-        raise HTTPException(status_code=401, detail=str(e))
-
-    user_id = UUID(payload.sub)
-    user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(user_id)
-
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+    user = await _get_active_user(db, authorization)
 
     if user.role not in ("admin", "adv", "commercial"):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    return user_id, user.role, user.email
+    return user.id, user.role, user.email
 
 
 # Type aliases for dependencies

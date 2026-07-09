@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.middleware.correlation import CorrelationIdMiddleware
 from app.api.middleware.error_handler import error_handler_middleware
@@ -73,17 +74,21 @@ app = FastAPI(
 )
 
 # Add rate limiter state and exception handler
+# The SlowAPIMiddleware below is required for the @limiter.limit decorators to be
+# enforced; without it the limiter in app.state stays inert.
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # Middleware (order matters - outermost runs first)
 # 1. CORS must be outermost to handle OPTIONS preflight
-# 2. Security headers added to all responses
-# 3. Correlation ID for request tracing
-# 4. Error handler for consistent error responses
+# 2. Rate limiting (activates the @limiter.limit decorators)
+# 3. Security headers added to all responses
+# 4. Correlation ID for request tracing
+# 5. Error handler for consistent error responses
 app.middleware("http")(error_handler_middleware)
 app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,

@@ -9,6 +9,19 @@ from app.contract_management.domain.exceptions import ContractRequestNotFoundErr
 
 logger = structlog.get_logger()
 
+# Per-contract edition keys managed by the article-overrides endpoint. They must
+# survive a `configure` call, which otherwise replaces the whole contract_config.
+_EDITION_KEYS = (
+    "article_overrides",
+    "annex_overrides",
+    "custom_articles",
+    "custom_annexes",
+    "article_order",
+    "annex_order",
+    "deleted_article_keys",
+    "deleted_annex_keys",
+)
+
 
 class ConfigureContractUseCase:
     """Set contract configuration (payment terms, clauses, etc.)."""
@@ -33,22 +46,33 @@ class ConfigureContractUseCase:
         if not cr:
             raise ContractRequestNotFoundError(str(contract_request_id))
 
-        # Extract company_id from config and set it as a direct field
-        raw_company_id = config.get("company_id")
-        if raw_company_id:
-            try:
-                cr.company_id = UUID(str(raw_company_id))
-            except (ValueError, AttributeError):
+        # company_id: only touch it when the key is present in the payload.
+        # An absent key must NOT wipe an already auto-resolved company.
+        if "company_id" in config:
+            raw_company_id = config.get("company_id")
+            if raw_company_id:
+                try:
+                    cr.company_id = UUID(str(raw_company_id))
+                except (ValueError, AttributeError):
+                    cr.company_id = None
+            else:
                 cr.company_id = None
-        else:
-            cr.company_id = None
 
-        cr.set_contract_config(config)
+        # Merge: start from the new config, then re-inject the per-contract edition
+        # keys from the previous config so article/annex customisations (managed by
+        # the article-overrides endpoint) are not lost.
+        old_config = dict(cr.contract_config or {})
+        merged = dict(config)
+        for key in _EDITION_KEYS:
+            if key in old_config:
+                merged[key] = old_config[key]
+
+        cr.set_contract_config(merged)
         saved = await self._cr_repo.save(cr)
 
         logger.info(
             "contract_configured",
             cr_id=str(saved.id),
-            config_keys=list(config.keys()),
+            config_keys=list(merged.keys()),
         )
         return saved
