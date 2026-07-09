@@ -15,8 +15,9 @@ logger = structlog.get_logger()
 class PushToCrmUseCase:
     """Push contract data to BoondManager after signature.
 
-    Creates or updates the provider in Boond, creates a purchase order,
-    and transitions the CR to ARCHIVED.
+    Creates or updates the provider in Boond and creates a purchase order
+    (idempotent). L'archivage du CR relève du CRON : ce use case ne le tente
+    que si la demande est déjà ACTIVE.
     """
 
     def __init__(
@@ -65,8 +66,16 @@ class PushToCrmUseCase:
             tp.boond_provider_id = provider_id
             await self._tp_repo.save(tp)
 
-        # Create purchase order in Boond
-        if tp and tp.boond_provider_id and cr.daily_rate:
+        # Create purchase order in Boond (idempotent : seulement si absent, pour
+        # qu'un rejeu ne crée pas un second BDC côté Boond).
+        if (
+            tp
+            and tp.boond_provider_id
+            and cr.daily_rate
+            and not contract.boond_purchase_order_id
+        ):
+            # NEEDS-CONFIRMATION: montant = TJM seul (cf. note détaillée dans
+            # BoondCrmAdapter.create_purchase_order).
             amount = float(cr.daily_rate)
             po_id = await self._crm.create_purchase_order(
                 provider_id=tp.boond_provider_id,
@@ -77,8 +86,12 @@ class PushToCrmUseCase:
             contract.boond_purchase_order_id = po_id
             await self._contract_repo.save(contract)
 
-        # Transition to ARCHIVED
-        cr.transition_to(ContractRequestStatus.ARCHIVED)
+        # L'archivage est le rôle du CRON, pas de ce use case. La seule
+        # transition légale vers ARCHIVED part de ACTIVE : SIGNED → ARCHIVED est
+        # invalide et levait une InvalidContractStatusError. On ne tente donc la
+        # transition que si la demande est déjà ACTIVE.
+        if cr.status == ContractRequestStatus.ACTIVE:
+            cr.transition_to(ContractRequestStatus.ARCHIVED)
         saved = await self._cr_repo.save(cr)
 
         logger.info(

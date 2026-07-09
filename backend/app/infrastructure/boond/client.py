@@ -4,7 +4,7 @@ import logging
 from datetime import UTC, datetime
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import Settings
 from app.domain.entities import Candidate, Opportunity
@@ -23,7 +23,9 @@ class BoondClient:
 
     def __init__(self, settings: Settings) -> None:
         self.base_url = settings.BOOND_API_URL
-        self.timeout = httpx.Timeout(5.0)
+        # 30s : un timeout trop court (5s) provoquait des POST rejoués et donc
+        # des doublons côté BoondManager sur les opérations non idempotentes.
+        self.timeout = httpx.Timeout(30.0)
         self._auth = (settings.BOOND_USERNAME, settings.BOOND_PASSWORD)
         self.candidate_state_id = settings.BOOND_CANDIDATE_STATE_ID
         self.positioning_state_id = settings.BOOND_POSITIONING_STATE_ID
@@ -31,6 +33,10 @@ class BoondClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=4),
+        # Ne re-tenter que sur des erreurs transport/timeout — jamais sur une
+        # HTTPStatusError (4xx/5xx) : rejouer un POST non idempotent que Boond
+        # aurait déjà traité côté serveur créerait un doublon.
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException)),
     )
     async def _make_request(self, method: str, endpoint: str, **kwargs) -> dict:
         """Generic request method for Boond API.
@@ -45,12 +51,14 @@ class BoondClient:
                 **kwargs,
             )
             if response.status_code >= 400:
+                # Ne pas logger le corps complet (données potentiellement
+                # sensibles) : on se limite au statut + un extrait court.
                 logger.error(
                     "boond_api_error %s %s → %s: %s",
                     method,
                     endpoint,
                     response.status_code,
-                    response.text[:2000],
+                    response.text[:200],
                 )
             response.raise_for_status()
             return response.json()

@@ -210,6 +210,17 @@ class SyncToBoondAfterSigningUseCase:
         boond_contact_ids: dict[str, int] = {}
 
         if tp and tp.boond_provider_id:
+            # Idempotence : réutiliser les contacts déjà créés lors d'un run
+            # précédent — un retry-boond-sync ne doit pas créer de doublons.
+            _persisted_contact_ids: dict[str, int | None] = {
+                "signataire": tp.boond_signatory_contact_id,
+                "adv": tp.boond_adv_contact_id,
+                "commercial": tp.boond_commercial_contact_id,
+            }
+            for _lbl, _pid in _persisted_contact_ids.items():
+                if _pid:
+                    boond_contact_ids[_lbl] = _pid
+
             signatory_types = [10]
             if tp.signatory_is_director:
                 signatory_types.append(7)
@@ -272,6 +283,9 @@ class SyncToBoondAfterSigningUseCase:
 
             agency_id = company.boond_agency_id if company else None
             for entry in merged.values():
+                # Skip si tous les rôles de ce contact ont déjà un ID persisté.
+                if all(_persisted_contact_ids.get(lbl) for lbl in entry["labels"]):
+                    continue
                 try:
                     contact_id = await self._crm.create_contact(
                         company_id=tp.boond_provider_id,
