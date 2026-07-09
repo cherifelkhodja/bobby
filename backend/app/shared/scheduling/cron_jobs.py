@@ -111,16 +111,28 @@ async def process_framework_contract_renewals():
     from app.contract_management.infrastructure.models import FrameworkContractModel
     from app.infrastructure.database.connection import async_session_factory
 
+    # NEEDS-CONFIRMATION: `datetime.utcnow()` (naïf) conservé — comparé à
+    # `fc.expires_at` (supposé naïf). Passer à `datetime.now(UTC)` risquerait une
+    # comparaison naïf/aware.
     now = datetime.utcnow()
     soon_threshold = now + timedelta(days=30)
 
     async with async_session_factory() as session:
         fc_repo = FrameworkContractRepository(session)
 
-        # Find active contracts expiring within 30 days
+        # Find active OR expiring-soon contracts within the 30-day window.
+        # EXPIRING_SOON doit rester inclus : sans cela, un contrat déjà marqué
+        # EXPIRING_SOON ne serait plus jamais re-sélectionné et ne pourrait donc
+        # jamais être renouvelé (renew) ni expiré (mark_expired) à échéance —
+        # un contrat expiré resterait utilisable indéfiniment.
         result = await session.execute(
             select(FrameworkContractModel).where(
-                FrameworkContractModel.status == FrameworkContractStatus.ACTIVE.value,
+                FrameworkContractModel.status.in_(
+                    [
+                        FrameworkContractStatus.ACTIVE.value,
+                        FrameworkContractStatus.EXPIRING_SOON.value,
+                    ]
+                ),
                 FrameworkContractModel.expires_at.isnot(None),
                 FrameworkContractModel.expires_at <= soon_threshold,
             )
@@ -184,6 +196,9 @@ async def archive_inactive_contract_requests():
     )
     from app.infrastructure.database.connection import async_session_factory
 
+    # NEEDS-CONFIRMATION: `datetime.utcnow()` (naïf) conservé — comparé à
+    # `cr.updated_at`/`po.updated_at` (supposés naïfs). Passer à `datetime.now(UTC)`
+    # risquerait une comparaison naïf/aware.
     six_months_ago = datetime.utcnow() - timedelta(days=180)
 
     async with async_session_factory() as session:

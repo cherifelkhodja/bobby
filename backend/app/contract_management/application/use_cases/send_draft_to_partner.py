@@ -4,7 +4,10 @@ from uuid import UUID
 
 import structlog
 
-from app.contract_management.domain.exceptions import ContractRequestNotFoundError
+from app.contract_management.domain.exceptions import (
+    ContractRequestNotFoundError,
+    InvalidContractStatusError,
+)
 from app.contract_management.domain.value_objects.contract_request_status import (
     ContractRequestStatus,
 )
@@ -57,6 +60,14 @@ class SendDraftToPartnerUseCase:
         tp = await self._tp_repo.get_by_id(cr.third_party_id)
         if not tp:
             raise ContractRequestNotFoundError(str(contract_request_id))
+
+        # Valider la transition AVANT tout effet de bord (génération du magic link +
+        # envoi de l'email au partenaire) : un statut illégal ne doit ni générer de
+        # lien ni déclencher d'envoi.
+        if not cr.status.can_transition_to(ContractRequestStatus.DRAFT_SENT_TO_PARTNER):
+            raise InvalidContractStatusError(
+                cr.status.value, ContractRequestStatus.DRAFT_SENT_TO_PARTNER.value
+            )
 
         email = cr.contractualization_contact_email or tp.contact_email
 

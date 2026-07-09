@@ -1,6 +1,6 @@
 """Use case: Generate a contract draft document."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 import structlog
@@ -9,6 +9,7 @@ from app.contract_management.domain.entities.contract import Contract
 from app.contract_management.domain.exceptions import (
     ComplianceBlockError,
     ContractRequestNotFoundError,
+    InvalidContractStatusError,
 )
 from app.contract_management.domain.value_objects.contract_request_status import (
     ContractRequestStatus,
@@ -63,6 +64,17 @@ class GenerateDraftUseCase:
         cr = await self._cr_repo.get_by_id(contract_request_id)
         if not cr:
             raise ContractRequestNotFoundError(str(contract_request_id))
+
+        # Garde précoce : vérifier la validité de la transition vers DRAFT_GENERATED
+        # AVANT tout effet de bord (génération PDF, upload S3, sauvegarde Contract),
+        # sinon un statut illégal laisserait un fichier S3 orphelin.
+        if (
+            not cr.status.can_transition_to(ContractRequestStatus.DRAFT_GENERATED)
+            and cr.status != ContractRequestStatus.DRAFT_GENERATED
+        ):
+            raise InvalidContractStatusError(
+                cr.status.value, ContractRequestStatus.DRAFT_GENERATED.value
+            )
 
         # Check compliance (soft block)
         if cr.third_party_id and not cr.compliance_override:
@@ -256,7 +268,7 @@ class GenerateDraftUseCase:
             "gemini_signatory_name": issuer_signatory_name,
             # Contract details
             "reference": cr.display_reference,
-            "contract_date": datetime.utcnow().strftime("%d/%m/%Y"),
+            "contract_date": datetime.now(UTC).strftime("%d/%m/%Y"),
             "daily_rate": str(cr.daily_rate) if cr.daily_rate else "",
             "start_date": cr.start_date.strftime("%d/%m/%Y") if cr.start_date else "",
             "client_name": cr.client_name or "",
@@ -430,7 +442,12 @@ class GenerateDraftUseCase:
             raw_content = article_overrides.get(article.article_key, article.content)
             try:
                 rendered_content = jinja_env.from_string(raw_content).render(**context)
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "article_render_failed",
+                    article_key=article.article_key,
+                    error=str(exc),
+                )
                 rendered_content = raw_content
             rendered_articles.append(dc_replace(article, content=rendered_content))
 
@@ -479,7 +496,12 @@ class GenerateDraftUseCase:
             raw_content = annex_overrides.get(annexe.annexe_key, annexe.content)
             try:
                 rendered_content = jinja_env.from_string(raw_content).render(**context)
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "annexe_render_failed",
+                    annexe_key=annexe.annexe_key,
+                    error=str(exc),
+                )
                 rendered_content = raw_content
             rendered_annexes.append(_dc_replace(annexe, content=rendered_content))
 
