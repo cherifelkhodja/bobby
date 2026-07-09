@@ -1,6 +1,7 @@
 """Portal (magic link) API integration tests."""
 
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
@@ -351,13 +352,17 @@ class TestGetContractDraft:
             third_party_id=tp.id,
         )
 
-        response = await client.get(f"/api/v1/portal/{ml.token}/contract-draft")
+        with patch(
+            "app.infrastructure.storage.s3_client.S3StorageClient.get_presigned_url",
+            new=AsyncMock(return_value="https://example.com/presigned"),
+        ):
+            response = await client.get(f"/api/v1/portal/{ml.token}/contract-draft")
 
         assert response.status_code == 200
         data = response.json()
         assert data["contract_request_id"] == str(cr.id)
-        assert "reference" in data
-        assert "s3_key_draft" in data
+        assert data["download_url"] == "https://example.com/presigned"
+        assert "contract_request_status" in data
 
     @pytest.mark.asyncio
     async def test_no_contract_request(
