@@ -1,10 +1,11 @@
 """PostgreSQL implementation of contract repositories."""
 
+import zlib
 from datetime import datetime
 from uuid import UUID
 
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -38,6 +39,35 @@ from app.contract_management.infrastructure.models import (
 logger = structlog.get_logger()
 
 
+def _reference_lock_key(prefix: str) -> int:
+    """Clé de verrou consultatif (advisory lock) stable, distincte par famille de préfixe.
+
+    Utilisée avec `pg_advisory_xact_lock` pour sérialiser l'allocation des
+    références numériques et éviter les doublons en cas de requêtes concurrentes.
+    CRC32 est déterministe entre processus (contrairement à `hash()`) et tient
+    dans un `bigint` PostgreSQL.
+    """
+    return zlib.crc32(prefix.encode("utf-8"))
+
+
+def _next_reference_number(references: list[str]) -> int:
+    """Retourne le prochain numéro de séquence à partir des suffixes numériques.
+
+    Le tri est numérique et non lexicographique : ainsi 1000 est bien supérieur
+    à 999 (ce que `MAX(reference)` sur une chaîne ne garantit pas). Les suffixes
+    non numériques sont ignorés. Retourne 1 si aucune référence exploitable.
+    """
+    max_num = 0
+    for ref in references:
+        try:
+            num = int(ref.rsplit("-", 1)[-1])
+        except (ValueError, IndexError):
+            continue
+        if num > max_num:
+            max_num = num
+    return max_num + 1
+
+
 class ContractRequestRepository:
     """PostgreSQL-backed contract request repository."""
 
@@ -58,13 +88,18 @@ class ContractRequestRepository:
         Cancelled CRs are excluded so that a new one can be created
         for the same positioning after cancellation.
         """
+        # Robuste aux doublons éventuels en base : on prend le plus récent
+        # plutôt que de lever MultipleResultsFound.
         result = await self.session.execute(
-            select(ContractRequestModel).where(
+            select(ContractRequestModel)
+            .where(
                 ContractRequestModel.boond_positioning_id == positioning_id,
                 ContractRequestModel.status != ContractRequestStatus.CANCELLED.value,
             )
+            .order_by(ContractRequestModel.created_at.desc())
+            .limit(1)
         )
-        model = result.scalar_one_or_none()
+        model = result.scalars().first()
         return self._to_entity(model) if model else None
 
     async def get_latest_by_resource_id(self, resource_id: int) -> ContractRequest | None:
@@ -101,6 +136,8 @@ class ContractRequestRepository:
             model.trigger_type = request.trigger_type
             model.previous_contract_request_id = request.previous_contract_request_id
             model.boond_resource_id = request.boond_resource_id
+            model.boond_candidate_id = request.boond_candidate_id
+            model.boond_consultant_type = request.boond_consultant_type
             model.third_party_id = request.third_party_id
             model.third_party_type = request.third_party_type
             model.daily_rate = request.daily_rate
@@ -194,21 +231,20 @@ class ContractRequestRepository:
         year = datetime.utcnow().year
         prefix = f"PROV-{year}-"
 
+        # Sérialise l'allocation pour cette famille de préfixe (anti-race condition).
+        # Le verrou tient jusqu'au commit de la requête, couvrant l'insert ultérieur.
+        await self.session.execute(
+            text("SELECT pg_advisory_xact_lock(:k)"),
+            {"k": _reference_lock_key(prefix)},
+        )
+
+        # Tri numérique (et non lexicographique via MAX) : 1000 > 999.
         result = await self.session.execute(
-            select(func.max(ContractRequestModel.provisional_reference)).where(
+            select(ContractRequestModel.provisional_reference).where(
                 ContractRequestModel.provisional_reference.like(f"{prefix}%")
             )
         )
-        max_ref = result.scalar_one_or_none()
-
-        if max_ref:
-            try:
-                last_num = int(max_ref.rsplit("-", 1)[-1])
-                next_num = last_num + 1
-            except (ValueError, IndexError):
-                next_num = 1
-        else:
-            next_num = 1
+        next_num = _next_reference_number(result.scalars().all())
 
         return f"{prefix}{next_num:03d}"
 
@@ -256,21 +292,20 @@ class ContractRequestRepository:
 
         prefix = f"{code}-CC-"
 
+        # Sérialise l'allocation pour cette famille de préfixe (anti-race condition).
+        # Le verrou tient jusqu'au commit de la requête, couvrant l'insert ultérieur.
+        await self.session.execute(
+            text("SELECT pg_advisory_xact_lock(:k)"),
+            {"k": _reference_lock_key(prefix)},
+        )
+
+        # Tri numérique (et non lexicographique via MAX) : 1000 > 999.
         result = await self.session.execute(
-            select(func.max(ContractRequestModel.reference)).where(
+            select(ContractRequestModel.reference).where(
                 ContractRequestModel.reference.like(f"{prefix}%")
             )
         )
-        max_ref = result.scalar_one_or_none()
-
-        if max_ref:
-            try:
-                last_num = int(max_ref.rsplit("-", 1)[-1])
-                next_num = last_num + 1
-            except (ValueError, IndexError):
-                next_num = 1
-        else:
-            next_num = 1
+        next_num = _next_reference_number(result.scalars().all())
 
         return f"{prefix}{next_num:03d}"
 
@@ -654,21 +689,21 @@ class PurchaseOrderRepository:
         e.g. BDC-GEM-CC-0001-0001
         """
         prefix = f"BDC-{framework_contract_reference}-"
+
+        # Sérialise l'allocation pour cette famille de préfixe (anti-race condition).
+        # Le verrou tient jusqu'au commit de la requête, couvrant l'insert ultérieur.
+        await self.session.execute(
+            text("SELECT pg_advisory_xact_lock(:k)"),
+            {"k": _reference_lock_key(prefix)},
+        )
+
+        # Tri numérique (et non lexicographique via MAX) : 1000 > 999.
         result = await self.session.execute(
-            select(func.max(PurchaseOrderModel.reference)).where(
+            select(PurchaseOrderModel.reference).where(
                 PurchaseOrderModel.reference.like(f"{prefix}%")
             )
         )
-        max_ref = result.scalar_one_or_none()
-
-        if max_ref:
-            try:
-                last_num = int(max_ref.rsplit("-", 1)[-1])
-                next_num = last_num + 1
-            except (ValueError, IndexError):
-                next_num = 1
-        else:
-            next_num = 1
+        next_num = _next_reference_number(result.scalars().all())
 
         return f"{prefix}{next_num:03d}"
 
@@ -753,13 +788,18 @@ class PurchaseOrderRequestRepository:
 
     async def get_by_positioning_id(self, positioning_id: int) -> PurchaseOrderRequest | None:
         """Get an active POR by Boond positioning ID (excludes cancelled)."""
+        # Robuste aux doublons éventuels en base : on prend le plus récent
+        # plutôt que de lever MultipleResultsFound.
         result = await self.session.execute(
-            select(PurchaseOrderRequestModel).where(
+            select(PurchaseOrderRequestModel)
+            .where(
                 PurchaseOrderRequestModel.boond_positioning_id == positioning_id,
                 PurchaseOrderRequestModel.status != PurchaseOrderRequestStatus.CANCELLED.value,
             )
+            .order_by(PurchaseOrderRequestModel.created_at.desc())
+            .limit(1)
         )
-        model = result.scalar_one_or_none()
+        model = result.scalars().first()
         return self._to_entity(model) if model else None
 
     async def list_all(
@@ -819,20 +859,21 @@ class PurchaseOrderRequestRepository:
         """Generate the next reference in format {CODE}-PO-NNN."""
         code = company_code.upper()
         prefix = f"{code}-PO-"
+
+        # Sérialise l'allocation pour cette famille de préfixe (anti-race condition).
+        # Le verrou tient jusqu'au commit de la requête, couvrant l'insert ultérieur.
+        await self.session.execute(
+            text("SELECT pg_advisory_xact_lock(:k)"),
+            {"k": _reference_lock_key(prefix)},
+        )
+
+        # Tri numérique (et non lexicographique via MAX) : 1000 > 999.
         result = await self.session.execute(
-            select(func.max(PurchaseOrderRequestModel.reference)).where(
+            select(PurchaseOrderRequestModel.reference).where(
                 PurchaseOrderRequestModel.reference.like(f"{prefix}%")
             )
         )
-        max_ref = result.scalar_one_or_none()
-        if max_ref:
-            try:
-                last_num = int(max_ref.rsplit("-", 1)[-1])
-                next_num = last_num + 1
-            except (ValueError, IndexError):
-                next_num = 1
-        else:
-            next_num = 1
+        next_num = _next_reference_number(result.scalars().all())
         return f"{prefix}{next_num:03d}"
 
     async def save(self, por: PurchaseOrderRequest) -> PurchaseOrderRequest:
