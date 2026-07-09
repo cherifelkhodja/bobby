@@ -524,6 +524,45 @@ async def debug_resource_provider(resource_id: int):
 
 
 @router.get(
+    "/boondmanager/debug-positioning/{positioning_id}",
+    summary="Debug: dump a Boond positioning payload (fields for BDC)",
+)
+async def debug_positioning(positioning_id: int):
+    """Dump the raw + parsed positioning payload used to pre-fill a BDC.
+
+    Lets us confirm the exact Boond attribute keys for TJM (tarif de vente),
+    billed days, dates and consultant. Not available in production.
+    """
+    settings = get_settings()
+    if settings.is_production:
+        return {"status": "error", "message": "Not available in production"}
+
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.infrastructure.boond.client import BoondClient
+
+    boond_client = BoondClient(settings)
+    crm = BoondCrmAdapter(boond_client)
+
+    raw_attributes: dict = {}
+    try:
+        response = await boond_client._make_request("GET", f"/positionings/{positioning_id}")
+        raw_attributes = response.get("data", {}).get("attributes", {})
+    except Exception as exc:  # noqa: BLE001
+        raw_attributes = {"error": str(exc)}
+
+    parsed = await crm.get_positioning(positioning_id)
+
+    return {
+        "status": "ok",
+        "positioning_id": positioning_id,
+        "raw_attributes": raw_attributes,
+        "parsed_for_bdc": parsed,
+    }
+
+
+@router.get(
     "/boondmanager/debug-cr",
     summary="Debug: check contract requests in DB",
 )

@@ -104,14 +104,31 @@ class BoondCrmAdapter:
                 relationship_keys=list(relationships.keys()),
             )
 
+            # TJM du BDC = tarif de VENTE journalier (« Tarif de vente journalier
+            # (HT) » dans Boond), pas le coût journalier moyen (souvent 0 pour un
+            # externe). Clé `averageDailyPriceForSale` (cf. create_positioning) ;
+            # fallbacks défensifs sur d'autres noms possibles, puis le coût.
+            daily_rate = (
+                attributes.get("averageDailyPriceForSale")
+                or attributes.get("averageDailyPriceExcludingTax")
+                or attributes.get("averageDailyRate")
+                or attributes.get("averageDailyCost")
+            )
+            quantity = (
+                attributes.get("numberOfDaysInvoicedOrQuantity")
+                or attributes.get("numberOfBilledDays")
+                or attributes.get("numberOfDaysFilled")
+            )
+
             return {
                 "id": positioning_id,
                 "state": attributes.get("state"),
                 "candidate_id": candidate_id,
                 "consultant_type": consultant_type,
                 "need_id": need_id,
-                "daily_rate": attributes.get("averageDailyCost"),
-                "quantity": attributes.get("numberOfDaysInvoicedOrQuantity"),
+                "daily_rate": daily_rate,
+                "daily_cost": attributes.get("averageDailyCost"),
+                "quantity": quantity,
                 "start_date": attributes.get("startDate"),
                 "end_date": attributes.get("endDate"),
                 "consultant_first_name": consultant_first_name,
