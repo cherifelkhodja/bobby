@@ -138,6 +138,13 @@
 | Tests intégration HR | Acceptent 500 quand BoondManager indisponible — mocker le client Boond | Low |
 | Gros composants frontend | HRDashboard.tsx (771 LOC), MyBoondOpportunities.tsx (768 LOC) | Low |
 | Accessibilité | ARIA labels manquants sur certains composants | Low |
+| Signature YouSign auto | `create_procedure` non branché (flux manuel `mark-as-signed` seul) ; webhook rendu idempotent mais inerte tant qu'aucun `yousign_procedure_id` n'est associé | Medium |
+| Format références contrat | Code en `:03d` (3 chiffres) vs docstrings `NNNN` (4 chiffres) — trancher avant d'atteindre 1000 réf/an/société | Medium |
+| Colonnes DateTime naïves | `TIMESTAMP WITHOUT TIME ZONE` → `datetime.utcnow()` conservé (asyncpg refuse tz-aware) ; migrer en `timezone=True` pour passer à `datetime.now(UTC)` | Low |
+| Montant PO Boond | `amountExcludingTax` = TJM unitaire (ni `quantity` ni `turnoverExcludingTax` envoyés) — confirmer la sémantique attendue par `/purchase-orders` | Medium |
+| Repo sans `get_latest_by_candidate_id` | Garde anti double-CR best-effort côté candidat_11 pur (dédup pleine côté ressource) | Low |
+| RLS décorative | `set_rls_context` jamais appelé + policy `app.user_email` non définie + tables `cm_*` récentes sans policy — isolation reposant sur le filtre applicatif | Medium |
+| Webhook Boond `X-Webhook-Token` | Auth ajoutée (secret vide = rétrocompat) ; configurer Boond pour envoyer le header avant de renseigner le secret | Medium |
 
 ---
 
@@ -187,6 +194,24 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-07-09 (audit croisé + corrections du module Contractualisation)
+
+**Audit** : revue croisée en 5 couches (domaine, use cases, infrastructure, API/sécurité, frontend) du module `contract_management`. ~50 constats. **3 bloquants** confirmés indépendamment par plusieurs couches : génération de références par `MAX+1` (déjà réparée à la main via migrations 073/074), signature YouSign inerte, syncs BoondManager non idempotentes.
+
+**Corrections — 8 lots** (branche `claude/contract-drafting-analysis-jgayzb`) :
+- **Références** (`postgres_contract_repo.py`) : `pg_advisory_xact_lock` par famille de préfixe + tri **numérique** des suffixes → fin des collisions concurrentes et du blocage lexicographique à la 1000ᵉ référence. `save()` persiste `boond_candidate_id`/`boond_consultant_type`. `get_by_positioning_id` sans `MultipleResultsFound`.
+- **Idempotence Boond** : timeout 5→30 s, retry limité aux erreurs transport, `verify_company_exists` ne recrée plus de société sur panne transitoire, `create_*` lèvent au lieu de renvoyer `0`, contacts/PO réutilisés (retry sans doublon), `push_to_crm` n'archive que depuis `ACTIVE`.
+- **Webhooks/signature** : auth `X-Webhook-Token` (Boond) + vraie vérif HMAC (YouSign) ; webhook YouSign rendu effectif + idempotent (ne casse pas `mark-as-signed`) ; suppression du générateur DOCX mort (`docx_contract_generator.py`), factory repointée sur `HtmlPdfContractGenerator`.
+- **Sécurité API** : IDOR `validate-commercial` + `/consultants` (ownership) ; 22 fuites d'exceptions assainies (dont réponses Boond brutes) ; `rollback` bloqué en prod ; `SlowAPIMiddleware` activé ; `is_active` vérifié dans les dépendances de rôle.
+- **Portail public** : `DomainError` → 4xx propres (plus de 500 bruts) ; `check-siren` gardé (transition + `positioning_id` None) ; magic links à **usage unique** (flag `is_revoked` existant, sans migration) ; chartes scoping + `purpose` ; uploads validés (type/taille) ; échec d'envoi email **non silencieux**.
+- **Use cases** : validation de transition **avant** les effets de bord (S3/email) ; vigilance non sautée sur documents vides ; parité d'idempotence `create_contract_request_from_entity` ; cron renouvellement inclut `EXPIRING_SOON` ; erreurs de rendu Jinja loggées.
+- **Domaine** : `status_history` amorcé au statut initial + rollback non destructif ; ports `CrmService`/`ContractRepository` alignés sur l'adapter réel.
+- **Frontend** : éditions d'articles préservées avant régénération ; gating rôles (403 silencieux corrigés) ; invalidation React Query après mutations ; bouton « relancer la synchronisation » Boond ; toasts d'erreur portail.
+
+**⚠️ Vérification** : environnement sans pytest/DB (ni deps app) → correctifs validés au `ruff`/`py_compile` **uniquement**. **Validation runtime à faire en CI.** Rapport d'audit détaillé disponible en artefact.
+
+**À arbitrer (NEEDS-CONFIRMATION)** — voir la table *Dette technique* : câblage auto YouSign, format réf 3/4 chiffres, migration DateTime tz-aware, sémantique montant PO Boond, `get_latest_by_candidate_id`, activation RLS, header webhook Boond. **Changement de flux** : un échec d'envoi d'email de collecte bloque désormais l'avancement du CR (rollback) au lieu d'échouer silencieusement.
 
 ### 2026-06-09 (fix: génération devis Thales — erreur Boond 422 schéma)
 
