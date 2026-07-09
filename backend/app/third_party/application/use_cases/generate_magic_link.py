@@ -39,6 +39,7 @@ class GenerateMagicLinkCommand:
         contract_request_id: UUID | None = None,
         from_email: str | None = None,
         company_name: str | None = None,
+        contract_ref: str = "",
     ) -> None:
         self.third_party_id = third_party_id
         self.purpose = purpose
@@ -46,6 +47,7 @@ class GenerateMagicLinkCommand:
         self.contract_request_id = contract_request_id
         self.from_email = from_email
         self.company_name = company_name
+        self.contract_ref = contract_ref
 
 
 class GenerateMagicLinkUseCase:
@@ -125,7 +127,7 @@ class GenerateMagicLinkUseCase:
                 email_sent = await self._email_service.send_contract_draft_review(
                     to=command.email,
                     third_party_name=third_party.company_name,
-                    contract_ref="",
+                    contract_ref=command.contract_ref,
                     portal_link=portal_url,
                     from_email=command.from_email,
                     company_name=command.company_name,

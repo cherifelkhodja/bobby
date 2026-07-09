@@ -93,7 +93,13 @@ class EmailServicePort(Protocol):
         ...
 
     async def send_document_reminder(
-        self, to: str, third_party_name: str, reminder_number: int, portal_link: str
+        self,
+        to: str,
+        third_party_name: str,
+        reminder_number: int,
+        portal_link: str,
+        from_email: str | None = None,
+        company_name: str | None = None,
     ) -> bool:
         """Send document collection reminder."""
         ...

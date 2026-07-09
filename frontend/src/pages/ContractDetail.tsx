@@ -24,6 +24,7 @@ import {
   GripVertical,
   User,
   X,
+  Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -34,9 +35,10 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
+import { DocumentViewerModal } from '../components/vigilance/DocumentViewerModal';
 import { getErrorMessage } from '../api/client';
 import { CONTRACT_STATUS_CONFIG, getDocumentBadgeConfig } from '../types';
-import type { ContractRequestStatus, ContractRequest } from '../types';
+import type { ContractRequestStatus, ContractRequest, VigilanceDocument } from '../types';
 
 // Progressive UI: status ordering for determining which sections to show
 const STATUS_ORDER: Record<ContractRequestStatus, number> = {
@@ -121,6 +123,7 @@ export default function ContractDetail() {
   const [linkCopied, setLinkCopied] = useState(false);
 
   const [tempValidatingDocId, setTempValidatingDocId] = useState<string | null>(null);
+  const [viewingDoc, setViewingDoc] = useState<VigilanceDocument | null>(null);
   const [showSignaturePreview, setShowSignaturePreview] = useState(false);
   const [excludedCharterIds, setExcludedCharterIds] = useState<Set<string>>(new Set());
 
@@ -1176,7 +1179,10 @@ export default function ContractDetail() {
                 Conformité bloquée
               </h3>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                Les documents de conformité du tiers ne sont pas complets.
+                Les documents de vigilance du tiers ne sont pas tous validés : le brouillon
+                de contrat ne peut pas être généré. Validez les documents dans la section
+                « Documents de conformité » ci-dessous, ou forcez la conformité en justifiant
+                la dérogation.
               </p>
               {!showOverride ? (
                 <Button
@@ -1551,6 +1557,23 @@ export default function ContractDetail() {
         </Card>
       )}
 
+      {/* Document viewer modal (vigilance documents) */}
+      {viewingDoc && (
+        <DocumentViewerModal
+          doc={viewingDoc}
+          onClose={() => setViewingDoc(null)}
+          onValidate={() => {
+            validateDocMutation.mutate(viewingDoc.id);
+            setViewingDoc(null);
+          }}
+          onRejectStart={() => {
+            setRejectingDocId(viewingDoc.id);
+            setViewingDoc(null);
+          }}
+          isValidating={validateDocMutation.isPending}
+        />
+      )}
+
       {/* Compliance documents — ADV/admin only (GET /vigilance/.../documents is ADV-scoped) */}
       {isAdv && complianceDocs && complianceDocs.documents.length > 0 && hasReachedStatus(cr.status, 'collecting_documents') && (
         <Card className="mb-6">
@@ -1563,6 +1586,10 @@ export default function ContractDetail() {
               const docBadge = getDocumentBadgeConfig(doc);
               const canValidate = isAdv && doc.status === 'received';
               const canTempValidate = isAdv && doc.status === 'requested' && doc.is_unavailable;
+              // Champs d'auto-analyse éditables (les dates/validité sont gérées à part) :
+              // sans champ éditable, le bouton « Modifier » ouvrirait un formulaire vide.
+              const editableAutoCheckEntries = Object.entries(doc.auto_check_results ?? {})
+                .filter(([k]) => !['is_valid', 'document_date', 'expiry_date'].includes(k));
               const isTempValidating = tempValidatingDocId === doc.id;
               const isRejecting = rejectingDocId === doc.id;
               return (
@@ -1588,6 +1615,14 @@ export default function ContractDetail() {
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${docBadge.color}`}>
                         {docBadge.label}
                       </span>
+                      {doc.s3_key && (
+                        <button
+                          onClick={() => setViewingDoc(doc)}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 px-2 py-1 rounded transition-colors"
+                        >
+                          <Eye className="h-3.5 w-3.5" /> Visualiser
+                        </button>
+                      )}
                       {canValidate && (
                         <>
                           <button
@@ -1679,12 +1714,14 @@ export default function ContractDetail() {
                         <div className="flex gap-1">
                           {isAdv && (
                             <>
-                              <button
-                                onClick={() => setEditingAutoCheck({ docId: doc.id, data: { ...doc.auto_check_results } as Record<string, string> })}
-                                className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
-                              >
-                                Modifier
-                              </button>
+                              {editableAutoCheckEntries.length > 0 && (
+                                <button
+                                  onClick={() => setEditingAutoCheck({ docId: doc.id, data: { ...doc.auto_check_results } as Record<string, string> })}
+                                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                                >
+                                  Modifier
+                                </button>
+                              )}
                               <button
                                 onClick={() => reExtractMutation.mutate(doc.id)}
                                 disabled={reExtractMutation.isPending}

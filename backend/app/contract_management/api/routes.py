@@ -34,6 +34,10 @@ from app.contract_management.application.use_cases.validate_commercial import (
     ValidateCommercialCommand,
     ValidateCommercialUseCase,
 )
+from app.contract_management.domain.exceptions import (
+    ComplianceBlockError,
+    InvalidContractStatusError,
+)
 from app.contract_management.domain.value_objects.contract_request_status import (
     ContractRequestStatus,
 )
@@ -1140,6 +1144,27 @@ async def generate_draft(
 
     try:
         contract = await use_case.execute(contract_request_id)
+    except ComplianceBlockError as exc:
+        logger.warning("generate_draft_blocked_by_compliance", error=str(exc))
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Impossible de générer le brouillon : les documents de vigilance du "
+                "sous-traitant ne sont pas encore tous validés. Validez les documents "
+                "dans la section « Documents de conformité » (ou forcez la conformité "
+                "avec une justification) avant de générer le contrat."
+            ),
+        )
+    except InvalidContractStatusError as exc:
+        logger.warning("generate_draft_invalid_status", error=str(exc))
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Impossible de générer le brouillon : le statut actuel de la demande "
+                "ne le permet pas. Vérifiez que la validation commerciale et la revue "
+                "de conformité ont bien été effectuées."
+            ),
+        )
     except Exception as exc:
         logger.error("generate_draft_failed", error=str(exc))
         raise HTTPException(status_code=400, detail="La génération du projet de contrat a échoué.")
@@ -1294,6 +1319,7 @@ async def resend_draft_email(
                 contract_request_id=cr.id,
                 from_email=company_email_from,
                 company_name=company_name,
+                contract_ref=cr.display_reference,
             )
         )
     except Exception as exc:

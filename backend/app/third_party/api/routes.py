@@ -783,12 +783,22 @@ async def submit_contract_review(
             row = r.first()
             return (row.email_from, row.name) if row else (None, None)
 
+        # Émetteurs internes du contrat (ADV/admin) à notifier de la décision
+        # du partenaire, en plus du commercial.
+        from app.domain.value_objects import UserRole
+        from app.infrastructure.database.repositories.user_repository import UserRepository
+
+        user_repo = UserRepository(db)
+        internal_users = await user_repo.list_by_roles([UserRole.ADV, UserRole.ADMIN])
+        internal_recipients = [str(u.email) for u in internal_users if u.email]
+
         use_case = ProcessPartnerReviewUseCase(
             contract_request_repository=cr_repo,
             contract_repository=contract_repo,
             email_service=email_service,
             draft_regenerator=draft_regenerator,
             company_email_resolver=_resolve_company_email_for_cr,
+            internal_recipients=internal_recipients,
         )
 
         updated = await use_case.execute(

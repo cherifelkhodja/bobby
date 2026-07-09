@@ -30,12 +30,23 @@ class ProcessPartnerReviewUseCase:
         email_service,
         draft_regenerator=None,
         company_email_resolver=None,
+        internal_recipients: list[str] | None = None,
     ) -> None:
         self._cr_repo = contract_request_repository
         self._contract_repo = contract_repository
         self._email_service = email_service
         self._draft_regenerator = draft_regenerator
         self._company_email_resolver = company_email_resolver
+        # Emails des émetteurs internes (ADV/admin) à notifier en plus du commercial
+        self._internal_recipients = internal_recipients or []
+
+    def _notification_recipients(self, cr) -> list[str]:
+        """Commercial + émetteurs internes (ADV/admin), dédupliqués, sans vide."""
+        recipients: list[str] = []
+        for addr in [cr.commercial_email, *self._internal_recipients]:
+            if addr and addr not in recipients:
+                recipients.append(addr)
+        return recipients
 
     async def execute(
         self,
@@ -102,15 +113,16 @@ class ProcessPartnerReviewUseCase:
                 final_reference=cr.reference,
             )
             client_label = f" pour <strong>{cr.client_name}</strong>" if cr.client_name else ""
-            await self._email_service.send_contract_progress_to_commercial(
-                to=cr.commercial_email,
-                contract_ref=cr.display_reference,
-                step_title="Partenaire a approuvé le contrat",
-                step_message=f"Le partenaire a validé le projet de contrat{client_label}. Le contrat peut maintenant être envoyé en signature.",
-                step_color="#10b981",
-                from_email=_from_email,
-                company_name=_company_name,
-            )
+            for recipient in self._notification_recipients(cr):
+                await self._email_service.send_contract_progress_to_commercial(
+                    to=recipient,
+                    contract_ref=cr.display_reference,
+                    step_title="Partenaire a approuvé le contrat",
+                    step_message=f"Le partenaire a validé le projet de contrat{client_label}. Le contrat peut maintenant être envoyé en signature.",
+                    step_color="#10b981",
+                    from_email=_from_email,
+                    company_name=_company_name,
+                )
 
             # Regenerate the draft PDF with the final reference
             if self._draft_regenerator:
@@ -140,18 +152,19 @@ class ProcessPartnerReviewUseCase:
                 contract.partner_comments = comments
                 await self._contract_repo.save(contract)
 
-            # Notify commercial
-            await self._email_service.send_contract_progress_to_commercial(
-                to=cr.commercial_email,
-                contract_ref=cr.display_reference,
-                step_title="Partenaire demande des modifications",
-                from_email=_from_email,
-                company_name=_company_name,
-                step_message=f"Le partenaire a demandé des modifications sur le contrat"
-                f"{' pour <strong>' + cr.client_name + '</strong>' if cr.client_name else ''}."
-                f"{('<br><br><strong>Commentaires :</strong> ' + comments) if comments else ''}",
-                step_color="#f59e0b",
-            )
+            # Notify commercial + émetteurs internes (ADV/admin)
+            for recipient in self._notification_recipients(cr):
+                await self._email_service.send_contract_progress_to_commercial(
+                    to=recipient,
+                    contract_ref=cr.display_reference,
+                    step_title="Partenaire demande des modifications",
+                    from_email=_from_email,
+                    company_name=_company_name,
+                    step_message=f"Le partenaire a demandé des modifications sur le contrat"
+                    f"{' pour <strong>' + cr.client_name + '</strong>' if cr.client_name else ''}."
+                    f"{('<br><br><strong>Commentaires :</strong> ' + comments) if comments else ''}",
+                    step_color="#f59e0b",
+                )
 
             logger.info(
                 "partner_requested_changes",
