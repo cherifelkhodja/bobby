@@ -20,6 +20,18 @@ class SendForSignatureUseCase:
     Simply marks the CR as sent for signature without calling any
     external signature service. The actual signing happens outside
     the system and is validated manually via the mark-as-signed endpoint.
+
+    # NEEDS-CONFIRMATION : le câblage automatique YouSign n'est pas branché ici.
+    # ``YouSignClient.create_procedure`` existe mais n'est appelé nulle part, et
+    # la route de production (``routes.py``, hors périmètre modifiable) ne fournit
+    # à ce use case que ``contract_request_repository`` — sans client YouSign, ni
+    # ``contract_repository``, ni accès S3 au brouillon PDF à faire signer.
+    # Le brancher (appel ``create_procedure`` + persistance de
+    # ``yousign_procedure_id`` sur le contrat) nécessiterait de modifier la route
+    # et le repository, non inclus dans le périmètre. Le flux reste donc MANUEL :
+    # la signature est validée via l'endpoint ``mark-as-signed``. Côté webhook
+    # YouSign, la réception est déjà sécurisée (HMAC) et idempotente : elle reste
+    # un no-op tant qu'aucun ``yousign_procedure_id`` n'est associé à un contrat.
     """
 
     def __init__(

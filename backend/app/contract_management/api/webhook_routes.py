@@ -1,10 +1,12 @@
 """Webhook routes for BoondManager and YouSign."""
 
+import hashlib
+import hmac
 import json
 import traceback
 
 import structlog
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -23,6 +25,29 @@ from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_lo
 logger = structlog.get_logger()
 
 router = APIRouter(tags=["Webhooks"])
+
+
+def _verify_boond_webhook_token(request: Request, settings) -> None:
+    """Vérifie le secret partagé des webhooks BoondManager.
+
+    Si ``BOOND_WEBHOOK_SECRET`` est configuré, le header ``X-Webhook-Token``
+    doit correspondre (comparaison à temps constant via ``hmac.compare_digest``) ;
+    sinon la requête est rejetée en 401.
+
+    Si le secret est vide, on laisse passer (rétrocompatibilité) avec un warning.
+
+    # NEEDS-CONFIRMATION : BoondManager doit être configuré pour envoyer le
+    # header ``X-Webhook-Token`` avec la valeur du secret partagé.
+    """
+    expected = getattr(settings, "BOOND_WEBHOOK_SECRET", "") or ""
+    if not expected:
+        logger.warning("boond_webhook_secret_not_configured")
+        return
+
+    provided = request.headers.get("X-Webhook-Token", "")
+    if not provided or not hmac.compare_digest(provided, expected):
+        logger.warning("boond_webhook_invalid_token")
+        raise HTTPException(status_code=401, detail="Invalid webhook token")
 
 
 def _make_company_email_resolver(db):
@@ -58,6 +83,7 @@ async def handle_boond_positioning_webhook(
     Always returns 200 OK to prevent retries from Boond.
     """
     settings = get_settings()
+    _verify_boond_webhook_token(request, settings)
 
     # Log raw body for debugging
     raw_body = await request.body()
@@ -163,6 +189,7 @@ async def handle_boond_candidate_webhook(
     Always returns 200 OK to prevent retries from Boond.
     """
     settings = get_settings()
+    _verify_boond_webhook_token(request, settings)
 
     raw_body = await request.body()
     logger.info(
@@ -262,6 +289,7 @@ async def handle_boond_resource_webhook(
     Always returns 200 OK to prevent retries from Boond.
     """
     settings = get_settings()
+    _verify_boond_webhook_token(request, settings)
 
     raw_body = await request.body()
     logger.info(
@@ -489,20 +517,31 @@ async def handle_yousign_webhook(
     """Handle signature completed event from YouSign."""
     settings = get_settings()
 
+    # On lit le corps brut pour vérifier la signature HMAC AVANT de parser.
+    raw_body = await request.body()
+
+    # Vraie vérification HMAC : hmac.new(secret, raw_body, sha256) comparé
+    # au header via compare_digest. Secret vide → warning + on laisse passer.
+    webhook_secret = settings.YOUSIGN_WEBHOOK_SECRET
+    if webhook_secret:
+        signature = request.headers.get("x-yousign-signature", "")
+        # YouSign peut préfixer la signature par "sha256=".
+        if signature.startswith("sha256="):
+            signature = signature[len("sha256=") :]
+        expected = hmac.new(
+            webhook_secret.encode("utf-8"), raw_body, hashlib.sha256
+        ).hexdigest()
+        if not signature or not hmac.compare_digest(signature, expected):
+            logger.warning("yousign_webhook_invalid_signature")
+            return WebhookResponse(status="ok", message="Invalid signature")
+    else:
+        logger.warning("yousign_webhook_secret_not_configured")
+
     try:
-        payload = await request.json()
+        payload = json.loads(raw_body)
     except Exception:
         logger.warning("yousign_webhook_invalid_json")
         return WebhookResponse(status="ok", message="Invalid JSON")
-
-    # Verify webhook secret if configured
-    webhook_secret = settings.YOUSIGN_WEBHOOK_SECRET
-    if webhook_secret:
-        # YouSign sends signature in header
-        signature = request.headers.get("x-yousign-signature", "")
-        if not signature:
-            logger.warning("yousign_webhook_no_signature")
-            return WebhookResponse(status="ok", message="Missing signature")
 
     audit_logger.log(
         AuditAction.WEBHOOK_RECEIVED,
@@ -554,7 +593,31 @@ async def handle_yousign_webhook(
             company_email_resolver=_make_company_email_resolver(db),
         )
 
-        await use_case.execute(procedure_id)
+        # Résolution procédure YouSign → contrat. Le repository n'expose pas de
+        # finder dédié (fichier hors périmètre modifiable), on interroge donc le
+        # modèle directement, comme le fait déjà le flux manuel mark-as-signed.
+        from sqlalchemy import select
+
+        from app.contract_management.infrastructure.models import ContractModel
+
+        result = await db.execute(
+            select(ContractModel.id)
+            .where(ContractModel.yousign_procedure_id == procedure_id)
+            .limit(1)
+        )
+        contract_id = result.scalar_one_or_none()
+        if not contract_id:
+            # Aucun contrat associé à cette procédure. En l'état, le flux auto
+            # n'assigne pas encore yousign_procedure_id (cf. send_for_signature,
+            # # NEEDS-CONFIRMATION) : ce webhook reste donc un no-op sûr.
+            logger.warning(
+                "yousign_webhook_no_matching_contract", procedure_id=procedure_id
+            )
+            return WebhookResponse(status="ok", message="No matching contract")
+
+        # Idempotent : no-op si déjà SIGNED (ne casse pas mark-as-signed manuel).
+        await use_case.execute_for_contract(contract_id)
+        await db.commit()
 
         audit_logger.log(
             AuditAction.CONTRACT_SIGNED,
@@ -564,5 +627,6 @@ async def handle_yousign_webhook(
 
         return WebhookResponse(status="ok", message="Signature processed")
     except Exception as exc:
+        await db.rollback()
         logger.error("yousign_webhook_processing_error", error=str(exc))
         return WebhookResponse(status="ok", message="Processing error")

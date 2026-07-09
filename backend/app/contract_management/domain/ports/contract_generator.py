@@ -16,6 +16,6 @@ class ContractGeneratorPort(Protocol):
             template_context: Variables for the contract template.
 
         Returns:
-            Generated document content as bytes (DOCX format).
+            Generated document content as bytes (PDF format).
         """
         ...
