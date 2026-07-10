@@ -2,7 +2,6 @@
 
 import re
 from datetime import datetime
-from typing import TYPE_CHECKING
 from uuid import UUID
 
 import structlog
@@ -19,7 +18,6 @@ from app.contract_management.api.schemas import (
     ContractRequestListResponse,
     ContractRequestResponse,
     ContractResponse,
-    PurchaseOrderRequestValidationRequest,
 )
 from app.contract_management.application.use_cases.block_compliance import (
     BlockComplianceUseCase,
@@ -33,6 +31,10 @@ from app.contract_management.application.use_cases.start_compliance_review impor
 from app.contract_management.application.use_cases.validate_commercial import (
     ValidateCommercialCommand,
     ValidateCommercialUseCase,
+)
+from app.contract_management.domain.exceptions import (
+    ComplianceBlockError,
+    InvalidContractStatusError,
 )
 from app.contract_management.domain.value_objects.contract_request_status import (
     ContractRequestStatus,
@@ -54,9 +56,6 @@ from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
 )
 from app.vigilance.application.use_cases.request_documents import RequestDocumentsUseCase
 from app.vigilance.infrastructure.adapters.postgres_document_repo import DocumentRepository
-
-if TYPE_CHECKING:
-    from app.contract_management.api.schemas import PurchaseOrderRequestResponse
 
 logger = structlog.get_logger()
 
@@ -888,14 +887,13 @@ async def cancel_contract_request(
     user_id: AdvOrAdminUser,
     db: AsyncSession = Depends(get_db),
 ):
-    """Cancel a contract request. ADV/admin only.
+    """Cancel a contract request (contrat cadre). ADV/admin only.
 
-    Only allowed when the Boond positioning state is no longer 7 or 2.
+    Depuis la refonte BDC, un ContractRequest n'est plus lié à un positionnement
+    (les contrats cadres proviennent des webhooks candidat/ressource ; les
+    positionnements créent des BDC). L'annulation ne dépend donc plus de l'état
+    du positionnement Boond — seule la transition de statut du CR est vérifiée.
     """
-    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
-        BoondCrmAdapter,
-    )
-    from app.infrastructure.boond.client import BoondClient
     from app.infrastructure.email.sender import EmailService
 
     settings = get_settings()
@@ -910,25 +908,7 @@ async def cancel_contract_request(
             detail=f"Impossible d'annuler une demande au statut '{cr.status.display_name}'.",
         )
 
-    # Check Boond positioning state — only allow cancel if state is NOT 7 or 2
-    # Skip check if no positioning (e.g. contract triggered by candidate state change)
     boond_state = None
-    if cr.boond_positioning_id:
-        boond_crm = BoondCrmAdapter(BoondClient(settings))
-        positioning = await boond_crm.get_positioning(cr.boond_positioning_id)
-        if positioning:
-            boond_state = positioning.get("state")
-            BLOCKED_STATES = {
-                2: "Gagné",
-                7: "Gagné attente contrat",
-            }
-            if boond_state in BLOCKED_STATES:
-                label = BLOCKED_STATES[boond_state]
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Annulation impossible : le positionnement Boond est en état « {label} » ({boond_state}).",
-                )
-
     previous_status = cr.status.value
     cr.transition_to(ContractRequestStatus.CANCELLED)
     saved = await cr_repo.save(cr)
@@ -1140,6 +1120,27 @@ async def generate_draft(
 
     try:
         contract = await use_case.execute(contract_request_id)
+    except ComplianceBlockError as exc:
+        logger.warning("generate_draft_blocked_by_compliance", error=str(exc))
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Impossible de générer le brouillon : les documents de vigilance du "
+                "sous-traitant ne sont pas encore tous validés. Validez les documents "
+                "dans la section « Documents de conformité » (ou forcez la conformité "
+                "avec une justification) avant de générer le contrat."
+            ),
+        )
+    except InvalidContractStatusError as exc:
+        logger.warning("generate_draft_invalid_status", error=str(exc))
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Impossible de générer le brouillon : le statut actuel de la demande "
+                "ne le permet pas. Vérifiez que la validation commerciale et la revue "
+                "de conformité ont bien été effectuées."
+            ),
+        )
     except Exception as exc:
         logger.error("generate_draft_failed", error=str(exc))
         raise HTTPException(status_code=400, detail="La génération du projet de contrat a échoué.")
@@ -1294,6 +1295,7 @@ async def resend_draft_email(
                 contract_request_id=cr.id,
                 from_email=company_email_from,
                 company_name=company_name,
+                contract_ref=cr.display_reference,
             )
         )
     except Exception as exc:
@@ -1886,46 +1888,6 @@ async def boond_upload_signed_documents(
 
     result = await _upload_signed_docs_to_boond(db, cr)
     return result
-
-
-@router.delete(
-    "/{contract_request_id}/framework-contracts/{fc_id}",
-    summary="Delete a framework contract (admin only)",
-)
-async def delete_framework_contract(
-    contract_request_id: UUID,
-    fc_id: UUID,
-    user_id: AdvOrAdminUser,
-    db: AsyncSession = Depends(get_db),
-):
-    """Permanently delete a framework contract. Admin only."""
-    from sqlalchemy import delete as sa_delete
-    from sqlalchemy import select as sa_select
-
-    from app.contract_management.infrastructure.models import FrameworkContractModel
-
-    result = await db.execute(
-        sa_select(FrameworkContractModel).where(
-            FrameworkContractModel.id == fc_id,
-        )
-    )
-    fc = result.scalar_one_or_none()
-    if not fc:
-        raise HTTPException(status_code=404, detail="Contrat cadre introuvable.")
-
-    ref = fc.reference
-    await db.execute(sa_delete(FrameworkContractModel).where(FrameworkContractModel.id == fc_id))
-    await db.commit()
-
-    audit_logger.log(
-        AuditAction.CONTRACT_REQUEST_CANCELLED,
-        AuditResource.CONTRACT_REQUEST,
-        user_id=user_id,
-        resource_id=str(fc_id),
-        details={"action": "delete_framework_contract", "reference": ref},
-    )
-
-    return {"status": "ok", "message": f"Contrat cadre {ref} supprime."}
 
 
 @router.delete(
@@ -2789,317 +2751,6 @@ async def rollback_status(
 
     name = await _resolve_commercial_name(db, saved.commercial_email)
     return _cr_to_response(saved, commercial_name=name)
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# Purchase order requests (BDC workflow)
-# ═══════════════════════════════════════════════════════════════════════
-
-por_router = APIRouter(tags=["Purchase Order Requests"])
-
-
-def _por_to_response(
-    por,
-    *,
-    commercial_name: str | None = None,
-    fc_reference: str | None = None,
-) -> "PurchaseOrderRequestResponse":
-    from app.contract_management.api.schemas import PurchaseOrderRequestResponse
-
-    return PurchaseOrderRequestResponse(
-        id=por.id,
-        framework_contract_id=por.framework_contract_id,
-        framework_contract_reference=fc_reference,
-        reference=por.reference,
-        boond_positioning_id=por.boond_positioning_id,
-        boond_candidate_id=por.boond_candidate_id,
-        status=por.status.value,
-        status_display=por.status.display_name,
-        daily_rate=float(por.daily_rate) if por.daily_rate else None,
-        quantity_sold=por.quantity_sold,
-        start_date=por.start_date,
-        end_date=por.end_date,
-        client_name=por.client_name,
-        mission_title=por.mission_title,
-        consultant_civility=por.consultant_civility,
-        consultant_first_name=por.consultant_first_name,
-        consultant_last_name=por.consultant_last_name,
-        consultant_email=por.consultant_email,
-        consultant_phone=por.consultant_phone,
-        commercial_email=por.commercial_email,
-        commercial_name=commercial_name,
-        third_party_id=por.third_party_id,
-        purchase_order_id=por.purchase_order_id,
-        original_contract_request_id=por.original_contract_request_id,
-        status_history=por.status_history or [],
-        created_at=por.created_at,
-        updated_at=por.updated_at,
-    )
-
-
-@por_router.get(
-    "",
-    summary="List purchase order requests",
-)
-async def list_purchase_order_requests(
-    auth: ContractAccessUser,
-    db: AsyncSession = Depends(get_db),
-    skip: int = 0,
-    limit: int = 20,
-    status_filter: str | None = None,
-):
-    """List purchase order requests. Commercial sees own, ADV/admin see all."""
-    from app.contract_management.api.schemas import PurchaseOrderRequestListResponse
-    from app.contract_management.domain.value_objects.purchase_order_request_status import (
-        PurchaseOrderRequestStatus,
-    )
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-        PurchaseOrderRequestRepository,
-    )
-
-    _user_id, role, email = auth
-    por_repo = PurchaseOrderRequestRepository(db)
-
-    status = PurchaseOrderRequestStatus(status_filter) if status_filter else None
-
-    if role == "commercial":
-        items = await por_repo.list_by_commercial_email(
-            email, skip=skip, limit=limit, status=status
-        )
-        total = await por_repo.count_by_commercial_email(email, status=status)
-    else:
-        items = await por_repo.list_all(skip=skip, limit=limit, status=status)
-        total = await por_repo.count(status=status)
-
-    emails = list({por.commercial_email for por in items})
-    name_map = await _resolve_commercial_names(db, emails) if emails else {}
-
-    return PurchaseOrderRequestListResponse(
-        items=[
-            _por_to_response(por, commercial_name=name_map.get(por.commercial_email))
-            for por in items
-        ],
-        total=total,
-        skip=skip,
-        limit=limit,
-    )
-
-
-@por_router.get(
-    "/{por_id}",
-    summary="Get purchase order request details",
-)
-async def get_purchase_order_request(
-    por_id: UUID,
-    auth: ContractAccessUser,
-    db: AsyncSession = Depends(get_db),
-):
-    """Get a purchase order request by ID."""
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-        FrameworkContractRepository,
-        PurchaseOrderRequestRepository,
-    )
-
-    _user_id, role, email = auth
-    por_repo = PurchaseOrderRequestRepository(db)
-    por = await por_repo.get_by_id(por_id)
-    if not por:
-        raise HTTPException(status_code=404, detail="Demande de BDC non trouvée.")
-    if role == "commercial" and por.commercial_email != email:
-        raise HTTPException(status_code=403, detail="Accès non autorisé.")
-
-    fc_repo = FrameworkContractRepository(db)
-    fc = await fc_repo.get_by_id(por.framework_contract_id)
-    fc_ref = fc.reference if fc else None
-
-    name = await _resolve_commercial_name(db, por.commercial_email)
-    return _por_to_response(por, commercial_name=name, fc_reference=fc_ref)
-
-
-@por_router.post(
-    "/{por_id}/validate",
-    summary="Validate purchase order request (commercial)",
-)
-async def validate_purchase_order_request(
-    por_id: UUID,
-    body: "PurchaseOrderRequestValidationRequest",
-    auth: ContractAccessUser,
-    db: AsyncSession = Depends(get_db),
-):
-    """Apply commercial validation to a purchase order request."""
-    from app.contract_management.application.use_cases.validate_purchase_order_request import (
-        ValidatePurchaseOrderRequestCommand,
-        ValidatePurchaseOrderRequestUseCase,
-    )
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-        PurchaseOrderRequestRepository,
-    )
-
-    user_id, _role, _email = auth
-    por_repo = PurchaseOrderRequestRepository(db)
-
-    use_case = ValidatePurchaseOrderRequestUseCase(
-        purchase_order_request_repository=por_repo,
-    )
-
-    try:
-        por = await use_case.execute(
-            ValidatePurchaseOrderRequestCommand(
-                purchase_order_request_id=por_id,
-                daily_rate=body.daily_rate,
-                start_date=body.start_date,
-                end_date=body.end_date,
-                quantity_sold=body.quantity_sold,
-                client_name=body.client_name,
-                mission_title=body.mission_title,
-                consultant_civility=body.consultant_civility,
-                consultant_first_name=body.consultant_first_name,
-                consultant_last_name=body.consultant_last_name,
-                consultant_email=body.consultant_email,
-                consultant_phone=body.consultant_phone,
-            )
-        )
-    except Exception as exc:
-        logger.error("validate_purchase_order_request_failed", error=str(exc), por_id=str(por_id))
-        raise HTTPException(status_code=400, detail="La validation du bon de commande a échoué.")
-
-    audit_logger.log(
-        AuditAction.COMMERCIAL_VALIDATED,
-        AuditResource.CONTRACT_REQUEST,
-        user_id=user_id,
-        resource_id=str(por_id),
-        details={"action": "purchase_order_request_validated"},
-    )
-
-    name = await _resolve_commercial_name(db, por.commercial_email)
-    return _por_to_response(por, commercial_name=name)
-
-
-@por_router.post(
-    "/{por_id}/finalize",
-    summary="Finalize purchase order request — create BDC",
-)
-async def finalize_purchase_order_request(
-    por_id: UUID,
-    user_id: AdvOrAdminUser,
-    db: AsyncSession = Depends(get_db),
-):
-    """Create the purchase order (BDC) in Bobby and Boond. ADV/admin only."""
-    from app.contract_management.api.schemas import PurchaseOrderResponse
-    from app.contract_management.application.use_cases.finalize_purchase_order_request import (
-        FinalizePurchaseOrderRequestUseCase,
-    )
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-        FrameworkContractRepository,
-        PurchaseOrderRepository,
-        PurchaseOrderRequestRepository,
-    )
-
-    por_repo = PurchaseOrderRequestRepository(db)
-    fc_repo = FrameworkContractRepository(db)
-    po_repo = PurchaseOrderRepository(db)
-    tp_repo = ThirdPartyRepository(db)
-
-    crm_service = None
-    try:
-        settings = get_settings()
-        from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
-            BoondCrmAdapter,
-        )
-        from app.infrastructure.boond.client import BoondClient
-
-        boond_client = BoondClient(settings)
-        crm_service = BoondCrmAdapter(boond_client)
-    except Exception:
-        pass
-
-    use_case = FinalizePurchaseOrderRequestUseCase(
-        purchase_order_request_repository=por_repo,
-        framework_contract_repository=fc_repo,
-        purchase_order_repository=po_repo,
-        third_party_repository=tp_repo,
-        crm_service=crm_service,
-    )
-
-    try:
-        po = await use_case.execute(por_id)
-    except ValueError as exc:
-        logger.error("finalize_purchase_order_request_failed", error=str(exc), por_id=str(por_id))
-        raise HTTPException(status_code=400, detail="La finalisation du bon de commande a échoué.")
-
-    audit_logger.log(
-        AuditAction.COMMERCIAL_VALIDATED,
-        AuditResource.CONTRACT_REQUEST,
-        user_id=user_id,
-        resource_id=str(por_id),
-        details={
-            "action": "purchase_order_finalized",
-            "po_id": str(po.id),
-            "po_reference": po.reference,
-        },
-    )
-
-    return PurchaseOrderResponse(
-        id=po.id,
-        framework_contract_id=po.framework_contract_id,
-        contract_request_id=po.contract_request_id,
-        reference=po.reference,
-        consultant_first_name=po.consultant_first_name,
-        consultant_last_name=po.consultant_last_name,
-        consultant_full_name=po.consultant_full_name,
-        daily_rate=float(po.daily_rate) if po.daily_rate else None,
-        start_date=po.start_date,
-        end_date=po.end_date,
-        quantity=po.quantity,
-        boond_positioning_id=po.boond_positioning_id,
-        boond_purchase_order_id=po.boond_purchase_order_id,
-        status=po.status.value,
-        status_display=po.status.display_name,
-        created_at=po.created_at,
-        updated_at=po.updated_at,
-    )
-
-
-@por_router.delete(
-    "/{por_id}",
-    summary="Cancel purchase order request",
-)
-async def cancel_purchase_order_request(
-    por_id: UUID,
-    user_id: AdvOrAdminUser,
-    db: AsyncSession = Depends(get_db),
-):
-    """Cancel a purchase order request. ADV/admin only."""
-    from app.contract_management.domain.value_objects.purchase_order_request_status import (
-        PurchaseOrderRequestStatus,
-    )
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-        PurchaseOrderRequestRepository,
-    )
-
-    por_repo = PurchaseOrderRequestRepository(db)
-    por = await por_repo.get_by_id(por_id)
-    if not por:
-        raise HTTPException(status_code=404, detail="Demande de BDC non trouvée.")
-
-    try:
-        por.transition_to(PurchaseOrderRequestStatus.CANCELLED)
-    except Exception as exc:
-        logger.error("cancel_purchase_order_request_failed", error=str(exc), por_id=str(por_id))
-        raise HTTPException(status_code=400, detail="L'annulation du bon de commande a échoué.")
-
-    saved = await por_repo.save(por)
-
-    audit_logger.log(
-        AuditAction.COMMERCIAL_VALIDATED,
-        AuditResource.CONTRACT_REQUEST,
-        user_id=user_id,
-        resource_id=str(por_id),
-        details={"action": "purchase_order_request_cancelled"},
-    )
-
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _por_to_response(saved, commercial_name=name)
 
 
 # ── Contract Consultants ─────────────────────────────────────────────────────

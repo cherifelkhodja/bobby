@@ -182,6 +182,51 @@ class TestChangesRequested:
         contract_repo.save.assert_awaited_once_with(contract)
 
 
+class TestInternalRecipients:
+    """L'émetteur interne (ADV/admin) est notifié en plus du commercial."""
+
+    @pytest.mark.asyncio
+    async def test_approved_notifies_commercial_and_internal_recipients(self):
+        """Approval sends the progress email to commercial + ADV/admin issuers."""
+        cr = _make_cr(company_id=uuid4(), reference=None)
+        uc = _make_use_case(cr, internal_recipients=["adv@example.com", "admin@example.com"])
+
+        await uc.execute(cr.id, approved=True)
+
+        calls = uc._email_service.send_contract_progress_to_commercial.call_args_list
+        recipients = [c.kwargs["to"] for c in calls]
+        assert recipients == [
+            "commercial@example.com",
+            "adv@example.com",
+            "admin@example.com",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_changes_requested_notifies_internal_recipients(self):
+        """Changes requested also notifies the internal issuers."""
+        cr = _make_cr()
+        uc = _make_use_case(cr, internal_recipients=["adv@example.com"])
+
+        await uc.execute(cr.id, approved=False, comments="Corriger le TJM")
+
+        calls = uc._email_service.send_contract_progress_to_commercial.call_args_list
+        recipients = [c.kwargs["to"] for c in calls]
+        assert recipients == ["commercial@example.com", "adv@example.com"]
+
+    @pytest.mark.asyncio
+    async def test_recipients_are_deduplicated_and_empty_skipped(self):
+        """Commercial appearing in the internal list is only notified once;
+        a missing commercial_email does not produce an empty recipient."""
+        cr = _make_cr(commercial_email=None)
+        uc = _make_use_case(cr, internal_recipients=["adv@example.com", "adv@example.com"])
+
+        await uc.execute(cr.id, approved=False, comments="doublon")
+
+        calls = uc._email_service.send_contract_progress_to_commercial.call_args_list
+        recipients = [c.kwargs["to"] for c in calls]
+        assert recipients == ["adv@example.com"]
+
+
 class TestNotFound:
     """Missing contract request raises the domain error."""
 

@@ -84,6 +84,7 @@ class SendDraftToPartnerUseCase:
                 contract_request_id=cr.id,
                 from_email=from_email,
                 company_name=company_name,
+                contract_ref=cr.display_reference,
             )
         )
 

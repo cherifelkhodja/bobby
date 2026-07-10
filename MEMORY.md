@@ -195,6 +195,53 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-07-10 (SUPPRESSION complète du module BDC)
+
+**Le module BDC (bons de commande / purchase orders / framework contracts) a été entièrement retiré** du code (backend + frontend), à la demande, pour être réimplémenté différemment. Les entrées de changelog BDC ci-dessous sont donc **historiques** (fonctionnalité supprimée).
+
+Retiré :
+- Entités `PurchaseOrder`, `PurchaseOrderRequest`, `FrameworkContract` + leurs value objects et repositories.
+- Modèles/tables `cm_purchase_orders`, `cm_purchase_order_requests`, `cm_framework_contracts` (**migration 077** — DROP ; migrations 075/076 conservées pour l'historique).
+- Use cases create/validate/finalize purchase order + `create_purchase_order_request_from_positioning`.
+- Routes `/purchase-order-requests/*`, endpoints de debug BDC, page frontend `PurchaseOrderRequestDetail`, onglet « Bons de commande ».
+- Détection contrat cadre au portail SIRET, création `FrameworkContract` à la signature, cron de renouvellement des cadres.
+
+Rétabli à l'état d'avant-refonte :
+- Le webhook `positioning-update` recrée un **`ContractRequest`** (`CreateContractRequestUseCase`), comme avant.
+- `push_to_crm` réarchive le contrat après signature.
+
+Conservé (flux contrat, hors module BDC) : `push_to_crm`, `BoondCrmAdapter.create_purchase_order`, route `/{id}/boond/create-purchase-order`, champ `contract.boond_purchase_order_id`.
+
+Conservé aussi (améliorations de la session, non-BDC) : emails depuis b0bby.fr + Reply-To société, objets explicites, visualisation des documents de conformité depuis le contrat, notification ADV sur revue partenaire, messages d'erreur de génération de brouillon.
+
+### 2026-07-09 (refonte flux BDC — webhook positionnement crée le BDC) [HISTORIQUE — supprimé le 2026-07-10]
+
+**Changement de flux majeur.** Le webhook `positioning-update` (état 7) ne crée plus une `ContractRequest` (contrat cadre) mais directement un **BDC** (`PurchaseOrderRequest`). Le contrat cadre est désormais déclenché **exclusivement** par `candidate-state-update` (candidat état 11).
+
+**Changement de flux majeur.** Le webhook `positioning-update` (état 7) ne crée plus une `ContractRequest` (contrat cadre) mais directement un **BDC** (`PurchaseOrderRequest`). Le contrat cadre est désormais déclenché **exclusivement** par `candidate-state-update` (candidat état 11).
+
+- **Nouveau statut BDC `PENDING_FRAMEWORK_CONTRACT`** (`purchase_order_request_status.py`) : état initial **verrouillé** (non éditable) → transition vers `PENDING_VALIDATION` (éditable). Ajout de `is_editable` sur le statut et l'entité.
+- **`framework_contract_id` rendu nullable** sur `PurchaseOrderRequest` (entité + `cm_purchase_order_requests`, **migration 075**) : un BDC verrouillé n'est rattaché à aucun contrat cadre tant que celui-ci n'est pas signé.
+- **État lu via l'API, pas via le payload** : le payload webhook Boond ne contient PAS le nouvel état (`docs/contracts/webhook-configuration.md`) — le filtre `state=7` est appliqué côté Boond. Le use case récupère donc l'état réel via `GET /positionings/{id}` et re-vérifie (fallback sur l'état du payload de test s'il est présent), au lieu de rejeter sur un état absent. Même pattern que le handler candidat/ressource.
+- **Nouveau use case `CreatePurchaseOrderRequestFromPositioningUseCase`** : parse le positionnement, détecte si le consultant est une **ressource** (`get_positioning.consultant_type`) rattachée à un fournisseur ayant un **contrat cadre actif** (`resource → providerCompany → ThirdParty.boond_provider_id → FrameworkContract`). Si oui → BDC **éditable** (`PENDING_VALIDATION`) + email commercial ; sinon → BDC **verrouillé** (`PENDING_FRAMEWORK_CONTRACT`, pas d'email). Idempotent sur le positionnement.
+- **Déverrouillage à la signature du contrat cadre** (`sync_to_boond_after_signing.py`) : quand le `FrameworkContract` devient actif, les BDC verrouillés du consultant (matchés par `boond_candidate_id`) sont rattachés + passés en `PENDING_VALIDATION` (`PurchaseOrderRequest.unlock()`).
+- **Briques ajoutées** : `BoondCrmAdapter.get_resource_provider_company_id`, `ThirdPartyRepository.get_by_boond_provider_id`, `PurchaseOrderRequestRepository.list_locked_by_candidate_id`.
+- **Portail SIRET** (`third_party/api/routes.py`) : la création de BDC à l'étape SIRET (redondante) est supprimée — le portail informe seulement de l'existence du contrat cadre (le BDC vient du webhook).
+- **Frontend** : bandeau « En attente du contrat cadre » + formulaire d'édition masqué tant que verrouillé (`PurchaseOrderRequestDetail.tsx`) ; statut ajouté à `POR_STATUS_CONFIG` et `framework_contract_id` typé nullable.
+- **Conformité** : pas de blocage sur la conformité au stade BDC (décision produit). `FinalizePurchaseOrderRequestUseCase` ne bloque plus si les documents du fournisseur sont périmés — il journalise un warning et poursuit.
+- **Montant Boond** : le bon de commande envoie désormais le **total HT** = `TJM × quantité de jours` (fallback TJM seul si quantité absente), au lieu du TJM seul. `NEEDS-CONFIRMATION` levé.
+- **Endpoint de debug** : `GET /webhooks/boondmanager/debug-resource/{id}` (désactivé en prod) pour inspecter la relation `providerCompany` d'une ressource Boond. La lecture de `providerCompany` interroge `/resources/{id}/administrative` en priorité + logs de diagnostic (`boond_resource_provider_resolved` / `_not_found`, `bdc_no_third_party_for_provider`, `bdc_no_active_framework_for_supplier`).
+- **Tests** : `test_create_purchase_order_request_from_positioning.py` (filtrage état 7, création éditable/verrouillée, idempotence), `test_purchase_order_request_unlock.py`, `test_finalize_purchase_order_request.py` (pas de blocage conformité, montant total). 549 tests unitaires verts.
+
+### 2026-07-09 (améliorations module contrats de sous-traitance — emails, conformité, notifications)
+
+- **Emails depuis le domaine b0bby.fr** (`sender.py`, `config.py`) : l'envoi se fait désormais **toujours** depuis l'adresse du domaine b0bby.fr (`SMTP_FROM`, défaut passé de `noreply@geminiconsulting.fr` à `noreply@b0bby.fr`). Le `email_from` de la société émettrice n'est **plus utilisé comme From** (domaine non validé pour l'envoi) : il part en **Reply-To**, et le nom de la société devient le **nom d'affichage** de l'expéditeur (`Société <noreply@b0bby.fr>`). Support Reply-To ajouté aux deux transports (Resend + SMTP). Garde ajoutée : destinataire vide → envoi sauté avec warning (plus d'erreur SMTP silencieuse).
+- **Objets d'emails fournisseur explicites** : les emails destinés au sous-traitant précisent la société émettrice et le contexte — `[Société] Sous-traitance {tiers} - Documents requis pour votre dossier`, `[Société] Contrat de sous-traitance {réf} - Votre relecture est attendue` (la référence du contrat transite désormais via `GenerateMagicLinkCommand.contract_ref`), `[Société] Document refusé : {type}`, `[Société] Rappel : documents de sous-traitance en attente (Ne relance)`.
+- **Notification de l'émetteur sur revue partenaire** (`process_partner_review.py`, portail `contract-review`) : quand le fournisseur **approuve** le contrat provisoire ou **demande des modifications**, les utilisateurs **ADV/admin** (émetteurs) sont notifiés par email en plus du commercial (destinataires dédupliqués ; `commercial_email` absent toléré). Avant, seul `commercial_email` était notifié → l'émetteur ADV ne recevait rien.
+- **Message d'erreur explicite sur génération de brouillon** (`routes.py::generate_draft`) : `ComplianceBlockError` et `InvalidContractStatusError` ne sont plus avalées par le catch générique → HTTP 409 avec message expliquant que les documents de vigilance doivent être validés (ou la conformité forcée) avant de générer le contrat. Encart « Conformité bloquée » du frontend aligné sur ce message.
+- **Visualisation des documents de vigilance depuis la page contrat** (`ContractDetail.tsx`) : la modale `DocumentViewerModal` (aperçu PDF/image + téléchargement + valider/rejeter) a été **extraite** de `ComplianceDashboard.tsx` vers `components/vigilance/DocumentViewerModal.tsx` (avec `ExpiryBadge`/`formatDate` exportés) et branchée sur la section « Documents de conformité » du contrat (bouton « Visualiser » sur chaque document déposé). Le bouton « Modifier » des vérifications auto n'apparaît plus quand il n'y a **aucun champ éditable** (il ouvrait un formulaire vide).
+- **Tests** : `test_email_sender.py` (From/Reply-To/nom d'affichage, destinataire vide) + 3 tests destinataires internes dans `test_process_partner_review.py`. 535 tests unitaires verts.
+
 ### 2026-07-09 (audit croisé + corrections du module Contractualisation)
 
 **Audit** : revue croisée en 5 couches (domaine, use cases, infrastructure, API/sécurité, frontend) du module `contract_management`. ~50 constats. **3 bloquants** confirmés indépendamment par plusieurs couches : génération de références par `MAX+1` (déjà réparée à la main via migrations 073/074), signature YouSign inerte, syncs BoondManager non idempotentes.

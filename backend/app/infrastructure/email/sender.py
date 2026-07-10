@@ -46,6 +46,18 @@ class EmailService:
         name = f"Bobby - {company_name}" if company_name else "Bobby"
         return f'<hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;"><p style="color: #666; font-size: 12px;">Cet email a ete envoye par {name}.</p>'
 
+    def _sender_address(self) -> str:
+        """Return the bare sending address (always on the b0bby.fr domain)."""
+        address = self.from_email or ""
+        if "<" in address and address.endswith(">"):
+            address = address.split("<", 1)[1].rstrip(">").strip()
+        return address
+
+    def _format_sender(self, company_name: str | None = None) -> str:
+        """Build the From header: issuing company as display name, b0bby.fr address."""
+        display = company_name or "Bobby"
+        return f"{display} <{self._sender_address()}>"
+
     async def _send_email(
         self,
         to: str,
@@ -56,16 +68,25 @@ class EmailService:
     ) -> bool:
         """Send email via Resend or SMTP.
 
+        L'envoi se fait TOUJOURS depuis le domaine b0bby.fr (seul domaine
+        validé pour l'envoi). L'adresse de la société émettrice (`from_email`)
+        est utilisée en Reply-To, et son nom comme nom d'affichage de
+        l'expéditeur, afin que le destinataire identifie la société.
+
         Args:
             to: Recipient email.
             subject: Email subject.
             html_body: HTML content.
-            from_email: Optional sender override (e.g. per-company email).
-            company_name: Optional company name for footer ("Bobby - {name}").
+            from_email: Optional per-company address, used as Reply-To.
+            company_name: Optional company name (sender display name + footer).
         """
         if not self.enabled:
             logger.info(f"Email notifications disabled. Would send to {to}: {subject}")
             return True
+
+        if not to:
+            logger.warning(f"Email skipped (no recipient): {subject}")
+            return False
 
         # Replace footer with company-aware version
         if company_name:
@@ -74,14 +95,20 @@ class EmailService:
                 f"Cet email a ete envoye par Bobby - {company_name}.",
             )
 
-        sender = from_email or self.from_email
+        sender = self._format_sender(company_name)
+        reply_to = from_email if from_email and from_email != self._sender_address() else None
         if self.use_resend:
-            return await self._send_via_resend(to, subject, html_body, sender)
+            return await self._send_via_resend(to, subject, html_body, sender, reply_to)
         else:
-            return await self._send_via_smtp(to, subject, html_body, sender)
+            return await self._send_via_smtp(to, subject, html_body, sender, reply_to)
 
     async def _send_via_resend(
-        self, to: str, subject: str, html_body: str, sender: str | None = None
+        self,
+        to: str,
+        subject: str,
+        html_body: str,
+        sender: str | None = None,
+        reply_to: str | None = None,
     ) -> bool:
         """Send email via Resend API."""
         try:
@@ -91,6 +118,8 @@ class EmailService:
                 "subject": subject,
                 "html": html_body,
             }
+            if reply_to:
+                params["reply_to"] = [reply_to]
             response = resend.Emails.send(params)
             logger.info(
                 f"Email sent via Resend to {to}: {subject} (id: {response.get('id', 'unknown')})"
@@ -101,7 +130,12 @@ class EmailService:
             return False
 
     async def _send_via_smtp(
-        self, to: str, subject: str, html_body: str, sender: str | None = None
+        self,
+        to: str,
+        subject: str,
+        html_body: str,
+        sender: str | None = None,
+        reply_to: str | None = None,
     ) -> bool:
         """Send email via SMTP."""
         try:
@@ -109,6 +143,8 @@ class EmailService:
             message["Subject"] = subject
             message["From"] = sender or self.from_email
             message["To"] = to
+            if reply_to:
+                message["Reply-To"] = reply_to
 
             html_part = MIMEText(html_body, "html")
             message.attach(html_part)
@@ -452,7 +488,10 @@ class EmailService:
         company_name: str | None = None,
     ) -> bool:
         """Send document collection request to a third party via portal link."""
-        subject = "Documents requis pour votre dossier - Bobby"
+        issuer = company_name or "Bobby"
+        subject = (
+            f"[{issuer}] Sous-traitance {third_party_name} - Documents requis pour votre dossier"
+        )
         html_body = f"""
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"></head>
@@ -460,7 +499,7 @@ class EmailService:
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
                 <h1 style="color: #0ea5e9;">Documents requis</h1>
                 <p>Bonjour,</p>
-                <p>Dans le cadre de notre collaboration avec <strong>{third_party_name}</strong>, nous avons besoin de documents légaux pour constituer votre dossier.</p>
+                <p>Dans le cadre de la contractualisation entre votre société <strong>{third_party_name}</strong> et <strong>{issuer}</strong>, nous avons besoin de documents légaux pour constituer votre dossier de sous-traitance.</p>
                 <p>Veuillez accéder à votre portail sécurisé pour consulter la liste des documents attendus et les téléverser :</p>
                 <p style="text-align: center; margin: 30px 0;">
                     <a href="{portal_link}" style="background-color: #0ea5e9; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
@@ -483,9 +522,15 @@ class EmailService:
         third_party_name: str,
         reminder_number: int,
         portal_link: str,
+        from_email: str | None = None,
+        company_name: str | None = None,
     ) -> bool:
         """Send document collection reminder."""
-        subject = f"Rappel : documents en attente ({reminder_number}e relance) - Bobby"
+        issuer = company_name or "Bobby"
+        subject = (
+            f"[{issuer}] Rappel : documents de sous-traitance en attente "
+            f"({reminder_number}e relance)"
+        )
         urgency = ""
         if reminder_number >= 3:
             urgency = "<p style='color: #ef4444; font-weight: bold;'>Dernier rappel avant blocage de votre dossier.</p>"
@@ -509,7 +554,9 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body)
+        return await self._send_email(
+            to, subject, html_body, from_email=from_email, company_name=company_name
+        )
 
     async def send_document_rejected(
         self,
@@ -522,7 +569,8 @@ class EmailService:
         company_name: str | None = None,
     ) -> bool:
         """Send notification that a document was rejected."""
-        subject = f"Document refusé : {doc_type} - Bobby"
+        issuer = company_name or "Bobby"
+        subject = f"[{issuer}] Document refusé : {doc_type} - Une action est requise"
         html_body = f"""
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"></head>
@@ -559,7 +607,9 @@ class EmailService:
         company_name: str | None = None,
     ) -> bool:
         """Send contract draft for partner review via portal."""
-        subject = f"Contrat à relire - {contract_ref or 'Nouveau contrat'}"
+        issuer = company_name or "Bobby"
+        ref_label = f" {contract_ref}" if contract_ref else ""
+        subject = f"[{issuer}] Contrat de sous-traitance{ref_label} - Votre relecture est attendue"
         html_body = f"""
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"></head>
@@ -567,7 +617,7 @@ class EmailService:
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
                 <h1 style="color: #0ea5e9;">Contrat à valider</h1>
                 <p>Bonjour,</p>
-                <p>Un projet de contrat a été préparé pour <strong>{third_party_name}</strong>.</p>
+                <p>La société <strong>{issuer}</strong> a préparé un projet de contrat de sous-traitance{ref_label} pour <strong>{third_party_name}</strong>.</p>
                 <p>Veuillez le relire et nous indiquer si vous l'approuvez ou si des modifications sont nécessaires.</p>
                 <p style="text-align: center; margin: 30px 0;">
                     <a href="{portal_link}" style="background-color: #0ea5e9; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
@@ -580,7 +630,9 @@ class EmailService:
             </div>
         </body></html>
         """
-        return await self._send_email(to, subject, html_body)
+        return await self._send_email(
+            to, subject, html_body, from_email=from_email, company_name=company_name
+        )
 
     async def send_contract_changes_requested(
         self,

@@ -783,12 +783,22 @@ async def submit_contract_review(
             row = r.first()
             return (row.email_from, row.name) if row else (None, None)
 
+        # Émetteurs internes du contrat (ADV/admin) à notifier de la décision
+        # du partenaire, en plus du commercial.
+        from app.domain.value_objects import UserRole
+        from app.infrastructure.database.repositories.user_repository import UserRepository
+
+        user_repo = UserRepository(db)
+        internal_users = await user_repo.list_by_roles([UserRole.ADV, UserRole.ADMIN])
+        internal_recipients = [str(u.email) for u in internal_users if u.email]
+
         use_case = ProcessPartnerReviewUseCase(
             contract_request_repository=cr_repo,
             contract_repository=contract_repo,
             email_service=email_service,
             draft_regenerator=draft_regenerator,
             company_email_resolver=_resolve_company_email_for_cr,
+            internal_recipients=internal_recipients,
         )
 
         updated = await use_case.execute(
@@ -837,178 +847,6 @@ async def submit_contract_review(
 
 
 # ── Portal Company Info ─────────────────────────────────────────
-
-
-@router.post(
-    "/portal/{token}/check-siren",
-    summary="Step 1: Check SIREN/SIRET for existing framework contract",
-)
-async def check_siren_for_framework_contract(
-    token: str,
-    body: dict,
-    db: AsyncSession = Depends(get_db),
-):
-    """Portal step 1: Supplier enters SIRET.
-
-    Checks if a third party with this SIREN already has an active framework
-    contract. If so, cancels the current ContractRequest and creates a
-    PurchaseOrderRequest instead. Returns the result so the portal frontend
-    can redirect accordingly.
-    """
-    try:
-        siret = body.get("siret", "")
-        if not siret or len(siret) < 9:
-            raise HTTPException(status_code=400, detail="SIRET invalide (14 chiffres requis).")
-
-        result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
-        siren = siret[:9]
-
-        # Check for existing framework contract
-        from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-            FrameworkContractRepository,
-        )
-
-        fc_repo = FrameworkContractRepository(db)
-        fc = await fc_repo.get_by_third_party_siren(siren)
-
-        if fc and fc.is_usable and result.contract_request_id:
-            from app.contract_management.domain.entities.purchase_order_request import (
-                PurchaseOrderRequest,
-            )
-            from app.contract_management.domain.value_objects.contract_request_status import (
-                ContractRequestStatus,
-            )
-            from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-                ContractRequestRepository,
-                PurchaseOrderRequestRepository,
-            )
-
-            cr_repo = ContractRequestRepository(db)
-            cr = await cr_repo.get_by_id(result.contract_request_id)
-
-            fc_payload = {
-                "id": str(fc.id),
-                "reference": fc.reference,
-                "signed_at": fc.signed_at.isoformat() if fc.signed_at else None,
-            }
-
-            if cr:
-                # Ne pas tenter d'annuler une demande déjà avancée (SIGNED/ACTIVE/
-                # ARCHIVED/…) : la transition serait illégale → 500. On informe
-                # simplement le tiers.
-                if not cr.status.can_transition_to(ContractRequestStatus.CANCELLED):
-                    logger.info(
-                        "siren_check_cr_not_cancellable",
-                        cr_id=str(cr.id),
-                        status=cr.status.value,
-                    )
-                    return {
-                        "has_framework_contract": True,
-                        "framework_contract": fc_payload,
-                        "purchase_order_request_id": None,
-                        "message": (
-                            f"Un contrat cadre actif a été détecté (réf. {fc.reference}), mais "
-                            "votre demande est déjà à un stade trop avancé pour être convertie "
-                            "automatiquement en bon de commande. Notre équipe va prendre le relais."
-                        ),
-                    }
-
-                # Le bon de commande exige un identifiant de positionnement Boond
-                # (colonne NOT NULL). Sur certains déclencheurs (candidat/ressource)
-                # il peut être absent → on évite l'IntegrityError et on informe.
-                if cr.boond_positioning_id is None:
-                    logger.warning(
-                        "siren_check_missing_positioning_id",
-                        cr_id=str(cr.id),
-                    )
-                    return {
-                        "has_framework_contract": True,
-                        "framework_contract": fc_payload,
-                        "purchase_order_request_id": None,
-                        "message": (
-                            f"Un contrat cadre actif a été détecté (réf. {fc.reference}). La "
-                            "création automatique du bon de commande n'a pas pu aboutir "
-                            "(référence de positionnement manquante). Notre équipe va prendre "
-                            "le relais."
-                        ),
-                    }
-
-                # Cancel the ContractRequest (transition validée ci-dessus)
-                cr.transition_to(ContractRequestStatus.CANCELLED)
-                await cr_repo.save(cr)
-
-                # Create a PurchaseOrderRequest
-                por_repo = PurchaseOrderRequestRepository(db)
-                por_ref = await por_repo.get_next_reference()
-                por = PurchaseOrderRequest(
-                    framework_contract_id=fc.id,
-                    boond_positioning_id=cr.boond_positioning_id,
-                    boond_candidate_id=cr.boond_candidate_id,
-                    boond_consultant_type=cr.boond_consultant_type,
-                    boond_need_id=cr.boond_need_id,
-                    third_party_id=fc.third_party_id,
-                    reference=por_ref,
-                    commercial_email=cr.commercial_email,
-                    daily_rate=cr.daily_rate,
-                    start_date=cr.start_date,
-                    end_date=cr.end_date,
-                    client_name=cr.client_name,
-                    mission_title=cr.mission_title,
-                    consultant_civility=cr.consultant_civility,
-                    consultant_first_name=cr.consultant_first_name,
-                    consultant_last_name=cr.consultant_last_name,
-                    consultant_email=cr.consultant_email,
-                    consultant_phone=cr.consultant_phone,
-                    original_contract_request_id=cr.id,
-                )
-                saved_por = await por_repo.save(por)
-
-                logger.info(
-                    "siren_check_framework_contract_found",
-                    siren=siren,
-                    cr_id=str(cr.id),
-                    por_id=str(saved_por.id),
-                    fc_reference=fc.reference,
-                )
-
-                audit_logger.log(
-                    AuditAction.PORTAL_ACCESSED,
-                    AuditResource.MAGIC_LINK,
-                    resource_id=str(result.magic_link.id),
-                    details={
-                        "action": "siren_check_redirected_to_bdc",
-                        "siren": siren,
-                        "framework_contract_id": str(fc.id),
-                        "purchase_order_request_id": str(saved_por.id),
-                    },
-                )
-
-                return {
-                    "has_framework_contract": True,
-                    "framework_contract": fc_payload,
-                    "purchase_order_request_id": str(saved_por.id),
-                    "message": (
-                        f"Un contrat cadre actif a été détecté (réf. {fc.reference}). "
-                        "Un bon de commande a été créé automatiquement. "
-                        "Vous n'avez pas besoin de remplir les informations de contact."
-                    ),
-                }
-
-        return {
-            "has_framework_contract": False,
-            "message": "Aucun contrat cadre trouvé pour ce SIREN. Veuillez continuer avec les informations de contact.",
-        }
-    except HTTPException:
-        raise
-    except DomainError as exc:
-        logger.warning("portal_check_siren_refused", token_prefix=token[:8], error=str(exc))
-        raise _domain_error_to_http(exc)
-    except Exception:
-        logger.exception("portal_check_siren_error", token_prefix=token[:8])
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Une erreur inattendue est survenue. Veuillez réessayer plus tard.",
-        )
 
 
 @router.post(

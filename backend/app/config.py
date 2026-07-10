@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 1025
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    SMTP_FROM: str = "noreply@geminiconsulting.fr"
+    SMTP_FROM: str = "noreply@b0bby.fr"
     RESEND_API_KEY: str = ""  # If set, uses Resend instead of SMTP
 
     # Frontend URL (for email links and CORS)
