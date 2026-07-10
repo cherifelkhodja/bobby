@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import traceback
+from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -559,6 +560,90 @@ async def debug_positioning(positioning_id: int):
         "positioning_id": positioning_id,
         "raw_attributes": raw_attributes,
         "parsed_for_bdc": parsed,
+    }
+
+
+@router.post(
+    "/boondmanager/debug-reactivate-framework/{contract_request_id}",
+    summary="Debug: reactivate a framework contract (CR + FrameworkContract → active)",
+)
+async def debug_reactivate_framework(
+    contract_request_id: UUID, db: AsyncSession = Depends(get_db)
+):
+    """Set a framework contract request back to ACTIVE and ensure an ACTIVE
+    FrameworkContract exists for its supplier (creates or reactivates one).
+
+    One-off dev fix for frameworks archived too early. Not available in production.
+    """
+    from datetime import datetime, timedelta
+
+    from sqlalchemy import select
+
+    from app.contract_management.domain.entities.framework_contract import (
+        FrameworkContract,
+    )
+    from app.contract_management.domain.value_objects.framework_contract_status import (
+        FrameworkContractStatus,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        ContractRepository,
+        FrameworkContractRepository,
+    )
+    from app.contract_management.infrastructure.models import (
+        ContractRequestModel,
+        FrameworkContractModel,
+    )
+
+    settings = get_settings()
+    if settings.is_production:
+        return {"status": "error", "message": "Not available in production"}
+
+    cr_model = await db.get(ContractRequestModel, contract_request_id)
+    if not cr_model:
+        return {"status": "error", "message": "contract request introuvable"}
+
+    previous = cr_model.status
+    cr_model.status = "active"
+
+    # Ensure an ACTIVE FrameworkContract for this third party
+    fc_info = None
+    if cr_model.third_party_id:
+        result = await db.execute(
+            select(FrameworkContractModel)
+            .where(FrameworkContractModel.third_party_id == cr_model.third_party_id)
+            .order_by(FrameworkContractModel.created_at.desc())
+        )
+        fc_model = result.scalars().first()
+        if fc_model:
+            fc_model.status = FrameworkContractStatus.ACTIVE.value
+            fc_info = {"action": "reactivated", "id": str(fc_model.id), "reference": fc_model.reference}
+        elif cr_model.company_id:
+            now = datetime.utcnow()
+            contract_repo = ContractRepository(db)
+            contract = await contract_repo.get_by_request_id(cr_model.id)
+            fc = FrameworkContract(
+                third_party_id=cr_model.third_party_id,
+                company_id=cr_model.company_id,
+                original_contract_request_id=cr_model.id,
+                original_contract_id=contract.id if contract else None,
+                reference=cr_model.reference or cr_model.provisional_reference,
+                s3_key_signed=contract.s3_key_signed if contract else None,
+                signed_at=contract.signed_at if contract else now,
+                status=FrameworkContractStatus.ACTIVE,
+                expires_at=now + timedelta(days=730),
+                tacit_renewal=True,
+            )
+            saved_fc = await FrameworkContractRepository(db).save(fc)
+            fc_info = {"action": "created", "id": str(saved_fc.id), "reference": saved_fc.reference}
+        else:
+            fc_info = {"action": "skipped", "reason": "no company_id on contract request"}
+
+    await db.commit()
+    return {
+        "status": "ok",
+        "contract_request_id": str(contract_request_id),
+        "cr_status": {"previous": previous, "now": "active"},
+        "framework_contract": fc_info,
     }
 
 
