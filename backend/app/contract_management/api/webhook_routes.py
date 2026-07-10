@@ -563,6 +563,100 @@ async def debug_positioning(positioning_id: int):
 
 
 @router.get(
+    "/boondmanager/debug-bdc-detection/{positioning_id}",
+    summary="Debug: trace the BDC lock/unlock detection chain",
+)
+async def debug_bdc_detection(positioning_id: int, db: AsyncSession = Depends(get_db)):
+    """Run the full 'resource + active framework contract' detection for a
+    positioning and report each step. Explains why a BDC is locked or editable.
+    Not available in production.
+    """
+    settings = get_settings()
+    if settings.is_production:
+        return {"status": "error", "message": "Not available in production"}
+
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        FrameworkContractRepository,
+    )
+    from app.infrastructure.boond.client import BoondClient
+    from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
+        ThirdPartyRepository,
+    )
+
+    crm = BoondCrmAdapter(BoondClient(settings))
+    cr_repo = ContractRequestRepository(db)
+    tp_repo = ThirdPartyRepository(db)
+    fc_repo = FrameworkContractRepository(db)
+
+    steps: dict = {}
+
+    positioning = await crm.get_positioning(positioning_id)
+    if not positioning:
+        return {"status": "error", "message": "positioning introuvable", "steps": steps}
+
+    consultant_type = positioning.get("consultant_type")
+    candidate_id = positioning.get("candidate_id")
+    need_id = positioning.get("need_id")
+    steps["1_positioning"] = {
+        "state": positioning.get("state"),
+        "consultant_type": consultant_type,
+        "candidate_id": candidate_id,
+        "need_id": need_id,
+    }
+
+    # Resolve resource id (even if the positioning still references a candidate)
+    resource_id = candidate_id if consultant_type == "resource" else None
+    resolved_resource = None
+    if consultant_type != "resource" and candidate_id:
+        resolved_resource = await crm.resolve_resource_id(candidate_id)
+    steps["2_resource_id"] = {
+        "used_resource_id": resource_id,
+        "candidate_maps_to_resource": resolved_resource,
+    }
+
+    lookup_resource_id = resource_id or resolved_resource
+    provider_company_id = None
+    if lookup_resource_id:
+        provider_company_id = await crm.get_resource_provider_company_id(lookup_resource_id)
+    steps["3_provider_company_id"] = provider_company_id
+
+    tp = None
+    if provider_company_id:
+        tp = await tp_repo.get_by_boond_provider_id(provider_company_id)
+    steps["4_third_party"] = (
+        {"id": str(tp.id), "company_name": tp.company_name} if tp else None
+    )
+
+    company_id = None
+    if need_id:
+        need = await crm.get_need(need_id)
+        agency_id = need.get("agency_id") if need else None
+        if agency_id:
+            company_id = await cr_repo.get_company_by_boond_agency_id(agency_id)
+    steps["5_company_id"] = str(company_id) if company_id else None
+
+    fc = None
+    if tp:
+        fc = await fc_repo.get_active_by_third_party(tp.id, company_id)
+    steps["6_active_framework_contract"] = (
+        {"id": str(fc.id), "reference": fc.reference, "status": fc.status.value} if fc else None
+    )
+
+    editable = fc is not None
+    return {
+        "status": "ok",
+        "positioning_id": positioning_id,
+        "verdict": "EDITABLE (rattaché à un contrat cadre actif)"
+        if editable
+        else "VERROUILLE (pas de ressource+contrat cadre actif détecté)",
+        "steps": steps,
+    }
+
+
+@router.get(
     "/boondmanager/debug-cr",
     summary="Debug: check contract requests in DB",
 )
