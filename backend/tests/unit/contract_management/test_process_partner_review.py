@@ -218,9 +218,7 @@ class TestInternalRecipients:
         """Commercial appearing in the internal list is only notified once;
         a missing commercial_email does not produce an empty recipient."""
         cr = _make_cr(commercial_email=None)
-        uc = _make_use_case(
-            cr, internal_recipients=["adv@example.com", "adv@example.com"]
-        )
+        uc = _make_use_case(cr, internal_recipients=["adv@example.com", "adv@example.com"])
 
         await uc.execute(cr.id, approved=False, comments="doublon")
 
