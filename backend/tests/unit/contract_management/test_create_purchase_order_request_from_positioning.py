@@ -114,6 +114,8 @@ def _make_use_case(
                       "commercial_email": "com@example.com"}
     )
     crm.get_resource_provider_company_id = AsyncMock(return_value=provider_company_id)
+    # Par défaut, un candidat n'est PAS converti en ressource (→ pas de résolution).
+    crm.resolve_resource_id = AsyncMock(return_value=None)
 
     return CreatePurchaseOrderRequestFromPositioningUseCase(
         purchase_order_request_repository=por_repo,
@@ -220,6 +222,20 @@ class TestLockedCreation:
         assert result.third_party_id is None
         # BDC verrouillé → pas d'email commercial
         uc._email_service.send_commercial_validation_request.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_converted_candidate_with_framework_is_editable(self):
+        """Positionnement référençant encore le candidat, mais converti en
+        ressource rattachée à un contrat cadre actif → BDC éditable."""
+        tp = type("TP", (), {"id": uuid4()})()
+        fc = type("FC", (), {"id": uuid4()})()
+        uc = _make_use_case(consultant_type="candidate", tp=tp, fc=fc)
+        uc._crm.resolve_resource_id = AsyncMock(return_value=999)  # candidat → ressource
+
+        result = await uc.execute(_webhook_payload())
+
+        assert result.status == PurchaseOrderRequestStatus.PENDING_VALIDATION
+        assert result.framework_contract_id == fc.id
 
     @pytest.mark.asyncio
     async def test_resource_without_framework_creates_locked_bdc(self):

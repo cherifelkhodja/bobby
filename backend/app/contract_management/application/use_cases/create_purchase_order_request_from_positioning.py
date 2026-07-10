@@ -139,14 +139,29 @@ class CreatePurchaseOrderRequestFromPositioningUseCase:
             # Détecter le rattachement à un contrat cadre actif.
             framework_contract_id = None
             third_party_id = None
-            if consultant_type == "resource" and candidate_id:
-                provider_company_id = await self._crm.get_resource_provider_company_id(
-                    candidate_id
+            if candidate_id:
+                # Résoudre l'ID ressource. Le positionnement peut encore référencer
+                # le CANDIDAT même après conversion en ressource : on résout alors
+                # la ressource pour retrouver sa société employeuse (providerCompany).
+                resource_id = candidate_id
+                if consultant_type != "resource":
+                    resolved = await self._crm.resolve_resource_id(candidate_id)
+                    resource_id = resolved or None
+
+                provider_company_id = (
+                    await self._crm.get_resource_provider_company_id(resource_id)
+                    if resource_id
+                    else None
                 )
                 if provider_company_id:
                     tp = await self._tp_repo.get_by_boond_provider_id(provider_company_id)
                     if tp:
+                        # Priorité au cadre de la société émettrice résolue ;
+                        # à défaut, tout cadre actif du fournisseur (le cadre peut
+                        # avoir été signé sous une société légèrement différente).
                         fc = await self._fc_repo.get_active_by_third_party(tp.id, company_id)
+                        if not fc:
+                            fc = await self._fc_repo.get_active_by_third_party(tp.id, None)
                         if fc:
                             framework_contract_id = fc.id
                             third_party_id = tp.id
@@ -163,6 +178,13 @@ class CreatePurchaseOrderRequestFromPositioningUseCase:
                             positioning_id=positioning_id,
                             provider_company_id=provider_company_id,
                         )
+                else:
+                    logger.info(
+                        "bdc_no_provider_company",
+                        positioning_id=positioning_id,
+                        consultant_type=consultant_type,
+                        resource_id=resource_id,
+                    )
 
             locked = framework_contract_id is None
             status = (
