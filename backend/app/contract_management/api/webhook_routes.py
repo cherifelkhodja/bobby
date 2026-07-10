@@ -647,6 +647,86 @@ async def debug_reactivate_framework(
     }
 
 
+@router.post(
+    "/boondmanager/debug-rerun-bdc-detection/{por_id}",
+    summary="Debug: re-run detection on a locked BDC and unlock it in place",
+)
+async def debug_rerun_bdc_detection(por_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Re-run the 'resource + active framework contract' detection for an existing
+    LOCKED BDC and unlock it (→ editable) if a framework is found. Useful after
+    reactivating a framework contract. Not available in production.
+    """
+    settings = get_settings()
+    if settings.is_production:
+        return {"status": "error", "message": "Not available in production"}
+
+    from app.contract_management.domain.value_objects.purchase_order_request_status import (
+        PurchaseOrderRequestStatus,
+    )
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        FrameworkContractRepository,
+        PurchaseOrderRequestRepository,
+    )
+    from app.infrastructure.boond.client import BoondClient
+    from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
+        ThirdPartyRepository,
+    )
+
+    por_repo = PurchaseOrderRequestRepository(db)
+    por = await por_repo.get_by_id(por_id)
+    if not por:
+        return {"status": "error", "message": "BDC introuvable"}
+    if por.status != PurchaseOrderRequestStatus.PENDING_FRAMEWORK_CONTRACT:
+        return {
+            "status": "noop",
+            "message": f"BDC déjà au statut {por.status.value} (pas verrouillé)",
+        }
+
+    crm = BoondCrmAdapter(BoondClient(settings))
+    tp_repo = ThirdPartyRepository(db)
+    fc_repo = FrameworkContractRepository(db)
+
+    positioning = await crm.get_positioning(por.boond_positioning_id)
+    consultant_type = positioning.get("consultant_type") if positioning else None
+    candidate_id = (positioning.get("candidate_id") if positioning else None) or por.boond_candidate_id
+
+    resource_id = candidate_id
+    if consultant_type != "resource" and candidate_id:
+        resource_id = await crm.resolve_resource_id(candidate_id)
+
+    provider_company_id = (
+        await crm.get_resource_provider_company_id(resource_id) if resource_id else None
+    )
+    tp = await tp_repo.get_by_boond_provider_id(provider_company_id) if provider_company_id else None
+    fc = await fc_repo.get_active_by_third_party(tp.id, None) if tp else None
+
+    if fc and tp:
+        por.unlock(framework_contract_id=fc.id, third_party_id=tp.id)
+        await por_repo.save(por)
+        await db.commit()
+        return {
+            "status": "ok",
+            "unlocked": True,
+            "por_reference": por.reference,
+            "framework_contract": fc.reference,
+        }
+
+    return {
+        "status": "ok",
+        "unlocked": False,
+        "reason": {
+            "consultant_type": consultant_type,
+            "resource_id": resource_id,
+            "provider_company_id": provider_company_id,
+            "third_party": str(tp.id) if tp else None,
+            "active_framework_contract": fc.reference if fc else None,
+        },
+    }
+
+
 @router.get(
     "/boondmanager/debug-bdc-detection/{positioning_id}",
     summary="Debug: trace the BDC lock/unlock detection chain",
