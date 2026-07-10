@@ -892,14 +892,13 @@ async def cancel_contract_request(
     user_id: AdvOrAdminUser,
     db: AsyncSession = Depends(get_db),
 ):
-    """Cancel a contract request. ADV/admin only.
+    """Cancel a contract request (contrat cadre). ADV/admin only.
 
-    Only allowed when the Boond positioning state is no longer 7 or 2.
+    Depuis la refonte BDC, un ContractRequest n'est plus lié à un positionnement
+    (les contrats cadres proviennent des webhooks candidat/ressource ; les
+    positionnements créent des BDC). L'annulation ne dépend donc plus de l'état
+    du positionnement Boond — seule la transition de statut du CR est vérifiée.
     """
-    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
-        BoondCrmAdapter,
-    )
-    from app.infrastructure.boond.client import BoondClient
     from app.infrastructure.email.sender import EmailService
 
     settings = get_settings()
@@ -914,25 +913,7 @@ async def cancel_contract_request(
             detail=f"Impossible d'annuler une demande au statut '{cr.status.display_name}'.",
         )
 
-    # Check Boond positioning state — only allow cancel if state is NOT 7 or 2
-    # Skip check if no positioning (e.g. contract triggered by candidate state change)
     boond_state = None
-    if cr.boond_positioning_id:
-        boond_crm = BoondCrmAdapter(BoondClient(settings))
-        positioning = await boond_crm.get_positioning(cr.boond_positioning_id)
-        if positioning:
-            boond_state = positioning.get("state")
-            BLOCKED_STATES = {
-                2: "Gagné",
-                7: "Gagné attente contrat",
-            }
-            if boond_state in BLOCKED_STATES:
-                label = BLOCKED_STATES[boond_state]
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Annulation impossible : le positionnement Boond est en état « {label} » ({boond_state}).",
-                )
-
     previous_status = cr.status.value
     cr.transition_to(ContractRequestStatus.CANCELLED)
     saved = await cr_repo.save(cr)
