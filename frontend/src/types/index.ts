@@ -810,50 +810,6 @@ export interface Contract {
   signed_at: string | null;
 }
 
-// Framework contracts
-export type FrameworkContractStatus = 'active' | 'expiring_soon' | 'expired' | 'terminated';
-
-export interface FrameworkContract {
-  id: string;
-  third_party_id: string;
-  company_id: string;
-  original_contract_request_id: string;
-  original_contract_id: string | null;
-  reference: string;
-  s3_key_signed: string | null;
-  signed_at: string | null;
-  status: FrameworkContractStatus;
-  status_display: string;
-  expires_at: string | null;
-  tacit_renewal: boolean;
-  created_at: string;
-  updated_at: string;
-  purchase_orders_count: number;
-  third_party_name: string | null;
-}
-
-// Purchase orders
-export type PurchaseOrderStatus = 'draft' | 'sent' | 'active' | 'closed';
-
-export interface PurchaseOrder {
-  id: string;
-  framework_contract_id: string;
-  contract_request_id: string;
-  reference: string;
-  consultant_first_name: string | null;
-  consultant_last_name: string | null;
-  consultant_full_name: string | null;
-  daily_rate: number | null;
-  start_date: string | null;
-  end_date: string | null;
-  quantity: number | null;
-  boond_positioning_id: number;
-  boond_purchase_order_id: number | null;
-  status: PurchaseOrderStatus;
-  status_display: string;
-  created_at: string;
-  updated_at: string;
-}
 
 // Vigilance
 export type ComplianceStatus = 'pending' | 'under_review' | 'compliant' | 'expiring_soon' | 'non_compliant';

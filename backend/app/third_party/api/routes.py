@@ -850,44 +850,6 @@ async def submit_contract_review(
 
 
 @router.post(
-    "/portal/{token}/check-siren",
-    summary="Step 1: Check SIREN/SIRET",
-)
-async def check_siren_for_framework_contract(
-    token: str,
-    body: dict,
-    db: AsyncSession = Depends(get_db),
-):
-    """Portal step 1: Supplier enters SIRET.
-
-    Validates the SIRET and the portal token, then lets the supplier continue
-    with the normal document collection flow.
-    """
-    try:
-        siret = body.get("siret", "")
-        if not siret or len(siret) < 9:
-            raise HTTPException(status_code=400, detail="SIRET invalide (14 chiffres requis).")
-
-        await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
-
-        return {
-            "has_framework_contract": False,
-            "message": "Veuillez continuer avec les informations de contact.",
-        }
-    except HTTPException:
-        raise
-    except DomainError as exc:
-        logger.warning("portal_check_siren_refused", token_prefix=token[:8], error=str(exc))
-        raise _domain_error_to_http(exc)
-    except Exception:
-        logger.exception("portal_check_siren_error", token_prefix=token[:8])
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Une erreur inattendue est survenue. Veuillez réessayer plus tard.",
-        )
-
-
-@router.post(
     "/portal/{token}/company-info",
     summary="Step 2-3: Submit company identity + contacts via portal",
 )
