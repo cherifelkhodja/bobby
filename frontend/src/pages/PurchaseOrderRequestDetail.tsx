@@ -208,7 +208,7 @@ export default function PurchaseOrderRequestDetail() {
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Validation commerciale</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">TJM (€) *</label>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">CJM (€) *</label>
               <input type="number" step="0.01" value={form.daily_rate} onChange={(e) => setForm((f) => ({ ...f, daily_rate: e.target.value }))} className={INPUT_CLS} />
             </div>
             <div>
@@ -224,7 +224,7 @@ export default function PurchaseOrderRequestDetail() {
               <input type="date" value={form.end_date} onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))} className={INPUT_CLS} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Client</label>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Client final</label>
               <input type="text" value={form.client_name} onChange={(e) => setForm((f) => ({ ...f, client_name: e.target.value }))} className={INPUT_CLS} />
             </div>
             <div>
@@ -266,7 +266,7 @@ export default function PurchaseOrderRequestDetail() {
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Récapitulatif</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">TJM</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">CJM</p>
               <p className="font-medium text-gray-900 dark:text-white">{por.daily_rate ? `${por.daily_rate}€/j` : '-'}</p>
             </div>
             <div>
@@ -282,6 +282,10 @@ export default function PurchaseOrderRequestDetail() {
               <p className="font-medium text-gray-900 dark:text-white">
                 {por.consultant_first_name} {por.consultant_last_name}
               </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Client final</p>
+              <p className="font-medium text-gray-900 dark:text-white">{por.client_name || '-'}</p>
             </div>
           </div>
         </Card>
