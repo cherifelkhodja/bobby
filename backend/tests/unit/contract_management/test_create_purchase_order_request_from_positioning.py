@@ -242,3 +242,19 @@ class TestIdempotence:
 
         assert result is existing
         uc._por_repo.save.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_recreates_after_cancel_clears_stale_dedup(self):
+        """BDC précédent annulé (aucun actif) + dédup présente → purge + recrée."""
+        tp = type("TP", (), {"id": uuid4()})()
+        fc = type("FC", (), {"id": uuid4()})()
+        uc = _make_use_case(consultant_type="resource", tp=tp, fc=fc)
+        # Aucun BDC actif (annulé), mais l'événement a déjà été dédupliqué.
+        uc._webhook_repo.exists = AsyncMock(return_value=True)
+
+        result = await uc.execute(_webhook_payload())
+
+        assert result is not None
+        assert result.status == PurchaseOrderRequestStatus.PENDING_VALIDATION
+        uc._webhook_repo.delete_by_prefix.assert_awaited()  # dédup purgée
+        uc._por_repo.save.assert_awaited()  # nouveau BDC créé

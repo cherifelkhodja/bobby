@@ -26,7 +26,6 @@ from app.contract_management.application.use_cases.create_contract_request impor
 from app.contract_management.domain.entities.purchase_order_request import (
     PurchaseOrderRequest,
 )
-from app.contract_management.domain.exceptions import WebhookDuplicateError
 from app.contract_management.domain.value_objects.purchase_order_request_status import (
     PurchaseOrderRequestStatus,
 )
@@ -115,10 +114,19 @@ class CreatePurchaseOrderRequestFromPositioningUseCase:
                 )
                 continue
 
+            # Déduplication webhook. Arrivé ici, aucun BDC ACTIF n'existe pour ce
+            # positionnement (sinon on aurait retourné plus haut). Si une entrée
+            # de dédup existe malgré tout, c'est qu'un BDC précédent a été annulé
+            # → on purge la dédup pour autoriser la recréation (re-test /
+            # re-contractualisation), au lieu de bloquer en doublon.
             event_id = f"positioning_bdc_{positioning_id}_{effective_state}"
             if await self._webhook_repo.exists(event_id):
-                logger.info("bdc_webhook_duplicate", event_id=event_id)
-                raise WebhookDuplicateError(event_id)
+                await self._webhook_repo.delete_by_prefix(f"positioning_bdc_{positioning_id}_")
+                logger.info(
+                    "bdc_webhook_dedup_cleared_after_cancel",
+                    positioning_id=positioning_id,
+                    event_id=event_id,
+                )
 
             candidate_id = positioning_data.get("candidate_id")
             consultant_type = positioning_data.get("consultant_type")
