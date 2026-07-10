@@ -16,23 +16,9 @@ import { Button } from '../ui/Button';
 import { PageSpinner } from '../ui/Spinner';
 import { getDocumentBadgeConfig } from '../../types';
 import type { VigilanceDocument } from '../../types';
+import { daysUntil, formatDate } from './dateUtils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-export function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-export function daysUntil(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const diff = new Date(iso).getTime() - Date.now();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
-}
 
 export function ExpiryBadge({ expiresAt }: { expiresAt: string | null }) {
   const days = daysUntil(expiresAt);

@@ -30,8 +30,8 @@ import { PageSpinner } from '../components/ui/Spinner';
 import {
   DocumentViewerModal,
   ExpiryBadge,
-  formatDate,
 } from '../components/vigilance/DocumentViewerModal';
+import { formatDate } from '../components/vigilance/dateUtils';
 import { getErrorMessage } from '../api/client';
 import {
   COMPLIANCE_STATUS_CONFIG,
