@@ -79,6 +79,13 @@ class CommercialValidationRequest(BaseModel):
     consultant_last_name: str | None = Field(None, max_length=255)
     consultant_email: str | None = Field(None, max_length=255)
     consultant_phone: str | None = Field(None, max_length=50)
+    notify_third_party: bool = Field(
+        True,
+        description=(
+            "Envoyer le lien de collecte au tiers. Décocher pour une saisie "
+            "manuelle par l'ADV, sans solliciter le fournisseur."
+        ),
+    )
 
 
 class ContractConfigRequest(BaseModel):

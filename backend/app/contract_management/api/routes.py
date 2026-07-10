@@ -45,6 +45,8 @@ from app.contract_management.infrastructure.adapters.postgres_contract_repo impo
 from app.dependencies import get_db
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
 from app.infrastructure.database.models import UserModel
+from app.third_party.api.schemas import CompanyInfoRequest, SiretLookupResponse
+from app.third_party.application.company_info_mapper import apply_company_info
 from app.third_party.application.use_cases.generate_magic_link import (
     GenerateMagicLinkUseCase,
 )
@@ -545,6 +547,7 @@ async def validate_commercial(
             consultant_last_name=body.consultant_last_name,
             consultant_email=body.consultant_email,
             consultant_phone=body.consultant_phone,
+            notify_third_party=body.notify_third_party,
         )
         cmd.from_email = company_email_from
         cmd.company_name = company_name
@@ -562,12 +565,23 @@ async def validate_commercial(
 
     client_label = f" pour <strong>{cr.client_name}</strong>" if cr.client_name else ""
     if cr.status == ContractRequestStatus.COLLECTING_DOCUMENTS:
+        if body.notify_third_party:
+            collection_msg = (
+                f"Votre validation commerciale a été enregistrée{client_label}. "
+                "Le tiers a été contacté pour fournir ses documents légaux."
+            )
+        else:
+            collection_msg = (
+                f"Votre validation commerciale a été enregistrée{client_label}. "
+                "Les informations du tiers seront saisies en interne (ADV), sans "
+                "solliciter le fournisseur."
+            )
         await _notify_commercial(
             email_service,
             to=cr.commercial_email,
             ref=cr.display_reference,
             title="Collecte de documents lancée",
-            msg=f"Votre validation commerciale a été enregistrée{client_label}. Le tiers a été contacté pour fournir ses documents légaux.",
+            msg=collection_msg,
             from_email=company_email_from,
             company_name=company_name,
         )
@@ -583,6 +597,110 @@ async def validate_commercial(
 
     name = await _resolve_commercial_name(db, cr.commercial_email)
     return _cr_to_response(cr, commercial_name=name)
+
+
+@router.get(
+    "/siret-lookup/{siret}",
+    response_model=SiretLookupResponse,
+    summary="Lookup SIRET via INSEE Sirene API (ADV manual entry)",
+)
+async def siret_lookup(
+    siret: str,
+    _user_id: AdvOrAdminUser,
+):
+    """Auto-fill company identity from a SIRET for ADV manual entry.
+
+    Same INSEE Sirene + INPI RNE source as the portal, but JWT-authenticated so
+    the ADV can fill the tiers info without a magic link. ADV/admin only.
+    """
+    from app.third_party.api.siret_lookup import lookup_siret_data
+
+    return await lookup_siret_data(siret, get_settings())
+
+
+@router.post(
+    "/{contract_request_id}/third-party-info",
+    response_model=ContractRequestResponse,
+    summary="Enter the third-party company identity + contacts manually (ADV)",
+)
+async def save_third_party_info(
+    contract_request_id: UUID,
+    body: CompanyInfoRequest,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually enter/update the tiers' company identity and contacts.
+
+    Lets an ADV fill in everything the fournisseur would normally provide via the
+    portal — without soliciting it — up to draft generation. Creates the vigilance
+    document slots (idempotent) so the ADV can then upload the legal documents (or
+    force compliance) before generating the draft. ADV/admin only.
+    """
+    from app.third_party.domain.entities.third_party import ThirdParty
+    from app.third_party.domain.value_objects.third_party_type import ThirdPartyType
+
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+
+    if not cr.third_party_type or cr.third_party_type == "salarie":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Effectuez d'abord la validation commerciale (type de tiers) "
+                "avant de saisir les informations du tiers."
+            ),
+        )
+
+    tp_repo = ThirdPartyRepository(db)
+    tp = await tp_repo.get_by_id(cr.third_party_id) if cr.third_party_id else None
+    if not tp:
+        tp = ThirdParty(
+            contact_email=cr.contractualization_contact_email or body.representative_email,
+            type=ThirdPartyType(cr.third_party_type),
+        )
+        tp = await tp_repo.save(tp)
+        cr.third_party_id = tp.id
+
+    apply_company_info(tp, body)
+    await tp_repo.save(tp)
+
+    # Create vigilance document slots based on entity_category (idempotent) so the
+    # ADV can upload the legal documents from the contract page.
+    doc_repo = DocumentRepository(db)
+    request_documents_uc = RequestDocumentsUseCase(
+        third_party_repository=tp_repo,
+        document_repository=doc_repo,
+    )
+    try:
+        await request_documents_uc.execute(tp.id, entity_category=body.entity_category)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    saved = await cr_repo.save(cr)
+    await db.commit()
+
+    audit_logger.log(
+        AuditAction.DOCUMENT_COLLECTION_INITIATED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(contract_request_id),
+        details={
+            "action": "third_party_info_manual_entry",
+            "third_party_id": str(tp.id),
+            "siret": body.siret,
+        },
+    )
+
+    logger.info(
+        "third_party_info_manual_entry",
+        cr_id=str(saved.id),
+        third_party_id=str(tp.id),
+    )
+
+    name = await _resolve_commercial_name(db, saved.commercial_email)
+    return _cr_to_response(saved, commercial_name=name)
 
 
 @router.post(

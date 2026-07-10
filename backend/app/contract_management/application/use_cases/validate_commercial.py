@@ -35,6 +35,7 @@ class ValidateCommercialCommand:
         consultant_last_name: str | None = None,
         consultant_email: str | None = None,
         consultant_phone: str | None = None,
+        notify_third_party: bool = True,
     ) -> None:
         self.contract_request_id = contract_request_id
         self.third_party_type = third_party_type
@@ -45,6 +46,9 @@ class ValidateCommercialCommand:
         self.consultant_last_name = consultant_last_name
         self.consultant_email = consultant_email
         self.consultant_phone = consultant_phone
+        # When False, the tiers is NOT emailed a collection link: the ADV will
+        # enter the company identity, contacts and documents manually.
+        self.notify_third_party = notify_third_party
         self.from_email: str | None = None
         self.company_name: str | None = None
 
@@ -166,20 +170,29 @@ class ValidateCommercialUseCase:
 
         cr.third_party_id = stub_tp.id
 
-        # Documents are created later when the tiers submits the portal
-        # company-info form (entity_category determines ei vs societe list).
+        # Documents are created later when the company-info form is submitted
+        # (entity_category determines ei vs societe list) — either by the tiers
+        # via the portal, or by the ADV via the manual-entry endpoint.
 
-        # Send portal magic link to the contact email
-        await self._generate_magic_link_uc.execute(
-            GenerateMagicLinkCommand(
-                third_party_id=stub_tp.id,
-                purpose=MagicLinkPurpose.DOCUMENT_UPLOAD,
-                email=command.contact_email,
-                contract_request_id=cr.id,
-                from_email=command.from_email,
-                company_name=command.company_name,
+        # Send the portal magic link to the contact email, unless the ADV opted
+        # to enter everything manually (notify_third_party=False).
+        if command.notify_third_party:
+            await self._generate_magic_link_uc.execute(
+                GenerateMagicLinkCommand(
+                    third_party_id=stub_tp.id,
+                    purpose=MagicLinkPurpose.DOCUMENT_UPLOAD,
+                    email=command.contact_email,
+                    contract_request_id=cr.id,
+                    from_email=command.from_email,
+                    company_name=command.company_name,
+                )
             )
-        )
+        else:
+            logger.info(
+                "commercial_validated_manual_entry",
+                cr_id=str(cr.id),
+                third_party_id=str(stub_tp.id),
+            )
 
         # Transition directly to collecting_documents
         cr.transition_to(ContractRequestStatus.COLLECTING_DOCUMENTS)
@@ -251,9 +264,10 @@ class ValidateCommercialUseCase:
             has_missing_docs = True
 
         if has_missing_docs:
-            # (Re)collecte nécessaire : envoi du magic link si disponible, puis
-            # passage en COLLECTING_DOCUMENTS (jamais d'auto-validation conformité).
-            if self._generate_magic_link_uc:
+            # (Re)collecte nécessaire : envoi du magic link si disponible et si le
+            # tiers doit être sollicité, puis passage en COLLECTING_DOCUMENTS
+            # (jamais d'auto-validation conformité).
+            if self._generate_magic_link_uc and command.notify_third_party:
                 await self._generate_magic_link_uc.execute(
                     GenerateMagicLinkCommand(
                         third_party_id=cr.third_party_id,

@@ -61,9 +61,14 @@ class ThirdPartyWithDocumentsResponse(BaseModel):
     capital: str | None = None
     siren: str | None = None
     siret: str | None = None
+    vat_number: str | None = None
+    ape_code: str | None = None
     rcs_city: str | None = None
     rcs_number: str | None = None
     head_office_address: str | None = None
+    head_office_street: str | None = None
+    head_office_postal_code: str | None = None
+    head_office_city: str | None = None
     representative_name: str | None = None
     representative_title: str | None = None
     representative_civility: str | None = None
@@ -76,6 +81,7 @@ class ThirdPartyWithDocumentsResponse(BaseModel):
     signatory_last_name: str | None = None
     signatory_email: str | None = None
     signatory_phone: str | None = None
+    signatory_is_director: bool = False
     adv_contact_civility: str | None = None
     adv_contact_first_name: str | None = None
     adv_contact_last_name: str | None = None
@@ -88,6 +94,7 @@ class ThirdPartyWithDocumentsResponse(BaseModel):
     billing_contact_phone: str | None = None
     type: str
     entity_category: str | None = None
+    company_info_submitted: bool = False
     compliance_status: str
     contact_email: str
     documents: list[DocumentResponse]
