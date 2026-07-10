@@ -88,6 +88,25 @@ class CommercialValidationRequest(BaseModel):
     )
 
 
+class ManualContractRequestCreate(BaseModel):
+    """Create a contract request from scratch (manual ADV entry, no Boond webhook).
+
+    The Boond resource ID is entered by the ADV; the consultant identity is
+    best-effort enriched from Boond. All other fields are optional and can also
+    be filled later during commercial validation.
+    """
+
+    boond_resource_id: int = Field(..., gt=0, description="ID Boond de la ressource")
+    company_id: UUID | None = None
+    client_name: str | None = Field(None, max_length=255)
+    mission_title: str | None = Field(None, max_length=255)
+    consultant_civility: str | None = Field(None, max_length=10)
+    consultant_first_name: str | None = Field(None, max_length=255)
+    consultant_last_name: str | None = Field(None, max_length=255)
+    consultant_email: str | None = Field(None, max_length=255)
+    consultant_phone: str | None = Field(None, max_length=50)
+
+
 class ContractConfigRequest(BaseModel):
     """Request to configure a contract.
 

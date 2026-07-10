@@ -44,6 +44,16 @@ export const contractsApi = {
     return response.data;
   },
 
+  // Create a contract request from scratch (no Boond webhook), entering the
+  // Boond resource ID. Consultant identity is best-effort enriched from Boond.
+  createManual: async (data: ManualContractInput): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      '/contract-requests/manual',
+      data,
+    );
+    return response.data;
+  },
+
   validateCommercial: async (
     id: string,
     data: {
@@ -375,6 +385,19 @@ export interface SiretLookupResult {
   capital?: string | null;
   rcs_city?: string | null;
   ape_code?: string | null;
+}
+
+// Manual creation of a contract request (no Boond webhook).
+export interface ManualContractInput {
+  boond_resource_id: number;
+  company_id?: string | null;
+  client_name?: string | null;
+  mission_title?: string | null;
+  consultant_civility?: string | null;
+  consultant_first_name?: string | null;
+  consultant_last_name?: string | null;
+  consultant_email?: string | null;
+  consultant_phone?: string | null;
 }
 
 // ── Contract companies ──────────────────────────────────────────────────────

@@ -18,6 +18,7 @@ from app.contract_management.api.schemas import (
     ContractRequestListResponse,
     ContractRequestResponse,
     ContractResponse,
+    ManualContractRequestCreate,
 )
 from app.contract_management.application.use_cases.block_compliance import (
     BlockComplianceUseCase,
@@ -294,6 +295,84 @@ async def list_contract_requests(
         skip=skip,
         limit=limit,
     )
+
+
+@router.post(
+    "/manual",
+    response_model=ContractRequestResponse,
+    summary="Create a contract request manually (ADV/admin, no Boond webhook)",
+)
+async def create_manual_contract_request(
+    body: ManualContractRequestCreate,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a contract request from scratch, entering the Boond resource ID.
+
+    The consultant identity is best-effort enriched from Boond (via the resource
+    ID). The request starts in PENDING_COMMERCIAL_VALIDATION and then follows the
+    standard flow (commercial validation → third-party info → draft). ADV/admin only.
+    """
+    from sqlalchemy import select
+
+    from app.contract_management.application.use_cases.create_manual_contract_request import (
+        CreateManualContractRequestUseCase,
+        ManualContractRequestCommand,
+    )
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.infrastructure.boond.client import BoondClient
+    from app.infrastructure.database.repositories.user_repository import UserRepository
+
+    settings = get_settings()
+    cr_repo = ContractRequestRepository(db)
+
+    # Creator email is the commercial fallback when the resource has no manager
+    # resolvable to a Bobby user.
+    creator_email = ""
+    row = (await db.execute(select(UserModel.email).where(UserModel.id == user_id))).first()
+    if row and row[0]:
+        creator_email = str(row[0])
+
+    crm = BoondCrmAdapter(BoondClient(settings))
+    use_case = CreateManualContractRequestUseCase(
+        contract_request_repository=cr_repo,
+        crm_service=crm,
+        user_repository=UserRepository(db),
+    )
+
+    try:
+        cr = await use_case.execute(
+            ManualContractRequestCommand(
+                boond_resource_id=body.boond_resource_id,
+                commercial_email=creator_email,
+                company_id=body.company_id,
+                client_name=body.client_name,
+                mission_title=body.mission_title,
+                consultant_civility=body.consultant_civility,
+                consultant_first_name=body.consultant_first_name,
+                consultant_last_name=body.consultant_last_name,
+                consultant_email=body.consultant_email,
+                consultant_phone=body.consultant_phone,
+            )
+        )
+    except Exception as exc:
+        logger.error("create_manual_contract_request_failed", error=str(exc))
+        raise HTTPException(status_code=400, detail="La création manuelle du contrat a échoué.")
+
+    await db.commit()
+
+    audit_logger.log(
+        AuditAction.CONTRACT_REQUEST_CREATED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(cr.id),
+        details={"trigger_type": "manual", "boond_resource_id": body.boond_resource_id},
+    )
+
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
 
 
 @router.get(

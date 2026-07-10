@@ -195,6 +195,21 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-07-10 (feat: création manuelle d'un dossier de contrat — sans déclencheur Boond)
+
+Complément de la saisie manuelle : l'ADV peut désormais **créer un dossier de contrat à la main**, sans webhook Boond, en **saisissant l'ID Boond de la ressource**.
+
+**Backend** :
+- **Nouvel endpoint** `POST /contract-requests/manual` (ADV/admin) : crée un `ContractRequest` en `PENDING_COMMERCIAL_VALIDATION`, `trigger_type="manual"`, `boond_resource_id` saisi, `boond_consultant_type="resource"`, référence provisoire auto.
+- **Use case** `CreateManualContractRequestUseCase` : enrichissement **best-effort** depuis Boond (`get_candidate_info(resource_id, "resource")`) — préremplit civilité/nom/email/téléphone du consultant + résout le commercial via `manager_id` → user Bobby ; un échec Boond ne bloque jamais la création. Fallback commercial = email du créateur.
+- `trigger_type` accepte la valeur `"manual"`.
+
+**Frontend** :
+- Bouton **« Nouveau contrat »** (ADV/admin) sur `/contracts` → modale : **ID Boond ressource** (requis) + société émettrice (optionnel). À la création → navigation vers la fiche, puis flux standard (validation commerciale → saisie tiers → brouillon).
+- `TriggerType` inclut `'manual'`.
+
+**Tests** : `test_create_manual_contract_request.py` (création sans CRM, enrichissement consultant+commercial depuis Boond, résilience à l'échec Boond). 96 tests unitaires verts. Frontend `tsc`/`eslint`/`build` OK.
+
 ### 2026-07-10 (feat: saisie manuelle des infos du tiers par l'ADV — sans solliciter le fournisseur)
 
 **Besoin** : permettre à l'ADV de saisir **toutes les informations du tiers** (identité société + contacts + documents de vigilance) **soi-même**, sans passer par le portail fournisseur, jusqu'à la génération du brouillon de contrat.
