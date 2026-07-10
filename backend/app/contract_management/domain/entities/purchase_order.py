@@ -19,9 +19,11 @@ class PurchaseOrder:
     """
 
     framework_contract_id: UUID
-    contract_request_id: UUID
     reference: str
     boond_positioning_id: int
+    # Nullable : un BDC issu du webhook positionnement n'a pas de ContractRequest
+    # d'origine. Renseigné uniquement lors d'une re-contractualisation liée à un CR.
+    contract_request_id: UUID | None = None
     id: UUID = field(default_factory=uuid4)
     consultant_first_name: str | None = None
     consultant_last_name: str | None = None

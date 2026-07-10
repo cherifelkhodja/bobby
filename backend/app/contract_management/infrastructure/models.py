@@ -288,8 +288,10 @@ class PurchaseOrderModel(Base):
     framework_contract_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("cm_framework_contracts.id"), nullable=False
     )
-    contract_request_id: Mapped[UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("cm_contract_requests.id"), nullable=False
+    # Nullable : un BDC issu du webhook positionnement n'a pas de ContractRequest
+    # d'origine (renseigné seulement en re-contractualisation liée à un CR).
+    contract_request_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_contract_requests.id"), nullable=True
     )
     reference: Mapped[str] = mapped_column(String(30), nullable=False, unique=True)
     consultant_first_name: Mapped[str | None] = mapped_column(String(255), nullable=True)

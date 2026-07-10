@@ -319,7 +319,7 @@ class PurchaseOrderResponse(BaseModel):
 
     id: UUID
     framework_contract_id: UUID
-    contract_request_id: UUID
+    contract_request_id: UUID | None = None
     reference: str
     consultant_first_name: str | None = None
     consultant_last_name: str | None = None

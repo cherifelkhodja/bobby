@@ -63,11 +63,18 @@ class FinalizePurchaseOrderRequestUseCase:
                 compliance_status=tp.compliance_status,
             )
 
-        cr_id_for_po = por.original_contract_request_id or por.id
+        # Un BDC issu du webhook positionnement n'a pas de ContractRequest
+        # d'origine : contract_request_id reste NULL (la colonne a une FK vers
+        # cm_contract_requests, on ne peut donc PAS y mettre l'id du BDC).
+        cr_id_for_po = por.original_contract_request_id
 
-        # Idempotence : réutiliser un BDC déjà créé pour cette demande, sinon en
-        # créer un nouveau (évite les doublons lors d'un rejeu).
-        po = await self._po_repo.get_by_contract_request_id(cr_id_for_po)
+        # Idempotence : réutiliser le PO déjà lié à cette demande (via le lien
+        # por.purchase_order_id, ou via le CR d'origine s'il existe), sinon créer.
+        po = None
+        if por.purchase_order_id:
+            po = await self._po_repo.get_by_id(por.purchase_order_id)
+        if po is None and cr_id_for_po:
+            po = await self._po_repo.get_by_contract_request_id(cr_id_for_po)
         if po is None:
             po_ref = await self._po_repo.get_next_reference(fc.reference)
             po = PurchaseOrder(

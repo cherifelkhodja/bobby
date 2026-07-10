@@ -82,6 +82,16 @@ class TestNoComplianceBlock:
         assert por.status == PurchaseOrderRequestStatus.ACTIVE
         crm.create_purchase_order.assert_awaited_once()
 
+    @pytest.mark.asyncio
+    async def test_po_has_no_contract_request_when_from_positioning(self):
+        """Un BDC issu du positionnement (pas de CR d'origine) crée un PO avec
+        contract_request_id=None (évite la FK violation vers cm_contract_requests)."""
+        uc, por, _ = _make_uc()  # POR sans original_contract_request_id
+
+        po = await uc.execute(por.id)
+
+        assert po.contract_request_id is None
+
 
 class TestBoondAmountIsTotal:
     @pytest.mark.asyncio
