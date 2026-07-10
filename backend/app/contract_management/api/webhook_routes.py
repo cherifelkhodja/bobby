@@ -4,7 +4,6 @@ import hashlib
 import hmac
 import json
 import traceback
-from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -12,6 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.contract_management.api.schemas import WebhookResponse
+from app.contract_management.application.use_cases.create_contract_request import (
+    CreateContractRequestUseCase,
+)
 from app.contract_management.domain.exceptions import WebhookDuplicateError
 from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
     ContractRequestRepository,
@@ -117,39 +119,24 @@ async def handle_boond_positioning_webhook(
 
     email_service = EmailService(settings)
 
-    from app.contract_management.application.use_cases.create_purchase_order_request_from_positioning import (  # noqa: E501
-        CreatePurchaseOrderRequestFromPositioningUseCase,
-    )
     from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
         BoondCrmAdapter,
     )
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-        FrameworkContractRepository,
-        PurchaseOrderRequestRepository,
-    )
     from app.infrastructure.boond.client import BoondClient
     from app.infrastructure.database.repositories.user_repository import UserRepository
-    from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
-        ThirdPartyRepository,
-    )
 
     boond_client = BoondClient(settings)
     crm_service = BoondCrmAdapter(boond_client)
     user_repo = UserRepository(db)
 
-    # Le webhook positionnement crée désormais un BDC (verrouillé tant que le
-    # consultant n'est pas une ressource rattachée à un contrat cadre actif).
-    # Le contrat cadre est déclenché uniquement par candidate-state-update.
-    use_case = CreatePurchaseOrderRequestFromPositioningUseCase(
-        purchase_order_request_repository=PurchaseOrderRequestRepository(db),
+    use_case = CreateContractRequestUseCase(
         contract_request_repository=cr_repo,
         webhook_event_repository=webhook_repo,
-        third_party_repository=ThirdPartyRepository(db),
-        framework_contract_repository=FrameworkContractRepository(db),
         crm_service=crm_service,
         email_service=email_service,
         user_repository=user_repo,
         frontend_url=settings.frontend_url,
+        company_repository=cr_repo,
         company_email_resolver=_make_company_email_resolver(db),
     )
 
@@ -159,15 +146,16 @@ async def handle_boond_positioning_webhook(
             # Explicit commit to ensure data is persisted
             await db.commit()
             logger.info(
-                "webhook_boond_bdc_created",
+                "webhook_boond_contract_created",
                 reference=result.reference,
-                por_id=str(result.id),
+                cr_id=str(result.id),
                 status=result.status.value,
                 commercial_email=result.commercial_email,
+                frontend_url=settings.frontend_url,
             )
             return WebhookResponse(
                 status="ok",
-                message=f"Purchase order request {result.reference} created",
+                message=f"Contract request {result.reference} created",
             )
         logger.info("webhook_boond_no_action", reason="filtered_or_empty")
         return WebhookResponse(status="ok", message="No action taken")
@@ -474,350 +462,6 @@ async def debug_list_webhooks(
             }
             for e in events
         ],
-    }
-
-
-@router.get(
-    "/boondmanager/debug-resource/{resource_id}",
-    summary="Debug: dump a Boond resource administrative payload",
-)
-async def debug_resource_provider(resource_id: int):
-    """Dump the administrative + base payload of a Boond resource.
-
-    Helps confirm the ``providerCompany`` relationship (name + endpoint) used to
-    link a consultant to its supplier for the BDC flow. Not available in
-    production.
-    """
-    settings = get_settings()
-    if settings.is_production:
-        return {"status": "error", "message": "Not available in production"}
-
-    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
-        BoondCrmAdapter,
-    )
-    from app.infrastructure.boond.client import BoondClient
-
-    boond_client = BoondClient(settings)
-    crm = BoondCrmAdapter(boond_client)
-
-    result: dict = {"status": "ok", "resource_id": resource_id, "endpoints": {}}
-
-    for endpoint in (
-        f"/resources/{resource_id}/administrative",
-        f"/resources/{resource_id}",
-    ):
-        try:
-            response = await boond_client._make_request("GET", endpoint)
-            data = response.get("data", {})
-            relationships = data.get("relationships", {})
-            result["endpoints"][endpoint] = {
-                "relationship_keys": list(relationships.keys()),
-                "providerCompany": relationships.get("providerCompany"),
-            }
-        except Exception as exc:  # noqa: BLE001
-            result["endpoints"][endpoint] = {"error": str(exc)}
-
-    # Resolved value via the adapter helper (what the BDC flow actually uses)
-    result["resolved_provider_company_id"] = await crm.get_resource_provider_company_id(
-        resource_id
-    )
-    return result
-
-
-@router.get(
-    "/boondmanager/debug-positioning/{positioning_id}",
-    summary="Debug: dump a Boond positioning payload (fields for BDC)",
-)
-async def debug_positioning(positioning_id: int):
-    """Dump the raw + parsed positioning payload used to pre-fill a BDC.
-
-    Lets us confirm the exact Boond attribute keys for TJM (tarif de vente),
-    billed days, dates and consultant. Not available in production.
-    """
-    settings = get_settings()
-    if settings.is_production:
-        return {"status": "error", "message": "Not available in production"}
-
-    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
-        BoondCrmAdapter,
-    )
-    from app.infrastructure.boond.client import BoondClient
-
-    boond_client = BoondClient(settings)
-    crm = BoondCrmAdapter(boond_client)
-
-    raw_attributes: dict = {}
-    try:
-        response = await boond_client._make_request("GET", f"/positionings/{positioning_id}")
-        raw_attributes = response.get("data", {}).get("attributes", {})
-    except Exception as exc:  # noqa: BLE001
-        raw_attributes = {"error": str(exc)}
-
-    parsed = await crm.get_positioning(positioning_id)
-
-    return {
-        "status": "ok",
-        "positioning_id": positioning_id,
-        "raw_attributes": raw_attributes,
-        "parsed_for_bdc": parsed,
-    }
-
-
-@router.post(
-    "/boondmanager/debug-reactivate-framework/{contract_request_id}",
-    summary="Debug: reactivate a framework contract (CR + FrameworkContract → active)",
-)
-async def debug_reactivate_framework(
-    contract_request_id: UUID, db: AsyncSession = Depends(get_db)
-):
-    """Set a framework contract request back to ACTIVE and ensure an ACTIVE
-    FrameworkContract exists for its supplier (creates or reactivates one).
-
-    One-off dev fix for frameworks archived too early. Not available in production.
-    """
-    from datetime import datetime, timedelta
-
-    from sqlalchemy import select
-
-    from app.contract_management.domain.entities.framework_contract import (
-        FrameworkContract,
-    )
-    from app.contract_management.domain.value_objects.framework_contract_status import (
-        FrameworkContractStatus,
-    )
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-        ContractRepository,
-        FrameworkContractRepository,
-    )
-    from app.contract_management.infrastructure.models import (
-        ContractRequestModel,
-        FrameworkContractModel,
-    )
-
-    settings = get_settings()
-    if settings.is_production:
-        return {"status": "error", "message": "Not available in production"}
-
-    cr_model = await db.get(ContractRequestModel, contract_request_id)
-    if not cr_model:
-        return {"status": "error", "message": "contract request introuvable"}
-
-    previous = cr_model.status
-    cr_model.status = "active"
-
-    # Ensure an ACTIVE FrameworkContract for this third party
-    fc_info = None
-    if cr_model.third_party_id:
-        result = await db.execute(
-            select(FrameworkContractModel)
-            .where(FrameworkContractModel.third_party_id == cr_model.third_party_id)
-            .order_by(FrameworkContractModel.created_at.desc())
-        )
-        fc_model = result.scalars().first()
-        if fc_model:
-            fc_model.status = FrameworkContractStatus.ACTIVE.value
-            fc_info = {"action": "reactivated", "id": str(fc_model.id), "reference": fc_model.reference}
-        elif cr_model.company_id:
-            now = datetime.utcnow()
-            contract_repo = ContractRepository(db)
-            contract = await contract_repo.get_by_request_id(cr_model.id)
-            fc = FrameworkContract(
-                third_party_id=cr_model.third_party_id,
-                company_id=cr_model.company_id,
-                original_contract_request_id=cr_model.id,
-                original_contract_id=contract.id if contract else None,
-                reference=cr_model.reference or cr_model.provisional_reference,
-                s3_key_signed=contract.s3_key_signed if contract else None,
-                signed_at=contract.signed_at if contract else now,
-                status=FrameworkContractStatus.ACTIVE,
-                expires_at=now + timedelta(days=730),
-                tacit_renewal=True,
-            )
-            saved_fc = await FrameworkContractRepository(db).save(fc)
-            fc_info = {"action": "created", "id": str(saved_fc.id), "reference": saved_fc.reference}
-        else:
-            fc_info = {"action": "skipped", "reason": "no company_id on contract request"}
-
-    await db.commit()
-    return {
-        "status": "ok",
-        "contract_request_id": str(contract_request_id),
-        "cr_status": {"previous": previous, "now": "active"},
-        "framework_contract": fc_info,
-    }
-
-
-@router.post(
-    "/boondmanager/debug-rerun-bdc-detection/{por_id}",
-    summary="Debug: re-run detection on a locked BDC and unlock it in place",
-)
-async def debug_rerun_bdc_detection(por_id: UUID, db: AsyncSession = Depends(get_db)):
-    """Re-run the 'resource + active framework contract' detection for an existing
-    LOCKED BDC and unlock it (→ editable) if a framework is found. Useful after
-    reactivating a framework contract. Not available in production.
-    """
-    settings = get_settings()
-    if settings.is_production:
-        return {"status": "error", "message": "Not available in production"}
-
-    from app.contract_management.domain.value_objects.purchase_order_request_status import (
-        PurchaseOrderRequestStatus,
-    )
-    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
-        BoondCrmAdapter,
-    )
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-        FrameworkContractRepository,
-        PurchaseOrderRequestRepository,
-    )
-    from app.infrastructure.boond.client import BoondClient
-    from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
-        ThirdPartyRepository,
-    )
-
-    por_repo = PurchaseOrderRequestRepository(db)
-    por = await por_repo.get_by_id(por_id)
-    if not por:
-        return {"status": "error", "message": "BDC introuvable"}
-    if por.status != PurchaseOrderRequestStatus.PENDING_FRAMEWORK_CONTRACT:
-        return {
-            "status": "noop",
-            "message": f"BDC déjà au statut {por.status.value} (pas verrouillé)",
-        }
-
-    crm = BoondCrmAdapter(BoondClient(settings))
-    tp_repo = ThirdPartyRepository(db)
-    fc_repo = FrameworkContractRepository(db)
-
-    positioning = await crm.get_positioning(por.boond_positioning_id)
-    consultant_type = positioning.get("consultant_type") if positioning else None
-    candidate_id = (positioning.get("candidate_id") if positioning else None) or por.boond_candidate_id
-
-    resource_id = candidate_id
-    if consultant_type != "resource" and candidate_id:
-        resource_id = await crm.resolve_resource_id(candidate_id)
-
-    provider_company_id = (
-        await crm.get_resource_provider_company_id(resource_id) if resource_id else None
-    )
-    tp = await tp_repo.get_by_boond_provider_id(provider_company_id) if provider_company_id else None
-    fc = await fc_repo.get_active_by_third_party(tp.id, None) if tp else None
-
-    if fc and tp:
-        por.unlock(framework_contract_id=fc.id, third_party_id=tp.id)
-        await por_repo.save(por)
-        await db.commit()
-        return {
-            "status": "ok",
-            "unlocked": True,
-            "por_reference": por.reference,
-            "framework_contract": fc.reference,
-        }
-
-    return {
-        "status": "ok",
-        "unlocked": False,
-        "reason": {
-            "consultant_type": consultant_type,
-            "resource_id": resource_id,
-            "provider_company_id": provider_company_id,
-            "third_party": str(tp.id) if tp else None,
-            "active_framework_contract": fc.reference if fc else None,
-        },
-    }
-
-
-@router.get(
-    "/boondmanager/debug-bdc-detection/{positioning_id}",
-    summary="Debug: trace the BDC lock/unlock detection chain",
-)
-async def debug_bdc_detection(positioning_id: int, db: AsyncSession = Depends(get_db)):
-    """Run the full 'resource + active framework contract' detection for a
-    positioning and report each step. Explains why a BDC is locked or editable.
-    Not available in production.
-    """
-    settings = get_settings()
-    if settings.is_production:
-        return {"status": "error", "message": "Not available in production"}
-
-    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
-        BoondCrmAdapter,
-    )
-    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-        FrameworkContractRepository,
-    )
-    from app.infrastructure.boond.client import BoondClient
-    from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
-        ThirdPartyRepository,
-    )
-
-    crm = BoondCrmAdapter(BoondClient(settings))
-    cr_repo = ContractRequestRepository(db)
-    tp_repo = ThirdPartyRepository(db)
-    fc_repo = FrameworkContractRepository(db)
-
-    steps: dict = {}
-
-    positioning = await crm.get_positioning(positioning_id)
-    if not positioning:
-        return {"status": "error", "message": "positioning introuvable", "steps": steps}
-
-    consultant_type = positioning.get("consultant_type")
-    candidate_id = positioning.get("candidate_id")
-    need_id = positioning.get("need_id")
-    steps["1_positioning"] = {
-        "state": positioning.get("state"),
-        "consultant_type": consultant_type,
-        "candidate_id": candidate_id,
-        "need_id": need_id,
-    }
-
-    # Resolve resource id (even if the positioning still references a candidate)
-    resource_id = candidate_id if consultant_type == "resource" else None
-    resolved_resource = None
-    if consultant_type != "resource" and candidate_id:
-        resolved_resource = await crm.resolve_resource_id(candidate_id)
-    steps["2_resource_id"] = {
-        "used_resource_id": resource_id,
-        "candidate_maps_to_resource": resolved_resource,
-    }
-
-    lookup_resource_id = resource_id or resolved_resource
-    provider_company_id = None
-    if lookup_resource_id:
-        provider_company_id = await crm.get_resource_provider_company_id(lookup_resource_id)
-    steps["3_provider_company_id"] = provider_company_id
-
-    tp = None
-    if provider_company_id:
-        tp = await tp_repo.get_by_boond_provider_id(provider_company_id)
-    steps["4_third_party"] = (
-        {"id": str(tp.id), "company_name": tp.company_name} if tp else None
-    )
-
-    company_id = None
-    if need_id:
-        need = await crm.get_need(need_id)
-        agency_id = need.get("agency_id") if need else None
-        if agency_id:
-            company_id = await cr_repo.get_company_by_boond_agency_id(agency_id)
-    steps["5_company_id"] = str(company_id) if company_id else None
-
-    fc = None
-    if tp:
-        fc = await fc_repo.get_active_by_third_party(tp.id, company_id)
-    steps["6_active_framework_contract"] = (
-        {"id": str(fc.id), "reference": fc.reference, "status": fc.status.value} if fc else None
-    )
-
-    editable = fc is not None
-    return {
-        "status": "ok",
-        "positioning_id": positioning_id,
-        "verdict": "EDITABLE (rattaché à un contrat cadre actif)"
-        if editable
-        else "VERROUILLE (pas de ressource+contrat cadre actif détecté)",
-        "steps": steps,
     }
 
 

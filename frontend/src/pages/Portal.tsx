@@ -708,11 +708,6 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
   const [signatoryIsDirector, setSignatoryIsDirector] = useState(initialData?.signatory_is_director ?? false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [frameworkContractDetected, setFrameworkContractDetected] = useState<{
-    reference: string;
-    signed_at: string | null;
-    message: string;
-  } | null>(null);
 
   const computeVatNumber = (siret: string): string => {
     const siren = siret.slice(0, 9);
@@ -752,22 +747,6 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
         toast.success('Données pré-remplies.');
       } catch {
         // Silently ignore — user can fill manually
-      }
-
-      // Check for existing framework contract
-      try {
-        const checkResult = await portalApi.checkSiren(token, digits);
-        if (checkResult.has_framework_contract && checkResult.framework_contract) {
-          setFrameworkContractDetected({
-            reference: checkResult.framework_contract.reference,
-            signed_at: checkResult.framework_contract.signed_at ?? null,
-            message: checkResult.message,
-          });
-        } else {
-          setFrameworkContractDetected(null);
-        }
-      } catch {
-        // Ignore — continue with normal flow
       } finally {
         setSiretLoading(false);
       }
@@ -916,33 +895,6 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
           </div>
         </div>
 
-        {/* Framework contract detected — skip contacts/documents */}
-        {frameworkContractDetected && (
-          <div className="mb-6 p-4 rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20">
-            <div className="flex items-start gap-3">
-              <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <h3 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
-                  Contrat cadre existant
-                </h3>
-                <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">
-                  {frameworkContractDetected.message}
-                </p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
-                  Ref. <span className="font-mono font-semibold">{frameworkContractDetected.reference}</span>
-                  {frameworkContractDetected.signed_at && (
-                    <> — signé le {new Date(frameworkContractDetected.signed_at).toLocaleDateString('fr-FR')}</>
-                  )}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
-                  Vous pouvez fermer cette page. Un bon de commande a été créé et sera traité par votre interlocuteur.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {!frameworkContractDetected && (<>
         {/* Entity category */}
         <div className="mb-5">
           <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1239,7 +1191,6 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
             Valider et continuer
           </Button>
         </div>
-        </>)}
       </Card>
     </div>
   );

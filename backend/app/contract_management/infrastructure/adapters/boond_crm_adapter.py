@@ -104,15 +104,6 @@ class BoondCrmAdapter:
                 relationship_keys=list(relationships.keys()),
             )
 
-            # TJM du BDC = coût journalier moyen (« Coût journalier moyen (HT/jour) »
-            # dans Boond) = ce que l'ESN paie au sous-traitant. Le BDC est un bon de
-            # commande FOURNISSEUR : on prend le coût, pas le tarif de vente client.
-            quantity = (
-                attributes.get("numberOfDaysInvoicedOrQuantity")
-                or attributes.get("numberOfBilledDays")
-                or attributes.get("numberOfDaysFilled")
-            )
-
             return {
                 "id": positioning_id,
                 "state": attributes.get("state"),
@@ -120,7 +111,7 @@ class BoondCrmAdapter:
                 "consultant_type": consultant_type,
                 "need_id": need_id,
                 "daily_rate": attributes.get("averageDailyCost"),
-                "quantity": quantity,
+                "quantity": attributes.get("numberOfDaysInvoicedOrQuantity"),
                 "start_date": attributes.get("startDate"),
                 "end_date": attributes.get("endDate"),
                 "consultant_first_name": consultant_first_name,
@@ -375,8 +366,7 @@ class BoondCrmAdapter:
             provider_id: Boond provider ID.
             positioning_id: Boond positioning ID.
             reference: Contract reference.
-            amount: Montant total HT du bon de commande (TJM × nombre de jours),
-                calculé par l'appelant.
+            amount: Order amount (voir NEEDS-CONFIRMATION ci-dessous).
 
         Returns:
             Boond purchase order ID.
@@ -386,7 +376,13 @@ class BoondCrmAdapter:
                 "type": "purchaseorder",
                 "attributes": {
                     "reference": reference,
-                    # Montant total HT de la commande (TJM × quantité de jours).
+                    # NEEDS-CONFIRMATION: `amount` reçu = TJM (prix unitaire) des
+                    # appelants. Dans le schéma Boond des devis, `amountExcludingTax`
+                    # est le prix UNITAIRE (cf. quotation_line.to_boond_record), le
+                    # total étant `turnoverExcludingTax` = TJM × quantité. Ce BDC
+                    # n'envoie ni quantité ni total : à confirmer si Boond attend ici
+                    # un TOTAL (TJM × quantity_sold) ou le TJM seul. Maths d'argent
+                    # laissées inchangées faute de certitude.
                     "amountExcludingTax": amount,
                 },
                 "relationships": {
@@ -404,50 +400,6 @@ class BoondCrmAdapter:
             reference=reference,
         )
         return purchase_order_id
-
-    async def get_resource_provider_company_id(self, resource_id: int) -> int | None:
-        """Resolve the Boond provider company ID a resource is attached to.
-
-        A sub-contracted consultant (resource) is linked to its employer via the
-        ``providerCompany`` relationship, written through
-        ``PUT /resources/{id}/administrative`` (see update_resource_administrative).
-        We read it to know whether the consultant belongs to a supplier that
-        already has a framework contract.
-
-        Reads the administrative sub-view first (authoritative for providerCompany),
-        then falls back to the base resource endpoint.
-
-        Returns:
-            The Boond company ID of the provider, or None if not attached / error.
-        """
-        for endpoint in (
-            f"/resources/{resource_id}/administrative",
-            f"/resources/{resource_id}",
-        ):
-            try:
-                response = await self._boond._make_request("GET", endpoint)
-                relationships = response.get("data", {}).get("relationships", {})
-                provider_id = self._extract_relationship_id(relationships, "providerCompany")
-                if provider_id:
-                    logger.info(
-                        "boond_resource_provider_resolved",
-                        resource_id=resource_id,
-                        endpoint=endpoint,
-                        provider_company_id=provider_id,
-                    )
-                    return provider_id
-            except Exception as exc:
-                logger.warning(
-                    "boond_get_resource_provider_failed",
-                    resource_id=resource_id,
-                    endpoint=endpoint,
-                    error=str(exc),
-                )
-        logger.info(
-            "boond_resource_provider_not_found",
-            resource_id=resource_id,
-        )
-        return None
 
     async def resolve_resource_id(self, candidate_id: int) -> int | None:
         """Resolve the Boond resource ID from a candidate ID.

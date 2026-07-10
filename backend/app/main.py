@@ -29,7 +29,6 @@ from app.api.routes.v1 import (
 )
 from app.api.routes.v1.admin_company_logo import router as admin_company_logo_router
 from app.config import settings
-from app.contract_management.api.routes import por_router as por_routes_router
 from app.contract_management.api.routes import router as contract_routes_router
 from app.contract_management.api.webhook_routes import router as webhook_router
 from app.infrastructure.database.connection import engine
@@ -127,8 +126,5 @@ app.include_router(vigilance_router, prefix="/api/v1/vigilance", tags=["Vigilanc
 app.include_router(compliance_dashboard_router, prefix="/api/v1/compliance", tags=["Compliance"])
 app.include_router(
     contract_routes_router, prefix="/api/v1/contract-requests", tags=["Contract Management"]
-)
-app.include_router(
-    por_routes_router, prefix="/api/v1/purchase-order-requests", tags=["Purchase Order Requests"]
 )
 app.include_router(webhook_router, prefix="/api/v1/webhooks", tags=["Webhooks"])

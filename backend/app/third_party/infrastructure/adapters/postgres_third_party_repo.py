@@ -36,20 +36,6 @@ class ThirdPartyRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def get_by_boond_provider_id(self, boond_provider_id: int) -> ThirdParty | None:
-        """Get third party by its BoondManager provider company ID.
-
-        Used to link a Boond resource (via its providerCompany) to the supplier
-        known in Bobby, in order to find its framework contract.
-        """
-        result = await self.session.execute(
-            select(ThirdPartyModel).where(
-                ThirdPartyModel.boond_provider_id == boond_provider_id
-            )
-        )
-        model = result.scalars().first()
-        return self._to_entity(model) if model else None
-
     async def save(self, third_party: ThirdParty) -> ThirdParty:
         """Save third party (create or update)."""
         result = await self.session.execute(

@@ -41,10 +41,10 @@ export function DataResetTab() {
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Remise a zero des contrats et BDC
+              Remise a zero des contrats
             </h3>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              Supprime toutes les demandes de contrats, bons de commande, contrats cadres,
+              Supprime toutes les demandes de contrats, contrats cadres,
               documents de conformite, tiers et fichiers S3 associes.
             </p>
             <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
@@ -90,8 +90,7 @@ export function DataResetTab() {
             </p>
             <ul className="mt-2 text-sm text-red-700 dark:text-red-400 space-y-1 ml-4 list-disc">
               <li>Demandes de contrats cadres</li>
-              <li>Demandes de bons de commande</li>
-              <li>Contrats cadres et BDC generes</li>
+              <li>Contrats cadres generes</li>
               <li>Tiers et documents de conformite</li>
               <li>Liens magiques portail</li>
               <li>Fichiers PDF sur S3</li>

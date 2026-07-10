@@ -5,6 +5,9 @@ from uuid import UUID
 import structlog
 
 from app.contract_management.domain.exceptions import ContractRequestNotFoundError
+from app.contract_management.domain.value_objects.contract_request_status import (
+    ContractRequestStatus,
+)
 
 logger = structlog.get_logger()
 
@@ -78,11 +81,12 @@ class PushToCrmUseCase:
             contract.boond_purchase_order_id = po_id
             await self._contract_repo.save(contract)
 
-        # Le contrat cadre reste ACTIF après signature : c'est un cadre vivant qui
-        # sert de base aux BDC (détection « contrat cadre actif »). L'archivage
-        # est le rôle du CRON (quand plus aucun BDC actif depuis 6 mois) — on ne
-        # l'archive donc PLUS ici, sinon le cadre disparaît de la détection BDC
-        # dès le push CRM et les futurs BDC restent verrouillés à tort.
+        # L'archivage est le rôle du CRON, pas de ce use case. La seule
+        # transition légale vers ARCHIVED part de ACTIVE : SIGNED → ARCHIVED est
+        # invalide et levait une InvalidContractStatusError. On ne tente donc la
+        # transition que si la demande est déjà ACTIVE.
+        if cr.status == ContractRequestStatus.ACTIVE:
+            cr.transition_to(ContractRequestStatus.ARCHIVED)
         saved = await self._cr_repo.save(cr)
 
         logger.info(

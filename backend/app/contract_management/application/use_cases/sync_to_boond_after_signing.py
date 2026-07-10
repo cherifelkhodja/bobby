@@ -1,7 +1,6 @@
 """Use case: Synchronise all data to BoondManager after contract signing."""
 
 import re
-from datetime import datetime
 from uuid import UUID
 
 import structlog
@@ -39,11 +38,7 @@ class SyncToBoondAfterSigningUseCase:
     2. Create the contacts (signataire, ADV, commercial) linked to the company.
     3. Convert the candidate to a resource (state 3) if boond_candidate_id is set.
     4a. Link the resource to the provider company + commercial contact.
-    5b. Create a FrameworkContract in the local DB.
     6. Transition the contract request to ACTIVE.
-
-    Note: Boond contract creation (4b) and purchase order (5) are handled
-    by the BDC workflow, not the contrat cadre.
     """
 
     def __init__(
@@ -446,85 +441,7 @@ class SyncToBoondAfterSigningUseCase:
             tp.boond_resource_id = resource_id
             await self._tp_repo.save(tp)
 
-        # ── Étapes 4b/5 (Contrat Boond + BDC) → gérées par le workflow BDC ──
-        # Le contrat cadre ne crée pas de contrat Boond ni de bon de commande.
-        # Ces étapes seront effectuées lors de la création du BDC.
-
-        # ── Étape 5b : Créer le contrat cadre (FrameworkContract) ─────────
-        # Crée un FrameworkContract qui sera réutilisé pour les prochains
-        # consultants du même fournisseur.
-        if tp and company:
-            try:
-                from app.contract_management.domain.entities.framework_contract import (
-                    FrameworkContract,
-                )
-                from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-                    FrameworkContractRepository,
-                )
-
-                fc_repo = FrameworkContractRepository(self._db)
-
-                # Check if a framework contract already exists for this supplier+company
-                existing_fc = await fc_repo.get_active_by_third_party(tp.id, company.id)
-                if not existing_fc:
-                    from datetime import timedelta
-
-                    from app.contract_management.domain.value_objects.framework_contract_status import (
-                        FrameworkContractStatus,
-                    )
-
-                    now = datetime.utcnow()
-                    contract = await self._contract_repo.get_by_request_id(cr.id)
-                    fc = FrameworkContract(
-                        third_party_id=tp.id,
-                        company_id=company.id,
-                        original_contract_request_id=cr.id,
-                        original_contract_id=contract.id if contract else None,
-                        reference=cr.display_reference,
-                        s3_key_signed=contract.s3_key_signed if contract else None,
-                        signed_at=contract.signed_at if contract else now,
-                        status=FrameworkContractStatus.ACTIVE,
-                        expires_at=now + timedelta(days=730),  # 2 years
-                        tacit_renewal=True,
-                    )
-                    saved_fc = await fc_repo.save(fc)
-                    logger.info(
-                        "framework_contract_created",
-                        cr_id=str(cr.id),
-                        fc_id=str(saved_fc.id),
-                        reference=saved_fc.reference,
-                        third_party_id=str(tp.id),
-                    )
-                else:
-                    saved_fc = existing_fc
-                    logger.info(
-                        "framework_contract_already_exists",
-                        cr_id=str(cr.id),
-                        fc_id=str(existing_fc.id),
-                    )
-
-                # ── Déverrouiller les BDC en attente de ce contrat cadre ────────
-                # Un positionnement gagné a pu créer un BDC verrouillé avant que
-                # le contrat cadre soit signé. On les rattache et on les rend
-                # éditables maintenant que le cadre est actif. Clé de rattachement
-                # : le candidat Boond (commun au positionnement et au flux cadre).
-                if cr.boond_candidate_id:
-                    await self._unlock_pending_bdc(cr.boond_candidate_id, saved_fc.id, tp.id)
-            except Exception as exc:
-                logger.warning(
-                    "framework_contract_creation_failed",
-                    cr_id=str(cr.id),
-                    error=str(exc),
-                )
-
-        # ── Étape 5c : PurchaseOrder → géré par le workflow BDC ─────────────
-        # Le contrat cadre ne crée pas de PurchaseOrder. Ce sera fait lors
-        # de la création du BDC (positionnement state 7).
-
         # ── Étape 6 : Transition → ACTIVE ─────────────────────────────────
-        # Le contrat cadre reste ACTIVE tant qu'il y a des BDC actifs.
-        # Il passera en ARCHIVED automatiquement (CRON) quand plus aucun
-        # BDC n'est actif depuis 6 mois.
         if cr.status == ContractRequestStatus.SIGNED:
             cr.transition_to(ContractRequestStatus.ACTIVE)
         saved = await self._cr_repo.save(cr)
@@ -535,38 +452,6 @@ class SyncToBoondAfterSigningUseCase:
             reference=cr.display_reference,
         )
         return saved
-
-    async def _unlock_pending_bdc(self, boond_candidate_id, framework_contract_id, third_party_id):
-        """Unlock BDC locked on the framework contract for this consultant.
-
-        Best-effort : un échec de déverrouillage ne doit pas faire échouer la
-        signature du contrat cadre (les BDC pourront être repris manuellement).
-        """
-        try:
-            from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-                PurchaseOrderRequestRepository,
-            )
-
-            por_repo = PurchaseOrderRequestRepository(self._db)
-            locked = await por_repo.list_locked_by_candidate_id(boond_candidate_id)
-            for por in locked:
-                por.unlock(
-                    framework_contract_id=framework_contract_id,
-                    third_party_id=third_party_id,
-                )
-                await por_repo.save(por)
-                logger.info(
-                    "bdc_unlocked_after_framework_signed",
-                    por_id=str(por.id),
-                    reference=por.reference,
-                    framework_contract_id=str(framework_contract_id),
-                )
-        except Exception as exc:
-            logger.warning(
-                "bdc_unlock_failed",
-                boond_candidate_id=boond_candidate_id,
-                error=str(exc),
-            )
 
     async def _get_contract_company(self, company_id):
         """Fetch the ContractCompanyModel for the given ID or the default."""

@@ -71,12 +71,11 @@ def _build(cr: ContractRequest, contract: Contract, tp=None):
 
 
 class TestArchiveTransition:
-    """Le push CRM n'archive PLUS le contrat cadre : il reste ACTIF (cadre vivant
-    servant de base aux BDC). L'archivage est laissé au CRON (6 mois sans BDC)."""
+    """Le use case n'archive que depuis ACTIVE (fix SIGNED -> ARCHIVED invalide)."""
 
     @pytest.mark.asyncio
-    async def test_active_stays_active(self):
-        """Depuis ACTIVE, le push ne transitionne PAS vers ARCHIVED."""
+    async def test_active_is_archived(self):
+        """Depuis ACTIVE, le push transitionne bien vers ARCHIVED."""
         cr = ContractRequest(
             provisional_reference="PROV-2026-0001",
             status=ContractRequestStatus.ACTIVE,
@@ -86,8 +85,8 @@ class TestArchiveTransition:
 
         saved = await uc.execute(cr.id)
 
-        assert saved.status == ContractRequestStatus.ACTIVE
-        assert all(entry["status"] != "archived" for entry in saved.status_history)
+        assert saved.status == ContractRequestStatus.ARCHIVED
+        cr_repo.save.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_signed_does_not_transition(self):

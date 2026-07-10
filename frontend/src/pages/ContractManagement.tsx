@@ -1,18 +1,18 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FileSignature, ShoppingCart, X, Trash2, User, Building2 } from 'lucide-react';
+import { FileSignature, X, Trash2, User, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { contractsApi, purchaseOrderRequestsApi } from '../api/contracts';
+import { contractsApi } from '../api/contracts';
 import { useAuthStore } from '../stores/authStore';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
 import { getErrorMessage } from '../api/client';
-import type { ContractRequestStatus, PurchaseOrderRequestStatus } from '../types';
-import { CONTRACT_STATUS_CONFIG, POR_STATUS_CONFIG } from '../types';
+import type { ContractRequestStatus } from '../types';
+import { CONTRACT_STATUS_CONFIG } from '../types';
 
 const THIRD_PARTY_TYPE_LABELS: Record<string, string> = {
   freelance: 'Freelance',
@@ -21,21 +21,18 @@ const THIRD_PARTY_TYPE_LABELS: Record<string, string> = {
   salarie: 'Salarié',
 };
 
-type MainTab = 'contracts' | 'bdc';
 type FilterTab = 'all' | 'active' | 'done';
 
 const CR_TERMINAL = new Set(['cancelled', 'signed', 'archived', 'redirected_payfit']);
-const POR_TERMINAL = new Set(['cancelled', 'archived']);
 
 export function ContractManagement() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
-  const [mainTab, setMainTab] = useState<MainTab>('contracts');
   const [page, setPage] = useState(0);
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const [cancelTarget, setCancelTarget] = useState<{ id: string; reference: string; type: MainTab } | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; reference: string } | null>(null);
   const pageSize = 20;
   // The group tabs (Tous / En cours / Finalisés) span several statuses, and the API
   // status_filter only accepts a single status — so group filtering, counts and
@@ -55,19 +52,6 @@ export function ContractManagement() {
         limit: FETCH_LIMIT,
         ...(statusFilter ? { status_filter: statusFilter as ContractRequestStatus } : {}),
       }),
-    enabled: mainTab === 'contracts',
-  });
-
-  // Purchase order requests query
-  const { data: porData, isLoading: porLoading } = useQuery({
-    queryKey: ['purchase-order-requests', statusFilter],
-    queryFn: () =>
-      purchaseOrderRequestsApi.list({
-        skip: 0,
-        limit: FETCH_LIMIT,
-        ...(statusFilter ? { status_filter: statusFilter as PurchaseOrderRequestStatus } : {}),
-      }),
-    enabled: mainTab === 'bdc',
   });
 
   const cancelCrMutation = useMutation({
@@ -76,16 +60,6 @@ export function ContractManagement() {
       toast.success('Demande de contrat annulée.');
       setCancelTarget(null);
       queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
-    },
-    onError: (error) => toast.error(getErrorMessage(error)),
-  });
-
-  const cancelPorMutation = useMutation({
-    mutationFn: (id: string) => purchaseOrderRequestsApi.cancel(id),
-    onSuccess: () => {
-      toast.success('Demande de BDC annulée.');
-      setCancelTarget(null);
-      queryClient.invalidateQueries({ queryKey: ['purchase-order-requests'] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -106,17 +80,9 @@ export function ContractManagement() {
       year: 'numeric',
     });
 
-  const handleSwitchMainTab = (tab: MainTab) => {
-    setMainTab(tab);
-    setPage(0);
-    setFilterTab('all');
-    setStatusFilter('');
-  };
+  if (crLoading) return <PageSpinner />;
 
-  const isLoading = mainTab === 'contracts' ? crLoading : porLoading;
-  if (isLoading) return <PageSpinner />;
-
-  // ── Contract requests tab content ─────────────────────────────────
+  // ── Contract requests list ────────────────────────────────────────
   const renderContractsList = () => {
     const items = crData?.items ?? [];
     const filtered = items.filter((cr) => {
@@ -190,7 +156,7 @@ export function ContractManagement() {
                         <p className="text-xs text-gray-400 dark:text-gray-500">{formatDate(cr.created_at)}</p>
                         {isAdv && !CR_TERMINAL.has(cr.status) && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); setCancelTarget({ id: cr.id, reference: cr.display_reference, type: 'contracts' }); }}
+                            onClick={(e) => { e.stopPropagation(); setCancelTarget({ id: cr.id, reference: cr.display_reference }); }}
                             className="p-1.5 rounded-md text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
                             title="Annuler"
                           >
@@ -226,81 +192,6 @@ export function ContractManagement() {
                     )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-        {renderPagination(filtered.length)}
-      </>
-    );
-  };
-
-  // ── Purchase order requests tab content ────────────────────────────
-  const renderPorList = () => {
-    const items = porData?.items ?? [];
-    const filtered = items.filter((por) => {
-      if (filterTab === 'all') return true;
-      const g = POR_STATUS_CONFIG[por.status]?.group;
-      if (filterTab === 'active') return g === 'active' || g === 'blocked';
-      return g === 'done';
-    });
-
-    const counts = {
-      all: items.length,
-      active: items.filter((p) => { const g = POR_STATUS_CONFIG[p.status]?.group; return g === 'active' || g === 'blocked'; }).length,
-      done: items.filter((p) => POR_STATUS_CONFIG[p.status]?.group === 'done').length,
-    };
-
-    const paged = filtered.slice(page * pageSize, page * pageSize + pageSize);
-
-    return (
-      <>
-        {renderFilterTabs(counts, POR_STATUS_CONFIG)}
-        {filtered.length === 0 ? (
-          <Card className="text-center py-12">
-            <ShoppingCart className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">Aucun bon de commande.</p>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {paged.map((por) => {
-              const config = POR_STATUS_CONFIG[por.status];
-              return (
-                <Card key={por.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/contracts/po/${por.id}`)}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4 min-w-0">
-                      <span className="shrink-0 text-sm font-mono font-semibold text-gray-900 dark:text-white">{por.reference}</span>
-                      <span className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config?.color ?? 'bg-gray-100 text-gray-600'}`}>{config?.label ?? por.status_display}</span>
-                      <div className="min-w-0">
-                        {por.consultant_first_name && (
-                          <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                            {por.consultant_first_name} {por.consultant_last_name}
-                          </p>
-                        )}
-                        <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
-                          {por.client_name && <span>{por.client_name}</span>}
-                          {por.client_name && por.daily_rate && <span>·</span>}
-                          {por.daily_rate && <span>{por.daily_rate}€/j</span>}
-                          {por.start_date && <><span>·</span><span>Début {formatDate(por.start_date)}</span></>}
-                          {por.framework_contract_reference && (
-                            <><span>·</span><span className="text-emerald-600 dark:text-emerald-400">CC {por.framework_contract_reference}</span></>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0 ml-4">
-                      <div className="text-right">
-                        <p className="text-xs text-gray-400 dark:text-gray-500">{formatDate(por.created_at)}</p>
-                        {isAdv && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{por.commercial_name || por.commercial_email}</p>}
-                      </div>
-                      {isAdv && !POR_TERMINAL.has(por.status) && (
-                        <button onClick={(e) => { e.stopPropagation(); setCancelTarget({ id: por.id, reference: por.reference, type: 'bdc' }); }} className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Annuler">
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </Card>
               );
             })}
           </div>
@@ -364,46 +255,18 @@ export function ContractManagement() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Gestion des contrats</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {isAdv ? 'Tous les contrats et bons de commande' : 'Vos contrats et bons de commande'}
+            {isAdv ? 'Tous les contrats' : 'Vos contrats'}
           </p>
         </div>
       </div>
 
-      {/* Main tabs: Contrats cadres / Bons de commande */}
-      <div className="flex space-x-1 border-b border-gray-200 dark:border-gray-700 mb-6">
-        <button
-          onClick={() => handleSwitchMainTab('contracts')}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-            mainTab === 'contracts'
-              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-              : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}
-        >
-          <FileSignature className="h-4 w-4" />
-          Contrats cadres
-          {crData && <span className="ml-1 text-xs bg-gray-100 dark:bg-gray-700 rounded-full px-2 py-0.5">{crData.total}</span>}
-        </button>
-        <button
-          onClick={() => handleSwitchMainTab('bdc')}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-            mainTab === 'bdc'
-              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}
-        >
-          <ShoppingCart className="h-4 w-4" />
-          Bons de commande
-          {porData && <span className="ml-1 text-xs bg-gray-100 dark:bg-gray-700 rounded-full px-2 py-0.5">{porData.total}</span>}
-        </button>
-      </div>
-
-      {mainTab === 'contracts' ? renderContractsList() : renderPorList()}
+      {renderContractsList()}
 
       {/* Cancel confirmation modal */}
       <Modal
         isOpen={!!cancelTarget}
         onClose={() => setCancelTarget(null)}
-        title={cancelTarget?.type === 'contracts' ? 'Annuler la demande de contrat' : 'Annuler la demande de BDC'}
+        title="Annuler la demande de contrat"
       >
         {cancelTarget && (
           <div className="space-y-4">
@@ -412,14 +275,11 @@ export function ContractManagement() {
             </p>
             <p className="text-sm text-red-600 dark:text-red-400">Cette action est irréversible.</p>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="secondary" onClick={() => setCancelTarget(null)} disabled={cancelCrMutation.isPending || cancelPorMutation.isPending}>Non, garder</Button>
+              <Button variant="secondary" onClick={() => setCancelTarget(null)} disabled={cancelCrMutation.isPending}>Non, garder</Button>
               <Button
                 variant="primary"
-                onClick={() => {
-                  if (cancelTarget.type === 'contracts') cancelCrMutation.mutate(cancelTarget.id);
-                  else cancelPorMutation.mutate(cancelTarget.id);
-                }}
-                isLoading={cancelCrMutation.isPending || cancelPorMutation.isPending}
+                onClick={() => cancelCrMutation.mutate(cancelTarget.id)}
+                isLoading={cancelCrMutation.isPending}
                 className="bg-red-600 hover:bg-red-700 text-white"
               >
                 Oui, annuler

@@ -851,7 +851,7 @@ async def submit_contract_review(
 
 @router.post(
     "/portal/{token}/check-siren",
-    summary="Step 1: Check SIREN/SIRET for existing framework contract",
+    summary="Step 1: Check SIREN/SIRET",
 )
 async def check_siren_for_framework_contract(
     token: str,
@@ -860,62 +860,19 @@ async def check_siren_for_framework_contract(
 ):
     """Portal step 1: Supplier enters SIRET.
 
-    Checks if a third party with this SIREN already has an active framework
-    contract. If so, cancels the current ContractRequest and creates a
-    PurchaseOrderRequest instead. Returns the result so the portal frontend
-    can redirect accordingly.
+    Validates the SIRET and the portal token, then lets the supplier continue
+    with the normal document collection flow.
     """
     try:
         siret = body.get("siret", "")
         if not siret or len(siret) < 9:
             raise HTTPException(status_code=400, detail="SIRET invalide (14 chiffres requis).")
 
-        result = await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
-        siren = siret[:9]
-
-        # Check for existing framework contract
-        from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
-            FrameworkContractRepository,
-        )
-
-        fc_repo = FrameworkContractRepository(db)
-        fc = await fc_repo.get_by_third_party_siren(siren)
-
-        if fc and fc.is_usable and result.contract_request_id:
-            # Un contrat cadre actif existe déjà pour ce fournisseur. Depuis la
-            # refonte BDC, la création du bon de commande n'est PLUS pilotée ici :
-            # elle est déclenchée par le webhook positionnement (state 7), qui crée
-            # le BDC directement (verrouillé tant que le consultant n'est pas une
-            # ressource rattachée au contrat cadre, déverrouillé à la signature).
-            # On se contente donc d'informer le portail, sans créer de POR
-            # (éviterait un doublon avec le BDC issu du webhook).
-            fc_payload = {
-                "id": str(fc.id),
-                "reference": fc.reference,
-                "signed_at": fc.signed_at.isoformat() if fc.signed_at else None,
-            }
-
-            logger.info(
-                "siren_check_framework_contract_found",
-                siren=siren,
-                contract_request_id=str(result.contract_request_id),
-                fc_reference=fc.reference,
-            )
-
-            return {
-                "has_framework_contract": True,
-                "framework_contract": fc_payload,
-                "purchase_order_request_id": None,
-                "message": (
-                    f"Un contrat cadre actif a été détecté (réf. {fc.reference}). "
-                    "Le bon de commande de la prestation est géré automatiquement ; "
-                    "vous n'avez pas de documents à fournir ici."
-                ),
-            }
+        await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
 
         return {
             "has_framework_contract": False,
-            "message": "Aucun contrat cadre trouvé pour ce SIREN. Veuillez continuer avec les informations de contact.",
+            "message": "Veuillez continuer avec les informations de contact.",
         }
     except HTTPException:
         raise

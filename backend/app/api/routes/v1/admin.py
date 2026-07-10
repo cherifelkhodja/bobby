@@ -1583,9 +1583,6 @@ async def reset_contract_data(
 
     # Deletion order respects foreign key dependencies (children first)
     tables = [
-        "cm_purchase_order_requests",
-        "cm_purchase_orders",
-        "cm_framework_contracts",
         "cm_contracts",
         "tp_magic_links",
         "cm_webhook_events",

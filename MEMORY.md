@@ -195,7 +195,28 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
-### 2026-07-09 (refonte flux BDC — webhook positionnement crée le BDC)
+### 2026-07-10 (SUPPRESSION complète du module BDC)
+
+**Le module BDC (bons de commande / purchase orders / framework contracts) a été entièrement retiré** du code (backend + frontend), à la demande, pour être réimplémenté différemment. Les entrées de changelog BDC ci-dessous sont donc **historiques** (fonctionnalité supprimée).
+
+Retiré :
+- Entités `PurchaseOrder`, `PurchaseOrderRequest`, `FrameworkContract` + leurs value objects et repositories.
+- Modèles/tables `cm_purchase_orders`, `cm_purchase_order_requests`, `cm_framework_contracts` (**migration 077** — DROP ; migrations 075/076 conservées pour l'historique).
+- Use cases create/validate/finalize purchase order + `create_purchase_order_request_from_positioning`.
+- Routes `/purchase-order-requests/*`, endpoints de debug BDC, page frontend `PurchaseOrderRequestDetail`, onglet « Bons de commande ».
+- Détection contrat cadre au portail SIRET, création `FrameworkContract` à la signature, cron de renouvellement des cadres.
+
+Rétabli à l'état d'avant-refonte :
+- Le webhook `positioning-update` recrée un **`ContractRequest`** (`CreateContractRequestUseCase`), comme avant.
+- `push_to_crm` réarchive le contrat après signature.
+
+Conservé (flux contrat, hors module BDC) : `push_to_crm`, `BoondCrmAdapter.create_purchase_order`, route `/{id}/boond/create-purchase-order`, champ `contract.boond_purchase_order_id`.
+
+Conservé aussi (améliorations de la session, non-BDC) : emails depuis b0bby.fr + Reply-To société, objets explicites, visualisation des documents de conformité depuis le contrat, notification ADV sur revue partenaire, messages d'erreur de génération de brouillon.
+
+### 2026-07-09 (refonte flux BDC — webhook positionnement crée le BDC) [HISTORIQUE — supprimé le 2026-07-10]
+
+**Changement de flux majeur.** Le webhook `positioning-update` (état 7) ne crée plus une `ContractRequest` (contrat cadre) mais directement un **BDC** (`PurchaseOrderRequest`). Le contrat cadre est désormais déclenché **exclusivement** par `candidate-state-update` (candidat état 11).
 
 **Changement de flux majeur.** Le webhook `positioning-update` (état 7) ne crée plus une `ContractRequest` (contrat cadre) mais directement un **BDC** (`PurchaseOrderRequest`). Le contrat cadre est désormais déclenché **exclusivement** par `candidate-state-update` (candidat état 11).
 
