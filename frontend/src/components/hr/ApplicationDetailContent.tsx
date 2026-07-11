@@ -1,32 +1,36 @@
 /**
- * ApplicationDetailContent - Reusable detail panel for a job application.
+ * ApplicationDetailContent - Reusable detail panel for a job application (design v2).
  *
- * Extracted from JobPostingDetails. Renders candidate info, matching analysis,
- * CV quality analysis, status change, notes, and action buttons.
- * Displayed inside modal, drawer, split, or inline expansion layouts.
+ * Renders the "expand" content of an application row: analyses IA (matching +
+ * qualité CV) on the left, coordonnées + actions (statut, notes, CV) on the right.
+ * In `compact` mode it returns two column fragments meant to be placed inside a
+ * 2-column grid parent (`.expand` or equivalent); otherwise columns are stacked
+ * (modal / drawer layouts).
  */
 
-import {
-  Loader2,
-  AlertCircle,
-  Download,
-  FileText,
-  Edit2,
-  CheckCircle,
-  RefreshCw,
-  Info,
-  Star,
-} from 'lucide-react';
-import {
-  APPLICATION_STATUS_LABELS,
-  getMatchingScoreColor,
-  getCvQualityScoreColor,
-} from '../../types';
+import { Download, FileText, RefreshCw, Star } from 'lucide-react';
+import { APPLICATION_STATUS_LABELS } from '../../types';
 import type { ApplicationStatus, JobApplication } from '../../types';
 import {
   EXPERIENCE_LEVEL_LABELS,
   CLASSIFICATION_LABELS,
 } from '../../constants/hr';
+import { Button } from '../ui/Button';
+
+/** Chip v2 pour le score de matching : ≥80 vert, 50-79 ambre, <50 rouge. */
+export function matchingScoreChip(score: number): string {
+  if (score >= 80) return 'st-grn';
+  if (score >= 50) return 'st-amb';
+  return 'st-red';
+}
+
+/** Chip v2 pour la note de qualité CV (/20). */
+export function cvQualityScoreChip(score: number): string {
+  if (score >= 16) return 'st-grn';
+  if (score >= 12) return 'st-blu';
+  if (score >= 8) return 'st-amb';
+  return 'st-red';
+}
 
 export interface ApplicationDetailContentProps {
   application: JobApplication;
@@ -39,6 +43,8 @@ export interface ApplicationDetailContentProps {
   handleDownloadCv: (application: JobApplication) => void;
   handleReanalyze: (application: JobApplication) => void;
   handleRetryBoondSync: (application: JobApplication) => void;
+  handleQuickValidate?: (application: JobApplication) => void;
+  handleQuickReject?: (application: JobApplication) => void;
   updateStatusMutation: { isPending: boolean };
   updateNoteMutation: { isPending: boolean };
   reanalyzeMutation: { isPending: boolean };
@@ -57,159 +63,149 @@ export function ApplicationDetailContent({
   handleDownloadCv,
   handleReanalyze,
   handleRetryBoondSync,
+  handleQuickValidate,
+  handleQuickReject,
   updateStatusMutation,
   updateNoteMutation,
   reanalyzeMutation,
   retryBoondMutation,
   compact = false,
 }: ApplicationDetailContentProps) {
-  return (
-    <div className={`${compact ? 'p-3' : 'p-6'} space-y-4`}>
-      {/* Candidate Info */}
-      <div className="grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <p className="text-gray-500 dark:text-gray-400">Email</p>
-          <p className="font-medium text-gray-900 dark:text-white">{application.email}</p>
-        </div>
-        <div>
-          <p className="text-gray-500 dark:text-gray-400">Téléphone</p>
-          <p className="font-medium text-gray-900 dark:text-white">{application.phone}</p>
-        </div>
-        <div>
-          <p className="text-gray-500 dark:text-gray-400">Poste</p>
-          <p className="font-medium text-gray-900 dark:text-white">{application.job_title}</p>
-        </div>
-        <div>
-          <p className="text-gray-500 dark:text-gray-400">TJM</p>
-          <p className="font-medium text-gray-900 dark:text-white">{application.tjm_range || '-'}</p>
-        </div>
-        <div>
-          <p className="text-gray-500 dark:text-gray-400">Disponibilité</p>
-          <p className="font-medium text-gray-900 dark:text-white">
-            {application.availability_display || application.availability || '-'}
-          </p>
-        </div>
-        <div>
-          <p className="text-gray-500 dark:text-gray-400">Date candidature</p>
-          <p className="text-sm font-medium text-gray-900 dark:text-white">
-            {new Date(application.created_at).toLocaleDateString('fr-FR')}
-          </p>
-        </div>
-      </div>
+  const infoPairs: { label: string; value: string }[] = [
+    { label: 'Email', value: application.email },
+    { label: 'Téléphone', value: application.phone || '—' },
+    { label: 'Poste', value: application.job_title || '—' },
+    { label: 'Statut pro', value: application.employment_status_display || '—' },
+    ...(application.tjm_range ? [{ label: 'TJM', value: application.tjm_range }] : []),
+    ...(application.salary_range ? [{ label: 'Salaire', value: application.salary_range }] : []),
+    {
+      label: 'Disponibilité',
+      value: application.availability_display || application.availability || '—',
+    },
+    {
+      label: 'Candidature',
+      value: new Date(application.created_at).toLocaleDateString('fr-FR'),
+    },
+    { label: 'CV', value: application.cv_filename || '—' },
+  ];
 
-      {/* Matching Analysis */}
-      {application.matching_details && (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-            <h4 className="text-sm font-medium text-gray-900 dark:text-white">Analyse Matching</h4>
-            <div className="ml-auto relative group">
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-help ${getMatchingScoreColor(
-                  application.matching_score ?? 0
-                )}`}
-              >
-                {application.matching_score}%
-                <Info className="h-3 w-3" />
+  /* ── Colonne gauche : analyses IA ─────────────────────────────────── */
+  const analysisColumn = (
+    <div className="space-y-3 min-w-0">
+      {application.matching_details ? (
+        <div className="xcard">
+          <div className="xh">
+            <FileText className="h-3.5 w-3.5 text-mut2 shrink-0" />
+            <h4 className="xt">Analyse Matching</h4>
+            {application.matching_score !== null && (
+              <span className={`st ${matchingScoreChip(application.matching_score)} ml-auto`}>
+                {application.matching_score} %
               </span>
-              <div className="absolute right-0 top-full mt-1 z-50 hidden group-hover:block w-64 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg text-xs">
-                <p className="font-medium text-gray-900 dark:text-white mb-1">Score de matching</p>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Évalue l'adéquation entre le CV du candidat et les exigences du poste (compétences, expérience, technologies).
-                </p>
-              </div>
-            </div>
+            )}
           </div>
-          <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
-            {application.matching_details.summary}
-          </p>
+          <p className="xp">{application.matching_details.summary}</p>
           {application.matching_details.strengths.length > 0 && (
-            <div className="mb-2">
-              <p className="text-xs font-medium text-green-700 dark:text-green-400 mb-1">Points forts</p>
-              <ul className="list-disc list-inside text-xs text-gray-600 dark:text-gray-400">
+            <>
+              <p className="xl g">Points forts</p>
+              <ul className="xul">
                 {application.matching_details.strengths.map((s, i) => (
                   <li key={i}>{s}</li>
                 ))}
               </ul>
-            </div>
+            </>
           )}
           {application.matching_details.gaps.length > 0 && (
-            <div>
-              <p className="text-xs font-medium text-orange-700 dark:text-orange-400 mb-1">Attention</p>
-              <ul className="list-disc list-inside text-xs text-gray-600 dark:text-gray-400">
+            <>
+              <p className="xl o">Attention</p>
+              <ul className="xul">
                 {application.matching_details.gaps.map((g, i) => (
                   <li key={i}>{g}</li>
                 ))}
               </ul>
-            </div>
+            </>
           )}
+        </div>
+      ) : (
+        <div className="xcard">
+          <div className="xh">
+            <FileText className="h-3.5 w-3.5 text-mut2 shrink-0" />
+            <h4 className="xt">Analyse Matching</h4>
+          </div>
+          <p className="notec">
+            Analyse IA non disponible pour cette candidature — utilisez « Re-analyser ».
+          </p>
         </div>
       )}
 
-      {/* CV Quality Analysis */}
       {application.cv_quality && (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Star className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-            <h4 className="text-sm font-medium text-gray-900 dark:text-white">Analyse Qualité CV</h4>
-            <div className="ml-auto relative group">
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-help ${getCvQualityScoreColor(
-                  application.cv_quality_score ?? 0
-                )}`}
-              >
+        <div className="xcard">
+          <div className="xh">
+            <Star className="h-3.5 w-3.5 text-mut2 shrink-0" />
+            <h4 className="xt">Analyse Qualité CV</h4>
+            {application.cv_quality_score !== null && (
+              <span className={`st ${cvQualityScoreChip(application.cv_quality_score)} ml-auto`}>
                 {application.cv_quality_score}/20
-                <Info className="h-3 w-3" />
               </span>
-              <div className="absolute right-0 top-full mt-1 z-50 hidden group-hover:block w-72 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg text-xs">
-                <p className="font-medium text-gray-900 dark:text-white mb-1">Note de qualité CV</p>
-                <p className="text-gray-600 dark:text-gray-400 mb-2">
-                  Évalue la qualité intrinsèque du profil : stabilité des missions, qualité des comptes, parcours scolaire, continuité.
-                </p>
-                <div className="space-y-1 text-gray-600 dark:text-gray-400">
-                  <p><span className="font-medium">Niveau :</span> {EXPERIENCE_LEVEL_LABELS[application.cv_quality.niveau_experience] || application.cv_quality.niveau_experience}</p>
-                  <p><span className="font-medium">Expérience :</span> {application.cv_quality.annees_experience} ans</p>
-                  <p><span className="font-medium">Classification :</span> {CLASSIFICATION_LABELS[application.cv_quality.classification] || application.cv_quality.classification}</p>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
-          <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
-            {application.cv_quality.synthese}
+          <p className="xp">{application.cv_quality.synthese}</p>
+          <p className="notec">
+            Niveau :{' '}
+            {EXPERIENCE_LEVEL_LABELS[application.cv_quality.niveau_experience] ||
+              application.cv_quality.niveau_experience}{' '}
+            · Expérience : {application.cv_quality.annees_experience} ans · Classification :{' '}
+            {CLASSIFICATION_LABELS[application.cv_quality.classification] ||
+              application.cv_quality.classification}
           </p>
           {application.cv_quality.points_forts.length > 0 && (
-            <div className="mb-2">
-              <p className="text-xs font-medium text-green-700 dark:text-green-400 mb-1">Points forts</p>
-              <ul className="list-disc list-inside text-xs text-gray-600 dark:text-gray-400">
+            <>
+              <p className="xl g">Points forts</p>
+              <ul className="xul">
                 {application.cv_quality.points_forts.map((s, i) => (
                   <li key={i}>{s}</li>
                 ))}
               </ul>
-            </div>
+            </>
           )}
           {application.cv_quality.points_faibles.length > 0 && (
-            <div>
-              <p className="text-xs font-medium text-orange-700 dark:text-orange-400 mb-1">Points faibles</p>
-              <ul className="list-disc list-inside text-xs text-gray-600 dark:text-gray-400">
+            <>
+              <p className="xl o">Points faibles</p>
+              <ul className="xul">
                 {application.cv_quality.points_faibles.map((g, i) => (
                   <li key={i}>{g}</li>
                 ))}
               </ul>
-            </div>
+            </>
           )}
         </div>
       )}
+    </div>
+  );
 
-      {/* Status Change */}
-      <div>
-        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+  /* ── Colonne droite : coordonnées + actions ───────────────────────── */
+  const actionsColumn = (
+    <div className="space-y-3 min-w-0">
+      <div className="xcard">
+        <div className="cfgrid !grid-cols-2 !mt-0">
+          {infoPairs.map(({ label, value }) => (
+            <div key={label} className="min-w-0">
+              <p className="ml">{label}</p>
+              <p className="mv !text-[12.5px] break-words">{value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="xcard">
+        <label className="f-lab" htmlFor={`app-status-${application.id}`}>
           Changer le statut
         </label>
         <div className="flex gap-2">
           <select
+            id={`app-status-${application.id}`}
             value={newStatus}
             onChange={(e) => setNewStatus(e.target.value as ApplicationStatus)}
-            className="flex-1 px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="f-in !px-2.5 flex-1 min-w-0"
           >
             {Object.entries(APPLICATION_STATUS_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -217,126 +213,153 @@ export function ApplicationDetailContent({
               </option>
             ))}
           </select>
-          <button
+          <Button
+            type="button"
             onClick={handleStatusChange}
-            disabled={updateStatusMutation.isPending || newStatus === application.status}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors inline-flex items-center gap-1"
+            disabled={newStatus === application.status}
+            isLoading={updateStatusMutation.isPending}
+            className="!h-[38px]"
           >
-            {updateStatusMutation.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <CheckCircle className="h-3.5 w-3.5" />
-            )}
             OK
-          </button>
+          </Button>
         </div>
-      </div>
+        {application.status === 'en_cours' && handleQuickValidate && handleQuickReject && (
+          <div className="flex gap-2 mt-2.5">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="flex-1 !text-grn-fg"
+              onClick={() => handleQuickValidate(application)}
+            >
+              Valider
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="flex-1 !text-redt"
+              onClick={() => handleQuickReject(application)}
+            >
+              Refuser
+            </Button>
+          </div>
+        )}
 
-      {/* Notes */}
-      <div>
-        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label className="f-lab !mt-3.5" htmlFor={`app-notes-${application.id}`}>
           Notes
         </label>
         <textarea
+          id={`app-notes-${application.id}`}
           value={noteText}
           onChange={(e) => setNoteText(e.target.value)}
-          placeholder="Notes sur ce candidat..."
+          placeholder="Notes sur ce candidat…"
           rows={compact ? 2 : 3}
-          className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          className="f-ta !min-h-[54px]"
         />
-        <button
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="mt-2"
           onClick={() => handleNoteUpdate(application)}
-          disabled={updateNoteMutation.isPending || noteText === (application.notes || '')}
-          className="mt-1 px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white text-sm font-medium rounded-lg transition-colors inline-flex items-center gap-1"
+          disabled={noteText === (application.notes || '')}
+          isLoading={updateNoteMutation.isPending}
         >
-          {updateNoteMutation.isPending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Edit2 className="h-3.5 w-3.5" />
-          )}
-          Sauvegarder
-        </button>
-      </div>
+          Sauvegarder la note
+        </Button>
 
-      {/* Boond Sync Status */}
-      {application.status === 'valide' && (
-        <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 dark:text-gray-400">BoondManager :</span>
-              {application.boond_sync_status === 'synced' && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                  <CheckCircle className="h-3 w-3" />
-                  Synchronisé
-                </span>
-              )}
+        {application.status === 'valide' && (
+          <div className="mt-3.5 pt-3 border-t border-lin2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="ml !mb-0">BoondManager</span>
+                {application.boond_sync_status === 'synced' && (
+                  <span className="st st-grn">
+                    <span className="dot" />
+                    Synchronisé
+                  </span>
+                )}
+                {application.boond_sync_status === 'error' && (
+                  <span className="st st-red">
+                    <span className="dot" />
+                    Erreur
+                  </span>
+                )}
+                {application.boond_sync_status === 'pending' && (
+                  <span className="st st-amb">
+                    <span className="dot" />
+                    En attente
+                  </span>
+                )}
+                {application.boond_candidate_id && (
+                  <span className="ref !text-[11px]">ID {application.boond_candidate_id}</span>
+                )}
+              </div>
               {application.boond_sync_status === 'error' && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
-                  <AlertCircle className="h-3 w-3" />
-                  Erreur
-                </span>
-              )}
-              {application.boond_sync_status === 'pending' && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
-                  <Loader2 className="h-3 w-3" />
-                  En attente
-                </span>
-              )}
-              {application.boond_candidate_id && (
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  ID: {application.boond_candidate_id}
-                </span>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<RefreshCw className="h-3 w-3" />}
+                  onClick={() => handleRetryBoondSync(application)}
+                  isLoading={retryBoondMutation.isPending}
+                >
+                  Réessayer
+                </Button>
               )}
             </div>
-            {application.boond_sync_status === 'error' && (
-              <button
-                onClick={() => handleRetryBoondSync(application)}
-                disabled={retryBoondMutation.isPending}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors disabled:opacity-50"
+            {application.boond_sync_error && (
+              <p
+                className="text-[11.5px] text-redt mt-1.5 truncate"
+                title={application.boond_sync_error}
               >
-                {retryBoondMutation.isPending ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3 w-3" />
-                )}
-                Réessayer
-              </button>
+                {application.boond_sync_error}
+              </p>
             )}
           </div>
-          {application.boond_sync_error && (
-            <p className="text-xs text-red-600 dark:text-red-400 mt-1 truncate" title={application.boond_sync_error}>
-              {application.boond_sync_error}
-            </p>
-          )}
-        </div>
-      )}
+        )}
 
-      {/* CV Download & Re-analyze */}
-      <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
-        <button
-          onClick={() => handleDownloadCv(application)}
-          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium rounded-lg transition-colors"
-        >
-          <Download className="h-3.5 w-3.5" />
-          Télécharger CV
-        </button>
-        <button
-          onClick={() => handleReanalyze(application)}
-          disabled={reanalyzeMutation.isPending}
-          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 font-medium rounded-lg transition-colors disabled:opacity-50"
-          title="Relancer l'analyse IA (matching + qualité CV)"
-        >
-          {reanalyzeMutation.isPending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="h-3.5 w-3.5" />
-          )}
-          Re-analyser
-        </button>
-        <p className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[150px]">
-          {application.cv_filename}
-        </p>
+        <div className="flex items-center justify-between gap-2 flex-wrap mt-3.5 pt-3 border-t border-lin2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            leftIcon={<Download className="h-3.5 w-3.5" />}
+            onClick={() => handleDownloadCv(application)}
+          >
+            Télécharger CV
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
+            onClick={() => handleReanalyze(application)}
+            isLoading={reanalyzeMutation.isPending}
+            title="Relancer l'analyse IA (matching + qualité CV)"
+          >
+            Re-analyser
+          </Button>
+        </div>
       </div>
+    </div>
+  );
+
+  if (compact) {
+    // Deux enfants directs : à placer dans un parent en grille 2 colonnes (`.expand`).
+    return (
+      <>
+        {analysisColumn}
+        {actionsColumn}
+      </>
+    );
+  }
+
+  return (
+    <div className="p-5 space-y-3">
+      {analysisColumn}
+      {actionsColumn}
     </div>
   );
 }
