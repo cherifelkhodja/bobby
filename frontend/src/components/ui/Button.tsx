@@ -25,22 +25,21 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseClasses =
-      'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-50';
+      'inline-flex items-center justify-center whitespace-nowrap rounded-[9px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pri focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45';
 
     const variantClasses = {
-      primary: 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500',
-      secondary:
-        'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-primary-500',
+      primary: 'bg-pri text-white font-semibold hover:brightness-110',
+      secondary: 'bg-sur text-ink font-medium border border-lin hover:bg-srf2',
       outline:
-        'bg-transparent text-primary-600 dark:text-primary-400 border border-primary-600 dark:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 focus:ring-primary-500',
-      danger: 'bg-error text-white hover:bg-error-dark focus:ring-error',
-      ghost: 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:ring-gray-500',
+        'bg-transparent text-prit font-semibold border border-pri hover:bg-pris',
+      danger: 'bg-redt text-white font-semibold hover:brightness-110',
+      ghost: 'text-mut font-medium hover:bg-srf2 hover:text-ink',
     };
 
     const sizeClasses = {
-      sm: 'px-3 py-1.5 text-sm',
-      md: 'px-4 py-2 text-sm',
-      lg: 'px-6 py-3 text-base',
+      sm: 'h-[30px] px-3 gap-1.5 text-xs',
+      md: 'h-9 px-3.5 gap-2 text-[13px]',
+      lg: 'h-11 px-5 gap-2 text-sm',
     };
 
     return (
@@ -53,10 +52,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {isLoading ? (
           <Loader2 className="h-4 w-4 animate-spin mr-2" />
         ) : leftIcon ? (
-          <span className="mr-2">{leftIcon}</span>
+          <span className="inline-flex shrink-0">{leftIcon}</span>
         ) : null}
         {children}
-        {rightIcon && !isLoading && <span className="ml-2">{rightIcon}</span>}
+        {rightIcon && !isLoading && <span className="inline-flex shrink-0">{rightIcon}</span>}
       </button>
     );
   }

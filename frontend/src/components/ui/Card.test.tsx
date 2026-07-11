@@ -119,6 +119,6 @@ describe('CardHeader', () => {
     render(<CardHeader title="Title" />);
     const title = screen.getByText('Title');
     expect(title.tagName).toBe('H3');
-    expect(title).toHaveClass('text-lg', 'font-semibold');
+    expect(title).toHaveClass('text-[14.5px]', 'font-bold');
   });
 });

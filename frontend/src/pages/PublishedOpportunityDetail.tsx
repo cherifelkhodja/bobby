@@ -9,14 +9,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Dialog, Transition } from '@headlessui/react';
 import {
-  ChevronLeft,
   Loader2,
   AlertCircle,
   Calendar,
   Users,
   FileText,
   Hash,
-  Sparkles,
   XCircle,
   RefreshCw,
   User,
@@ -25,7 +23,6 @@ import {
   Download,
   X,
   Euro,
-  MessageSquare,
   Clock,
   ChevronRight,
   Pencil,
@@ -44,56 +41,24 @@ import {
 import { useAuthStore } from '../stores/authStore';
 import { cooptationsApi } from '../api/cooptations';
 import { getErrorMessage } from '../api/client';
-import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
+import { PageSpinner } from '../components/ui/Spinner';
 import type { Cooptation, CooptationStatus, PublishedOpportunity, PublishedOpportunityStatus } from '../types';
 
-const STATUS_BADGES: Record<PublishedOpportunityStatus, { label: string; bgClass: string; textClass: string }> = {
-  draft: {
-    label: 'Brouillon',
-    bgClass: 'bg-gray-100 dark:bg-gray-700',
-    textClass: 'text-gray-800 dark:text-gray-300',
-  },
-  published: {
-    label: 'Publiee',
-    bgClass: 'bg-green-100 dark:bg-green-900/30',
-    textClass: 'text-green-800 dark:text-green-300',
-  },
-  closed: {
-    label: 'Cloturee',
-    bgClass: 'bg-red-100 dark:bg-red-900/30',
-    textClass: 'text-red-800 dark:text-red-300',
-  },
+const STATUS_BADGES: Record<PublishedOpportunityStatus, { label: string; chip: string }> = {
+  draft: { label: 'Brouillon', chip: 'st-sla' },
+  published: { label: 'Active', chip: 'st-grn' },
+  closed: { label: 'Fermée', chip: 'st-red' },
 };
 
-const COOPTATION_STATUS_BADGES: Record<string, { label: string; bgClass: string; textClass: string }> = {
-  pending: {
-    label: 'En attente',
-    bgClass: 'bg-yellow-100 dark:bg-yellow-900/30',
-    textClass: 'text-yellow-800 dark:text-yellow-300',
-  },
-  in_review: {
-    label: 'En cours d\'examen',
-    bgClass: 'bg-blue-100 dark:bg-blue-900/30',
-    textClass: 'text-blue-800 dark:text-blue-300',
-  },
-  interview: {
-    label: 'En entretien',
-    bgClass: 'bg-purple-100 dark:bg-purple-900/30',
-    textClass: 'text-purple-800 dark:text-purple-300',
-  },
-  accepted: {
-    label: 'Accepte',
-    bgClass: 'bg-green-100 dark:bg-green-900/30',
-    textClass: 'text-green-800 dark:text-green-300',
-  },
-  rejected: {
-    label: 'Refuse',
-    bgClass: 'bg-red-100 dark:bg-red-900/30',
-    textClass: 'text-red-800 dark:text-red-300',
-  },
+const COOPTATION_STATUS_CHIPS: Record<string, { label: string; chip: string }> = {
+  pending: { label: 'En attente', chip: 'st-amb' },
+  in_review: { label: "En cours d'examen", chip: 'st-blu' },
+  interview: { label: 'En entretien', chip: 'st-ind' },
+  accepted: { label: 'Accepté', chip: 'st-grn' },
+  rejected: { label: 'Refusé', chip: 'st-red' },
 };
 
 // Valid status transitions
@@ -106,11 +71,11 @@ const VALID_TRANSITIONS: Record<CooptationStatus, CooptationStatus[]> = {
 };
 
 const STATUS_ACTION_CONFIG: Record<CooptationStatus, { label: string; icon: typeof CheckCircle; colorClass: string }> = {
-  pending: { label: 'Remettre en attente', icon: RefreshCw, colorClass: 'text-yellow-600 border-yellow-300 hover:bg-yellow-50 dark:text-yellow-400 dark:border-yellow-700 dark:hover:bg-yellow-900/20' },
-  in_review: { label: 'En cours d\'examen', icon: ArrowRight, colorClass: 'text-blue-600 border-blue-300 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-700 dark:hover:bg-blue-900/20' },
-  interview: { label: 'Entretien', icon: ArrowRight, colorClass: 'text-purple-600 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-700 dark:hover:bg-purple-900/20' },
-  accepted: { label: 'Accepter', icon: CheckCircle, colorClass: 'text-green-600 border-green-300 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-900/20' },
-  rejected: { label: 'Refuser', icon: Ban, colorClass: 'text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/20' },
+  pending: { label: 'Remettre en attente', icon: RefreshCw, colorClass: 'text-amb-fg hover:bg-amb-bg' },
+  in_review: { label: "En cours d'examen", icon: ArrowRight, colorClass: 'text-blu-fg hover:bg-blu-bg' },
+  interview: { label: 'Entretien', icon: ArrowRight, colorClass: 'text-ind-fg hover:bg-ind-bg' },
+  accepted: { label: 'Accepter', icon: CheckCircle, colorClass: 'text-grn-fg hover:bg-grn-bg' },
+  rejected: { label: 'Refuser', icon: Ban, colorClass: 'text-redt hover:bg-red-bg' },
 };
 
 function CandidateDrawer({
@@ -133,7 +98,7 @@ function CandidateDrawer({
     mutationFn: ({ id, status, comment }: { id: string; status: string; comment?: string }) =>
       cooptationsApi.updateStatus(id, status, comment || undefined),
     onSuccess: () => {
-      toast.success('Statut mis a jour');
+      toast.success('Statut mis à jour');
       setStatusAction(null);
       setStatusComment('');
       setStatusError(null);
@@ -192,7 +157,7 @@ function CandidateDrawer({
 
   if (!cooptation) return null;
 
-  const statusBadge = COOPTATION_STATUS_BADGES[cooptation.status] || COOPTATION_STATUS_BADGES.pending;
+  const statusChip = COOPTATION_STATUS_CHIPS[cooptation.status] || COOPTATION_STATUS_CHIPS.pending;
   const nextStatuses = VALID_TRANSITIONS[cooptation.status] || [];
 
   return (
@@ -223,26 +188,29 @@ function CandidateDrawer({
                 leaveTo="translate-x-full"
               >
                 <Dialog.Panel className="pointer-events-auto w-screen max-w-md">
-                  <div className="flex h-full flex-col bg-white dark:bg-gray-900 shadow-xl">
+                  <div className="flex h-full flex-col bg-sur border-l border-lin shadow-xl">
                     {/* Header */}
-                    <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <div className="px-5 py-4 border-b border-lin">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
-                            <User className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+                          <div className="w-10 h-10 bg-pris rounded-full flex items-center justify-center shrink-0">
+                            <User className="h-5 w-5 text-prit" />
                           </div>
                           <div>
-                            <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            <Dialog.Title className="text-[15px] font-bold text-ink">
                               {cooptation.candidate_name}
                             </Dialog.Title>
-                            <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${statusBadge.bgClass} ${statusBadge.textClass}`}>
-                              {statusBadge.label}
+                            <span className={`st ${statusChip.chip} mt-1`}>
+                              <span className="dot" />
+                              {statusChip.label}
                             </span>
                           </div>
                         </div>
                         <button
+                          type="button"
                           onClick={onClose}
-                          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                          className="text-mut2 hover:text-ink transition-colors"
+                          aria-label="Fermer"
                         >
                           <X className="h-5 w-5" />
                         </button>
@@ -250,13 +218,11 @@ function CandidateDrawer({
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+                    <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
                       {/* Status actions */}
                       {nextStatuses.length > 0 && (
                         <div>
-                          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                            Actions
-                          </h3>
+                          <p className="ml mb-2">Actions</p>
                           {!statusAction ? (
                             <div className="flex flex-wrap gap-2">
                               {nextStatuses.map((nextStatus) => {
@@ -265,8 +231,9 @@ function CandidateDrawer({
                                 return (
                                   <button
                                     key={nextStatus}
+                                    type="button"
                                     onClick={() => handleStatusChange(nextStatus)}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border rounded-lg transition-colors ${config.colorClass}`}
+                                    className={`inline-flex items-center gap-1.5 h-[30px] px-3 text-xs font-medium border border-lin rounded-[9px] transition-colors ${config.colorClass}`}
                                   >
                                     <Icon className="h-3.5 w-3.5" />
                                     {config.label}
@@ -275,39 +242,38 @@ function CandidateDrawer({
                               })}
                             </div>
                           ) : (
-                            <div className="space-y-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm text-gray-700 dark:text-gray-300">
+                            <div className="space-y-3 p-3.5 bg-srf2 rounded-xl border border-lin">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[13px] text-mut">
                                   Changer le statut vers :
                                 </span>
-                                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${COOPTATION_STATUS_BADGES[statusAction]?.bgClass} ${COOPTATION_STATUS_BADGES[statusAction]?.textClass}`}>
-                                  {COOPTATION_STATUS_BADGES[statusAction]?.label}
+                                <span className={`st ${COOPTATION_STATUS_CHIPS[statusAction]?.chip}`}>
+                                  <span className="dot" />
+                                  {COOPTATION_STATUS_CHIPS[statusAction]?.label}
                                 </span>
                               </div>
                               <div>
-                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                                  Commentaire {statusAction === 'rejected' ? <span className="text-red-500">*</span> : '(optionnel)'}
+                                <label htmlFor="status-comment" className="f-lab">
+                                  Commentaire {statusAction === 'rejected' ? <span className="text-redt">*</span> : '(optionnel)'}
                                 </label>
                                 <textarea
+                                  id="status-comment"
                                   value={statusComment}
                                   onChange={(e) => {
                                     setStatusComment(e.target.value);
                                     if (statusError) setStatusError(null);
                                   }}
-                                  placeholder={statusAction === 'rejected' ? 'Motif du rejet...' : 'Commentaire...'}
-                                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm min-h-[60px] focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                  placeholder={statusAction === 'rejected' ? 'Motif du rejet…' : 'Commentaire…'}
+                                  className="f-ta !min-h-[60px]"
                                 />
                                 {statusError && (
-                                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{statusError}</p>
+                                  <p className="f-hint !text-redt">{statusError}</p>
                                 )}
                               </div>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={handleCancelStatus}
-                                  className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-                                >
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="sm" onClick={handleCancelStatus}>
                                   Annuler
-                                </button>
+                                </Button>
                                 <Button
                                   size="sm"
                                   onClick={handleConfirmStatus}
@@ -323,25 +289,23 @@ function CandidateDrawer({
 
                       {/* Contact */}
                       <div>
-                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                          Contact
-                        </h3>
+                        <p className="ml mb-2">Contact</p>
                         <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-sm">
-                            <Mail className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          <div className="flex items-center gap-2 text-[13px]">
+                            <Mail className="h-4 w-4 text-mut2 shrink-0" />
                             <a
                               href={`mailto:${cooptation.candidate_email}`}
-                              className="text-primary-600 dark:text-primary-400 hover:underline"
+                              className="text-prit hover:underline"
                             >
                               {cooptation.candidate_email}
                             </a>
                           </div>
                           {cooptation.candidate_phone && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex items-center gap-2 text-[13px]">
+                              <Phone className="h-4 w-4 text-mut2 shrink-0" />
                               <a
                                 href={`tel:${cooptation.candidate_phone}`}
-                                className="text-gray-700 dark:text-gray-300 hover:underline"
+                                className="text-ink hover:underline"
                               >
                                 {cooptation.candidate_phone}
                               </a>
@@ -353,14 +317,10 @@ function CandidateDrawer({
                       {/* TJM */}
                       {cooptation.candidate_daily_rate && (
                         <div>
-                          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                            TJM souhaite
-                          </h3>
-                          <div className="flex items-center gap-2 text-sm">
-                            <Euro className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                            <span className="text-gray-900 dark:text-gray-100 font-medium">
-                              {cooptation.candidate_daily_rate} EUR/jour
-                            </span>
+                          <p className="ml mb-2">TJM souhaité</p>
+                          <div className="flex items-center gap-2">
+                            <Euro className="h-4 w-4 text-mut2 shrink-0" />
+                            <span className="tjm">{cooptation.candidate_daily_rate} € / jour</span>
                           </div>
                         </div>
                       )}
@@ -368,27 +328,24 @@ function CandidateDrawer({
                       {/* CV */}
                       {cooptation.candidate_cv_filename && (
                         <div>
-                          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                            CV
-                          </h3>
+                          <p className="ml mb-2">CV</p>
                           <button
+                            type="button"
                             onClick={handleDownloadCv}
                             disabled={isDownloading}
-                            className="w-full flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+                            className="filecard w-full text-left hover:border-pri transition-colors disabled:opacity-60"
                           >
-                            <FileText className="h-5 w-5 text-primary-600 dark:text-primary-400 flex-shrink-0" />
+                            <div className="dico">
+                              <FileText className="h-4 w-4" />
+                            </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                {cooptation.candidate_cv_filename}
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                Cliquez pour telecharger
-                              </p>
+                              <p className="dn truncate">{cooptation.candidate_cv_filename}</p>
+                              <p className="ds">Cliquez pour télécharger</p>
                             </div>
                             {isDownloading ? (
-                              <Loader2 className="h-4 w-4 text-gray-400 animate-spin flex-shrink-0" />
+                              <Loader2 className="h-4 w-4 text-mut2 animate-spin shrink-0" />
                             ) : (
-                              <Download className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                              <Download className="h-4 w-4 text-mut2 shrink-0" />
                             )}
                           </button>
                         </div>
@@ -397,32 +354,23 @@ function CandidateDrawer({
                       {/* Note */}
                       {cooptation.candidate_note && (
                         <div>
-                          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                            Note
-                          </h3>
-                          <div className="flex gap-2 text-sm">
-                            <MessageSquare className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                              {cooptation.candidate_note}
-                            </p>
-                          </div>
+                          <p className="ml mb-2">Note</p>
+                          <p className="quote !mt-0 whitespace-pre-line">
+                            {cooptation.candidate_note}
+                          </p>
                         </div>
                       )}
 
                       {/* Submitter */}
                       <div>
-                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                          Soumis par
-                        </h3>
-                        <div className="flex items-center gap-2 text-sm">
-                          <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {cooptation.submitter_name || '-'}
-                          </span>
+                        <p className="ml mb-2">Soumis par</p>
+                        <div className="flex items-center gap-2 text-[13px] text-ink">
+                          <User className="h-4 w-4 text-mut2 shrink-0" />
+                          <span>{cooptation.submitter_name || '—'}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm mt-1">
-                          <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                          <span className="text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-2 text-[12.5px] text-mut mt-1.5">
+                          <Clock className="h-4 w-4 text-mut2 shrink-0" />
+                          <span>
                             {new Date(cooptation.submitted_at).toLocaleDateString('fr-FR', {
                               day: 'numeric',
                               month: 'long',
@@ -435,30 +383,19 @@ function CandidateDrawer({
                       {/* Status history */}
                       {cooptation.status_history.length > 0 && (
                         <div>
-                          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                            Historique
-                          </h3>
-                          <div className="space-y-2">
+                          <p className="ml mb-2.5">Historique</p>
+                          <div>
                             {cooptation.status_history.map((change, i) => {
-                              const toBadge = COOPTATION_STATUS_BADGES[change.to_status] || COOPTATION_STATUS_BADGES.pending;
+                              const chip = COOPTATION_STATUS_CHIPS[change.to_status] || COOPTATION_STATUS_CHIPS.pending;
+                              const isLast = i === cooptation.status_history.length - 1;
                               return (
-                                <div key={i} className="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                  <ChevronRight className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <span className={`px-1.5 py-0.5 rounded-full ${toBadge.bgClass} ${toBadge.textClass}`}>
-                                        {toBadge.label}
-                                      </span>
-                                      <span>
-                                        {new Date(change.changed_at).toLocaleDateString('fr-FR')}
-                                      </span>
-                                    </div>
-                                    {change.comment && (
-                                      <p className="text-gray-600 dark:text-gray-400 italic mt-0.5">
-                                        {change.comment}
-                                      </p>
-                                    )}
-                                  </div>
+                                <div key={i} className="ev">
+                                  <span className="evd" />
+                                  {!isLast && <span className="evl" />}
+                                  <p className="evt">
+                                    {chip.label} · {new Date(change.changed_at).toLocaleDateString('fr-FR')}
+                                  </p>
+                                  {change.comment && <p className="evs">{change.comment}</p>}
                                 </div>
                               );
                             })}
@@ -505,7 +442,7 @@ function EditOpportunityModal({
         end_date: endDate,
       }),
     onSuccess: () => {
-      toast.success('Opportunite mise a jour');
+      toast.success('Opportunité mise à jour');
       onSaved();
       onClose();
     },
@@ -515,7 +452,7 @@ function EditOpportunityModal({
   });
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Modifier l'opportunite" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="Modifier l'opportunité" size="lg">
       <div className="space-y-4">
         <Input
           label="Titre"
@@ -523,20 +460,19 @@ function EditOpportunityModal({
           onChange={(e) => setTitle(e.target.value)}
         />
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label htmlFor="edit-opp-description" className="f-lab">
             Description
           </label>
           <textarea
+            id="edit-opp-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm min-h-[200px] focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            className="f-ta !min-h-[200px]"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Competences (separees par des virgules)
-          </label>
           <Input
+            label="Compétences (séparées par des virgules)"
             value={skillsText}
             onChange={(e) => setSkillsText(e.target.value)}
             placeholder="React, TypeScript, Node.js"
@@ -549,7 +485,7 @@ function EditOpportunityModal({
           onChange={(e) => setEndDate(e.target.value)}
           required
         />
-        <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+        <div className="flex justify-end gap-2 pt-3 border-t border-lin2">
           <Button variant="secondary" onClick={onClose}>
             Annuler
           </Button>
@@ -601,10 +537,10 @@ export default function PublishedOpportunityDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['published-opportunity', publishedId] });
       queryClient.invalidateQueries({ queryKey: ['my-boond-opportunities'] });
-      toast.success('Opportunite cloturee');
+      toast.success('Opportunité clôturée');
     },
     onError: () => {
-      toast.error('Erreur lors de la cloture');
+      toast.error('Erreur lors de la clôture');
     },
   });
 
@@ -614,10 +550,10 @@ export default function PublishedOpportunityDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['published-opportunity', publishedId] });
       queryClient.invalidateQueries({ queryKey: ['my-boond-opportunities'] });
-      toast.success('Opportunite reactivee');
+      toast.success('Opportunité réactivée');
     },
     onError: () => {
-      toast.error('Erreur lors de la reactivation');
+      toast.error('Erreur lors de la réactivation');
     },
   });
 
@@ -663,25 +599,17 @@ export default function PublishedOpportunityDetail() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 text-primary-500 animate-spin" />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   if (error || !opportunity) {
     return (
-      <div className="text-center py-12">
-        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-          Opportunite non trouvee
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400 mb-4">
-          Cette opportunite n'existe pas ou a ete supprimee.
-        </p>
-        <Button variant="outline" onClick={() => navigate('/my-boond-opportunities')}>
-          Retour aux opportunites
+      <div className="text-center py-16">
+        <AlertCircle className="h-10 w-10 text-redt mx-auto mb-4" />
+        <h2 className="text-[15px] font-bold text-ink mb-2">Opportunité non trouvée</h2>
+        <p className="notec mb-6">Cette opportunité n'existe pas ou a été supprimée.</p>
+        <Button variant="secondary" onClick={() => navigate('/my-boond-opportunities')}>
+          Retour aux opportunités
         </Button>
       </div>
     );
@@ -690,298 +618,215 @@ export default function PublishedOpportunityDetail() {
   const statusBadge = STATUS_BADGES[opportunity.status as PublishedOpportunityStatus] || STATUS_BADGES.draft;
   const cooptations = cooptationsData?.items || [];
 
+  const gridCols = 'grid-cols-[1.7fr_100px_80px_170px_1fr_95px_60px]';
+
   return (
-    <div className="space-y-6">
-      {/* Back link */}
+    <div>
+      {/* Breadcrumb / back */}
       <Link
         to="/my-boond-opportunities"
-        className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+        className="bc block cursor-pointer !text-mut2 hover:!text-mut"
       >
-        <ChevronLeft className="h-4 w-4" />
-        Retour aux opportunites
+        ← Commercial / Gestion opportunités
       </Link>
 
       {/* Header */}
-      <Card className="!p-4">
-        <div className="flex items-start justify-between gap-4">
+      <div className="hdcard !mt-2">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 truncate">
-                {opportunity.title}
-              </h1>
-              <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full flex-shrink-0 ${statusBadge.bgClass} ${statusBadge.textClass}`}>
-                {statusBadge.label}
+            <span className={`st ${statusBadge.chip}`}>
+              <span className="dot" />
+              {statusBadge.label}
+            </span>
+            <h1 className="h1 !text-[26px] mt-2.5">{opportunity.title}</h1>
+            <div className="om !mt-3.5 !mb-0">
+              <span className="omi">
+                <Hash className="h-3.5 w-3.5" />
+                Réf. Boond : {opportunity.boond_opportunity_id}
+              </span>
+              <span className="omi">
+                <Calendar className="h-3.5 w-3.5" />
+                Publiée le {new Date(opportunity.created_at).toLocaleDateString('fr-FR')}
+              </span>
+              {opportunity.end_date && (
+                <span className="omi">
+                  <Calendar className="h-3.5 w-3.5" />
+                  Fin prévue : {new Date(opportunity.end_date).toLocaleDateString('fr-FR')}
+                </span>
+              )}
+              <span className="omi">
+                <Users className="h-3.5 w-3.5" />
+                {cooptations.length} cooptation{cooptations.length > 1 ? 's' : ''}
               </span>
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Ref Boond: {opportunity.boond_opportunity_id}
-              {' · '}
-              Publiee le {new Date(opportunity.created_at).toLocaleDateString('fr-FR')}
-            </p>
           </div>
-          <div className="flex gap-2 flex-shrink-0">
+          <div className="flex gap-2 shrink-0 flex-wrap">
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
               onClick={() => setShowEditModal(true)}
-              leftIcon={<Pencil className="h-4 w-4" />}
+              leftIcon={<Pencil className="h-3.5 w-3.5" />}
             >
               Modifier
             </Button>
             {opportunity.status === 'published' && (
               <Button
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 onClick={() => closeMutation.mutate()}
                 disabled={closeMutation.isPending}
-                leftIcon={<XCircle className="h-4 w-4" />}
-                className="text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/20"
+                leftIcon={<XCircle className="h-3.5 w-3.5" />}
+                className="!text-redt"
               >
-                {closeMutation.isPending ? 'Fermeture...' : 'Cloturer'}
+                {closeMutation.isPending ? 'Fermeture…' : 'Clôturer'}
               </Button>
             )}
             {opportunity.status === 'closed' && (
               <Button
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 onClick={() => reopenMutation.mutate()}
                 disabled={reopenMutation.isPending}
-                leftIcon={<RefreshCw className="h-4 w-4" />}
+                leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
               >
-                {reopenMutation.isPending ? 'Reactivation...' : 'Reactiver'}
+                {reopenMutation.isPending ? 'Réactivation…' : 'Réactiver'}
               </Button>
             )}
             {isAdmin && (
               <Button
                 size="sm"
-                variant="outline"
+                variant="danger"
                 onClick={() => setShowDeleteConfirm(true)}
-                leftIcon={<Trash2 className="h-4 w-4" />}
-                className="text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/20"
+                leftIcon={<Trash2 className="h-3.5 w-3.5" />}
               >
                 Supprimer
               </Button>
             )}
           </div>
         </div>
-      </Card>
+      </div>
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="!p-3 text-center">
-          <div className="flex items-center justify-center mb-1">
-            <Hash className="h-4 w-4 text-gray-400" />
-          </div>
-          <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
-            {opportunity.boond_opportunity_id}
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Ref Boond</p>
-        </Card>
-        <Card className="!p-3 text-center">
-          <div className="flex items-center justify-center mb-1">
-            <Sparkles className="h-4 w-4 text-gray-400" />
-          </div>
-          <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
-            {opportunity.skills.length}
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Competences</p>
-        </Card>
-        <Card className="!p-3 text-center">
-          <div className="flex items-center justify-center mb-1">
-            <Users className="h-4 w-4 text-gray-400" />
-          </div>
-          <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
-            {cooptations.length}
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Cooptations</p>
-        </Card>
-        <Card className="!p-3 text-center">
-          <div className="flex items-center justify-center mb-1">
-            <Calendar className="h-4 w-4 text-gray-400" />
-          </div>
-          <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
-            {opportunity.end_date
-              ? new Date(opportunity.end_date).toLocaleDateString('fr-FR')
-              : '-'}
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Date de fin</p>
-        </Card>
+      {/* Description */}
+      <div className="card mt-4">
+        <h3 className="ct">Description anonymisée</h3>
+        <p className="odesc !max-w-none mt-2.5 whitespace-pre-line">{opportunity.description}</p>
       </div>
 
       {/* Skills */}
       {opportunity.skills.length > 0 && (
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              Competences extraites
-            </h2>
-          </div>
+        <div className="card mt-4">
+          <h3 className="ct mb-3">Compétences extraites</h3>
           <div className="flex flex-wrap gap-2">
             {opportunity.skills.map((skill, index) => (
-              <span
-                key={index}
-                className="px-2.5 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-md text-sm font-medium"
-              >
+              <span key={index} className="sk">
                 {skill}
               </span>
             ))}
           </div>
-        </Card>
+        </div>
       )}
 
-      {/* Description */}
-      <Card>
-        <div className="flex items-center gap-2 mb-3">
-          <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            Description anonymisee
-          </h2>
+      {/* Cooptations */}
+      <div className="flex items-center justify-between gap-4 mt-7 mb-2.5">
+        <h3 className="ct">Cooptations reçues</h3>
+        {cooptations.length > 0 && (
+          <span className="cs !mt-0">
+            {cooptations.length} candidat{cooptations.length > 1 ? 's' : ''} proposé{cooptations.length > 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+
+      {isLoadingCooptations ? (
+        <div className="card flex items-center justify-center gap-2 py-10">
+          <Loader2 className="h-5 w-5 text-prit animate-spin" />
+          <span className="text-[13px] text-mut">Chargement…</span>
         </div>
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line text-sm leading-relaxed">
-            {opportunity.description}
+      ) : cooptations.length === 0 ? (
+        <div className="card text-center py-10">
+          <Users className="h-8 w-8 text-mut2 mx-auto mb-3" />
+          <p className="dn">Aucune cooptation pour cette opportunité</p>
+          <p className="ds mt-1.5">
+            Les candidats proposés par les consultants apparaîtront ici.
           </p>
         </div>
-      </Card>
-
-      {/* Cooptations table */}
-      <Card className="!p-0 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              Cooptations ({cooptations.length})
-            </h2>
+      ) : (
+        <div className="tbl">
+          <div className={`thead ${gridCols}`}>
+            <span>Candidat</span>
+            <span>TJM</span>
+            <span>CV</span>
+            <span>Statut</span>
+            <span>Soumis par</span>
+            <span>Date</span>
+            <span></span>
+          </div>
+          {cooptations.map((cooptation) => {
+            const coopChip = COOPTATION_STATUS_CHIPS[cooptation.status] || COOPTATION_STATUS_CHIPS.pending;
+            return (
+              <div
+                key={cooptation.id}
+                onClick={() => setSelectedCooptation(cooptation)}
+                className={`row click ${gridCols} group`}
+              >
+                <div className="min-w-0">
+                  <p className="nm truncate">{cooptation.candidate_name}</p>
+                  <p className="ns truncate">
+                    {cooptation.candidate_email}
+                    {cooptation.candidate_phone && ` · ${cooptation.candidate_phone}`}
+                  </p>
+                </div>
+                <span className="tjm">
+                  {cooptation.candidate_daily_rate
+                    ? `${cooptation.candidate_daily_rate} €`
+                    : '—'}
+                </span>
+                <div>
+                  {cooptation.candidate_cv_filename ? (
+                    <span className="omi text-xs font-medium text-prit">
+                      <FileText className="h-3.5 w-3.5" />
+                      CV
+                    </span>
+                  ) : (
+                    <span className="cell text-mut2">—</span>
+                  )}
+                </div>
+                <div>
+                  <span className={`st ${coopChip.chip}`}>
+                    <span className="dot" />
+                    {coopChip.label}
+                  </span>
+                </div>
+                <span className="cell truncate">{cooptation.submitter_name || '—'}</span>
+                <span className="cell">
+                  {new Date(cooptation.submitted_at).toLocaleDateString('fr-FR')}
+                </span>
+                <div className="flex items-center justify-end gap-1">
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteCooptationId(cooptation.id);
+                      }}
+                      className="p-1 rounded-md text-mut2 opacity-0 group-hover:opacity-100 hover:text-redt hover:bg-red-bg transition-all"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <ChevronRight className="h-4 w-4 chev shrink-0" />
+                </div>
+              </div>
+            );
+          })}
+          <div className="tfoot">
+            <span>
+              {cooptations.length} cooptation{cooptations.length > 1 ? 's' : ''} · cliquez sur une
+              ligne pour gérer le candidat
+            </span>
           </div>
         </div>
-
-        {isLoadingCooptations ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 text-primary-500 animate-spin" />
-            <span className="ml-2 text-sm text-gray-500">Chargement...</span>
-          </div>
-        ) : cooptations.length === 0 ? (
-          <div className="text-center py-8">
-            <Users className="h-8 w-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Aucune cooptation pour cette opportunite
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-800/50">
-                <tr>
-                  <th className="text-left py-2 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
-                    Candidat
-                  </th>
-                  <th className="text-left py-2 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
-                    Contact
-                  </th>
-                  <th className="text-left py-2 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
-                    TJM
-                  </th>
-                  <th className="text-left py-2 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
-                    CV
-                  </th>
-                  <th className="text-left py-2 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
-                    Statut
-                  </th>
-                  <th className="text-left py-2 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
-                    Soumis par
-                  </th>
-                  <th className="text-left py-2 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
-                    Date
-                  </th>
-                  {isAdmin && (
-                    <th className="text-right py-2 px-4 font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-xs">
-                      Action
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {cooptations.map((cooptation) => {
-                  const coopStatusBadge = COOPTATION_STATUS_BADGES[cooptation.status] || COOPTATION_STATUS_BADGES.pending;
-                  return (
-                    <tr
-                      key={cooptation.id}
-                      onClick={() => setSelectedCooptation(cooptation)}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800/30 cursor-pointer"
-                    >
-                      <td className="py-2.5 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center flex-shrink-0">
-                            <User className="h-3.5 w-3.5 text-primary-600 dark:text-primary-400" />
-                          </div>
-                          <span className="font-medium text-gray-900 dark:text-gray-100">
-                            {cooptation.candidate_name}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-4">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 text-xs">
-                            <Mail className="h-3 w-3" />
-                            {cooptation.candidate_email}
-                          </div>
-                          {cooptation.candidate_phone && (
-                            <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 text-xs">
-                              <Phone className="h-3 w-3" />
-                              {cooptation.candidate_phone}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-4 text-gray-600 dark:text-gray-400">
-                        {cooptation.candidate_daily_rate
-                          ? `${cooptation.candidate_daily_rate} EUR/j`
-                          : '-'}
-                      </td>
-                      <td className="py-2.5 px-4">
-                        {cooptation.candidate_cv_filename ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400">
-                            <FileText className="h-3 w-3" />
-                            CV
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-4">
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${coopStatusBadge.bgClass} ${coopStatusBadge.textClass}`}>
-                          {coopStatusBadge.label}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-4 text-gray-600 dark:text-gray-400 text-xs">
-                        {cooptation.submitter_name || '-'}
-                      </td>
-                      <td className="py-2.5 px-4 text-gray-600 dark:text-gray-400 text-xs">
-                        {new Date(cooptation.submitted_at).toLocaleDateString('fr-FR')}
-                      </td>
-                      {isAdmin && (
-                        <td className="py-2.5 px-4 text-right">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteCooptationId(cooptation.id);
-                            }}
-                            className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+      )}
 
       {/* Candidate detail drawer */}
       <CandidateDrawer
@@ -1006,21 +851,21 @@ export default function PublishedOpportunityDetail() {
       <Modal
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
-        title="Supprimer l'opportunite"
+        title="Supprimer l'opportunité"
       >
         <div className="space-y-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Etes-vous sur de vouloir supprimer definitivement cette opportunite ?
-            Cette action est irreversible.
+          <p className="notec">
+            Êtes-vous sûr de vouloir supprimer définitivement cette opportunité ?
           </p>
-          <div className="flex justify-end gap-3">
+          <p className="text-[12.5px] text-redt">Cette action est irréversible.</p>
+          <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>
               Annuler
             </Button>
             <Button
+              variant="danger"
               onClick={() => deleteOpportunityMutation.mutate()}
               isLoading={deleteOpportunityMutation.isPending}
-              className="bg-red-600 hover:bg-red-700 text-white"
             >
               Supprimer
             </Button>
@@ -1035,18 +880,18 @@ export default function PublishedOpportunityDetail() {
         title="Supprimer la cooptation"
       >
         <div className="space-y-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Etes-vous sur de vouloir supprimer definitivement cette cooptation ?
-            Cette action est irreversible.
+          <p className="notec">
+            Êtes-vous sûr de vouloir supprimer définitivement cette cooptation ?
           </p>
-          <div className="flex justify-end gap-3">
+          <p className="text-[12.5px] text-redt">Cette action est irréversible.</p>
+          <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setDeleteCooptationId(null)}>
               Annuler
             </Button>
             <Button
+              variant="danger"
               onClick={() => deleteCooptationId && deleteCooptationMutation.mutate(deleteCooptationId)}
               isLoading={deleteCooptationMutation.isPending}
-              className="bg-red-600 hover:bg-red-700 text-white"
             >
               Supprimer
             </Button>

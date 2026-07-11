@@ -10,7 +10,6 @@ import { useAuthStore } from '../stores/authStore';
 import { getErrorMessage } from '../api/client';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Card } from '../components/ui/Card';
 
 const loginSchema = z.object({
   email: z.string().email('Email invalide'),
@@ -51,14 +50,14 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Bobby</h1>
-          <p className="text-gray-600 mt-2">Connectez-vous à votre compte</p>
+    <div className="lgwrap">
+      <div className="lgcard">
+        <div className="text-center mb-[26px]">
+          <p className="logo text-[22px]">Bobby</p>
+          <p className="sub mt-2">Connectez-vous à votre compte</p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5">
           <Input
             label="Email"
             type="email"
@@ -76,29 +75,23 @@ export function Login() {
           />
 
           <div className="flex items-center justify-between">
-            <Link
-              to="/forgot-password"
-              className="text-sm text-primary-600 hover:text-primary-700"
-            >
+            <Link to="/forgot-password" className="text-[12.5px]">
               Mot de passe oublié ?
             </Link>
           </div>
 
-          <Button type="submit" className="w-full" isLoading={isLoading}>
+          <Button type="submit" className="w-full !mt-4" isLoading={isLoading}>
             Se connecter
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-600">
+        <p className="notec text-center mt-5">
           Pas encore de compte ?{' '}
-          <Link
-            to="/register"
-            className="text-primary-600 hover:text-primary-700 font-medium"
-          >
+          <Link to="/register" className="font-semibold">
             S'inscrire
           </Link>
         </p>
-      </Card>
+      </div>
     </div>
   );
 }

@@ -1,185 +1,132 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, Users, FileText, FileSpreadsheet, UserCheck, Sparkles, FileSignature, ShieldCheck } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  LayoutDashboard,
+  Briefcase,
+  Users,
+  FileText,
+  FileSpreadsheet,
+  UserCheck,
+  Sparkles,
+  FileSignature,
+  ShieldCheck,
+  Inbox,
+  Shield,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 import { useAuthStore } from '../../stores/authStore';
+import { contractsApi } from '../../api/contracts';
+import { vigilanceApi } from '../../api/vigilance';
 
-const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
-  { to: '/opportunities', icon: Briefcase, label: 'Opportunités' },
-  { to: '/my-cooptations', icon: Users, label: 'Mes cooptations' },
-];
+interface NavItemProps {
+  to: string;
+  icon: LucideIcon;
+  label: string;
+  count?: number;
+  hot?: boolean;
+}
 
-const commercialItems = [
-  { to: '/my-boond-opportunities', icon: Sparkles, label: 'Gestion opportunités' },
-];
+function NavItem({ to, icon: Icon, label, count, hot }: NavItemProps) {
+  return (
+    <NavLink to={to} className={({ isActive }) => `it ${isActive ? 'on' : ''}`}>
+      <Icon className="h-4 w-4 shrink-0" />
+      <span className="truncate">{label}</span>
+      {count !== undefined && count > 0 && (
+        <span className={`cnt ${hot ? 'hot' : ''}`}>{count}</span>
+      )}
+    </NavLink>
+  );
+}
 
-const contractItems = [
-  { to: '/contracts', icon: FileSignature, label: 'Gestion des contrats' },
-  { to: '/compliance', icon: ShieldCheck, label: 'Conformité', advOnly: true },
-];
-
-const toolsItems = [
-  { to: '/cv-generator', icon: FileText, label: 'Générateur de CV' },
-];
-
-const adminToolsItems = [
-  { to: '/quotation-generator', icon: FileSpreadsheet, label: 'Génération Devis Thales' },
-];
-
-const hrItems = [
-  { to: '/rh', icon: UserCheck, label: 'Gestion des annonces' },
-];
+function GroupHeading({ children, first = false }: { children: React.ReactNode; first?: boolean }) {
+  return <div className={`gh ${first ? '!pt-1' : ''}`}>{children}</div>;
+}
 
 export function Sidebar() {
   const { user } = useAuthStore();
-  const isAdmin = user?.role === 'admin';
-  const isCommercialOrAdmin = user?.role && ['admin', 'commercial'].includes(user.role);
-  const canAccessContracts = user?.role && ['admin', 'commercial', 'adv'].includes(user.role);
-  const isAdvOrAdmin = user?.role && ['admin', 'adv'].includes(user.role);
+  const role = user?.role;
+  const isAdmin = role === 'admin';
+  const isCommercialOrAdmin = !!role && ['admin', 'commercial'].includes(role);
+  const canAccessContracts = !!role && ['admin', 'commercial', 'adv'].includes(role);
+  const isAdvOrAdmin = !!role && ['admin', 'adv'].includes(role);
+  const canAccessCv = !!role && ['admin', 'commercial', 'rh'].includes(role);
+  const canAccessHR = !!role && ['admin', 'rh'].includes(role);
 
-  const canAccessTools = user?.role && ['admin', 'commercial', 'rh'].includes(user.role);
-  const canAccessHR = user?.role && ['admin', 'rh'].includes(user.role);
+  const { data: contractsData } = useQuery({
+    queryKey: ['contracts', 'nav-count'],
+    queryFn: () => contractsApi.list({ limit: 1 }),
+    enabled: canAccessContracts,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+
+  const { data: complianceData } = useQuery({
+    queryKey: ['compliance', 'nav-count'],
+    queryFn: () => vigilanceApi.getDashboard(),
+    enabled: isAdvOrAdmin,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
 
   return (
-    <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 min-h-[calc(100vh-73px)]">
-      <nav className="p-4 space-y-1">
-        {navItems.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              `flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
-              }`
-            }
-          >
-            <Icon className="h-5 w-5" />
-            <span>{label}</span>
-          </NavLink>
-        ))}
+    <aside className="side min-h-[calc(100vh-56px)]">
+      <nav>
+        <GroupHeading first>Pilotage</GroupHeading>
+        <NavItem to="/dashboard" icon={LayoutDashboard} label="Tableau de bord" />
+
+        <GroupHeading>Cooptation</GroupHeading>
+        <NavItem to="/opportunities" icon={Briefcase} label="Opportunités" />
+        <NavItem to="/my-cooptations" icon={Users} label="Mes cooptations" />
 
         {isCommercialOrAdmin && (
           <>
-            <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
-              <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                Commercial
-              </p>
-            </div>
-            {commercialItems.map(({ to, icon: Icon, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  `flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
-                  }`
-                }
-              >
-                <Icon className="h-5 w-5" />
-                <span>{label}</span>
-              </NavLink>
-            ))}
-          </>
-        )}
-
-        {(canAccessTools || isAdmin) && (
-          <>
-            <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
-              <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                Outils
-              </p>
-            </div>
-            {canAccessTools && toolsItems.map(({ to, icon: Icon, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  `flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
-                  }`
-                }
-              >
-                <Icon className="h-5 w-5" />
-                <span>{label}</span>
-              </NavLink>
-            ))}
-            {isAdmin && adminToolsItems.map(({ to, icon: Icon, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  `flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
-                  }`
-                }
-              >
-                <Icon className="h-5 w-5" />
-                <span>{label}</span>
-              </NavLink>
-            ))}
-          </>
-        )}
-
-        {canAccessHR && (
-          <>
-            <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
-              <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                RH
-              </p>
-            </div>
-            {hrItems.map(({ to, icon: Icon, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  `flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
-                  }`
-                }
-              >
-                <Icon className="h-5 w-5" />
-                <span>{label}</span>
-              </NavLink>
-            ))}
+            <GroupHeading>Commercial</GroupHeading>
+            <NavItem to="/my-boond-opportunities" icon={Sparkles} label="Gestion opportunités" />
           </>
         )}
 
         {canAccessContracts && (
           <>
-            <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
-              <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                Contrats
-              </p>
-            </div>
-            {contractItems.filter((item) => !('advOnly' in item && item.advOnly) || isAdvOrAdmin).map(({ to, icon: Icon, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  `flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
-                  }`
-                }
-              >
-                <Icon className="h-5 w-5" />
-                <span>{label}</span>
-              </NavLink>
-            ))}
+            <GroupHeading>Contrats</GroupHeading>
+            <NavItem
+              to="/contracts"
+              icon={FileSignature}
+              label="Demandes"
+              count={contractsData?.total}
+              hot
+            />
+            {isAdvOrAdmin && (
+              <>
+                <NavItem to="/compliance" icon={ShieldCheck} label="Tiers & conformité" />
+                <NavItem
+                  to="/documents-a-valider"
+                  icon={Inbox}
+                  label="Documents à valider"
+                  count={complianceData?.documents_pending_review}
+                />
+              </>
+            )}
           </>
         )}
 
+        {(canAccessCv || isAdmin || canAccessHR) && (
+          <>
+            <GroupHeading>Outils</GroupHeading>
+            {canAccessCv && <NavItem to="/cv-generator" icon={FileText} label="Générateur de CV" />}
+            {isAdmin && (
+              <NavItem to="/quotation-generator" icon={FileSpreadsheet} label="Génération Devis Thales" />
+            )}
+            {canAccessHR && <NavItem to="/rh" icon={UserCheck} label="Gestion des annonces" />}
+          </>
+        )}
+
+        {isAdmin && (
+          <>
+            <GroupHeading>Admin</GroupHeading>
+            <NavItem to="/admin" icon={Shield} label="Administration" />
+          </>
+        )}
       </nav>
     </aside>
   );

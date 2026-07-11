@@ -112,16 +112,11 @@ function ErrorFallback({
   // Compact view for component-level errors
   if (level === 'component') {
     return (
-      <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-        <div className="flex items-center text-red-700 dark:text-red-400">
-          <AlertTriangle className="h-5 w-5 mr-2" />
-          <span className="text-sm font-medium">Une erreur est survenue</span>
-        </div>
+      <div className="alert red !mt-0">
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        <span>Une erreur est survenue</span>
         {onReset && (
-          <button
-            onClick={onReset}
-            className="mt-2 text-sm text-red-600 dark:text-red-400 hover:underline"
-          >
+          <button onClick={onReset} className="alink hover:underline">
             Réessayer
           </button>
         )}
@@ -132,23 +127,20 @@ function ErrorFallback({
   // Section-level error
   if (level === 'section') {
     return (
-      <div className="p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+      <div className="card p-6">
         <div className="flex flex-col items-center text-center">
-          <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full mb-4">
-            <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400" />
+          <div className="p-3 bg-red-bg rounded-full mb-4">
+            <AlertTriangle className="h-7 w-7 text-red-fg" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          <h3 className="text-[15px] font-bold text-ink mb-2">
             Erreur de chargement
           </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <p className="notec mb-4">
             Cette section n'a pas pu être chargée correctement.
           </p>
           {onReset && (
-            <button
-              onClick={onReset}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
+            <button onClick={onReset} className="btn">
+              <RefreshCw className="h-3.5 w-3.5" />
               Réessayer
             </button>
           )}
@@ -159,13 +151,13 @@ function ErrorFallback({
 
   // Page-level error (full screen)
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-      <div className="max-w-lg w-full bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 text-center">
-        <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
-          <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400" />
+    <div className="min-h-screen flex items-center justify-center bg-bgc px-4">
+      <div className="max-w-lg w-full bg-sur border border-lin rounded-2xl shadow-soft p-8 text-center">
+        <div className="mx-auto w-14 h-14 bg-red-bg rounded-full flex items-center justify-center mb-6">
+          <AlertTriangle className="h-7 w-7 text-red-fg" />
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+        <h1 className="text-[19px] font-bold text-ink mb-2">
           Oups ! Une erreur est survenue
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mb-6">

@@ -4,13 +4,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { ArrowLeft } from 'lucide-react';
 
 import { authApi } from '../api/auth';
 import { getErrorMessage } from '../api/client';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Card } from '../components/ui/Card';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Email invalide'),
@@ -44,44 +42,36 @@ export function ForgotPassword() {
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md text-center">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
-            Email envoyé !
-          </h2>
-          <p className="text-gray-600 mb-6">
+      <div className="lgwrap">
+        <div className="lgcard text-center">
+          <p className="logo text-[22px] mb-2">Bobby</p>
+          <h2 className="text-[15px] font-bold text-ink mb-3">Email envoyé !</h2>
+          <p className="notec mb-6">
             Si cette adresse email existe dans notre système, vous recevrez un
             lien pour réinitialiser votre mot de passe.
           </p>
           <Link to="/login">
             <Button variant="secondary">Retour à la connexion</Button>
           </Link>
-        </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <Link
-          to="/login"
-          className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Retour à la connexion
-        </Link>
-
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Mot de passe oublié
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Entrez votre email pour recevoir un lien de réinitialisation
-          </p>
+    <div className="lgwrap">
+      <div className="lgcard">
+        <div className="text-center mb-[26px]">
+          <p className="logo text-[22px]">Bobby</p>
+          <p className="sub mt-2">Réinitialiser votre mot de passe</p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <p className="notec mb-3.5">
+          Saisissez votre email — nous vous enverrons un lien de
+          réinitialisation valide 1 heure.
+        </p>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5">
           <Input
             label="Email"
             type="email"
@@ -90,11 +80,17 @@ export function ForgotPassword() {
             {...register('email')}
           />
 
-          <Button type="submit" className="w-full" isLoading={isLoading}>
+          <Button type="submit" className="w-full !mt-4" isLoading={isLoading}>
             Envoyer le lien
           </Button>
         </form>
-      </Card>
+
+        <p className="notec text-center mt-5">
+          <Link to="/login" className="font-semibold">
+            ← Retour à la connexion
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
