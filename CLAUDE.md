@@ -461,10 +461,13 @@ nouveau → en_cours → entretien → accepté
 ### Contract Management (`/api/v1/contract-requests`)
 - `GET /companies` - List contract companies (active)
 - `GET /` - List contract requests (commercial: own, adv/admin: all)
+- `POST /manual` - Create a contract request from scratch, entering the Boond consultant ID + type candidate/resource (ADV/admin, no webhook)
 - `GET /next-reference` - Get next contract request reference
+- `GET /siret-lookup/{siret}` - SIRET auto-fill INSEE+INPI for ADV manual entry (ADV/admin)
 - `GET /{id}` - Get contract request detail
 - `POST /{id}/sync-from-boond` - Re-sync data from Boond (ADV/admin)
-- `POST /{id}/validate-commercial` - Commercial validation (type tiers, TJM, dates, consultant, address)
+- `POST /{id}/validate-commercial` - Commercial validation (type tiers, contact, consultant; `notify_third_party` to skip the fournisseur email for manual entry)
+- `POST /{id}/third-party-info` - Manually enter third-party identity + contacts, no email (ADV/admin)
 - `POST /{id}/resend-collection-email` - Resend document collection email
 - `POST /{id}/configure` - Configure contract (ADV/admin)
 - `PATCH /{id}/article-overrides` - Override contract articles (ADV/admin)
@@ -474,6 +477,7 @@ nouveau → en_cours → entretien → accepté
 - `DELETE /{id}` - Cancel contract request (ADV/admin)
 - `POST /{id}/generate-draft` - Generate DOCX draft (ADV/admin)
 - `POST /{id}/send-draft-to-partner` - Send draft via magic link (ADV/admin)
+- `POST /{id}/approve-draft-internal` - Approve the draft on the partner's behalf, no email (ADV/admin, fully manual flow)
 - `POST /{id}/send-for-signature` - Send to YouSign (ADV/admin)
 - `POST /{id}/mark-as-signed` - Mark contract as signed (ADV/admin)
 - `POST /{id}/push-to-crm` - Push to BoondManager (ADV/admin, full sync)
@@ -496,6 +500,7 @@ nouveau → en_cours → entretien → accepté
 - `POST /third-parties/{id}/documents/{doc_id}/validate` - Validate document
 - `POST /third-parties/{id}/documents/{doc_id}/reject` - Reject document
 - `POST /third-parties/{id}/request-documents` - Request documents
+- `POST /documents/{doc_id}/upload` - Upload a document internally on behalf of the tiers (ADV/admin, manual entry)
 - `GET /compliance/dashboard` - Compliance dashboard
 
 ### Portal (`/api/v1/portal`)

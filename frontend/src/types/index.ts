@@ -744,7 +744,7 @@ export const CONTRACT_STATUS_CONFIG: Record<ContractRequestStatus, { label: stri
   cancelled: { label: 'Annulé', color: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400', group: 'done' },
 };
 
-export type TriggerType = 'positioning_7' | 'candidat_11' | 'ressource_4' | 'ressource_5';
+export type TriggerType = 'positioning_7' | 'candidat_11' | 'ressource_4' | 'ressource_5' | 'manual';
 
 export interface ContractRequest {
   id: string;
@@ -874,9 +874,14 @@ export interface ThirdPartyWithDocuments {
   capital: string | null;
   siren: string;
   siret: string | null;
+  vat_number: string | null;
+  ape_code: string | null;
   rcs_city: string | null;
   rcs_number: string | null;
   head_office_address: string | null;
+  head_office_street: string | null;
+  head_office_postal_code: string | null;
+  head_office_city: string | null;
   representative_name: string | null;
   representative_title: string | null;
   representative_civility: string | null;
@@ -889,6 +894,7 @@ export interface ThirdPartyWithDocuments {
   signatory_last_name: string | null;
   signatory_email: string | null;
   signatory_phone: string | null;
+  signatory_is_director: boolean;
   adv_contact_civility: string | null;
   adv_contact_first_name: string | null;
   adv_contact_last_name: string | null;
@@ -901,6 +907,7 @@ export interface ThirdPartyWithDocuments {
   billing_contact_phone: string | null;
   type: string;
   entity_category: string | null;
+  company_info_submitted: boolean;
   compliance_status: string;
   contact_email: string;
   documents: VigilanceDocument[];

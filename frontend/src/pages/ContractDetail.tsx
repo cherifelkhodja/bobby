@@ -25,6 +25,7 @@ import {
   User,
   X,
   Eye,
+  Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -36,6 +37,7 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
 import { DocumentViewerModal } from '../components/vigilance/DocumentViewerModal';
+import { ThirdPartyInfoForm } from '../components/contracts/ThirdPartyInfoForm';
 import { getErrorMessage } from '../api/client';
 import { CONTRACT_STATUS_CONFIG, getDocumentBadgeConfig } from '../types';
 import type { ContractRequestStatus, ContractRequest, VigilanceDocument } from '../types';
@@ -123,6 +125,7 @@ export default function ContractDetail() {
   const [linkCopied, setLinkCopied] = useState(false);
 
   const [tempValidatingDocId, setTempValidatingDocId] = useState<string | null>(null);
+  const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
   const [viewingDoc, setViewingDoc] = useState<VigilanceDocument | null>(null);
   const [showSignaturePreview, setShowSignaturePreview] = useState(false);
   const [excludedCharterIds, setExcludedCharterIds] = useState<Set<string>>(new Set());
@@ -139,6 +142,9 @@ export default function ContractDetail() {
     company_id: '',
   });
   const [formInitialized, setFormInitialized] = useState(false);
+  // Manual entry: ADV enters the tiers info themselves without soliciting the fournisseur.
+  const [manualEntry, setManualEntry] = useState(false);
+  const [showTpForm, setShowTpForm] = useState(false);
 
   // Contract configuration form state
   const [configForm, setConfigForm] = useState({
@@ -248,6 +254,18 @@ export default function ContractDetail() {
     onError: (error) => {
       toast.error(getErrorMessage(error));
     },
+  });
+
+  // ADV approves the draft on the partner's behalf (fully manual flow).
+  const approveDraftInternalMutation = useMutation({
+    mutationFn: () => contractsApi.approveDraftInternal(id!),
+    onSuccess: () => {
+      toast.success('Brouillon validé (à la place du partenaire).');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['contracts', id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
   });
 
   const deleteContractMutation = useMutation({
@@ -492,6 +510,8 @@ export default function ContractDetail() {
         consultant_last_name: validationForm.consultant_last_name || undefined,
         consultant_email: validationForm.consultant_email || undefined,
         consultant_phone: validationForm.consultant_phone || undefined,
+        // When the ADV opts for manual entry, do not email the fournisseur.
+        notify_third_party: !manualEntry,
       }),
     onSuccess: () => {
       toast.success('Validation commerciale effectuée.');
@@ -501,6 +521,30 @@ export default function ContractDetail() {
     onError: (error) => {
       toast.error(getErrorMessage(error));
     },
+  });
+
+  // ADV uploads a compliance document on behalf of the tiers (manual entry).
+  const uploadDocMutation = useMutation({
+    mutationFn: ({ docId, file }: { docId: string; file: File }) =>
+      vigilanceApi.uploadDocument(docId, file),
+    onSuccess: () => {
+      toast.success('Document déposé.');
+      queryClient.invalidateQueries({ queryKey: ['compliance-docs', cr?.third_party_id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+    onSettled: () => setUploadingDocId(null),
+  });
+
+  // Advance collecting_documents → reviewing_compliance (manual/ADV path).
+  const startComplianceReviewMutation = useMutation({
+    mutationFn: () => contractsApi.startComplianceReview(id!),
+    onSuccess: () => {
+      toast.success('Revue de conformité démarrée.');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
   });
 
   const isValidationFormValid =
@@ -603,6 +647,17 @@ export default function ContractDetail() {
               >
                 <actionConfig.icon className="h-4 w-4 mr-2" />
                 {actionMutation.isPending ? 'En cours...' : actionConfig.label}
+              </Button>
+            )}
+            {isAdv && (cr.status === 'draft_generated' || cr.status === 'draft_sent_to_partner') && (
+              <Button
+                variant="secondary"
+                onClick={() => approveDraftInternalMutation.mutate()}
+                disabled={approveDraftInternalMutation.isPending}
+                title="Valider le brouillon sans passer par le fournisseur"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                {approveDraftInternalMutation.isPending ? 'Validation...' : 'Valider à la place du partenaire'}
               </Button>
             )}
             {cr.status === 'partner_approved' && isAdv && (
@@ -774,6 +829,24 @@ export default function ContractDetail() {
             </div>
 
           </div>
+
+          {/* Manual entry: ADV enters everything without soliciting the fournisseur */}
+          <label className="flex items-start gap-2 mt-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={manualEntry}
+              onChange={(e) => setManualEntry(e.target.checked)}
+              className="mt-0.5 rounded border-gray-300 dark:border-gray-600"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="font-medium">Je saisis les informations moi-même</span>
+              <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Aucun email ne sera envoyé au fournisseur. Vous renseignerez ensuite l'identité,
+                les contacts et les documents du tiers depuis cette page.
+              </span>
+            </span>
+          </label>
+
           <div className="flex justify-end mt-4">
             <Button
               onClick={() => validateCommercialMutation.mutate()}
@@ -781,7 +854,7 @@ export default function ContractDetail() {
               isLoading={validateCommercialMutation.isPending}
             >
               <CheckCircle className="h-4 w-4 mr-2" />
-              Valider
+              {manualEntry ? 'Valider et saisir les informations' : 'Valider'}
             </Button>
           </div>
         </Card>
@@ -860,6 +933,17 @@ export default function ContractDetail() {
                 <Mail className="h-4 w-4 mr-2" />
                 Renvoyer le lien
               </Button>
+              {cr.status === 'collecting_documents' && (
+                <Button
+                  size="sm"
+                  onClick={() => startComplianceReviewMutation.mutate()}
+                  disabled={startComplianceReviewMutation.isPending}
+                  isLoading={startComplianceReviewMutation.isPending}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Démarrer la revue
+                </Button>
+              )}
             </div>
           </div>
         </Card>
@@ -1406,9 +1490,33 @@ export default function ContractDetail() {
       {/* Third-party company info — visible after document collection starts (ADV/admin only) */}
       {isAdv && complianceDocs && hasReachedStatus(cr.status, 'collecting_documents') && (
         <Card className="mb-6">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-            Informations société
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+              Informations société
+            </h3>
+            {!showTpForm && (
+              <Button variant="secondary" size="sm" onClick={() => setShowTpForm(true)}>
+                <Pencil className="h-4 w-4 mr-2" />
+                {complianceDocs.company_info_submitted ? 'Modifier' : 'Saisir les informations'}
+              </Button>
+            )}
+          </div>
+
+          {showTpForm && (
+            <ThirdPartyInfoForm
+              contractRequestId={cr.id}
+              initial={complianceDocs}
+              onSaved={() => {
+                setShowTpForm(false);
+                queryClient.invalidateQueries({ queryKey: ['compliance-docs', cr.third_party_id] });
+                queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+              }}
+              onCancel={() => setShowTpForm(false)}
+            />
+          )}
+
+          {!showTpForm && (
+          <>
           <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
             {cr.third_party_type && (
               <div>
@@ -1554,6 +1662,8 @@ export default function ContractDetail() {
               </div>
             </div>
           )}
+          </>
+          )}
         </Card>
       )}
 
@@ -1622,6 +1732,26 @@ export default function ContractDetail() {
                         >
                           <Eye className="h-3.5 w-3.5" /> Visualiser
                         </button>
+                      )}
+                      {(doc.status === 'requested' || doc.status === 'rejected' || doc.status === 'expired') && (
+                        <label className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 px-2 py-1 rounded transition-colors cursor-pointer">
+                          <Upload className="h-3.5 w-3.5" />
+                          {uploadingDocId === doc.id ? 'Dépôt…' : 'Déposer'}
+                          <input
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            className="hidden"
+                            disabled={uploadingDocId === doc.id}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setUploadingDocId(doc.id);
+                                uploadDocMutation.mutate({ docId: doc.id, file });
+                              }
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
                       )}
                       {canValidate && (
                         <>

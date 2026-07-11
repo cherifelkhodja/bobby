@@ -25,6 +25,7 @@ from app.third_party.api.schemas import (
     ThirdPartyPortalResponse,
     UpdateDocumentAvailabilityRequest,
 )
+from app.third_party.application.company_info_mapper import apply_company_info
 from app.third_party.application.use_cases.verify_magic_link import (
     VerifyMagicLinkUseCase,
 )
@@ -871,81 +872,10 @@ async def submit_company_info(
     tp = result.third_party
     tp_repo = ThirdPartyRepository(db)
 
-    # Derive SIREN from first 9 digits of SIRET
+    # Derive SIREN (kept for the audit log below); full mapping in the shared helper
+    # so the ADV manual-entry endpoint produces an identical ThirdParty.
     siren = body.siret[:9]
-
-    # Auto-compute VAT number from SIREN if not provided
-    vat_number = body.vat_number
-    if not vat_number and siren.isdigit():
-        siren_int = int(siren)
-        key = (12 + 3 * (siren_int % 97)) % 97
-        vat_number = f"FR{key:02d}{siren}"
-
-    tp.entity_category = body.entity_category
-    tp.company_info_submitted = True
-    tp.company_name = body.company_name
-    tp.legal_form = body.legal_form
-    tp.capital = body.capital
-    tp.siren = siren
-    tp.siret = body.siret
-    tp.vat_number = vat_number
-    tp.ape_code = body.ape_code
-    tp.rcs_city = body.rcs_city or body.head_office_city
-    tp.rcs_number = siren  # In France, RCS registration number = SIREN
-    tp.head_office_street = body.head_office_street
-    tp.head_office_postal_code = body.head_office_postal_code
-    tp.head_office_city = body.head_office_city
-    tp.head_office_address = (
-        f"{body.head_office_street}, {body.head_office_postal_code} {body.head_office_city}"
-    )
-    # Représentant légal
-    tp.representative_civility = body.representative_civility
-    tp.representative_first_name = body.representative_first_name
-    tp.representative_last_name = body.representative_last_name
-    tp.representative_email = body.representative_email
-    tp.representative_phone = body.representative_phone
-    tp.representative_title = body.representative_title
-    tp.representative_name = f"{body.representative_first_name} {body.representative_last_name}"
-    # Signataire
-    if body.signatory_same_as_representative:
-        tp.signatory_civility = body.representative_civility
-        tp.signatory_first_name = body.representative_first_name
-        tp.signatory_last_name = body.representative_last_name
-        tp.signatory_email = body.representative_email
-        tp.signatory_phone = body.representative_phone
-    else:
-        tp.signatory_civility = body.signatory_civility
-        tp.signatory_first_name = body.signatory_first_name
-        tp.signatory_last_name = body.signatory_last_name
-        tp.signatory_email = body.signatory_email
-        tp.signatory_phone = body.signatory_phone
-    tp.signatory_is_director = body.signatory_is_director
-    # Contact ADV
-    if body.adv_contact_same_as_representative:
-        tp.adv_contact_civility = body.representative_civility
-        tp.adv_contact_first_name = body.representative_first_name
-        tp.adv_contact_last_name = body.representative_last_name
-        tp.adv_contact_email = body.representative_email
-        tp.adv_contact_phone = body.representative_phone
-    else:
-        tp.adv_contact_civility = body.adv_contact_civility
-        tp.adv_contact_first_name = body.adv_contact_first_name
-        tp.adv_contact_last_name = body.adv_contact_last_name
-        tp.adv_contact_email = body.adv_contact_email
-        tp.adv_contact_phone = body.adv_contact_phone
-    # Contact facturation
-    if body.billing_contact_same_as_representative:
-        tp.billing_contact_civility = body.representative_civility
-        tp.billing_contact_first_name = body.representative_first_name
-        tp.billing_contact_last_name = body.representative_last_name
-        tp.billing_contact_email = body.representative_email
-        tp.billing_contact_phone = body.representative_phone
-    else:
-        tp.billing_contact_civility = body.billing_contact_civility
-        tp.billing_contact_first_name = body.billing_contact_first_name
-        tp.billing_contact_last_name = body.billing_contact_last_name
-        tp.billing_contact_email = body.billing_contact_email
-        tp.billing_contact_phone = body.billing_contact_phone
+    apply_company_info(tp, body)
 
     try:
         await tp_repo.save(tp)
@@ -1073,17 +1003,6 @@ async def save_company_info_draft(
 # ── INSEE Sirene Lookup ─────────────────────────────────────────
 
 
-def _map_legal_form(code: str) -> str | None:
-    """Map INSEE categorieJuridiqueUniteLegale code to human-readable form.
-
-    Delegates to the canonical FORME_JURIDIQUE_LABELS dict (same source as the
-    frontend dropdown) so the returned label always matches a select option.
-    """
-    from app.third_party.infrastructure.adapters.inpi_client import forme_juridique_label
-
-    return forme_juridique_label(code)
-
-
 @router.get(
     "/portal/{token}/siret/{siret}",
     response_model=SiretLookupResponse,
@@ -1099,142 +1018,13 @@ async def lookup_siret(
     The magic link token authenticates the request.
     The INSEE API key is read from server-side configuration.
     """
-    import httpx
-
     from app.config import get_settings
+    from app.third_party.api.siret_lookup import lookup_siret_data
 
     # Verify the portal token (any valid doc_upload link)
     await _verify_portal_token(token, db, MagicLinkPurpose.DOCUMENT_UPLOAD)
 
-    settings = get_settings()
-    if not settings.SIRENE_API_KEY:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="INSEE Sirene API non configurée.",
-        )
-
-    if len(siret) != 14 or not siret.isdigit():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="SIRET invalide (14 chiffres requis).",
-        )
-
-    url = f"{settings.SIRENE_API_URL}/siret/{siret}"
-    headers = {
-        "X-INSEE-Api-Key-Integration": settings.SIRENE_API_KEY,
-        "Accept": "application/json",
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url, headers=headers)
-    except httpx.TimeoutException:
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="L'API INSEE n'a pas répondu à temps.",
-        )
-    except Exception as exc:
-        logger.error("sirene_lookup_error", error=str(exc), siret=siret)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Erreur lors de la communication avec l'API INSEE.",
-        )
-
-    if resp.status_code == 404:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="SIRET introuvable dans la base INSEE.",
-        )
-    if resp.status_code == 401 or resp.status_code == 403:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Clé API INSEE invalide.",
-        )
-    if resp.status_code != 200:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Erreur INSEE ({resp.status_code}).",
-        )
-
-    data = resp.json()
-    etab = data.get("etablissement", {})
-    unite = etab.get("uniteLegale", {})
-    adresse = etab.get("adresseEtablissement", {})
-
-    def _clean(val: str | None) -> str | None:
-        """Return None if value is [ND] or empty."""
-        if not val or val == "[ND]":
-            return None
-        return val
-
-    siren = _clean(etab.get("siren"))
-    company_name = _clean(unite.get("denominationUniteLegale"))
-    categorie_code = _clean(unite.get("categorieJuridiqueUniteLegale")) or ""
-    legal_form = _map_legal_form(categorie_code) if categorie_code else None
-    entity_category = "ei" if categorie_code.startswith("1") else "societe"
-
-    # Build address
-    parts = [
-        _clean(adresse.get("numeroVoieEtablissement")),
-        _clean(adresse.get("indiceRepetitionEtablissement")),
-        _clean(adresse.get("typeVoieEtablissement")),
-        _clean(adresse.get("libelleVoieEtablissement")),
-    ]
-    street = " ".join(p for p in parts if p) or None
-    postal_code = _clean(adresse.get("codePostalEtablissement"))
-    city = _clean(adresse.get("libelleCommuneEtablissement"))
-
-    # Enrich with INPI RNE data (forme juridique, capital, greffe) — uses SIREN (first 9 digits)
-    capital_str: str | None = None
-    rcs_city: str | None = None
-    inpi_configured = bool(settings.INPI_USERNAME and settings.INPI_PASSWORD) or bool(
-        settings.INPI_TOKEN
-    )
-    if siren and inpi_configured:
-        from app.third_party.infrastructure.adapters.inpi_client import InpiClient
-
-        try:
-            inpi = InpiClient(
-                username=settings.INPI_USERNAME,
-                password=settings.INPI_PASSWORD,
-                token=settings.INPI_TOKEN,
-            )
-            inpi_info = await inpi.get_company(siren)
-            if not inpi_info:
-                logger.warning("inpi_no_data_returned", siren=siren)
-            if inpi_info:
-                # Forme juridique : INPI est source de vérité (RNE officiel)
-                if inpi_info.legal_form_label:
-                    legal_form = inpi_info.legal_form_label
-                if inpi_info.capital_amount is not None:
-                    capital_str = f"{inpi_info.capital_amount:,.0f}".replace(",", " ")
-                rcs_city = inpi_info.greffe_city
-        except Exception as exc:
-            logger.warning(
-                "inpi_enrich_failed", siren=siren, error=str(exc), error_type=type(exc).__name__
-            )
-
-    # APE/NAF code from INSEE
-    ape_code = (
-        _clean(etab.get("periodesEtablissement", [{}])[0].get("activitePrincipaleEtablissement"))
-        if etab.get("periodesEtablissement")
-        else None
-    )
-    if not ape_code:
-        ape_code = _clean(unite.get("activitePrincipaleUniteLegale"))
-
-    return SiretLookupResponse(
-        siren=siren,
-        company_name=company_name,
-        legal_form=legal_form,
-        entity_category=entity_category if categorie_code else None,
-        head_office_street=street,
-        head_office_postal_code=postal_code,
-        head_office_city=city,
-        capital=capital_str,
-        rcs_city=rcs_city,
-        ape_code=ape_code,
-    )
+    return await lookup_siret_data(siret, get_settings())
 
 
 # ── Portal charter endpoints ─────────────────────────────────────────────────

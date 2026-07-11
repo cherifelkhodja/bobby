@@ -3,7 +3,7 @@
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import AdvOrAdminUser
@@ -161,9 +161,14 @@ async def get_third_party_documents(
         capital=tp.capital,
         siren=tp.siren,
         siret=tp.siret,
+        vat_number=tp.vat_number,
+        ape_code=tp.ape_code,
         rcs_city=tp.rcs_city,
         rcs_number=tp.rcs_number,
         head_office_address=tp.head_office_address,
+        head_office_street=tp.head_office_street,
+        head_office_postal_code=tp.head_office_postal_code,
+        head_office_city=tp.head_office_city,
         representative_name=tp.representative_name,
         representative_title=tp.representative_title,
         representative_civility=tp.representative_civility,
@@ -176,6 +181,7 @@ async def get_third_party_documents(
         signatory_last_name=tp.signatory_last_name,
         signatory_email=tp.signatory_email,
         signatory_phone=tp.signatory_phone,
+        signatory_is_director=tp.signatory_is_director,
         adv_contact_civility=tp.adv_contact_civility,
         adv_contact_first_name=tp.adv_contact_first_name,
         adv_contact_last_name=tp.adv_contact_last_name,
@@ -188,6 +194,7 @@ async def get_third_party_documents(
         billing_contact_phone=tp.billing_contact_phone,
         type=tp.type.value,
         entity_category=tp.entity_category,
+        company_info_submitted=tp.company_info_submitted,
         compliance_status=tp.compliance_status.value,
         contact_email=tp.contact_email,
         documents=[_document_to_response(d) for d in documents],
@@ -221,6 +228,119 @@ async def request_documents(
         raise HTTPException(status_code=400, detail=str(exc))
 
     return [_document_to_response(d) for d in created]
+
+
+@router.post(
+    "/documents/{document_id}/upload",
+    response_model=DocumentResponse,
+    summary="Upload a document internally (ADV/admin, on behalf of the tiers)",
+)
+async def upload_document_internal(
+    document_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+    file: UploadFile = File(...),
+):
+    """Upload a vigilance document file on behalf of the tiers. ADV/admin only.
+
+    Mirrors the portal upload (type/extension allowlist + size guard + Gemini
+    auto-extraction) but authenticated by JWT instead of a magic link, so an ADV
+    can constitute the whole compliance dossier manually without soliciting the
+    tiers. The document still needs to be validated afterwards (existing
+    `/documents/{id}/validate`).
+    """
+    import os
+
+    from app.vigilance.application.use_cases.upload_document import (
+        UploadDocumentCommand,
+        UploadDocumentUseCase,
+    )
+    from app.vigilance.domain.exceptions import (
+        DocumentNotAllowedError,
+        DocumentNotFoundError,
+        ExpiredDocumentError,
+        InvalidDocumentTransitionError,
+    )
+    from app.vigilance.domain.services.vigilance_requirements import (
+        ALLOWED_EXTENSIONS,
+        ALLOWED_MIME_TYPES,
+        MAX_FILE_SIZE_BYTES,
+    )
+    from app.vigilance.infrastructure.adapters.gemini_document_extractor import (
+        GeminiDocumentExtractor,
+    )
+
+    settings = get_settings()
+    doc_repo = DocumentRepository(db)
+
+    doc = await doc_repo.get_by_id(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document introuvable.")
+
+    # Same hardening as the public portal: allowlist type/extension + size cap
+    # BEFORE any heavy processing (full read, S3 upload, Gemini extraction).
+    content_type = (file.content_type or "").lower()
+    if content_type not in ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail="Format de fichier non autorisé. Formats acceptés : PDF, JPG, PNG.",
+        )
+    _, ext = os.path.splitext(file.filename or "")
+    if ext.lower() not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=415,
+            detail="Extension de fichier non autorisée. Extensions acceptées : .pdf, .jpg, .jpeg, .png.",
+        )
+
+    file_content = await file.read()
+    if len(file_content) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Fichier trop volumineux (maximum {MAX_FILE_SIZE_BYTES // (1024 * 1024)} Mo).",
+        )
+
+    storage = VigilanceDocumentStorage(S3StorageClient(settings))
+    extractor = GeminiDocumentExtractor(settings)
+    use_case = UploadDocumentUseCase(
+        document_repository=doc_repo,
+        document_storage=storage,
+        document_extractor=extractor,
+    )
+
+    try:
+        updated = await use_case.execute(
+            UploadDocumentCommand(
+                document_id=document_id,
+                file_content=file_content,
+                file_name=file.filename or "document.pdf",
+                content_type=file.content_type or "application/octet-stream",
+            )
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except DocumentNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except DocumentNotAllowedError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ExpiredDocumentError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    except InvalidDocumentTransitionError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+    audit_logger.log(
+        AuditAction.DOCUMENT_UPLOADED,
+        AuditResource.VIGILANCE_DOCUMENT,
+        user_id=user_id,
+        resource_id=str(updated.id),
+        details={
+            "third_party_id": str(updated.third_party_id),
+            "document_type": updated.document_type.value,
+            "file_name": file.filename,
+            "via": "adv_internal",
+        },
+    )
+
+    return _document_to_response(updated)
 
 
 @router.get(

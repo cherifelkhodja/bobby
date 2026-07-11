@@ -79,6 +79,38 @@ class CommercialValidationRequest(BaseModel):
     consultant_last_name: str | None = Field(None, max_length=255)
     consultant_email: str | None = Field(None, max_length=255)
     consultant_phone: str | None = Field(None, max_length=50)
+    notify_third_party: bool = Field(
+        True,
+        description=(
+            "Envoyer le lien de collecte au tiers. Décocher pour une saisie "
+            "manuelle par l'ADV, sans solliciter le fournisseur."
+        ),
+    )
+
+
+class ManualContractRequestCreate(BaseModel):
+    """Create a contract request from scratch (manual ADV entry, no Boond webhook).
+
+    The ADV enters the Boond ID of the consultant and whether it is a candidate or
+    a resource. The consultant identity is best-effort enriched from Boond. All
+    other fields are optional and can also be filled later during commercial
+    validation.
+    """
+
+    boond_consultant_id: int = Field(..., gt=0, description="ID Boond du consultant")
+    consultant_type: str = Field(
+        "candidate",
+        pattern=r"^(candidate|resource)$",
+        description="'candidate' (candidat Boond, converti à la signature) ou 'resource'",
+    )
+    company_id: UUID | None = None
+    client_name: str | None = Field(None, max_length=255)
+    mission_title: str | None = Field(None, max_length=255)
+    consultant_civility: str | None = Field(None, max_length=10)
+    consultant_first_name: str | None = Field(None, max_length=255)
+    consultant_last_name: str | None = Field(None, max_length=255)
+    consultant_email: str | None = Field(None, max_length=255)
+    consultant_phone: str | None = Field(None, max_length=50)
 
 
 class ContractConfigRequest(BaseModel):

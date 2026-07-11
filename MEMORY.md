@@ -195,6 +195,65 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-07-10 (feat: consultant candidat/ressource + validation interne du brouillon)
+
+Deux compléments au flux manuel, pour un parcours **100 % sans fournisseur** de la création à la signature.
+
+**1. Consultant candidat OU ressource (création manuelle)**
+- Le schéma `ManualContractRequestCreate` remplace `boond_resource_id` par `boond_consultant_id` + `consultant_type` (`candidate` | `resource`, défaut `candidate`).
+- Le use case route l'ID vers le bon champ : `candidate` → `boond_candidate_id` (converti candidat→ressource à la signature) ; `resource` → `boond_resource_id` (conversion sautée). Enrichissement Boond via `get_candidate_info(id, consultant_type)`.
+- Front : sélecteur Candidat/Ressource dans la modale « Nouveau contrat ».
+
+**2. Validation du brouillon à la place du partenaire (ADV)**
+- Nouvelle transition **`DRAFT_GENERATED → PARTNER_APPROVED`** dans la machine à états (en plus de `DRAFT_SENT_TO_PARTNER → PARTNER_APPROVED`).
+- **Use case** `ApproveDraftInternallyUseCase` : transite en `PARTNER_APPROVED`, assigne la **référence définitive** (`XXX-CC-NNNN`) et **régénère le brouillon** — miroir de l'approbation partenaire, mais déclenché en interne, **sans email**. Autorisé depuis `DRAFT_GENERATED` ou `DRAFT_SENT_TO_PARTNER`.
+- **Endpoint** `POST /contract-requests/{id}/approve-draft-internal` (ADV/admin).
+- Front : bouton **« Valider à la place du partenaire »** (à côté de « Envoyer au partenaire ») en `draft_generated`/`draft_sent_to_partner`.
+- La signature qui suit est déjà côté ADV (checklist + upload + `mark-as-signed`) → le fournisseur n'est jamais sollicité. La synchro Boond finale reste correcte (candidat→ressource si `candidate`, sinon liaison directe via l'ID ressource).
+
+**Tests** : `test_approve_draft_internally.py` (transitions autorisées/refusées, référence définitive, régénération), `test_create_manual_contract_request.py` mis à jour (candidat vs ressource, endpoint Boond appelé selon le type). 103 tests unitaires verts. Front `tsc`/`eslint`/`build` OK.
+
+### 2026-07-10 (feat: création manuelle d'un dossier de contrat — sans déclencheur Boond)
+
+Complément de la saisie manuelle : l'ADV peut désormais **créer un dossier de contrat à la main**, sans webhook Boond, en **saisissant l'ID Boond de la ressource**.
+
+**Backend** :
+- **Nouvel endpoint** `POST /contract-requests/manual` (ADV/admin) : crée un `ContractRequest` en `PENDING_COMMERCIAL_VALIDATION`, `trigger_type="manual"`, `boond_resource_id` saisi, `boond_consultant_type="resource"`, référence provisoire auto.
+- **Use case** `CreateManualContractRequestUseCase` : enrichissement **best-effort** depuis Boond (`get_candidate_info(resource_id, "resource")`) — préremplit civilité/nom/email/téléphone du consultant + résout le commercial via `manager_id` → user Bobby ; un échec Boond ne bloque jamais la création. Fallback commercial = email du créateur.
+- `trigger_type` accepte la valeur `"manual"`.
+
+**Frontend** :
+- Bouton **« Nouveau contrat »** (ADV/admin) sur `/contracts` → modale : **ID Boond ressource** (requis) + société émettrice (optionnel). À la création → navigation vers la fiche, puis flux standard (validation commerciale → saisie tiers → brouillon).
+- `TriggerType` inclut `'manual'`.
+
+**Tests** : `test_create_manual_contract_request.py` (création sans CRM, enrichissement consultant+commercial depuis Boond, résilience à l'échec Boond). 96 tests unitaires verts. Frontend `tsc`/`eslint`/`build` OK.
+
+### 2026-07-10 (feat: saisie manuelle des infos du tiers par l'ADV — sans solliciter le fournisseur)
+
+**Besoin** : permettre à l'ADV de saisir **toutes les informations du tiers** (identité société + contacts + documents de vigilance) **soi-même**, sans passer par le portail fournisseur, jusqu'à la génération du brouillon de contrat.
+
+**Décisions produit** (validées avec l'utilisateur) :
+- Conformité : **les deux** — dépôt des documents par l'ADV **+** forçage de conformité existant.
+- Point de départ : **demande existante** (créée par le webhook Boond), pas de création ex nihilo.
+- Emplacement : **section dédiée sur la fiche contrat** (indépendante de la validation commerciale).
+
+**Backend** :
+- `validate-commercial` accepte `notify_third_party` (défaut `True`). À `False` : aucun lien de collecte n'est envoyé au fournisseur, mais le stub `ThirdParty` est créé et le statut passe à `COLLECTING_DOCUMENTS` (idem re-contractualisation). Message commercial adapté.
+- **Nouvel endpoint** `POST /contract-requests/{id}/third-party-info` (ADV/admin) : saisit/met à jour l'identité + les 4 contacts du tiers, crée les slots de vigilance (idempotent) — **sans email**.
+- **Nouvel endpoint** `GET /contract-requests/siret-lookup/{siret}` (ADV/admin) : auto-remplissage INSEE Sirene + INPI RNE, JWT (sans lien magique).
+- **Nouvel endpoint** `POST /vigilance/documents/{id}/upload` (ADV/admin) : dépôt d'un document à la place du tiers (mêmes gardes que le portail : allowlist type/extension + taille + extraction Gemini).
+- **Helpers partagés** (DRY portail ↔ ADV) : `third_party/application/company_info_mapper.py::apply_company_info` (mapping identité/contacts → `ThirdParty`) et `third_party/api/siret_lookup.py::lookup_siret_data` (INSEE+INPI). Le portail (`submit_company_info`, `lookup_siret`) est refactoré pour les réutiliser → un `ThirdParty` identique quel que soit l'auteur de la saisie.
+- Réponse vigilance `ThirdPartyWithDocuments` enrichie : `signatory_is_director`, `company_info_submitted`, `vat_number`, `ape_code`, `head_office_street/postal_code/city` (pour préremplir le formulaire d'édition).
+
+**Frontend** :
+- Case « Je saisis les informations moi-même » sur la validation commerciale → `notify_third_party=false`.
+- Carte « Informations société » rendue **éditable** : nouveau composant `components/contracts/ThirdPartyInfoForm.tsx` (identité + 4 contacts + bouton SIRET auto-remplissage). Bouton « Saisir les informations » / « Modifier ».
+- Bouton **« Déposer »** par document dans « Documents de conformité » (upload ADV) + bouton **« Démarrer la revue »** dans le bandeau de collecte (`collecting_documents → reviewing_compliance`).
+
+**Tests** : `test_validate_commercial_simplified.py` (mode manuel : pas de lien envoyé, transition OK ; défaut `notify=True`), `test_company_info_mapper.py` (SIREN/TVA/adresse, signataire=représentant). Backend `ruff`/`py_compile` OK (20 tests unitaires verts, env sans fastapi/DB). Frontend `tsc`/`eslint`/`vite build` OK.
+
+**Flux manuel complet** : validation commerciale (case cochée) → « Informations société » (saisie + SIRET) → « Documents de conformité » (dépôt + validation, ou forçage conformité) → « Démarrer la revue » → génération du brouillon.
+
 ### 2026-07-10 (SUPPRESSION complète du module BDC)
 
 **Le module BDC (bons de commande / purchase orders / framework contracts) a été entièrement retiré** du code (backend + frontend), à la demande, pour être réimplémenté différemment. Les entrées de changelog BDC ci-dessous sont donc **historiques** (fonctionnalité supprimée).

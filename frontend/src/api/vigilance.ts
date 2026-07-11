@@ -43,6 +43,20 @@ export const vigilanceApi = {
     return response.data;
   },
 
+  // ADV/admin uploads a document on behalf of the tiers (manual entry, no portal).
+  uploadDocument: async (
+    documentId: string,
+    file: File,
+  ): Promise<VigilanceDocument> => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await apiClient.post<VigilanceDocument>(
+      `/vigilance/documents/${documentId}/upload`,
+      form,
+    );
+    return response.data;
+  },
+
   validateDocument: async (documentId: string): Promise<VigilanceDocument> => {
     const response = await apiClient.post<VigilanceDocument>(
       `/vigilance/documents/${documentId}/validate`,

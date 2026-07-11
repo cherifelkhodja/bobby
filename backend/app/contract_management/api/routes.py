@@ -18,6 +18,7 @@ from app.contract_management.api.schemas import (
     ContractRequestListResponse,
     ContractRequestResponse,
     ContractResponse,
+    ManualContractRequestCreate,
 )
 from app.contract_management.application.use_cases.block_compliance import (
     BlockComplianceUseCase,
@@ -34,6 +35,7 @@ from app.contract_management.application.use_cases.validate_commercial import (
 )
 from app.contract_management.domain.exceptions import (
     ComplianceBlockError,
+    ContractRequestNotFoundError,
     InvalidContractStatusError,
 )
 from app.contract_management.domain.value_objects.contract_request_status import (
@@ -45,6 +47,8 @@ from app.contract_management.infrastructure.adapters.postgres_contract_repo impo
 from app.dependencies import get_db
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
 from app.infrastructure.database.models import UserModel
+from app.third_party.api.schemas import CompanyInfoRequest, SiretLookupResponse
+from app.third_party.application.company_info_mapper import apply_company_info
 from app.third_party.application.use_cases.generate_magic_link import (
     GenerateMagicLinkUseCase,
 )
@@ -292,6 +296,89 @@ async def list_contract_requests(
         skip=skip,
         limit=limit,
     )
+
+
+@router.post(
+    "/manual",
+    response_model=ContractRequestResponse,
+    summary="Create a contract request manually (ADV/admin, no Boond webhook)",
+)
+async def create_manual_contract_request(
+    body: ManualContractRequestCreate,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a contract request from scratch, entering the Boond resource ID.
+
+    The consultant identity is best-effort enriched from Boond (via the resource
+    ID). The request starts in PENDING_COMMERCIAL_VALIDATION and then follows the
+    standard flow (commercial validation → third-party info → draft). ADV/admin only.
+    """
+    from sqlalchemy import select
+
+    from app.contract_management.application.use_cases.create_manual_contract_request import (
+        CreateManualContractRequestUseCase,
+        ManualContractRequestCommand,
+    )
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.infrastructure.boond.client import BoondClient
+    from app.infrastructure.database.repositories.user_repository import UserRepository
+
+    settings = get_settings()
+    cr_repo = ContractRequestRepository(db)
+
+    # Creator email is the commercial fallback when the resource has no manager
+    # resolvable to a Bobby user.
+    creator_email = ""
+    row = (await db.execute(select(UserModel.email).where(UserModel.id == user_id))).first()
+    if row and row[0]:
+        creator_email = str(row[0])
+
+    crm = BoondCrmAdapter(BoondClient(settings))
+    use_case = CreateManualContractRequestUseCase(
+        contract_request_repository=cr_repo,
+        crm_service=crm,
+        user_repository=UserRepository(db),
+    )
+
+    try:
+        cr = await use_case.execute(
+            ManualContractRequestCommand(
+                boond_consultant_id=body.boond_consultant_id,
+                consultant_type=body.consultant_type,
+                commercial_email=creator_email,
+                company_id=body.company_id,
+                client_name=body.client_name,
+                mission_title=body.mission_title,
+                consultant_civility=body.consultant_civility,
+                consultant_first_name=body.consultant_first_name,
+                consultant_last_name=body.consultant_last_name,
+                consultant_email=body.consultant_email,
+                consultant_phone=body.consultant_phone,
+            )
+        )
+    except Exception as exc:
+        logger.error("create_manual_contract_request_failed", error=str(exc))
+        raise HTTPException(status_code=400, detail="La création manuelle du contrat a échoué.")
+
+    await db.commit()
+
+    audit_logger.log(
+        AuditAction.CONTRACT_REQUEST_CREATED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(cr.id),
+        details={
+            "trigger_type": "manual",
+            "boond_consultant_id": body.boond_consultant_id,
+            "consultant_type": body.consultant_type,
+        },
+    )
+
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
 
 
 @router.get(
@@ -545,6 +632,7 @@ async def validate_commercial(
             consultant_last_name=body.consultant_last_name,
             consultant_email=body.consultant_email,
             consultant_phone=body.consultant_phone,
+            notify_third_party=body.notify_third_party,
         )
         cmd.from_email = company_email_from
         cmd.company_name = company_name
@@ -562,12 +650,23 @@ async def validate_commercial(
 
     client_label = f" pour <strong>{cr.client_name}</strong>" if cr.client_name else ""
     if cr.status == ContractRequestStatus.COLLECTING_DOCUMENTS:
+        if body.notify_third_party:
+            collection_msg = (
+                f"Votre validation commerciale a été enregistrée{client_label}. "
+                "Le tiers a été contacté pour fournir ses documents légaux."
+            )
+        else:
+            collection_msg = (
+                f"Votre validation commerciale a été enregistrée{client_label}. "
+                "Les informations du tiers seront saisies en interne (ADV), sans "
+                "solliciter le fournisseur."
+            )
         await _notify_commercial(
             email_service,
             to=cr.commercial_email,
             ref=cr.display_reference,
             title="Collecte de documents lancée",
-            msg=f"Votre validation commerciale a été enregistrée{client_label}. Le tiers a été contacté pour fournir ses documents légaux.",
+            msg=collection_msg,
             from_email=company_email_from,
             company_name=company_name,
         )
@@ -583,6 +682,110 @@ async def validate_commercial(
 
     name = await _resolve_commercial_name(db, cr.commercial_email)
     return _cr_to_response(cr, commercial_name=name)
+
+
+@router.get(
+    "/siret-lookup/{siret}",
+    response_model=SiretLookupResponse,
+    summary="Lookup SIRET via INSEE Sirene API (ADV manual entry)",
+)
+async def siret_lookup(
+    siret: str,
+    _user_id: AdvOrAdminUser,
+):
+    """Auto-fill company identity from a SIRET for ADV manual entry.
+
+    Same INSEE Sirene + INPI RNE source as the portal, but JWT-authenticated so
+    the ADV can fill the tiers info without a magic link. ADV/admin only.
+    """
+    from app.third_party.api.siret_lookup import lookup_siret_data
+
+    return await lookup_siret_data(siret, get_settings())
+
+
+@router.post(
+    "/{contract_request_id}/third-party-info",
+    response_model=ContractRequestResponse,
+    summary="Enter the third-party company identity + contacts manually (ADV)",
+)
+async def save_third_party_info(
+    contract_request_id: UUID,
+    body: CompanyInfoRequest,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually enter/update the tiers' company identity and contacts.
+
+    Lets an ADV fill in everything the fournisseur would normally provide via the
+    portal — without soliciting it — up to draft generation. Creates the vigilance
+    document slots (idempotent) so the ADV can then upload the legal documents (or
+    force compliance) before generating the draft. ADV/admin only.
+    """
+    from app.third_party.domain.entities.third_party import ThirdParty
+    from app.third_party.domain.value_objects.third_party_type import ThirdPartyType
+
+    cr_repo = ContractRequestRepository(db)
+    cr = await cr_repo.get_by_id(contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+
+    if not cr.third_party_type or cr.third_party_type == "salarie":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Effectuez d'abord la validation commerciale (type de tiers) "
+                "avant de saisir les informations du tiers."
+            ),
+        )
+
+    tp_repo = ThirdPartyRepository(db)
+    tp = await tp_repo.get_by_id(cr.third_party_id) if cr.third_party_id else None
+    if not tp:
+        tp = ThirdParty(
+            contact_email=cr.contractualization_contact_email or body.representative_email,
+            type=ThirdPartyType(cr.third_party_type),
+        )
+        tp = await tp_repo.save(tp)
+        cr.third_party_id = tp.id
+
+    apply_company_info(tp, body)
+    await tp_repo.save(tp)
+
+    # Create vigilance document slots based on entity_category (idempotent) so the
+    # ADV can upload the legal documents from the contract page.
+    doc_repo = DocumentRepository(db)
+    request_documents_uc = RequestDocumentsUseCase(
+        third_party_repository=tp_repo,
+        document_repository=doc_repo,
+    )
+    try:
+        await request_documents_uc.execute(tp.id, entity_category=body.entity_category)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    saved = await cr_repo.save(cr)
+    await db.commit()
+
+    audit_logger.log(
+        AuditAction.DOCUMENT_COLLECTION_INITIATED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(contract_request_id),
+        details={
+            "action": "third_party_info_manual_entry",
+            "third_party_id": str(tp.id),
+            "siret": body.siret,
+        },
+    )
+
+    logger.info(
+        "third_party_info_manual_entry",
+        cr_id=str(saved.id),
+        third_party_id=str(tp.id),
+    )
+
+    name = await _resolve_commercial_name(db, saved.commercial_email)
+    return _cr_to_response(saved, commercial_name=name)
 
 
 @router.post(
@@ -1232,6 +1435,93 @@ async def send_draft_to_partner(
         msg=f"Le projet de contrat{client_label} a été transmis au partenaire pour relecture et validation.",
         from_email=company_email_from,
         company_name=company_name,
+    )
+
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
+
+
+@router.post(
+    "/{contract_request_id}/approve-draft-internal",
+    response_model=ContractRequestResponse,
+    summary="Approve the draft internally, on the partner's behalf (ADV/admin)",
+)
+async def approve_draft_internal(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Approve the draft without soliciting the partner (fully manual flow).
+
+    Assigns the definitive reference, regenerates the draft with it, and moves to
+    PARTNER_APPROVED. The signature that follows is also ADV-side (checklist upload
+    + mark-as-signed), so the partner is never contacted. ADV/admin only.
+    """
+    from app.contract_management.application.use_cases.approve_draft_internally import (
+        ApproveDraftInternallyUseCase,
+    )
+    from app.contract_management.application.use_cases.regenerate_draft import (
+        DraftRegenerator,
+    )
+    from app.contract_management.infrastructure.adapters.html_pdf_contract_generator import (
+        HtmlPdfContractGenerator,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
+        AnnexTemplateRepository,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
+        ArticleTemplateRepository,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        ContractRepository,
+    )
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+    cr_repo = ContractRequestRepository(db)
+    contract_repo = ContractRepository(db)
+
+    draft_regenerator = DraftRegenerator(
+        contract_request_repository=cr_repo,
+        contract_repository=contract_repo,
+        third_party_repository=ThirdPartyRepository(db),
+        contract_generator=HtmlPdfContractGenerator(),
+        article_template_repository=ArticleTemplateRepository(db),
+        annex_template_repository=AnnexTemplateRepository(db),
+        s3_service=S3StorageClient(settings),
+        settings=settings,
+        db=db,
+    )
+
+    use_case = ApproveDraftInternallyUseCase(
+        contract_request_repository=cr_repo,
+        draft_regenerator=draft_regenerator,
+    )
+
+    try:
+        cr = await use_case.execute(contract_request_id)
+    except ContractRequestNotFoundError:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+    except InvalidContractStatusError:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "La validation interne n'est possible que sur un brouillon généré "
+                "(ou envoyé au partenaire)."
+            ),
+        )
+    except Exception as exc:
+        logger.error(
+            "approve_draft_internal_failed", error=str(exc), cr_id=str(contract_request_id)
+        )
+        raise HTTPException(status_code=400, detail="La validation interne du brouillon a échoué.")
+
+    audit_logger.log(
+        AuditAction.DRAFT_GENERATED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(contract_request_id),
+        details={"action": "approve_draft_internal"},
     )
 
     name = await _resolve_commercial_name(db, cr.commercial_email)

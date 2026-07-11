@@ -74,6 +74,8 @@ class ContractRequestStatus(str, Enum):
                 {
                     ContractRequestStatus.DRAFT_SENT_TO_PARTNER,
                     ContractRequestStatus.DRAFT_GENERATED,  # Allow re-generation
+                    # Internal ADV approval (skip partner review, fully manual flow)
+                    ContractRequestStatus.PARTNER_APPROVED,
                     ContractRequestStatus.CANCELLED,
                 }
             ),

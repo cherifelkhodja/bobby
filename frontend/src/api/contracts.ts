@@ -44,6 +44,16 @@ export const contractsApi = {
     return response.data;
   },
 
+  // Create a contract request from scratch (no Boond webhook), entering the
+  // Boond resource ID. Consultant identity is best-effort enriched from Boond.
+  createManual: async (data: ManualContractInput): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      '/contract-requests/manual',
+      data,
+    );
+    return response.data;
+  },
+
   validateCommercial: async (
     id: string,
     data: {
@@ -55,11 +65,32 @@ export const contractsApi = {
       consultant_last_name?: string;
       consultant_email?: string;
       consultant_phone?: string;
+      notify_third_party?: boolean;
     },
   ): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
       `/contract-requests/${id}/validate-commercial`,
       data,
+    );
+    return response.data;
+  },
+
+  // Manual ADV entry of the tiers' company identity + contacts (no email sent).
+  saveThirdPartyInfo: async (
+    id: string,
+    data: ThirdPartyInfoInput,
+  ): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      `/contract-requests/${id}/third-party-info`,
+      data,
+    );
+    return response.data;
+  },
+
+  // SIRET auto-fill for ADV manual entry (INSEE Sirene + INPI RNE).
+  lookupSiret: async (siret: string): Promise<SiretLookupResult> => {
+    const response = await apiClient.get<SiretLookupResult>(
+      `/contract-requests/siret-lookup/${siret}`,
     );
     return response.data;
   },
@@ -129,6 +160,14 @@ export const contractsApi = {
   sendDraftToPartner: async (id: string): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
       `/contract-requests/${id}/send-draft-to-partner`,
+    );
+    return response.data;
+  },
+
+  // Approve the draft on the partner's behalf (fully manual flow, no fournisseur).
+  approveDraftInternal: async (id: string): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      `/contract-requests/${id}/approve-draft-internal`,
     );
     return response.data;
   },
@@ -301,6 +340,74 @@ export const contractsApi = {
   },
 
 };
+
+// Company identity + contacts entered manually by an ADV (mirrors the portal
+// CompanyInfoRequest so the generated draft is identical whoever typed it).
+export interface ThirdPartyInfoInput {
+  entity_category: string; // ei | societe | portage_salarial
+  company_name: string;
+  legal_form: string;
+  capital?: string | null;
+  siret: string;
+  vat_number?: string | null;
+  ape_code?: string | null;
+  head_office_street: string;
+  head_office_postal_code: string;
+  head_office_city: string;
+  rcs_city?: string | null;
+  representative_civility: string;
+  representative_first_name: string;
+  representative_last_name: string;
+  representative_email: string;
+  representative_phone?: string | null;
+  representative_title: string;
+  signatory_same_as_representative?: boolean;
+  signatory_civility?: string | null;
+  signatory_first_name?: string | null;
+  signatory_last_name?: string | null;
+  signatory_email?: string | null;
+  signatory_phone?: string | null;
+  signatory_is_director?: boolean;
+  adv_contact_same_as_representative?: boolean;
+  adv_contact_civility?: string | null;
+  adv_contact_first_name?: string | null;
+  adv_contact_last_name?: string | null;
+  adv_contact_email?: string | null;
+  adv_contact_phone?: string | null;
+  billing_contact_same_as_representative?: boolean;
+  billing_contact_civility?: string | null;
+  billing_contact_first_name?: string | null;
+  billing_contact_last_name?: string | null;
+  billing_contact_email?: string | null;
+  billing_contact_phone?: string | null;
+}
+
+export interface SiretLookupResult {
+  siren?: string | null;
+  company_name?: string | null;
+  legal_form?: string | null;
+  entity_category?: string | null;
+  head_office_street?: string | null;
+  head_office_postal_code?: string | null;
+  head_office_city?: string | null;
+  capital?: string | null;
+  rcs_city?: string | null;
+  ape_code?: string | null;
+}
+
+// Manual creation of a contract request (no Boond webhook).
+export interface ManualContractInput {
+  boond_consultant_id: number;
+  consultant_type: 'candidate' | 'resource';
+  company_id?: string | null;
+  client_name?: string | null;
+  mission_title?: string | null;
+  consultant_civility?: string | null;
+  consultant_first_name?: string | null;
+  consultant_last_name?: string | null;
+  consultant_email?: string | null;
+  consultant_phone?: string | null;
+}
 
 // ── Contract companies ──────────────────────────────────────────────────────
 

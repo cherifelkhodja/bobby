@@ -117,6 +117,68 @@ class TestSimplifiedValidation:
         assert result.consultant_last_name == "Martin"
 
 
+class TestManualEntryWithoutNotification:
+    """Manual ADV entry: notify_third_party=False must not solicit the tiers."""
+
+    @staticmethod
+    def _build(cr):
+        cr_repo = AsyncMock()
+        cr_repo.get_by_id = AsyncMock(return_value=cr)
+        cr_repo.save = AsyncMock(side_effect=lambda x: x)
+
+        tp_repo = AsyncMock()
+        stub = MagicMock()
+        stub.id = uuid4()
+        tp_repo.save = AsyncMock(return_value=stub)
+
+        magic_link_uc = AsyncMock()
+        magic_link_uc.execute = AsyncMock()
+
+        uc = ValidateCommercialUseCase(
+            contract_request_repository=cr_repo,
+            third_party_repository=tp_repo,
+            find_or_create_third_party_use_case=None,
+            generate_magic_link_use_case=magic_link_uc,
+            request_documents_use_case=AsyncMock(),
+        )
+        return uc, magic_link_uc, stub
+
+    @pytest.mark.asyncio
+    async def test_no_magic_link_when_manual_entry(self):
+        """Should not email the tiers, but still advance so the ADV can fill it in."""
+        cr = _make_cr()
+        uc, magic_link_uc, stub = self._build(cr)
+
+        command = ValidateCommercialCommand(
+            contract_request_id=cr.id,
+            third_party_type="freelance",
+            contact_email="contact@fournisseur.fr",
+            notify_third_party=False,
+        )
+
+        result = await uc.execute(command)
+
+        magic_link_uc.execute.assert_not_called()
+        assert result.status == ContractRequestStatus.COLLECTING_DOCUMENTS
+        assert result.third_party_id == stub.id
+
+    @pytest.mark.asyncio
+    async def test_magic_link_sent_by_default(self):
+        """Should keep emailing the tiers when notify_third_party defaults to True."""
+        cr = _make_cr()
+        uc, magic_link_uc, _stub = self._build(cr)
+
+        command = ValidateCommercialCommand(
+            contract_request_id=cr.id,
+            third_party_type="freelance",
+            contact_email="contact@fournisseur.fr",
+        )
+
+        await uc.execute(command)
+
+        magic_link_uc.execute.assert_called_once()
+
+
 class TestSalarieRedirectPayfit:
     """Test salarié type redirects to PayFit."""
 
@@ -286,3 +348,11 @@ class TestCommandValidation:
         assert "contact_email" in params
         assert "consultant_civility" in params
         assert "consultant_first_name" in params
+
+    def test_command_accepts_notify_third_party_defaulting_true(self):
+        """Command should accept notify_third_party, defaulting to True."""
+        import inspect
+
+        params = inspect.signature(ValidateCommercialCommand.__init__).parameters
+        assert "notify_third_party" in params
+        assert params["notify_third_party"].default is True
