@@ -2,11 +2,9 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Upload,
   FileText,
-  Check,
   AlertCircle,
+  CheckCircle,
   Download,
-  X,
-  Loader2,
 } from 'lucide-react';
 
 import { cvGeneratorApi } from '../api/cvGenerator';
@@ -16,7 +14,6 @@ import { generateCV } from '../cv-generator/renderer';
 import type { TemplateConfig } from '../cv-generator/renderer';
 import geminiConfig from '../cv-generator/templates/gemini/config.json';
 import craftmaniaConfig from '../cv-generator/templates/craftmania/config.json';
-import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 
 type TemplateId = 'gemini' | 'craftmania';
@@ -254,21 +251,18 @@ export function CvGeneratorBeta() {
   const canTransform = selectedFile && !isProcessing;
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-        CV Generator
-      </h1>
-      <p className="text-gray-600 dark:text-gray-400 mb-8">
-        Générez un CV formaté à partir d'un CV existant
+    <div className="max-w-[880px]">
+      <p className="bc">Outils / Générateur de CV</p>
+      <h1 className="h1">Générateur de CV</h1>
+      <p className="sub">
+        Générez un CV formaté à partir d'un CV existant · extraction et analyse par IA (Claude)
       </p>
 
-      {/* Template Selection */}
-      <Card className="mb-6">
-        <CardHeader
-          title="1. Choisir un template"
-          subtitle="Sélectionnez le format de mise en forme"
-        />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* 1 · Template */}
+      <div className="card mt-[18px]">
+        <h3 className="ct">1 · Choisir un template</h3>
+        <p className="cs mb-3.5">Sélectionnez le format de mise en forme</p>
+        <div className="f-grid">
           {(Object.entries(TEMPLATES) as [TemplateId, TemplateOption][]).map(
             ([id, tpl]) => (
               <button
@@ -276,42 +270,22 @@ export function CvGeneratorBeta() {
                 type="button"
                 onClick={() => setSelectedTemplate(id)}
                 disabled={isProcessing}
-                className={`
-                  relative p-4 rounded-lg border-2 text-left transition-all
-                  ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                  ${
-                    selectedTemplate === id
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-700'
-                  }
-                `}
+                className={`tcard text-left disabled:opacity-45 disabled:cursor-not-allowed ${
+                  selectedTemplate === id ? 'on' : ''
+                }`}
               >
-                {selectedTemplate === id && (
-                  <div className="absolute top-2 right-2">
-                    <Check className="h-5 w-5 text-primary-500" />
-                  </div>
-                )}
-                <div className="flex items-center mb-2">
-                  <FileText className={`h-6 w-6 mr-2 ${selectedTemplate === id ? 'text-primary-500' : 'text-gray-400'}`} />
-                  <span className="font-medium text-gray-900 dark:text-gray-100">
-                    {tpl.label}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {tpl.description}
-                </p>
+                <span className="tt block">{tpl.label}</span>
+                <span className="td2 block">{tpl.description}</span>
               </button>
             )
           )}
         </div>
-      </Card>
+      </div>
 
-      {/* File Upload */}
-      <Card className="mb-6">
-        <CardHeader
-          title="2. Importer un CV"
-          subtitle="PDF ou Word (.docx), max 16 Mo"
-        />
+      {/* 2 · Import */}
+      <div className="card mt-4">
+        <h3 className="ct">2 · Importer un CV</h3>
+        <p className="cs mb-3.5">PDF ou Word (.docx) · 16 Mo max</p>
 
         {!selectedFile ? (
           <div
@@ -319,28 +293,14 @@ export function CvGeneratorBeta() {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`
-              border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-              ${
-                isDragging
-                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                  : 'border-gray-300 dark:border-gray-600 hover:border-primary-400 dark:hover:border-primary-500'
-              }
-            `}
+            className={`drop ${isDragging ? 'active' : ''}`}
           >
             <Upload
-              className={`h-12 w-12 mx-auto mb-4 ${
-                isDragging ? 'text-primary-500' : 'text-gray-400'
-              }`}
+              className={`h-9 w-9 mx-auto ${isDragging ? 'text-prit' : 'text-mut2'}`}
             />
-            <p className="text-gray-600 dark:text-gray-400 mb-2">
-              Glissez-déposez votre CV ici
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-500">
-              ou{' '}
-              <span className="text-primary-600 dark:text-primary-400 font-medium">
-                parcourez vos fichiers
-              </span>
+            <p className="dropt">Glissez-déposez votre CV ici</p>
+            <p className="drops">
+              ou <b className="text-prit font-semibold">parcourez vos fichiers</b>
             </p>
             <input
               ref={fileInputRef}
@@ -351,24 +311,19 @@ export function CvGeneratorBeta() {
             />
           </div>
         ) : (
-          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <div className="flex items-center">
-              <FileText className="h-10 w-10 text-primary-500 mr-4" />
-              <div>
-                <p className="font-medium text-gray-900 dark:text-gray-100">
-                  {selectedFile.name}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {formatFileSize(selectedFile.size)}
-                </p>
-              </div>
+          <div className="filecard">
+            <div className="dico">
+              <FileText className="h-4 w-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="dn truncate">{selectedFile.name}</p>
+              <p className="ds">{formatFileSize(selectedFile.size)}</p>
             </div>
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
               onClick={resetForm}
               disabled={isProcessing}
-              leftIcon={<X className="h-4 w-4" />}
             >
               Supprimer
             </Button>
@@ -376,101 +331,76 @@ export function CvGeneratorBeta() {
         )}
 
         {errorMessage && step !== 'error' && (
-          <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center text-red-700 dark:text-red-400">
-            <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
-            <span className="text-sm">{errorMessage}</span>
+          <div className="alert red">
+            <AlertCircle className="h-[18px] w-[18px] flex-shrink-0" />
+            <span>{errorMessage}</span>
           </div>
         )}
-      </Card>
+      </div>
 
-      {/* Generate & Download */}
-      <Card>
-        <CardHeader
-          title="3. Générer le CV"
-          subtitle={`Le document sera téléchargé au format ${TEMPLATES[selectedTemplate].label}`}
-        />
+      {/* 3 · Génération */}
+      <div className="card mt-4">
+        <h3 className="ct">3 · Générer le CV</h3>
+        <p className="cs">
+          Le document Word ({TEMPLATES[selectedTemplate].label}) sera téléchargé automatiquement
+        </p>
 
-        {/* Progress indicator */}
+        {/* Progression */}
         {isProcessing && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center">
-                <Loader2 className="h-5 w-5 text-primary-500 animate-spin mr-2" />
-                <span className="text-gray-700 dark:text-gray-300">
-                  {progressMessage || stepConfig[step]?.message || ''}
-                </span>
-              </div>
-              <span className="text-sm text-gray-500 dark:text-gray-400 tabular-nums">
-                {formatElapsed(elapsed)}
+          <div className="mt-3.5">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-[12.5px] font-semibold text-ink">
+                {progressMessage || stepConfig[step]?.message || ''}
+              </span>
+              <span className="docs">
+                {formatElapsed(elapsed)} · {progress} %
               </span>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-primary-500 h-2 rounded-full transition-all duration-700 ease-out"
-                style={{ width: `${progress}%` }}
-              />
+            <div className="pbar">
+              <div className="pfill" style={{ width: `${progress}%` }} />
             </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-xs text-gray-400">{progress}%</span>
-              {step === 'ai_parsing' && (
-                <span className="text-xs text-gray-400">
-                  Cette étape peut prendre 15-30 secondes
-                </span>
-              )}
-            </div>
+            <p className="f-hint">L'analyse IA peut prendre 15 à 30 secondes</p>
           </div>
         )}
 
-        {/* Success message */}
+        {/* Succès */}
         {step === 'done' && (
-          <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center">
-            <Check className="h-6 w-6 text-green-500 mr-3" />
-            <div>
-              <p className="font-medium text-green-700 dark:text-green-400">
-                CV généré avec succès !
-              </p>
-              <p className="text-sm text-green-600 dark:text-green-500">
-                Le document a été téléchargé automatiquement ({formatElapsed(elapsed)})
-              </p>
-            </div>
+          <div className="okbox">
+            <CheckCircle className="h-4 w-4 flex-shrink-0" />
+            <span>
+              CV généré avec succès — le document a été téléchargé ({formatElapsed(elapsed)})
+            </span>
           </div>
         )}
 
-        {/* Error message */}
+        {/* Erreur */}
         {step === 'error' && errorMessage && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center">
-            <AlertCircle className="h-6 w-6 text-red-500 mr-3" />
+          <div className="alert red">
+            <AlertCircle className="h-[18px] w-[18px] flex-shrink-0" />
             <div>
-              <p className="font-medium text-red-700 dark:text-red-400">
-                Erreur lors de la génération
-              </p>
-              <p className="text-sm text-red-600 dark:text-red-500">
-                {errorMessage}
-              </p>
+              <p className="font-semibold">Erreur lors de la génération</p>
+              <p className="text-xs font-normal mt-0.5">{errorMessage}</p>
             </div>
           </div>
         )}
 
-        <div className="flex gap-4">
+        <div className="flex items-center gap-2 mt-3.5">
           <Button
             onClick={handleTransform}
             disabled={!canTransform}
             isLoading={isProcessing}
             leftIcon={<Download className="h-4 w-4" />}
-            className="flex-1"
           >
-            {isProcessing
-              ? 'Génération en cours...'
-              : 'Générer et télécharger'}
+            {isProcessing ? 'Génération en cours...' : 'Générer et télécharger'}
           </Button>
 
           {(step === 'done' || step === 'error') && (
-            <Button variant="outline" onClick={resetForm}>
+            <Button variant="secondary" onClick={resetForm}>
               Nouveau CV
             </Button>
           )}
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

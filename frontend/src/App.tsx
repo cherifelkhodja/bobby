@@ -26,6 +26,7 @@ import ProposeCandidate from './pages/ProposeCandidate';
 import { ContractManagement } from './pages/ContractManagement';
 import ContractDetail from './pages/ContractDetail';
 import ComplianceDashboard from './pages/ComplianceDashboard';
+import DocumentsToValidate from './pages/DocumentsToValidate';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import Portal from './pages/Portal';
 import type { UserRole } from './types';
@@ -129,6 +130,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin', 'adv']}>
               <ComplianceDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="documents-a-valider"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'adv']}>
+              <DocumentsToValidate />
             </ProtectedRoute>
           }
         />
