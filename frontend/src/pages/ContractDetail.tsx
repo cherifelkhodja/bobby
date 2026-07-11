@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft,
   FileSignature,
+  FileText,
   Send,
   PenTool,
   CheckCircle,
@@ -12,8 +12,7 @@ import {
   Mail,
   Copy,
   Check,
-  Settings,
-  Clock,
+  Lock,
   Download,
   ChevronDown,
   ChevronUp,
@@ -32,7 +31,6 @@ import { toast } from 'sonner';
 import { contractsApi, contractCompaniesApi, contractArticlesApi, contractAnnexesApi, contractConsultantsApi } from '../api/contracts';
 import { vigilanceApi } from '../api/vigilance';
 import { useAuthStore } from '../stores/authStore';
-import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
@@ -104,9 +102,47 @@ const ACTION_CONFIG: Partial<
   // partner_approved: handled separately with signature preview panel
 };
 
+// Stepper v2 — 6 étapes pilotées par CONTRACT_STATUS_CONFIG[status].stage
+const STEP_LABELS = ['Validation', 'Documents', 'Configuration', 'Review', 'Signature', 'Signé'];
 
-const INPUT_CLS =
-  'w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300';
+// Chips v2 des documents de vigilance
+const DOC_CHIP_CLASS: Record<string, string> = {
+  requested: 'st-sla',
+  received: 'st-blu',
+  validated: 'st-grn',
+  rejected: 'st-red',
+  expiring_soon: 'st-amb',
+  expired: 'st-red',
+};
+
+function docChipClass(doc: Pick<VigilanceDocument, 'status' | 'is_unavailable'>): string {
+  if (doc.status === 'validated' && doc.is_unavailable) return 'st st-amb';
+  return `st ${DOC_CHIP_CLASS[doc.status] ?? 'st-sla'}`;
+}
+
+// Cartes sélectionnables « type de tiers » (validation commerciale)
+const THIRD_PARTY_TYPE_CARDS = [
+  {
+    value: 'freelance',
+    label: 'Freelance',
+    desc: 'Contrat de sous-traitance individuel · Kbis, URSSAF, RC Pro…',
+  },
+  {
+    value: 'sous_traitant',
+    label: 'Sous-traitant',
+    desc: 'Société avec salariés intervenant sur la mission',
+  },
+  {
+    value: 'portage_salarial',
+    label: 'Portage salarial',
+    desc: 'Contrat conclu avec la société de portage',
+  },
+  {
+    value: 'salarie',
+    label: 'Salarié',
+    desc: 'Embauche directe · redirigée vers le process Payfit',
+  },
+];
 
 export default function ContractDetail() {
   const { id } = useParams<{ id: string }>();
@@ -584,185 +620,434 @@ export default function ContractDetail() {
     ? contracts[contracts.length - 1]
     : null;
 
+  const consultantName = [cr.consultant_first_name, cr.consultant_last_name]
+    .filter(Boolean)
+    .join(' ');
+  const statusChipClass = `st ${statusConfig?.color ?? 'bg-sla-bg text-sla-fg'}`;
+  const issuingCompany =
+    companies.find(
+      (c) =>
+        c.id === (cr.contract_config as Record<string, unknown> | null)?.company_id ||
+        c.id === cr.company_id,
+    ) ?? companies.find((c) => c.is_default);
+
+  // Stepper v2 — stage 0 (annulée / Payfit) : aucune progression.
+  const stage = statusConfig?.stage ?? 0;
+  const stageBlocked = statusConfig?.group === 'blocked';
+  const stepFillPct = stage === 0 ? 0 : Math.round(((stage === 6 ? 5 : stage - 1) / 5) * 84);
+  const stepNodeClass = (step: number): string => {
+    if (stage === 0) return 'nd';
+    if (stage === 6 || step < stage) return 'nd d';
+    if (step === stage) return stageBlocked ? 'nd bl' : 'nd cur';
+    return 'nd';
+  };
+
+  const isPendingValidation = isCommercialOrAdmin && cr.status === 'pending_commercial_validation';
+
+  // Documents de vigilance
+  const vigDocs = complianceDocs?.documents ?? [];
+  const validatedDocsCount = vigDocs.filter((d) => d.status === 'validated').length;
+  const docsBarRed =
+    cr.status === 'compliance_blocked' ||
+    vigDocs.some((d) => d.status === 'rejected' || d.status === 'expired');
+
+  const showVigilanceCard =
+    isAdv && vigDocs.length > 0 && hasReachedStatus(cr.status, 'collecting_documents');
+  const showTpInfoCard =
+    isAdv && !!complianceDocs && hasReachedStatus(cr.status, 'collecting_documents');
+  const showConfigLocked = isAdv && cr.status === 'collecting_documents';
+  const showConsultantsSection = isAdv && hasReachedStatus(cr.status, 'signed');
+  const showLinkActions =
+    isAdv &&
+    !!cr.portal_url &&
+    (cr.status === 'collecting_documents' ||
+      cr.status === 'compliance_blocked' ||
+      cr.status === 'draft_sent_to_partner');
+
+  const hasLeftColumn =
+    showVigilanceCard ||
+    showConfigForm ||
+    showConfigLocked ||
+    showTpInfoCard ||
+    showConsultantsSection ||
+    cr.status === 'sent_for_signature';
+
+  const copyPortalLink = () => {
+    navigator.clipboard.writeText(cr.portal_url!);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
   return (
     <div>
-      {/* Header */}
-      <div className="mb-6">
-        <button
-          onClick={() => navigate('/contracts')}
-          className="flex items-center text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Retour aux contrats
-        </button>
+      {/* Fil d'ariane */}
+      <button
+        type="button"
+        onClick={() => navigate('/contracts')}
+        className="bc block cursor-pointer !text-mut2 hover:!text-mut"
+      >
+        ← Contrats / Demandes / {cr.display_reference}
+      </button>
 
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {cr.display_reference}
-              </h1>
+      {/* Entête */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="h1">
+              {cr.display_reference}
+              {consultantName && ` · ${consultantName}`}
+            </h1>
+            <span className={statusChipClass}>
+              <span className="dot" />
+              {statusConfig?.label ?? cr.status_display}
+            </span>
+            {issuingCompany && (
               <span
-                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${statusConfig?.color ?? 'bg-gray-100 text-gray-600'}`}
-              >
-                {statusConfig?.label ?? cr.status_display}
-              </span>
-              {(() => {
-                const company = companies.find((c) => c.id === (cr.contract_config as Record<string, unknown> | null)?.company_id || c.id === cr.company_id)
-                  ?? companies.find((c) => c.is_default);
-                return company ? (
-                  <span
-                    className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border"
-                    style={{ color: company.color_code, borderColor: company.color_code, backgroundColor: `${company.color_code}15` }}
-                  >
-                    {company.name}
-                  </span>
-                ) : null;
-              })()}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Download signed contract button */}
-            {latestContract?.signed_at && latestContract?.s3_key_signed && (
-              <Button
-                variant="secondary"
-                onClick={async () => {
-                  try {
-                    const url = await contractsApi.getContractDownloadUrl(cr.id, latestContract.id, 'signed');
-                    window.open(url, '_blank');
-                  } catch {
-                    toast.error('Impossible de telecharger le contrat signe.');
-                  }
+                className="st"
+                style={{
+                  color: issuingCompany.color_code,
+                  backgroundColor: `${issuingCompany.color_code}15`,
                 }}
               >
-                <Download className="h-4 w-4 mr-2" />
-                Contrat signe
-              </Button>
+                <span className="dot" />
+                {issuingCompany.name}
+              </span>
             )}
-            {actionConfig && (
-              <Button
-                onClick={() => actionMutation.mutate(actionConfig.action)}
-                disabled={actionMutation.isPending}
-              >
-                <actionConfig.icon className="h-4 w-4 mr-2" />
-                {actionMutation.isPending ? 'En cours...' : actionConfig.label}
-              </Button>
+          </div>
+          {(cr.mission_title || cr.boond_positioning_id) && (
+            <p className="sub">
+              {[
+                cr.mission_title,
+                cr.boond_positioning_id ? `positionnement Boond #${cr.boond_positioning_id}` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {showLinkActions && (
+            <Button
+              variant="secondary"
+              onClick={copyPortalLink}
+              leftIcon={
+                linkCopied ? (
+                  <Check className="h-3.5 w-3.5 text-grn-fg" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )
+              }
+            >
+              {linkCopied ? 'Copié !' : 'Copier le lien magique'}
+            </Button>
+          )}
+          {isAdv && (cr.status === 'collecting_documents' || cr.status === 'compliance_blocked') && (
+            <Button
+              variant="secondary"
+              onClick={() => resendCollectionEmailMutation.mutate()}
+              disabled={resendCollectionEmailMutation.isPending}
+              isLoading={resendCollectionEmailMutation.isPending}
+              leftIcon={<Mail className="h-3.5 w-3.5" />}
+            >
+              Relancer le tiers
+            </Button>
+          )}
+          {isAdv && cr.status === 'draft_sent_to_partner' && (
+            <Button
+              variant="secondary"
+              onClick={() => resendDraftEmailMutation.mutate()}
+              disabled={resendDraftEmailMutation.isPending}
+              isLoading={resendDraftEmailMutation.isPending}
+              leftIcon={<Mail className="h-3.5 w-3.5" />}
+            >
+              Relancer le tiers
+            </Button>
+          )}
+          {isAdv && cr.status === 'collecting_documents' && (
+            <Button
+              onClick={() => startComplianceReviewMutation.mutate()}
+              disabled={startComplianceReviewMutation.isPending}
+              isLoading={startComplianceReviewMutation.isPending}
+              leftIcon={<CheckCircle className="h-3.5 w-3.5" />}
+            >
+              Démarrer la revue
+            </Button>
+          )}
+          {latestContract?.signed_at && latestContract?.s3_key_signed && (
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                try {
+                  const url = await contractsApi.getContractDownloadUrl(cr.id, latestContract.id, 'signed');
+                  window.open(url, '_blank');
+                } catch {
+                  toast.error('Impossible de telecharger le contrat signe.');
+                }
+              }}
+              leftIcon={<Download className="h-3.5 w-3.5" />}
+            >
+              Contrat signé
+            </Button>
+          )}
+          {actionConfig && (
+            <Button
+              onClick={() => actionMutation.mutate(actionConfig.action)}
+              disabled={actionMutation.isPending}
+              leftIcon={<actionConfig.icon className="h-3.5 w-3.5" />}
+            >
+              {actionMutation.isPending ? 'En cours…' : actionConfig.label}
+            </Button>
+          )}
+          {isAdv && (cr.status === 'draft_generated' || cr.status === 'draft_sent_to_partner') && (
+            <Button
+              variant="secondary"
+              onClick={() => approveDraftInternalMutation.mutate()}
+              disabled={approveDraftInternalMutation.isPending}
+              title="Valider le brouillon sans passer par le fournisseur"
+              leftIcon={<CheckCircle className="h-3.5 w-3.5" />}
+            >
+              {approveDraftInternalMutation.isPending ? 'Validation…' : 'Valider à la place du partenaire'}
+            </Button>
+          )}
+          {cr.status === 'partner_approved' && isAdv && (
+            <Button
+              onClick={() => setShowSignaturePreview(true)}
+              disabled={showSignaturePreview}
+              leftIcon={<PenTool className="h-3.5 w-3.5" />}
+            >
+              Envoyer en signature
+            </Button>
+          )}
+          {canRollback && (
+            <Button
+              variant="secondary"
+              onClick={() => rollbackMutation.mutate()}
+              disabled={rollbackMutation.isPending}
+              leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
+            >
+              {rollbackMutation.isPending ? 'Retour…' : 'État précédent'}
+            </Button>
+          )}
+          {canCancel && (
+            <Button
+              variant="secondary"
+              onClick={() => setShowCancelModal(true)}
+              leftIcon={<Trash2 className="h-3.5 w-3.5" />}
+            >
+              Annuler
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Conformité bloquée — alerte + dérogation tracée */}
+      {isAdv && cr.status === 'compliance_blocked' && (
+        <>
+          <div className="alert red">
+            <AlertTriangle className="h-[18px] w-[18px] shrink-0" />
+            <span>
+              Génération de contrat bloquée — les documents de vigilance ne sont pas tous validés.
+              Validez-les dans la carte « Documents de vigilance », ou forcez la conformité avec une
+              justification tracée.
+            </span>
+            {!showOverride && (
+              <button type="button" className="alink" onClick={() => setShowOverride(true)}>
+                Forcer la conformité →
+              </button>
             )}
-            {isAdv && (cr.status === 'draft_generated' || cr.status === 'draft_sent_to_partner') && (
-              <Button
-                variant="secondary"
-                onClick={() => approveDraftInternalMutation.mutate()}
-                disabled={approveDraftInternalMutation.isPending}
-                title="Valider le brouillon sans passer par le fournisseur"
-              >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                {approveDraftInternalMutation.isPending ? 'Validation...' : 'Valider à la place du partenaire'}
-              </Button>
-            )}
-            {cr.status === 'partner_approved' && isAdv && (
-              <Button
-                onClick={() => setShowSignaturePreview(true)}
-                disabled={showSignaturePreview}
-              >
-                <PenTool className="h-4 w-4 mr-2" />
-                Envoyer en signature
-              </Button>
-            )}
-            {canRollback && (
-              <Button
-                variant="secondary"
-                onClick={() => rollbackMutation.mutate()}
-                disabled={rollbackMutation.isPending}
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                {rollbackMutation.isPending ? 'Retour...' : 'État précédent'}
-              </Button>
-            )}
-            {canCancel && (
-              <Button
-                variant="secondary"
-                onClick={() => setShowCancelModal(true)}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Annuler
-              </Button>
-            )}
+          </div>
+          {showOverride && (
+            <div className="card mt-3">
+              <label className="f-lab" htmlFor="override-reason">
+                Justification de la dérogation *
+              </label>
+              <textarea
+                id="override-reason"
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                placeholder="Raison du forçage (min. 10 caractères)…"
+                className="f-ta"
+                rows={2}
+              />
+              <div className="flex gap-2 mt-3">
+                <Button
+                  size="sm"
+                  onClick={() => overrideMutation.mutate()}
+                  disabled={overrideReason.length < 10 || overrideMutation.isPending}
+                  isLoading={overrideMutation.isPending}
+                >
+                  Confirmer la dérogation
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setShowOverride(false);
+                    setOverrideReason('');
+                  }}
+                >
+                  Annuler
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Signé mais synchronisation BoondManager en attente */}
+      {isAdv && cr.status === 'signed' && (
+        <div className="alert">
+          <AlertTriangle className="h-[18px] w-[18px] shrink-0" />
+          <span>
+            Le contrat est signé mais n'a pas encore été synchronisé dans BoondManager. Relancez la
+            synchronisation pour finaliser la mise en actif.
+          </span>
+          <button
+            type="button"
+            className="alink"
+            onClick={() => retryBoondSyncMutation.mutate()}
+            disabled={retryBoondSyncMutation.isPending}
+          >
+            {retryBoondSyncMutation.isPending ? 'Synchronisation…' : 'Relancer la synchronisation →'}
+          </button>
+        </div>
+      )}
+
+      {/* Carte d'entête : meta + stepper 6 étapes */}
+      <div className="hdcard">
+        <div className="meta">
+          <div>
+            <p className="ml">Partenaire</p>
+            <p className="mv">{cr.third_party_name ?? complianceDocs?.company_name ?? '—'}</p>
+          </div>
+          {complianceDocs?.siren && (
+            <div>
+              <p className="ml">SIREN</p>
+              <p className="mv font-mono">{complianceDocs.siren}</p>
+            </div>
+          )}
+          <div>
+            <p className="ml">Client final</p>
+            <p className="mv">{cr.client_name ?? '—'}</p>
+          </div>
+          <div>
+            <p className="ml">TJM achat</p>
+            <p className="mv">{cr.daily_rate != null ? `${cr.daily_rate} €` : '—'}</p>
+          </div>
+          <div>
+            <p className="ml">Démarrage</p>
+            <p className="mv">{cr.start_date ? formatDate(cr.start_date) : '—'}</p>
+          </div>
+          <div>
+            <p className="ml">Commercial</p>
+            <p className="mv">{cr.commercial_name ?? '—'}</p>
+          </div>
+          <div>
+            <p className="ml">Contact contrat</p>
+            <p className="mv">{cr.contractualization_contact_email ?? '—'}</p>
+          </div>
+        </div>
+        <div className="steps">
+          <div className="track" />
+          <div className="tfill" style={{ width: `${stepFillPct}%` }} />
+          <div className="nodes">
+            {STEP_LABELS.map((label, i) => (
+              <div key={label} className="stw">
+                <span className={stepNodeClass(i + 1)} />
+                <p className="lb">{label}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Commercial validation form */}
-      {isCommercialOrAdmin && cr.status === 'pending_commercial_validation' && (
-        <Card className="mb-6 border-yellow-200 dark:border-yellow-800">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-            Validation commerciale
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Société émettrice
-              </label>
-              <select
-                value={validationForm.company_id}
-                onChange={(e) =>
-                  setValidationForm((f) => ({ ...f, company_id: e.target.value }))
-                }
-                className={INPUT_CLS}
-              >
-                <option value="">Sélectionner...</option>
-                {companies.filter((c) => c.is_active).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.code})
-                  </option>
+      {isPendingValidation ? (
+        /* ── Validation commerciale (screen « Formulaire commercial ») ─────── */
+        <div className="cols">
+          <div>
+            <div className="card">
+              <h3 className="ct">Type de tiers</h3>
+              <p className="cs mb-3.5">
+                Détermine les documents de vigilance et le modèle de contrat
+              </p>
+              <div className="tcards !grid-cols-2">
+                {THIRD_PARTY_TYPE_CARDS.map((t) => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() =>
+                      setValidationForm((f) => ({ ...f, third_party_type: t.value }))
+                    }
+                    className={`tcard text-left ${validationForm.third_party_type === t.value ? 'on' : ''}`}
+                  >
+                    <span className="tt block">{t.label}</span>
+                    <span className="td2 block">{t.desc}</span>
+                  </button>
                 ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Type de tiers *
-              </label>
-              <select
-                value={validationForm.third_party_type}
-                onChange={(e) =>
-                  setValidationForm((f) => ({ ...f, third_party_type: e.target.value }))
-                }
-                className={INPUT_CLS}
-              >
-                <option value="">Sélectionner...</option>
-                <option value="freelance">Freelance</option>
-                <option value="sous_traitant">Sous-traitant</option>
-                <option value="portage_salarial">Portage salarial</option>
-                <option value="salarie">Salarié</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Email contact contractualisation *
-              </label>
-              <input
-                type="email"
-                value={validationForm.contact_email}
-                onChange={(e) =>
-                  setValidationForm((f) => ({ ...f, contact_email: e.target.value }))
-                }
-                className={INPUT_CLS}
-              />
-            </div>
-            {/* Consultant */}
-            <div className="md:col-span-2 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">Consultant</p>
+              </div>
+
+              {validationForm.third_party_type === 'salarie' && (
+                <div className="alert !mt-0 mb-4">
+                  <AlertTriangle className="h-[18px] w-[18px] shrink-0" />
+                  <span>
+                    Cette demande sera redirigée vers le process Payfit — Bobby ne génère pas de
+                    contrat de travail.
+                  </span>
+                </div>
+              )}
+
+              <div className="f-grid">
+                <div className="col-span-2">
+                  <label className="f-lab" htmlFor="cv-company">
+                    Société émettrice
+                  </label>
+                  <select
+                    id="cv-company"
+                    value={validationForm.company_id}
+                    onChange={(e) =>
+                      setValidationForm((f) => ({ ...f, company_id: e.target.value }))
+                    }
+                    className="f-in !px-2.5"
+                  >
+                    <option value="">Sélectionner...</option>
+                    {companies.filter((c) => c.is_active).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="f-lab" htmlFor="cv-contact-email">
+                    Email du contact contractualisation *
+                  </label>
+                  <input
+                    id="cv-contact-email"
+                    type="email"
+                    value={validationForm.contact_email}
+                    onChange={(e) =>
+                      setValidationForm((f) => ({ ...f, contact_email: e.target.value }))
+                    }
+                    className="f-in"
+                  />
+                  <p className="f-hint">Recevra le lien magique de collecte documentaire</p>
+                </div>
+              </div>
+
+              <p className="ml mt-5 mb-3">Consultant</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="f-lab" htmlFor="cv-civility">
                     Civilité
                   </label>
                   <select
+                    id="cv-civility"
                     value={validationForm.consultant_civility}
                     onChange={(e) =>
                       setValidationForm((f) => ({ ...f, consultant_civility: e.target.value }))
                     }
-                    className={INPUT_CLS}
+                    className="f-in !px-2.5"
                   >
                     <option value="">-</option>
                     <option value="M.">M.</option>
@@ -770,901 +1055,966 @@ export default function ContractDetail() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="f-lab" htmlFor="cv-first-name">
                     Prénom
                   </label>
                   <input
+                    id="cv-first-name"
                     type="text"
                     value={validationForm.consultant_first_name}
                     onChange={(e) =>
                       setValidationForm((f) => ({ ...f, consultant_first_name: e.target.value }))
                     }
-                    className={INPUT_CLS}
+                    className="f-in"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="f-lab" htmlFor="cv-last-name">
                     Nom
                   </label>
                   <input
+                    id="cv-last-name"
                     type="text"
                     value={validationForm.consultant_last_name}
                     onChange={(e) =>
                       setValidationForm((f) => ({ ...f, consultant_last_name: e.target.value }))
                     }
-                    className={INPUT_CLS}
+                    className="f-in"
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div className="f-grid mt-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="f-lab" htmlFor="cv-email">
                     Email professionnel
                   </label>
                   <input
+                    id="cv-email"
                     type="email"
                     value={validationForm.consultant_email}
                     onChange={(e) =>
                       setValidationForm((f) => ({ ...f, consultant_email: e.target.value }))
                     }
                     placeholder="prenom.nom@societe.fr"
-                    className={INPUT_CLS}
+                    className="f-in"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="f-lab" htmlFor="cv-phone">
                     Téléphone
                   </label>
                   <input
+                    id="cv-phone"
                     type="tel"
                     value={validationForm.consultant_phone}
                     onChange={(e) =>
                       setValidationForm((f) => ({ ...f, consultant_phone: e.target.value }))
                     }
                     placeholder="+33 6 00 00 00 00"
-                    className={INPUT_CLS}
+                    className="f-in"
                   />
                 </div>
               </div>
-            </div>
 
-          </div>
+              {/* Saisie manuelle : l'ADV renseigne tout sans solliciter le fournisseur */}
+              <label className="flex items-start gap-2.5 mt-5 p-3 rounded-[10px] bg-srf2 border border-lin2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={manualEntry}
+                  onChange={(e) => setManualEntry(e.target.checked)}
+                  className="mt-0.5 rounded border-lin text-pri focus:ring-pri"
+                />
+                <span className="text-[12.5px] text-mut leading-relaxed">
+                  <span className="font-semibold text-ink block">
+                    Je saisis les informations moi-même
+                  </span>
+                  Aucun email ne sera envoyé au fournisseur. Vous renseignerez ensuite l'identité,
+                  les contacts et les documents du tiers depuis cette page.
+                </span>
+              </label>
 
-          {/* Manual entry: ADV enters everything without soliciting the fournisseur */}
-          <label className="flex items-start gap-2 mt-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={manualEntry}
-              onChange={(e) => setManualEntry(e.target.checked)}
-              className="mt-0.5 rounded border-gray-300 dark:border-gray-600"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              <span className="font-medium">Je saisis les informations moi-même</span>
-              <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                Aucun email ne sera envoyé au fournisseur. Vous renseignerez ensuite l'identité,
-                les contacts et les documents du tiers depuis cette page.
-              </span>
-            </span>
-          </label>
-
-          <div className="flex justify-end mt-4">
-            <Button
-              onClick={() => validateCommercialMutation.mutate()}
-              disabled={!isValidationFormValid || validateCommercialMutation.isPending}
-              isLoading={validateCommercialMutation.isPending}
-            >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              {manualEntry ? 'Valider et saisir les informations' : 'Valider'}
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Partner requested changes — banner */}
-      {isAdv && cr.status === 'partner_requested_changes' && (
-        <Card className="mb-4 border-orange-200 dark:border-orange-800">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-orange-500 mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="text-sm font-semibold text-orange-800 dark:text-orange-300">
-                Le partenaire demande des modifications
-              </h3>
-              {latestContract?.partner_comments ? (
-                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                  {latestContract.partner_comments}
-                </p>
-              ) : (
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Aucun commentaire fourni.
-                </p>
-              )}
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                Modifiez les articles/annexes ci-dessous ou la configuration, puis re-générez le brouillon.
-              </p>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Collecting documents — info banner + resend button */}
-      {isAdv && (cr.status === 'collecting_documents' || cr.status === 'compliance_blocked') && (
-        <Card className="mb-6 border-indigo-200 dark:border-indigo-800">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <Mail className="h-5 w-5 text-indigo-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <h3 className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">
-                  Collecte de documents en cours
-                </h3>
-                {cr.contractualization_contact_email && (
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                    Lien envoyé à{' '}
-                    <span className="font-medium">{cr.contractualization_contact_email}</span>
-                  </p>
-                )}
+              <div className="flex items-center justify-between gap-2 mt-5">
+                <span className="cs !mt-0">* champs requis</span>
+                <Button
+                  onClick={() => validateCommercialMutation.mutate()}
+                  disabled={!isValidationFormValid || validateCommercialMutation.isPending}
+                  isLoading={validateCommercialMutation.isPending}
+                  leftIcon={<CheckCircle className="h-3.5 w-3.5" />}
+                >
+                  {manualEntry ? 'Valider et saisir les informations' : 'Valider'}
+                </Button>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {cr.portal_url && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(cr.portal_url!);
-                    setLinkCopied(true);
-                    setTimeout(() => setLinkCopied(false), 2000);
-                  }}
-                >
-                  {linkCopied ? (
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                  ) : (
-                    <Copy className="h-4 w-4 mr-2" />
-                  )}
-                  {linkCopied ? 'Copié !' : 'Copier le lien'}
-                </Button>
-              )}
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => resendCollectionEmailMutation.mutate()}
-                disabled={resendCollectionEmailMutation.isPending}
-                isLoading={resendCollectionEmailMutation.isPending}
-              >
-                <Mail className="h-4 w-4 mr-2" />
-                Renvoyer le lien
-              </Button>
-              {cr.status === 'collecting_documents' && (
-                <Button
-                  size="sm"
-                  onClick={() => startComplianceReviewMutation.mutate()}
-                  disabled={startComplianceReviewMutation.isPending}
-                  isLoading={startComplianceReviewMutation.isPending}
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Démarrer la revue
-                </Button>
-              )}
-            </div>
           </div>
-        </Card>
-      )}
 
-
-      {/* Draft sent to partner — waiting banner (ADV/admin only: resend + portal endpoints are ADV-scoped) */}
-      {isAdv && cr.status === 'draft_sent_to_partner' && (
-        <Card className="mb-6 border-sky-200 dark:border-sky-800">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <Clock className="h-5 w-5 text-sky-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <h3 className="text-sm font-semibold text-sky-800 dark:text-sky-300">
-                  Brouillon envoyé au partenaire
-                </h3>
-                {cr.contractualization_contact_email && (
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                    Lien envoyé à{' '}
-                    <span className="font-medium">{cr.contractualization_contact_email}</span>
-                  </p>
-                )}
+          <div>
+            <div className="card">
+              <h3 className="ct mb-3.5">Ce qui se passe ensuite</h3>
+              <div className="ev">
+                <span className="evd" />
+                <span className="evl" />
+                <p className="evt">Recherche du tiers par SIREN</p>
+                <p className="evs">Dossier existant réutilisé si le tiers est déjà connu</p>
+              </div>
+              <div className="ev">
+                <span className="evd" />
+                <span className="evl" />
+                <p className="evt">Vérification de conformité</p>
+                <p className="evs">Si conforme → configuration directe du contrat</p>
+              </div>
+              <div className="ev">
+                <span className="evd" />
+                <span className="evl" />
+                <p className="evt">Collecte documentaire</p>
+                <p className="evs">Lien magique envoyé au contact · relances J+3, J+7, J+14</p>
+              </div>
+              <div className="ev !pb-0">
+                <span className="evd" />
+                <p className="evt">Configuration puis signature</p>
+                <p className="evs">Draft DOCX → review partenaire → YouSign → push Boond</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {cr.portal_url && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(cr.portal_url!);
-                    setLinkCopied(true);
-                    setTimeout(() => setLinkCopied(false), 2000);
-                  }}
-                >
-                  {linkCopied ? (
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                  ) : (
-                    <Copy className="h-4 w-4 mr-2" />
-                  )}
-                  {linkCopied ? 'Copié !' : 'Copier le lien'}
-                </Button>
-              )}
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => resendDraftEmailMutation.mutate()}
-                disabled={resendDraftEmailMutation.isPending}
-                isLoading={resendDraftEmailMutation.isPending}
-              >
-                <Mail className="h-4 w-4 mr-2" />
-                Renvoyer le lien
-              </Button>
+            <div className="card mt-4">
+              <HistoryTimeline statusHistory={cr.status_history} />
             </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Partner approved — signature documents selection modal */}
-      <Modal
-        isOpen={showSignaturePreview && cr.status === 'partner_approved'}
-        onClose={() => setShowSignaturePreview(false)}
-        title="Documents inclus dans la signature"
-      >
-        <div className="space-y-3">
-          <p className="text-xs text-gray-600 dark:text-gray-400">
-            Le contrat cadre est toujours inclus. Selectionnez les documents supplementaires a faire signer.
-          </p>
-
-          {/* Contract (always included, not toggleable) */}
-          <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
-            <input type="checkbox" checked disabled className="rounded border-gray-300" />
-            <span className="text-xs font-medium text-gray-900 dark:text-white">Contrat cadre</span>
-            <span className="text-[10px] text-gray-400 ml-1">(obligatoire)</span>
-          </div>
-
-          {!signaturePreview && (
-            <p className="text-xs text-gray-400 py-2 text-center">Chargement...</p>
-          )}
-
-          {signaturePreview && signaturePreview.length === 0 && (
-            <p className="text-xs text-gray-400 py-2 text-center">Aucun document supplementaire configure pour cette societe.</p>
-          )}
-
-          {/* Partner documents */}
-          {signaturePreview && signaturePreview.filter(i => i.signer_role === 'partner').length > 0 && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-1">Partenaire</p>
-              {signaturePreview.filter(i => i.signer_role === 'partner').map(item => (
-                <label key={item.charter_template_id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!excludedCharterIds.has(item.charter_template_id)}
-                    onChange={(e) => {
-                      const next = new Set(excludedCharterIds);
-                      if (e.target.checked) {
-                        next.delete(item.charter_template_id);
-                      } else {
-                        next.add(item.charter_template_id);
-                      }
-                      setExcludedCharterIds(next);
-                    }}
-                    className="rounded border-gray-300"
-                  />
-                  <span className="text-xs text-gray-900 dark:text-white">{item.label}</span>
-                  <span className="text-[10px] text-gray-400">{item.document_kind === 'charter_engagement' ? 'Signature' : 'AR'}</span>
-                </label>
-              ))}
-            </div>
-          )}
-
-          {/* Consultant documents */}
-          {signaturePreview && signaturePreview.filter(i => i.signer_role === 'consultant').length > 0 && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-purple-600 dark:text-purple-400 mb-1">Collaborateur</p>
-              {signaturePreview.filter(i => i.signer_role === 'consultant').map(item => (
-                <label key={item.charter_template_id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!excludedCharterIds.has(item.charter_template_id)}
-                    onChange={(e) => {
-                      const next = new Set(excludedCharterIds);
-                      if (e.target.checked) {
-                        next.delete(item.charter_template_id);
-                      } else {
-                        next.add(item.charter_template_id);
-                      }
-                      setExcludedCharterIds(next);
-                    }}
-                    className="rounded border-gray-300"
-                  />
-                  <span className="text-xs text-gray-900 dark:text-white">{item.label}</span>
-                  <span className="text-[10px] text-gray-400">{item.document_kind === 'charter_engagement' ? 'Signature' : 'AR'}</span>
-                </label>
-              ))}
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
-            <Button variant="secondary" size="sm" onClick={() => setShowSignaturePreview(false)}>
-              Annuler
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => sendForSignatureMutation.mutate()}
-              disabled={sendForSignatureMutation.isPending}
-              isLoading={sendForSignatureMutation.isPending}
-            >
-              <PenTool className="h-4 w-4 mr-1" />
-              Confirmer
-            </Button>
           </div>
         </div>
-      </Modal>
-
-      {/* Sent for signature — checklist */}
-      {cr.status === 'sent_for_signature' && (
-        <Card className="mb-6 border-violet-200 dark:border-violet-800">
-          <div className="flex items-start gap-3">
-            <PenTool className="h-5 w-5 text-violet-500 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold text-violet-800 dark:text-violet-300">
-                Documents a signer
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                Uploadez chaque document signe pour valider la signature.
-              </p>
-
-              {isAdv && signatureChecklist && (
-                <div className="mt-4 space-y-2">
-                  {/* Partner documents */}
-                  {signatureChecklist.filter(i => i.signer_role === 'partner').length > 0 && (
+      ) : (
+        /* ── Corps standard : colonne gauche (dossier) / colonne droite (activité) ── */
+        <div className={hasLeftColumn ? 'cols' : 'mt-4'}>
+          {hasLeftColumn && (
+            <div className="space-y-4">
+              {/* Documents de vigilance */}
+              {showVigilanceCard && (
+                <div className="card">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-1.5">
-                        Partenaire
-                      </p>
-                      <div className="space-y-1.5">
-                        {signatureChecklist.filter(i => i.signer_role === 'partner').map(item => (
-                          <div key={item.id} className="flex items-center justify-between p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-                            <div className="flex items-center gap-2 min-w-0">
-                              {item.uploaded ? (
-                                <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
-                              ) : (
-                                <div className="h-4 w-4 rounded-full border-2 border-gray-300 dark:border-gray-600 shrink-0" />
+                      <h3 className="ct">Documents de vigilance</h3>
+                      <p className="cs">Collecte et validation des documents du tiers</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="docs">
+                        {validatedDocsCount}/{vigDocs.length}
+                      </span>
+                      <div className="dbar ml-auto">
+                        <div
+                          className={`dfill ${docsBarRed ? 'r' : ''}`}
+                          style={{
+                            width: `${vigDocs.length ? Math.round((validatedDocsCount / vigDocs.length) * 100) : 0}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    {vigDocs.map((doc) => {
+                      const docBadge = getDocumentBadgeConfig(doc);
+                      const canValidate = isAdv && doc.status === 'received';
+                      const canTempValidate = isAdv && doc.status === 'requested' && doc.is_unavailable;
+                      // Champs d'auto-analyse éditables (les dates/validité sont gérées à part) :
+                      // sans champ éditable, le bouton « Modifier » ouvrirait un formulaire vide.
+                      const editableAutoCheckEntries = Object.entries(doc.auto_check_results ?? {})
+                        .filter(([k]) => !['is_valid', 'document_date', 'expiry_date'].includes(k));
+                      const isTempValidating = tempValidatingDocId === doc.id;
+                      const isRejecting = rejectingDocId === doc.id;
+                      return (
+                        <div key={doc.id} className="border-t border-lin2 py-3 first:border-t-0 first:pt-0">
+                          <div className="flex items-center gap-3">
+                            <div className="dico">
+                              <FileText className="h-4 w-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="dn truncate">{doc.document_type_display}</p>
+                              <p className="ds truncate">
+                                {doc.file_name ?? 'En attente de dépôt'}
+                                {doc.expires_at &&
+                                  ` · expire le ${new Date(doc.expires_at).toLocaleDateString('fr-FR')}`}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {doc.s3_key && (
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingDoc(doc)}
+                                  className="inline-flex items-center gap-1 text-[12px] font-semibold text-prit hover:bg-pris px-2 py-1 rounded-md transition-colors"
+                                >
+                                  <Eye className="h-3.5 w-3.5" /> Visualiser
+                                </button>
                               )}
-                              <div className="min-w-0">
-                                <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{item.label}</p>
-                                {item.file_name && (
-                                  <p className="text-[10px] text-gray-500 truncate">{item.file_name}</p>
-                                )}
+                              {(doc.status === 'requested' || doc.status === 'rejected' || doc.status === 'expired') && (
+                                <label className="inline-flex items-center gap-1 text-[12px] font-semibold text-prit hover:bg-pris px-2 py-1 rounded-md transition-colors cursor-pointer">
+                                  <Upload className="h-3.5 w-3.5" />
+                                  {uploadingDocId === doc.id ? 'Dépôt…' : 'Déposer'}
+                                  <input
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    className="hidden"
+                                    disabled={uploadingDocId === doc.id}
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        setUploadingDocId(doc.id);
+                                        uploadDocMutation.mutate({ docId: doc.id, file });
+                                      }
+                                      e.target.value = '';
+                                    }}
+                                  />
+                                </label>
+                              )}
+                              {canValidate ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => validateDocMutation.mutate(doc.id)}
+                                    disabled={validateDocMutation.isPending}
+                                  >
+                                    Valider
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => setRejectingDocId(doc.id)}
+                                  >
+                                    Rejeter
+                                  </Button>
+                                </>
+                              ) : (
+                                <span className={docChipClass(doc)}>
+                                  <span className="dot" />
+                                  {docBadge.label}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {doc.is_unavailable && doc.unavailability_reason && (
+                            <p className="mt-2 ml-[46px] text-[12px] text-amb-fg bg-amb-bg rounded-md px-2.5 py-1.5">
+                              Indisponible : {doc.unavailability_reason}
+                            </p>
+                          )}
+                          {doc.rejection_reason && (
+                            <p className="mt-2 ml-[46px] text-[12px] text-red-fg bg-red-bg rounded-md px-2.5 py-1.5">
+                              Motif de rejet : {doc.rejection_reason}
+                            </p>
+                          )}
+                          {isRejecting && (
+                            <div className="mt-2 ml-[46px] flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={rejectReason}
+                                onChange={(e) => setRejectReason(e.target.value)}
+                                placeholder="Motif du rejet…"
+                                className="f-in !h-[30px] !text-[12px] flex-1"
+                                autoFocus
+                              />
+                              <Button
+                                size="sm"
+                                variant="danger"
+                                onClick={() => rejectDocMutation.mutate({ docId: doc.id, reason: rejectReason })}
+                                disabled={!rejectReason.trim() || rejectDocMutation.isPending}
+                              >
+                                Confirmer
+                              </Button>
+                              <button
+                                type="button"
+                                onClick={() => { setRejectingDocId(null); setRejectReason(''); }}
+                                className="text-[12px] text-mut2 hover:text-mut"
+                              >
+                                Annuler
+                              </button>
+                            </div>
+                          )}
+                          {canTempValidate && !isRejecting && (
+                            <div className="mt-2 ml-[46px]">
+                              {!isTempValidating ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setTempValidatingDocId(doc.id)}
+                                  className="text-[12px] font-semibold text-prit hover:underline"
+                                >
+                                  Valider temporairement
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-2 text-[12px]">
+                                  <span className="text-mut">Confirmer ?</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => tempValidateMutation.mutate(doc.id)}
+                                    disabled={tempValidateMutation.isPending}
+                                    className="font-semibold text-grn-fg hover:underline disabled:opacity-50"
+                                  >
+                                    Oui
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setTempValidatingDocId(null)}
+                                    className="text-mut2 hover:underline"
+                                  >
+                                    Non
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {/* Auto-check results + edit/re-extract */}
+                          {doc.auto_check_results && Object.keys(doc.auto_check_results).length > 0 && (
+                            <div className="mt-2 ml-[46px] rounded-[10px] bg-srf2 border border-lin2 px-3 py-2.5 text-[12px]">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="ml !mb-0">Vérifications auto</span>
+                                <div className="flex gap-2">
+                                  {isAdv && (
+                                    <>
+                                      {editableAutoCheckEntries.length > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditingAutoCheck({ docId: doc.id, data: { ...doc.auto_check_results } as Record<string, string> })}
+                                          className="text-[12px] font-medium text-prit hover:underline"
+                                        >
+                                          Modifier
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => reExtractMutation.mutate(doc.id)}
+                                        disabled={reExtractMutation.isPending}
+                                        className="text-[12px] font-medium text-prit hover:underline disabled:opacity-50"
+                                      >
+                                        {reExtractMutation.isPending ? 'Analyse…' : 'Re-analyser'}
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              {Object.entries(doc.auto_check_results).filter(([k]) => !['is_valid', 'document_date', 'expiry_date'].includes(k)).map(([key, val]) => (
+                                <div key={key} className="flex gap-2 text-mut">
+                                  <span className="text-mut2 capitalize">{key.replace(/_/g, ' ')} :</span>
+                                  <span className="font-medium text-ink">{String(val || '—')}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {/* Inline edit form */}
+                          {editingAutoCheck?.docId === doc.id && (
+                            <div className="mt-2 ml-[46px] rounded-[10px] bg-pris border border-[color-mix(in_oklab,var(--pri)_25%,transparent)] px-3 py-2.5 space-y-2">
+                              {Object.entries(editingAutoCheck.data).filter(([k]) => !['is_valid', 'document_date', 'expiry_date'].includes(k)).map(([key, val]) => (
+                                <div key={key} className="flex items-center gap-2">
+                                  <label className="text-[12px] text-mut w-28 capitalize shrink-0">{key.replace(/_/g, ' ')}</label>
+                                  <input
+                                    type="text"
+                                    value={val ?? ''}
+                                    onChange={(e) => setEditingAutoCheck((prev) => prev ? { ...prev, data: { ...prev.data, [key]: e.target.value } } : null)}
+                                    className="f-in !h-[30px] !text-[12px]"
+                                  />
+                                </div>
+                              ))}
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingAutoCheck(null)}
+                                  className="text-[12px] text-mut2 hover:text-mut"
+                                >
+                                  Annuler
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateAutoCheckMutation.mutate({ docId: doc.id, data: editingAutoCheck.data })}
+                                  disabled={updateAutoCheckMutation.isPending}
+                                  className="text-[12px] font-semibold text-prit hover:underline disabled:opacity-50"
+                                >
+                                  {updateAutoCheckMutation.isPending ? 'Sauvegarde…' : 'Sauvegarder'}
+                                </button>
                               </div>
                             </div>
-                            <label className="text-xs text-primary hover:underline cursor-pointer shrink-0 ml-2">
-                              {item.uploaded ? 'Remplacer' : 'Uploader'}
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Commentaire du partenaire (review) */}
+              {isAdv && cr.status === 'partner_requested_changes' && (
+                <div className="card">
+                  <div className="flex items-center gap-2.5">
+                    <AlertTriangle className="h-4 w-4 text-amb-fg shrink-0" />
+                    <h3 className="ct">Le partenaire demande des modifications</h3>
+                  </div>
+                  {latestContract?.partner_comments ? (
+                    <div className="quote whitespace-pre-wrap">{latestContract.partner_comments}</div>
+                  ) : (
+                    <p className="notec mt-2">Aucun commentaire fourni.</p>
+                  )}
+                  <p className="cs mt-2.5">
+                    Modifiez les articles/annexes ci-dessous ou la configuration, puis re-générez le
+                    brouillon.
+                  </p>
+                </div>
+              )}
+
+              {/* Configuration du contrat — verrouillée pendant la collecte */}
+              {showConfigLocked && (
+                <div className="card">
+                  <h3 className="ct">Configuration du contrat</h3>
+                  <div className="lock">
+                    <Lock className="h-4 w-4 shrink-0 mt-px" />
+                    <span>
+                      Conditions de paiement, articles optionnels et annexes se débloquent quand les
+                      documents requis sont validés. Validez les documents puis démarrez la revue de
+                      conformité.
+                    </span>
+                  </div>
+                  <div className="flex gap-2 mt-3.5">
+                    <Button disabled>Générer le brouillon</Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Configuration du contrat — formulaire complet */}
+              {showConfigForm && (
+                <div className="card">
+                  <h3 className="ct">Configuration du contrat</h3>
+                  <p className="cs">Conditions, articles et annexes repris dans le brouillon DOCX</p>
+
+                  {cr.compliance_override && (
+                    <div className="alert red !mt-3 !py-2.5 !text-[12.5px]">
+                      <span>
+                        Conformité débloquée par dérogation — justification tracée dans l'activité.
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="f-grid mt-4">
+                    <div className="col-span-2">
+                      <label className="f-lab" htmlFor="cfg-company">
+                        Société émettrice du contrat
+                      </label>
+                      <select
+                        id="cfg-company"
+                        value={configForm.company_id}
+                        onChange={(e) => setConfigForm((f) => ({ ...f, company_id: e.target.value }))}
+                        className="f-in !px-2.5"
+                      >
+                        <option value="">— Utiliser la société par défaut —</option>
+                        {companies
+                          .filter((c) => c.is_active)
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.legal_form} {c.name}{c.is_default ? ' (par défaut)' : ''}
+                            </option>
+                          ))}
+                      </select>
+                      {companies.length === 0 && (
+                        <p className="f-hint">
+                          Aucune société configurée — rendez-vous dans{' '}
+                          <strong>Administration &gt; Sociétés</strong> pour en ajouter.
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="f-lab" htmlFor="cfg-payment">
+                        Délai de paiement
+                      </label>
+                      <select
+                        id="cfg-payment"
+                        value={configForm.payment_terms}
+                        onChange={(e) => setConfigForm((f) => ({ ...f, payment_terms: e.target.value }))}
+                        className="f-in !px-2.5"
+                      >
+                        <option value="immediate">Comptant</option>
+                        <option value="net_30">30 jours</option>
+                        <option value="net_45_eom">45 jours fin de mois</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="f-lab" htmlFor="cfg-invoice">
+                        Dépôt des factures
+                      </label>
+                      <select
+                        id="cfg-invoice"
+                        value={configForm.invoice_submission_method}
+                        onChange={(e) => setConfigForm((f) => ({ ...f, invoice_submission_method: e.target.value }))}
+                        className="f-in !px-2.5"
+                      >
+                        {(() => {
+                          const selectedCompany = companies.find((c) => c.id === configForm.company_id)
+                            ?? companies.find((c) => c.is_default);
+                          const mail = selectedCompany?.invoices_company_mail;
+                          return (
+                            <>
+                              <option value="email">
+                                Email{mail ? ` — ${mail}` : ' — (email non configuré)'}
+                              </option>
+                              <option value="boondmanager">BoondManager</option>
+                            </>
+                          );
+                        })()}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Articles optionnels */}
+                  {optionalArticles.length > 0 && (
+                    <div className="mt-5 pt-4 border-t border-lin2">
+                      <p className="ml mb-1">Articles optionnels</p>
+                      <p className="f-hint !mt-0 mb-3">
+                        Cochez les articles à inclure dans ce contrat. Les articles non cochés seront
+                        exclus du PDF.
+                      </p>
+                      <div className="space-y-2">
+                        {optionalArticles.map((article) => {
+                          const isIncluded = !configForm.excluded_optional_article_keys.includes(article.article_key);
+                          return (
+                            <label
+                              key={article.article_key}
+                              className="flex items-center gap-2.5 cursor-pointer group"
+                            >
                               <input
-                                type="file"
-                                accept=".pdf"
-                                className="hidden"
+                                type="checkbox"
+                                checked={isIncluded}
                                 onChange={(e) => {
-                                  const f = e.target.files?.[0];
-                                  if (f) uploadSignatureDocMutation.mutate({ itemId: item.id, file: f });
-                                  e.target.value = '';
+                                  setConfigForm((f) => {
+                                    const excluded = f.excluded_optional_article_keys;
+                                    if (e.target.checked) {
+                                      return {
+                                        ...f,
+                                        excluded_optional_article_keys: excluded.filter(
+                                          (k) => k !== article.article_key,
+                                        ),
+                                      };
+                                    } else {
+                                      return {
+                                        ...f,
+                                        excluded_optional_article_keys: [...excluded, article.article_key],
+                                      };
+                                    }
+                                  });
                                 }}
+                                className="h-4 w-4 rounded border-lin text-pri focus:ring-pri"
                               />
+                              <span className="text-[12.5px] text-mut group-hover:text-ink transition-colors">
+                                {article.title}
+                              </span>
                             </label>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
 
-                  {/* Consultant documents */}
-                  {signatureChecklist.filter(i => i.signer_role === 'consultant').length > 0 && (
-                    <div className="mt-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-purple-600 dark:text-purple-400 mb-1.5">
-                        Collaborateur
-                      </p>
-                      <div className="space-y-1.5">
-                        {signatureChecklist.filter(i => i.signer_role === 'consultant').map(item => (
-                          <div key={item.id} className="flex items-center justify-between p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-                            <div className="flex items-center gap-2 min-w-0">
-                              {item.uploaded ? (
-                                <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
-                              ) : (
-                                <div className="h-4 w-4 rounded-full border-2 border-gray-300 dark:border-gray-600 shrink-0" />
-                              )}
-                              <div className="min-w-0">
-                                <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{item.label}</p>
-                                {item.file_name && (
-                                  <p className="text-[10px] text-gray-500 truncate">{item.file_name}</p>
-                                )}
-                              </div>
-                            </div>
-                            <label className="text-xs text-primary hover:underline cursor-pointer shrink-0 ml-2">
-                              {item.uploaded ? 'Remplacer' : 'Uploader'}
-                              <input
-                                type="file"
-                                accept=".pdf"
-                                className="hidden"
-                                onChange={(e) => {
-                                  const f = e.target.files?.[0];
-                                  if (f) uploadSignatureDocMutation.mutate({ itemId: item.id, file: f });
-                                  e.target.value = '';
-                                }}
-                              />
-                            </label>
-                          </div>
-                        ))}
-                      </div>
+                  {/* Conditions particulières */}
+                  <div className="mt-5 pt-4 border-t border-lin2">
+                    <label className="f-lab" htmlFor="cfg-special">
+                      Conditions particulières
+                    </label>
+                    <textarea
+                      id="cfg-special"
+                      value={configForm.special_conditions}
+                      onChange={(e) => setConfigForm((f) => ({ ...f, special_conditions: e.target.value }))}
+                      placeholder="Clauses libres, conditions spécifiques à cette mission…"
+                      className="f-ta"
+                      rows={3}
+                    />
+                  </div>
+
+                  {/* Éditeur d'articles / annexes (inline) */}
+                  {activeArticles.length > 0 && (
+                    <div className="mt-5 pt-4 border-t border-lin2">
+                      <ArticleAnnexEditor
+                        contractRequestId={id!}
+                        articles={activeArticles}
+                        annexes={activeAnnexes}
+                        existingOverrides={(cr.contract_config as Record<string, unknown> | null) ?? {}}
+                        onSaved={() => queryClient.invalidateQueries({ queryKey: ['contract-request', id] })}
+                        onRegenerateDraft={undefined}
+                        isRegenerating={false}
+                        inline
+                      />
                     </div>
                   )}
 
-                  {/* Validate button */}
-                  <div className="pt-3">
+                  <div className="flex justify-end mt-5">
                     <Button
-                      variant="primary"
-                      size="sm"
-                      disabled={!signatureChecklist.every(i => i.uploaded) || markAsSignedMutation.isPending}
-                      onClick={() => markAsSignedMutation.mutate()}
-                      isLoading={markAsSignedMutation.isPending}
+                      onClick={() => configureMutation.mutate()}
+                      disabled={configureMutation.isPending}
+                      isLoading={configureMutation.isPending}
+                      leftIcon={<FileSignature className="h-3.5 w-3.5" />}
                     >
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Valider la signature ({signatureChecklist.filter(i => i.uploaded).length}/{signatureChecklist.length})
+                      {latestContract ? 'Régénérer le brouillon' : 'Générer le brouillon'}
                     </Button>
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        </Card>
-      )}
 
-      {/* Signed but not active — BoondManager sync failed/pending: allow a retry */}
-      {isAdv && cr.status === 'signed' && (
-        <Card className="mb-6 border-amber-200 dark:border-amber-800">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                  Synchronisation BoondManager en attente
-                </h3>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                  Le contrat est signé mais n'a pas encore été synchronisé dans BoondManager.
-                  Relancez la synchronisation pour finaliser la mise en actif.
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => retryBoondSyncMutation.mutate()}
-              disabled={retryBoondSyncMutation.isPending}
-              isLoading={retryBoondSyncMutation.isPending}
-              className="flex-shrink-0"
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Relancer la synchronisation
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Consultants section — visible after signing */}
-      {isAdv && hasReachedStatus(cr.status, 'signed') && (
-        <ConsultantsSection contractRequestId={cr.id} cr={cr} />
-      )}
-
-      {/* Compliance override (for blocked status) */}
-      {isAdv && cr.status === 'compliance_blocked' && (
-        <Card className="mb-6 border-orange-200 dark:border-orange-800">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-orange-500 mt-0.5" />
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold text-orange-800 dark:text-orange-300">
-                Conformité bloquée
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                Les documents de vigilance du tiers ne sont pas tous validés : le brouillon
-                de contrat ne peut pas être généré. Validez les documents dans la section
-                « Documents de conformité » ci-dessous, ou forcez la conformité en justifiant
-                la dérogation.
-              </p>
-              {!showOverride ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => setShowOverride(true)}
-                >
-                  Forcer la conformité
-                </Button>
-              ) : (
-                <div className="mt-3 space-y-2">
-                  <textarea
-                    value={overrideReason}
-                    onChange={(e) => setOverrideReason(e.target.value)}
-                    placeholder="Raison du forçage (min. 10 caractères)..."
-                    className={INPUT_CLS}
-                    rows={2}
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => overrideMutation.mutate()}
-                      disabled={overrideReason.length < 10 || overrideMutation.isPending}
-                    >
-                      Confirmer
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => {
-                        setShowOverride(false);
-                        setOverrideReason('');
-                      }}
-                    >
-                      Annuler
-                    </Button>
+              {/* Signature en cours — checklist des documents signés */}
+              {cr.status === 'sent_for_signature' && (
+                <div className="card">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="ct">Documents à signer</h3>
+                      <p className="cs">Uploadez chaque document signé pour valider la signature.</p>
+                    </div>
+                    <span className="st st-ind shrink-0">
+                      <span className="dot" />
+                      Signature
+                    </span>
                   </div>
+
+                  {isAdv && signatureChecklist && (
+                    <div className="mt-2">
+                      {/* Partner documents */}
+                      {signatureChecklist.filter(i => i.signer_role === 'partner').length > 0 && (
+                        <>
+                          <p className="ml mt-3 mb-1">Partenaire</p>
+                          {signatureChecklist.filter(i => i.signer_role === 'partner').map(item => (
+                            <div key={item.id} className="doc">
+                              <div className="dico">
+                                {item.uploaded ? (
+                                  <CheckCircle className="h-4 w-4 text-grn-fg" />
+                                ) : (
+                                  <span className="h-4 w-4 rounded-full border-2 border-lin block" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="dn truncate">{item.label}</p>
+                                {item.file_name && <p className="ds truncate">{item.file_name}</p>}
+                              </div>
+                              <label className="text-[12px] font-semibold text-prit hover:underline cursor-pointer shrink-0">
+                                {item.uploaded ? 'Remplacer' : 'Uploader'}
+                                <input
+                                  type="file"
+                                  accept=".pdf"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    if (f) uploadSignatureDocMutation.mutate({ itemId: item.id, file: f });
+                                    e.target.value = '';
+                                  }}
+                                />
+                              </label>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Consultant documents */}
+                      {signatureChecklist.filter(i => i.signer_role === 'consultant').length > 0 && (
+                        <>
+                          <p className="ml mt-3 mb-1">Collaborateur</p>
+                          {signatureChecklist.filter(i => i.signer_role === 'consultant').map(item => (
+                            <div key={item.id} className="doc">
+                              <div className="dico">
+                                {item.uploaded ? (
+                                  <CheckCircle className="h-4 w-4 text-grn-fg" />
+                                ) : (
+                                  <span className="h-4 w-4 rounded-full border-2 border-lin block" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="dn truncate">{item.label}</p>
+                                {item.file_name && <p className="ds truncate">{item.file_name}</p>}
+                              </div>
+                              <label className="text-[12px] font-semibold text-prit hover:underline cursor-pointer shrink-0">
+                                {item.uploaded ? 'Remplacer' : 'Uploader'}
+                                <input
+                                  type="file"
+                                  accept=".pdf"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    if (f) uploadSignatureDocMutation.mutate({ itemId: item.id, file: f });
+                                    e.target.value = '';
+                                  }}
+                                />
+                              </label>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Validate button */}
+                      <div className="pt-4">
+                        <Button
+                          size="sm"
+                          disabled={!signatureChecklist.every(i => i.uploaded) || markAsSignedMutation.isPending}
+                          onClick={() => markAsSignedMutation.mutate()}
+                          isLoading={markAsSignedMutation.isPending}
+                          leftIcon={<CheckCircle className="h-3.5 w-3.5" />}
+                        >
+                          Valider la signature ({signatureChecklist.filter(i => i.uploaded).length}/{signatureChecklist.length})
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          </div>
-        </Card>
-      )}
 
-      {/* Contract configuration form */}
-      {showConfigForm && (
-        <Card className="mb-6 border-purple-200 dark:border-purple-800">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2">
-            <Settings className="h-4 w-4 text-purple-500" />
-            Preparation du contrat
-          </h3>
+              {/* Informations société du tiers */}
+              {showTpInfoCard && complianceDocs && (
+                <div className="card">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="ct">Informations société</h3>
+                      <p className="cs">Identité et contacts du tiers</p>
+                    </div>
+                    {!showTpForm && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setShowTpForm(true)}
+                        leftIcon={<Pencil className="h-3.5 w-3.5" />}
+                      >
+                        {complianceDocs.company_info_submitted ? 'Modifier' : 'Saisir les informations'}
+                      </Button>
+                    )}
+                  </div>
 
-          {/* Section 0 — Société émettrice */}
-          <div className="mb-5">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
-              Société émettrice du contrat
-            </p>
-            <select
-              value={configForm.company_id}
-              onChange={(e) => setConfigForm((f) => ({ ...f, company_id: e.target.value }))}
-              className={INPUT_CLS}
-            >
-              <option value="">— Utiliser la société par défaut —</option>
-              {companies
-                .filter((c) => c.is_active)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.legal_form} {c.name}{c.is_default ? ' (par défaut)' : ''}
-                  </option>
-                ))}
-            </select>
-            {companies.length === 0 && (
-              <p className="text-xs text-gray-400 mt-1">
-                Aucune société configurée — rendez-vous dans{' '}
-                <strong>Administration &gt; Sociétés</strong> pour en ajouter.
-              </p>
-            )}
-          </div>
+                  {showTpForm && (
+                    <div className="mt-4">
+                      <ThirdPartyInfoForm
+                        contractRequestId={cr.id}
+                        initial={complianceDocs}
+                        onSaved={() => {
+                          setShowTpForm(false);
+                          queryClient.invalidateQueries({ queryKey: ['compliance-docs', cr.third_party_id] });
+                          queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+                        }}
+                        onCancel={() => setShowTpForm(false)}
+                      />
+                    </div>
+                  )}
 
-          {/* Section 1 — Conditions financières */}
-          <div className="mb-5 border-t border-gray-200 dark:border-gray-700 pt-4">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
-              Conditions financières
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Délai de paiement
-                </label>
-                <select
-                  value={configForm.payment_terms}
-                  onChange={(e) => setConfigForm((f) => ({ ...f, payment_terms: e.target.value }))}
-                  className={INPUT_CLS}
-                >
-                  <option value="immediate">Comptant</option>
-                  <option value="net_30">30 jours</option>
-                  <option value="net_45_eom">45 jours fin de mois</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Dépôt des factures
-                </label>
-                <select
-                  value={configForm.invoice_submission_method}
-                  onChange={(e) => setConfigForm((f) => ({ ...f, invoice_submission_method: e.target.value }))}
-                  className={INPUT_CLS}
-                >
+                  {!showTpForm && (
+                  <>
+                  <div className="cfgrid">
+                    {cr.third_party_type && (
+                      <div>
+                        <p className="ml">Type de tiers</p>
+                        <p className="mv">
+                          {cr.third_party_type === 'freelance' ? 'Freelance / EI' : cr.third_party_type === 'sous_traitant' ? 'Sous-traitant' : cr.third_party_type === 'portage_salarial' ? 'Portage salarial' : 'Salarié'}
+                        </p>
+                      </div>
+                    )}
+                    {complianceDocs.company_name && (
+                      <div>
+                        <p className="ml">Raison sociale</p>
+                        <p className="mv">{complianceDocs.company_name}</p>
+                      </div>
+                    )}
+                    {complianceDocs.legal_form && (
+                      <div>
+                        <p className="ml">Forme juridique</p>
+                        <p className="mv">{complianceDocs.legal_form}</p>
+                      </div>
+                    )}
+                    {complianceDocs.capital && (
+                      <div>
+                        <p className="ml">Capital</p>
+                        <p className="mv">{complianceDocs.capital} €</p>
+                      </div>
+                    )}
+                    {complianceDocs.siren && (
+                      <div>
+                        <p className="ml">SIREN</p>
+                        <p className="mv font-mono">{complianceDocs.siren}</p>
+                      </div>
+                    )}
+                    {complianceDocs.siret && (
+                      <div>
+                        <p className="ml">SIRET</p>
+                        <p className="mv font-mono">{complianceDocs.siret}</p>
+                      </div>
+                    )}
+                    {(complianceDocs.rcs_city || complianceDocs.rcs_number) && (
+                      <div>
+                        <p className="ml">RCS</p>
+                        <p className="mv">
+                          {[complianceDocs.rcs_city, complianceDocs.rcs_number].filter(Boolean).join(' ')}
+                        </p>
+                      </div>
+                    )}
+                    {complianceDocs.head_office_address && (
+                      <div className="col-span-3">
+                        <p className="ml">Siège social</p>
+                        <p className="mv">{complianceDocs.head_office_address}</p>
+                      </div>
+                    )}
+                  </div>
+
                   {(() => {
-                    const selectedCompany = companies.find((c) => c.id === configForm.company_id)
-                      ?? companies.find((c) => c.is_default);
-                    const mail = selectedCompany?.invoices_company_mail;
+                    const hasRepresentative = complianceDocs.representative_first_name || complianceDocs.representative_last_name || complianceDocs.representative_name;
+                    const hasSignatory = complianceDocs.signatory_first_name || complianceDocs.signatory_last_name;
+                    const hasAdv = complianceDocs.adv_contact_first_name || complianceDocs.adv_contact_last_name || complianceDocs.adv_contact_email;
+                    const hasBilling = complianceDocs.billing_contact_first_name || complianceDocs.billing_contact_last_name || complianceDocs.billing_contact_email;
+                    const hasContractContact = cr.contractualization_contact_email || complianceDocs.contact_email;
+                    if (!hasRepresentative && !hasSignatory && !hasAdv && !hasBilling && !hasContractContact) return null;
+
+                    const formatName = (civility: string | null, firstName: string | null, lastName: string | null) =>
+                      [civility, firstName, lastName].filter(Boolean).join(' ') || null;
+
+                    const ContactCard = ({ title, name, email, phone }: { title: string; name: string | null; email: string | null; phone: string | null }) => (
+                      <div className="bg-srf2 border border-lin2 rounded-[10px] p-3">
+                        <p className="ml mb-1.5">{title}</p>
+                        {name && <p className="mv !text-[13px]">{name}</p>}
+                        {email && <p className="ds !mt-1">{email}</p>}
+                        {phone && <p className="ds !mt-0.5">{phone}</p>}
+                        {!name && !email && !phone && <p className="ds !mt-0 italic">Non renseigné</p>}
+                      </div>
+                    );
+
                     return (
-                      <>
-                        <option value="email">
-                          Email{mail ? ` — ${mail}` : ' — (email non configuré)'}
-                        </option>
-                        <option value="boondmanager">BoondManager</option>
-                      </>
+                      <div className="border-t border-lin2 mt-4 pt-4">
+                        <p className="ml mb-2.5">Contacts</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          {hasRepresentative && (
+                            <ContactCard
+                              title="Représentant légal"
+                              name={
+                                formatName(complianceDocs.representative_civility, complianceDocs.representative_first_name, complianceDocs.representative_last_name)
+                                || (complianceDocs.representative_title ? `${complianceDocs.representative_title} ${complianceDocs.representative_name ?? ''}`.trim() : complianceDocs.representative_name)
+                              }
+                              email={complianceDocs.representative_email}
+                              phone={complianceDocs.representative_phone}
+                            />
+                          )}
+                          {hasSignatory && (
+                            <ContactCard
+                              title="Signataire"
+                              name={formatName(complianceDocs.signatory_civility, complianceDocs.signatory_first_name, complianceDocs.signatory_last_name)}
+                              email={complianceDocs.signatory_email}
+                              phone={complianceDocs.signatory_phone}
+                            />
+                          )}
+                          {hasAdv && (
+                            <ContactCard
+                              title="Contact ADV"
+                              name={formatName(complianceDocs.adv_contact_civility, complianceDocs.adv_contact_first_name, complianceDocs.adv_contact_last_name)}
+                              email={complianceDocs.adv_contact_email}
+                              phone={complianceDocs.adv_contact_phone}
+                            />
+                          )}
+                          {hasBilling && (
+                            <ContactCard
+                              title="Contact facturation"
+                              name={formatName(complianceDocs.billing_contact_civility, complianceDocs.billing_contact_first_name, complianceDocs.billing_contact_last_name)}
+                              email={complianceDocs.billing_contact_email}
+                              phone={complianceDocs.billing_contact_phone}
+                            />
+                          )}
+                          {hasContractContact && (
+                            <ContactCard
+                              title="Contact contractualisation"
+                              name={null}
+                              email={cr.contractualization_contact_email ?? complianceDocs.contact_email}
+                              phone={null}
+                            />
+                          )}
+                        </div>
+                      </div>
                     );
                   })()}
-                </select>
-              </div>
-            </div>
-          </div>
 
-          {/* Section 2 — Articles optionnels */}
-          {optionalArticles.length > 0 && (
-            <div className="mb-5 border-t border-gray-200 dark:border-gray-700 pt-4">
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">
-                Articles optionnels
-              </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
-                Cochez les articles à inclure dans ce contrat. Les articles non cochés seront exclus du PDF.
-              </p>
-              <div className="space-y-2">
-                {optionalArticles.map((article) => {
-                  const isIncluded = !configForm.excluded_optional_article_keys.includes(article.article_key);
+                  {/* Consultant sub-section */}
+                  {(cr.consultant_first_name || cr.consultant_last_name) && (
+                    <div className="border-t border-lin2 mt-4 pt-4">
+                      <p className="ml mb-2.5">Consultant</p>
+                      <div className="bg-srf2 border border-lin2 rounded-[10px] p-3 inline-block min-w-[250px]">
+                        <p className="mv !text-[13px]">
+                          {[cr.consultant_civility, cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ')}
+                        </p>
+                        {cr.consultant_email && <p className="ds !mt-1">{cr.consultant_email}</p>}
+                        {cr.consultant_phone && <p className="ds !mt-0.5">{cr.consultant_phone}</p>}
+                      </div>
+                    </div>
+                  )}
+                  </>
+                  )}
+                </div>
+              )}
+
+              {/* Consultants (chartes) — visible après signature */}
+              {showConsultantsSection && (
+                <ConsultantsSection contractRequestId={cr.id} cr={cr} />
+              )}
+            </div>
+          )}
+
+          {/* Colonne droite : activité + documents contractuels */}
+          <div className="space-y-4">
+            <div className="card">
+              <HistoryTimeline statusHistory={cr.status_history} />
+            </div>
+
+            {contracts && contracts.length > 0 && (
+              <div className="card">
+                <h3 className="ct mb-1">Documents contractuels</h3>
+                {[...contracts].sort((a, b) => {
+                  // Signed first, then final (non-PROV), then provisional (PROV) by version desc
+                  const aSigned = !!(a.signed_at && a.s3_key_signed);
+                  const bSigned = !!(b.signed_at && b.s3_key_signed);
+                  if (aSigned !== bSigned) return aSigned ? -1 : 1;
+                  const aProv = a.reference.startsWith('PROV-');
+                  const bProv = b.reference.startsWith('PROV-');
+                  if (aProv !== bProv) return aProv ? 1 : -1;
+                  return b.version - a.version;
+                }).map((c) => {
+                  const isSigned = !!(c.signed_at && c.s3_key_signed);
+                  const isProvisional = c.reference.startsWith('PROV-');
+                  const isFinal = !isProvisional;
+
                   return (
-                    <label
-                      key={article.article_key}
-                      className="flex items-center gap-3 cursor-pointer group"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isIncluded}
-                        onChange={(e) => {
-                          setConfigForm((f) => {
-                            const excluded = f.excluded_optional_article_keys;
-                            if (e.target.checked) {
-                              return {
-                                ...f,
-                                excluded_optional_article_keys: excluded.filter(
-                                  (k) => k !== article.article_key,
-                                ),
-                              };
-                            } else {
-                              return {
-                                ...f,
-                                excluded_optional_article_keys: [...excluded, article.article_key],
-                              };
-                            }
-                          });
-                        }}
-                        className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                      />
-                      <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
-                        {article.title}
+                    <div key={c.id} className="doc">
+                      <div className="dico">
+                        <FileSignature className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`dn truncate ${isProvisional ? '!text-mut' : ''}`}>
+                          {isSigned
+                            ? `${c.reference} (Signed)`
+                            : isFinal
+                              ? c.reference
+                              : `${c.reference} v${c.version}`
+                          }
+                        </p>
+                        <p className="ds truncate">
+                          {formatDate(c.created_at)}{isSigned ? ` — signé le ${formatDate(c.signed_at!)}` : ''}
+                        </p>
+                      </div>
+                      <span className={`st shrink-0 ${isSigned ? 'st-grn' : isFinal ? 'st-blu' : 'st-sla'}`}>
+                        <span className="dot" />
+                        {isSigned ? 'Signé' : isFinal ? 'Définitif' : 'Brouillon'}
                       </span>
-                    </label>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const url = await contractsApi.getContractDownloadUrl(cr.id, c.id, isSigned ? 'signed' : 'draft');
+                            window.open(url, '_blank');
+                          } catch {
+                            toast.error('Impossible de telecharger.');
+                          }
+                        }}
+                        className="p-1.5 rounded-md text-mut2 hover:text-prit hover:bg-pris transition-colors shrink-0"
+                        title={`Télécharger ${c.reference}.pdf`}
+                      >
+                        <Download className="h-4 w-4" />
+                      </button>
+                      {user?.role === 'admin' && (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteContractTarget({ id: c.id, reference: c.reference })}
+                          className="p-1.5 rounded-md text-mut2 hover:text-redt hover:bg-red-bg transition-colors shrink-0"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
-            </div>
-          )}
-
-          {/* Section 3 — Conditions particulières */}
-          <div className="mb-5 border-t border-gray-200 dark:border-gray-700 pt-4">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wide">
-              Conditions particulières
-            </p>
-            <textarea
-              value={configForm.special_conditions}
-              onChange={(e) => setConfigForm((f) => ({ ...f, special_conditions: e.target.value }))}
-              placeholder="Clauses libres, conditions spécifiques à cette mission..."
-              className={INPUT_CLS}
-              rows={3}
-            />
-          </div>
-
-          {/* Section 4 — Article/annex editor (inline) */}
-          {activeArticles.length > 0 && (
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mb-5">
-              <ArticleAnnexEditor
-                contractRequestId={id!}
-                articles={activeArticles}
-                annexes={activeAnnexes}
-                existingOverrides={(cr.contract_config as Record<string, unknown> | null) ?? {}}
-                onSaved={() => queryClient.invalidateQueries({ queryKey: ['contract-request', id] })}
-                onRegenerateDraft={undefined}
-                isRegenerating={false}
-                inline
-              />
-            </div>
-          )}
-
-          <div className="flex justify-end">
-            <Button
-              onClick={() => configureMutation.mutate()}
-              disabled={configureMutation.isPending}
-              isLoading={configureMutation.isPending}
-            >
-              <FileSignature className="h-4 w-4 mr-2" />
-              {latestContract ? 'Régénérer le brouillon' : 'Générer le brouillon'}
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Third-party company info — visible after document collection starts (ADV/admin only) */}
-      {isAdv && complianceDocs && hasReachedStatus(cr.status, 'collecting_documents') && (
-        <Card className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-              Informations société
-            </h3>
-            {!showTpForm && (
-              <Button variant="secondary" size="sm" onClick={() => setShowTpForm(true)}>
-                <Pencil className="h-4 w-4 mr-2" />
-                {complianceDocs.company_info_submitted ? 'Modifier' : 'Saisir les informations'}
-              </Button>
             )}
           </div>
-
-          {showTpForm && (
-            <ThirdPartyInfoForm
-              contractRequestId={cr.id}
-              initial={complianceDocs}
-              onSaved={() => {
-                setShowTpForm(false);
-                queryClient.invalidateQueries({ queryKey: ['compliance-docs', cr.third_party_id] });
-                queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
-              }}
-              onCancel={() => setShowTpForm(false)}
-            />
-          )}
-
-          {!showTpForm && (
-          <>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
-            {cr.third_party_type && (
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Type de tiers</p>
-                <p className="font-medium text-gray-900 dark:text-white">
-                  {cr.third_party_type === 'freelance' ? 'Freelance / EI' : cr.third_party_type === 'sous_traitant' ? 'Sous-traitant' : cr.third_party_type === 'portage_salarial' ? 'Portage salarial' : 'Salarié'}
-                </p>
-              </div>
-            )}
-            {complianceDocs.company_name && (
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Raison sociale</p>
-                <p className="font-medium text-gray-900 dark:text-white">{complianceDocs.company_name}</p>
-              </div>
-            )}
-            {complianceDocs.legal_form && (
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Forme juridique</p>
-                <p className="font-medium text-gray-900 dark:text-white">{complianceDocs.legal_form}</p>
-              </div>
-            )}
-            {complianceDocs.capital && (
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Capital</p>
-                <p className="font-medium text-gray-900 dark:text-white">{complianceDocs.capital} €</p>
-              </div>
-            )}
-            {complianceDocs.siren && (
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">SIREN</p>
-                <p className="font-medium text-gray-900 dark:text-white">{complianceDocs.siren}</p>
-              </div>
-            )}
-            {complianceDocs.siret && (
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">SIRET</p>
-                <p className="font-medium text-gray-900 dark:text-white">{complianceDocs.siret}</p>
-              </div>
-            )}
-            {(complianceDocs.rcs_city || complianceDocs.rcs_number) && (
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">RCS</p>
-                <p className="font-medium text-gray-900 dark:text-white">
-                  {[complianceDocs.rcs_city, complianceDocs.rcs_number].filter(Boolean).join(' ')}
-                </p>
-              </div>
-            )}
-            {complianceDocs.head_office_address && (
-              <div className="col-span-2">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Siège social</p>
-                <p className="font-medium text-gray-900 dark:text-white">{complianceDocs.head_office_address}</p>
-              </div>
-            )}
-          </div>
-
-          {(() => {
-            const hasRepresentative = complianceDocs.representative_first_name || complianceDocs.representative_last_name || complianceDocs.representative_name;
-            const hasSignatory = complianceDocs.signatory_first_name || complianceDocs.signatory_last_name;
-            const hasAdv = complianceDocs.adv_contact_first_name || complianceDocs.adv_contact_last_name || complianceDocs.adv_contact_email;
-            const hasBilling = complianceDocs.billing_contact_first_name || complianceDocs.billing_contact_last_name || complianceDocs.billing_contact_email;
-            const hasContractContact = cr.contractualization_contact_email || complianceDocs.contact_email;
-            if (!hasRepresentative && !hasSignatory && !hasAdv && !hasBilling && !hasContractContact) return null;
-
-            const formatName = (civility: string | null, firstName: string | null, lastName: string | null) =>
-              [civility, firstName, lastName].filter(Boolean).join(' ') || null;
-
-            const ContactCard = ({ title, name, email, phone }: { title: string; name: string | null; email: string | null; phone: string | null }) => (
-              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 text-sm">
-                <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">{title}</p>
-                {name && <p className="font-medium text-gray-900 dark:text-white mb-1">{name}</p>}
-                {email && <p className="text-gray-600 dark:text-gray-400 text-xs">{email}</p>}
-                {phone && <p className="text-gray-500 dark:text-gray-500 text-xs">{phone}</p>}
-                {!name && !email && !phone && <p className="text-gray-400 dark:text-gray-600 text-xs italic">Non renseigné</p>}
-              </div>
-            );
-
-            return (
-              <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4">
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Contacts</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {hasRepresentative && (
-                    <ContactCard
-                      title="Représentant légal"
-                      name={
-                        formatName(complianceDocs.representative_civility, complianceDocs.representative_first_name, complianceDocs.representative_last_name)
-                        || (complianceDocs.representative_title ? `${complianceDocs.representative_title} ${complianceDocs.representative_name ?? ''}`.trim() : complianceDocs.representative_name)
-                      }
-                      email={complianceDocs.representative_email}
-                      phone={complianceDocs.representative_phone}
-                    />
-                  )}
-                  {hasSignatory && (
-                    <ContactCard
-                      title="Signataire"
-                      name={formatName(complianceDocs.signatory_civility, complianceDocs.signatory_first_name, complianceDocs.signatory_last_name)}
-                      email={complianceDocs.signatory_email}
-                      phone={complianceDocs.signatory_phone}
-                    />
-                  )}
-                  {hasAdv && (
-                    <ContactCard
-                      title="Contact ADV"
-                      name={formatName(complianceDocs.adv_contact_civility, complianceDocs.adv_contact_first_name, complianceDocs.adv_contact_last_name)}
-                      email={complianceDocs.adv_contact_email}
-                      phone={complianceDocs.adv_contact_phone}
-                    />
-                  )}
-                  {hasBilling && (
-                    <ContactCard
-                      title="Contact facturation"
-                      name={formatName(complianceDocs.billing_contact_civility, complianceDocs.billing_contact_first_name, complianceDocs.billing_contact_last_name)}
-                      email={complianceDocs.billing_contact_email}
-                      phone={complianceDocs.billing_contact_phone}
-                    />
-                  )}
-                  {hasContractContact && (
-                    <ContactCard
-                      title="Contact contractualisation"
-                      name={null}
-                      email={cr.contractualization_contact_email ?? complianceDocs.contact_email}
-                      phone={null}
-                    />
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Consultant sub-section */}
-          {(cr.consultant_first_name || cr.consultant_last_name) && (
-            <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4">
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Consultant</p>
-              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 text-sm inline-block min-w-[250px]">
-                <p className="font-medium text-gray-900 dark:text-white mb-1">
-                  {[cr.consultant_civility, cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ')}
-                </p>
-                {cr.consultant_email && (
-                  <p className="text-gray-600 dark:text-gray-400 text-xs">{cr.consultant_email}</p>
-                )}
-                {cr.consultant_phone && (
-                  <p className="text-gray-500 dark:text-gray-500 text-xs">{cr.consultant_phone}</p>
-                )}
-              </div>
-            </div>
-          )}
-          </>
-          )}
-        </Card>
+        </div>
       )}
 
       {/* Document viewer modal (vigilance documents) */}
@@ -1684,340 +2034,104 @@ export default function ContractDetail() {
         />
       )}
 
-      {/* Compliance documents — ADV/admin only (GET /vigilance/.../documents is ADV-scoped) */}
-      {isAdv && complianceDocs && complianceDocs.documents.length > 0 && hasReachedStatus(cr.status, 'collecting_documents') && (
-        <Card className="mb-6">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-gray-400" />
-            Documents de conformité
-          </h3>
-          <div className="space-y-2">
-            {complianceDocs.documents.map((doc) => {
-              const docBadge = getDocumentBadgeConfig(doc);
-              const canValidate = isAdv && doc.status === 'received';
-              const canTempValidate = isAdv && doc.status === 'requested' && doc.is_unavailable;
-              // Champs d'auto-analyse éditables (les dates/validité sont gérées à part) :
-              // sans champ éditable, le bouton « Modifier » ouvrirait un formulaire vide.
-              const editableAutoCheckEntries = Object.entries(doc.auto_check_results ?? {})
-                .filter(([k]) => !['is_valid', 'document_date', 'expiry_date'].includes(k));
-              const isTempValidating = tempValidatingDocId === doc.id;
-              const isRejecting = rejectingDocId === doc.id;
-              return (
-                <div
-                  key={doc.id}
-                  className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {doc.document_type_display}
-                      </p>
-                      {doc.file_name && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{doc.file_name}</p>
-                      )}
-                      {doc.expires_at && (
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                          Expire le {new Date(doc.expires_at).toLocaleDateString('fr-FR')}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 ml-3 shrink-0">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${docBadge.color}`}>
-                        {docBadge.label}
-                      </span>
-                      {doc.s3_key && (
-                        <button
-                          onClick={() => setViewingDoc(doc)}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 px-2 py-1 rounded transition-colors"
-                        >
-                          <Eye className="h-3.5 w-3.5" /> Visualiser
-                        </button>
-                      )}
-                      {(doc.status === 'requested' || doc.status === 'rejected' || doc.status === 'expired') && (
-                        <label className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 px-2 py-1 rounded transition-colors cursor-pointer">
-                          <Upload className="h-3.5 w-3.5" />
-                          {uploadingDocId === doc.id ? 'Dépôt…' : 'Déposer'}
-                          <input
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            className="hidden"
-                            disabled={uploadingDocId === doc.id}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                setUploadingDocId(doc.id);
-                                uploadDocMutation.mutate({ docId: doc.id, file });
-                              }
-                              e.target.value = '';
-                            }}
-                          />
-                        </label>
-                      )}
-                      {canValidate && (
-                        <>
-                          <button
-                            onClick={() => validateDocMutation.mutate(doc.id)}
-                            disabled={validateDocMutation.isPending}
-                            className="text-xs font-medium text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 px-2 py-1 rounded transition-colors disabled:opacity-50"
-                          >
-                            Valider
-                          </button>
-                          <button
-                            onClick={() => setRejectingDocId(doc.id)}
-                            className="text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 py-1 rounded transition-colors"
-                          >
-                            Rejeter
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {doc.is_unavailable && doc.unavailability_reason && (
-                    <p className="mt-1.5 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 rounded px-2 py-1">
-                      Indisponible : {doc.unavailability_reason}
-                    </p>
-                  )}
-                  {doc.rejection_reason && (
-                    <p className="mt-1.5 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded px-2 py-1">
-                      Motif de rejet : {doc.rejection_reason}
-                    </p>
-                  )}
-                  {isRejecting && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={rejectReason}
-                        onChange={(e) => setRejectReason(e.target.value)}
-                        placeholder="Motif du rejet..."
-                        className="flex-1 text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => rejectDocMutation.mutate({ docId: doc.id, reason: rejectReason })}
-                        disabled={!rejectReason.trim() || rejectDocMutation.isPending}
-                        className="text-xs font-medium text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
-                      >
-                        Confirmer
-                      </button>
-                      <button
-                        onClick={() => { setRejectingDocId(null); setRejectReason(''); }}
-                        className="text-xs text-gray-400 hover:underline"
-                      >
-                        Annuler
-                      </button>
-                    </div>
-                  )}
-                  {canTempValidate && !isRejecting && (
-                    <div className="mt-2">
-                      {!isTempValidating ? (
-                        <button
-                          onClick={() => setTempValidatingDocId(doc.id)}
-                          className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
-                        >
-                          Valider temporairement
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Confirmer ?</span>
-                          <button
-                            onClick={() => tempValidateMutation.mutate(doc.id)}
-                            disabled={tempValidateMutation.isPending}
-                            className="text-xs font-medium text-green-600 dark:text-green-400 hover:underline disabled:opacity-50"
-                          >
-                            Oui
-                          </button>
-                          <button
-                            onClick={() => setTempValidatingDocId(null)}
-                            className="text-xs text-gray-400 hover:underline"
-                          >
-                            Non
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {/* Auto-check results + edit/re-extract */}
-                  {doc.auto_check_results && Object.keys(doc.auto_check_results).length > 0 && (
-                    <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-700/50 rounded text-xs">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide" style={{ fontSize: '10px' }}>Verifications auto</span>
-                        <div className="flex gap-1">
-                          {isAdv && (
-                            <>
-                              {editableAutoCheckEntries.length > 0 && (
-                                <button
-                                  onClick={() => setEditingAutoCheck({ docId: doc.id, data: { ...doc.auto_check_results } as Record<string, string> })}
-                                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
-                                >
-                                  Modifier
-                                </button>
-                              )}
-                              <button
-                                onClick={() => reExtractMutation.mutate(doc.id)}
-                                disabled={reExtractMutation.isPending}
-                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
-                              >
-                                {reExtractMutation.isPending ? 'Analyse...' : 'Re-analyser'}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      {Object.entries(doc.auto_check_results).filter(([k]) => !['is_valid', 'document_date', 'expiry_date'].includes(k)).map(([key, val]) => (
-                        <div key={key} className="flex gap-2 text-gray-600 dark:text-gray-300">
-                          <span className="text-gray-400 dark:text-gray-500 capitalize">{key.replace(/_/g, ' ')} :</span>
-                          <span className="font-medium">{String(val || '—')}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {/* Inline edit form */}
-                  {editingAutoCheck?.docId === doc.id && (
-                    <div className="mt-2 p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded space-y-2">
-                      {Object.entries(editingAutoCheck.data).filter(([k]) => !['is_valid', 'document_date', 'expiry_date'].includes(k)).map(([key, val]) => (
-                        <div key={key} className="flex items-center gap-2">
-                          <label className="text-xs text-gray-500 dark:text-gray-400 w-24 capitalize">{key.replace(/_/g, ' ')}</label>
-                          <input
-                            type="text"
-                            value={val ?? ''}
-                            onChange={(e) => setEditingAutoCheck((prev) => prev ? { ...prev, data: { ...prev.data, [key]: e.target.value } } : null)}
-                            className="flex-1 text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                          />
-                        </div>
-                      ))}
-                      <div className="flex gap-2 justify-end">
-                        <button onClick={() => setEditingAutoCheck(null)} className="text-xs text-gray-400 hover:underline">Annuler</button>
-                        <button
-                          onClick={() => updateAutoCheckMutation.mutate({ docId: doc.id, data: editingAutoCheck.data })}
-                          disabled={updateAutoCheckMutation.isPending}
-                          className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50"
-                        >
-                          {updateAutoCheckMutation.isPending ? 'Sauvegarde...' : 'Sauvegarder'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
+      {/* Partner approved — signature documents selection modal */}
+      <Modal
+        isOpen={showSignaturePreview && cr.status === 'partner_approved'}
+        onClose={() => setShowSignaturePreview(false)}
+        title="Documents inclus dans la signature"
+      >
+        <div className="space-y-3">
+          <p className="notec">
+            Le contrat cadre est toujours inclus. Sélectionnez les documents supplémentaires à faire
+            signer.
+          </p>
 
-      {/* Contracts list */}
-      {contracts && contracts.length > 0 && (
-        <Card className="mb-6">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-            Documents contractuels
-          </h3>
-          <div className="space-y-2">
-            {[...contracts].sort((a, b) => {
-              // Signed first, then final (non-PROV), then provisional (PROV) by version desc
-              const aSigned = !!(a.signed_at && a.s3_key_signed);
-              const bSigned = !!(b.signed_at && b.s3_key_signed);
-              if (aSigned !== bSigned) return aSigned ? -1 : 1;
-              const aProv = a.reference.startsWith('PROV-');
-              const bProv = b.reference.startsWith('PROV-');
-              if (aProv !== bProv) return aProv ? 1 : -1;
-              return b.version - a.version;
-            }).map((c) => {
-              const isSigned = !!(c.signed_at && c.s3_key_signed);
-              const isProvisional = c.reference.startsWith('PROV-');
-              const isFinal = !isProvisional;
-
-              return (
-                <div
-                  key={c.id}
-                  className={`flex items-center justify-between p-3 rounded-lg ${
-                    isSigned
-                      ? 'bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800'
-                      : isFinal
-                        ? 'bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800'
-                        : 'bg-gray-50 dark:bg-gray-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <FileSignature className={`h-4 w-4 ${isSigned ? 'text-green-500' : isFinal ? 'text-blue-400' : 'text-gray-300'}`} />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className={`text-sm font-medium ${isProvisional ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                          {isSigned
-                            ? `${c.reference} (Signed)`
-                            : isFinal
-                              ? c.reference
-                              : `${c.reference} v${c.version}`
-                          }
-                        </p>
-                        {isSigned && (
-                          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Signe
-                          </span>
-                        )}
-                        {!isSigned && isFinal && (
-                          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                            Definitif
-                          </span>
-                        )}
-                        {isProvisional && (
-                          <span className="text-xs text-gray-400 dark:text-gray-500">
-                            Brouillon
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                        {formatDate(c.created_at)}{isSigned ? ` — signe le ${formatDate(c.signed_at!)}` : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {isSigned ? (
-                      <button
-                        onClick={async () => {
-                          try {
-                            const url = await contractsApi.getContractDownloadUrl(cr.id, c.id, 'signed');
-                            window.open(url, '_blank');
-                          } catch {
-                            toast.error('Impossible de telecharger.');
-                          }
-                        }}
-                        className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 hover:text-green-800 font-medium transition-colors"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        {c.reference} (Signed).pdf
-                      </button>
-                    ) : (
-                      <button
-                        onClick={async () => {
-                          try {
-                            const url = await contractsApi.getContractDownloadUrl(cr.id, c.id, 'draft');
-                            window.open(url, '_blank');
-                          } catch {
-                            toast.error('Impossible de telecharger.');
-                          }
-                        }}
-                        className={`flex items-center gap-1 text-xs transition-colors ${isProvisional ? 'text-gray-400 hover:text-gray-600' : 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-800'}`}
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        {isProvisional ? `${c.reference} v${c.version}.pdf` : `${c.reference}.pdf`}
-                      </button>
-                    )}
-                    {user?.role === 'admin' && (
-                      <button
-                        onClick={() => setDeleteContractTarget({ id: c.id, reference: c.reference })}
-                        className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                        title="Supprimer"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          {/* Contract (always included, not toggleable) */}
+          <div className="flex items-center gap-2.5 p-2.5 rounded-[10px] bg-srf2 border border-lin2">
+            <input type="checkbox" checked disabled className="rounded border-lin" />
+            <span className="text-[12.5px] font-semibold text-ink">Contrat cadre</span>
+            <span className="text-[11px] text-mut2">(obligatoire)</span>
           </div>
-        </Card>
-      )}
+
+          {!signaturePreview && (
+            <p className="notec py-2 text-center">Chargement…</p>
+          )}
+
+          {signaturePreview && signaturePreview.length === 0 && (
+            <p className="notec py-2 text-center">Aucun document supplémentaire configuré pour cette société.</p>
+          )}
+
+          {/* Partner documents */}
+          {signaturePreview && signaturePreview.filter(i => i.signer_role === 'partner').length > 0 && (
+            <div>
+              <p className="ml !text-blu-fg mb-1">Partenaire</p>
+              {signaturePreview.filter(i => i.signer_role === 'partner').map(item => (
+                <label key={item.charter_template_id} className="flex items-center gap-2.5 p-2 rounded-[10px] hover:bg-srf2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!excludedCharterIds.has(item.charter_template_id)}
+                    onChange={(e) => {
+                      const next = new Set(excludedCharterIds);
+                      if (e.target.checked) {
+                        next.delete(item.charter_template_id);
+                      } else {
+                        next.add(item.charter_template_id);
+                      }
+                      setExcludedCharterIds(next);
+                    }}
+                    className="rounded border-lin text-pri focus:ring-pri"
+                  />
+                  <span className="text-[12.5px] text-ink flex-1">{item.label}</span>
+                  <span className="text-[11px] text-mut2">{item.document_kind === 'charter_engagement' ? 'Signature' : 'AR'}</span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          {/* Consultant documents */}
+          {signaturePreview && signaturePreview.filter(i => i.signer_role === 'consultant').length > 0 && (
+            <div>
+              <p className="ml !text-ind-fg mb-1">Collaborateur</p>
+              {signaturePreview.filter(i => i.signer_role === 'consultant').map(item => (
+                <label key={item.charter_template_id} className="flex items-center gap-2.5 p-2 rounded-[10px] hover:bg-srf2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!excludedCharterIds.has(item.charter_template_id)}
+                    onChange={(e) => {
+                      const next = new Set(excludedCharterIds);
+                      if (e.target.checked) {
+                        next.delete(item.charter_template_id);
+                      } else {
+                        next.add(item.charter_template_id);
+                      }
+                      setExcludedCharterIds(next);
+                    }}
+                    className="rounded border-lin text-pri focus:ring-pri"
+                  />
+                  <span className="text-[12.5px] text-ink flex-1">{item.label}</span>
+                  <span className="text-[11px] text-mut2">{item.document_kind === 'charter_engagement' ? 'Signature' : 'AR'}</span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-lin2">
+            <Button variant="secondary" size="sm" onClick={() => setShowSignaturePreview(false)}>
+              Annuler
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => sendForSignatureMutation.mutate()}
+              disabled={sendForSignatureMutation.isPending}
+              isLoading={sendForSignatureMutation.isPending}
+              leftIcon={<PenTool className="h-3.5 w-3.5" />}
+            >
+              Confirmer
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Delete contract confirmation modal (double verification) */}
       <Modal
@@ -2027,26 +2141,32 @@ export default function ContractDetail() {
       >
         {deleteContractTarget && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Supprimer definitivement le contrat <strong>{deleteContractTarget.reference}</strong> ?
+            <p className="notec">
+              Supprimer définitivement le contrat{' '}
+              <span className="font-semibold text-ink">{deleteContractTarget.reference}</span> ?
             </p>
-            <p className="text-sm text-red-600 dark:text-red-400">
-              Cette action est irreversible. Les fichiers PDF associes seront aussi supprimes.
+            <p className="text-[12.5px] text-redt">
+              Cette action est irréversible. Les fichiers PDF associés seront aussi supprimés.
             </p>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                Tapez <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-red-600 font-mono">{deleteContractTarget.reference}</code> pour confirmer
+              <label className="f-lab" htmlFor="delete-contract-confirm">
+                Tapez{' '}
+                <code className="px-1 py-0.5 bg-srf2 border border-lin2 rounded text-redt font-mono">
+                  {deleteContractTarget.reference}
+                </code>{' '}
+                pour confirmer
               </label>
               <input
+                id="delete-contract-confirm"
                 type="text"
                 value={deleteContractConfirmText}
                 onChange={(e) => setDeleteContractConfirmText(e.target.value)}
                 placeholder={deleteContractTarget.reference}
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-mono"
+                className="f-in font-mono"
                 autoFocus
               />
             </div>
-            <div className="flex justify-end gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex justify-end gap-2 pt-2 border-t border-lin2">
               <Button variant="secondary" size="sm" onClick={() => { setDeleteContractTarget(null); setDeleteContractConfirmText(''); }}>
                 Annuler
               </Button>
@@ -2056,19 +2176,14 @@ export default function ContractDetail() {
                 disabled={deleteContractConfirmText !== deleteContractTarget.reference || deleteContractMutation.isPending}
                 isLoading={deleteContractMutation.isPending}
                 onClick={() => deleteContractMutation.mutate({ contractId: deleteContractTarget.id })}
+                leftIcon={<Trash2 className="h-3.5 w-3.5" />}
               >
-                <Trash2 className="h-4 w-4 mr-1" />
                 Supprimer
               </Button>
             </div>
           </div>
         )}
       </Modal>
-
-      {/* Metadata */}
-      <Card>
-        <HistoryTimeline statusHistory={cr.status_history} />
-      </Card>
 
       {/* Cancel confirmation modal */}
       <Modal
@@ -2077,12 +2192,11 @@ export default function ContractDetail() {
         title="Annuler la demande de contrat"
       >
         <div className="space-y-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Voulez-vous vraiment annuler la demande <span className="font-semibold">{cr.display_reference}</span> ?
+          <p className="notec">
+            Voulez-vous vraiment annuler la demande{' '}
+            <span className="font-semibold text-ink">{cr.display_reference}</span> ?
           </p>
-          <p className="text-sm text-red-600 dark:text-red-400">
-            Cette action est irréversible.
-          </p>
+          <p className="text-[12.5px] text-redt">Cette action est irréversible.</p>
           <div className="flex justify-end gap-2 pt-2">
             <Button
               variant="secondary"
@@ -2092,10 +2206,9 @@ export default function ContractDetail() {
               Non, garder
             </Button>
             <Button
-              variant="primary"
+              variant="danger"
               onClick={() => cancelMutation.mutate()}
               isLoading={cancelMutation.isPending}
-              className="bg-red-600 hover:bg-red-700 text-white"
             >
               Oui, annuler
             </Button>
@@ -2176,7 +2289,7 @@ function SortableEditorRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`border rounded-lg overflow-hidden ${isDragging ? 'shadow-lg z-10 relative' : ''} ${isDeleted ? 'border-red-200 dark:border-red-800 opacity-60' : 'border-gray-200 dark:border-gray-700'}`}
+      className={`border rounded-[10px] overflow-hidden bg-sur ${isDragging ? 'shadow-lg z-10 relative' : ''} ${isDeleted ? 'border-[color-mix(in_oklab,var(--red-fg)_35%,transparent)] opacity-60' : 'border-lin'}`}
     >
       <div className="flex items-center">
         {/* Drag handle */}
@@ -2184,63 +2297,56 @@ function SortableEditorRow({
           type="button"
           {...attributes}
           {...listeners}
-          className="flex-shrink-0 px-2 py-3 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing touch-none bg-gray-50 dark:bg-gray-800/60"
+          className="flex-shrink-0 px-2 py-3 text-mut2 hover:text-mut cursor-grab active:cursor-grabbing touch-none bg-srf2"
           title="Glisser pour réordonner"
         >
           <GripVertical className="h-4 w-4" />
         </button>
         <button
           type="button"
-          className={`flex-1 flex items-center justify-between px-4 py-3 text-left transition-colors ${isDeleted ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+          className={`flex-1 flex items-center justify-between px-4 py-3 text-left transition-colors ${isDeleted ? 'bg-red-bg' : 'bg-srf2 hover:bg-lin2'}`}
           onClick={() => !isDeleted && onToggleExpand()}
         >
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide flex-shrink-0">
-              {label}
-            </span>
-            <span className={`text-sm font-medium truncate ${isDeleted ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-200'}`}>
+            <span className="ml !mb-0 flex-shrink-0">{label}</span>
+            <span className={`text-[13px] font-semibold truncate ${isDeleted ? 'line-through text-mut2' : 'text-ink'}`}>
               {title}
             </span>
             {isCustom && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-700 flex-shrink-0">
-                ajouté
-              </span>
+              <span className="st st-grn !text-[10.5px] !px-2 !py-0.5 flex-shrink-0">ajouté</span>
             )}
             {isDeleted && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-700 flex-shrink-0">
-                supprimé
-              </span>
+              <span className="st st-red !text-[10.5px] !px-2 !py-0.5 flex-shrink-0">supprimé</span>
             )}
             {!isDeleted && !isCustom && hasOverride && !isDirty && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-700 flex-shrink-0">
-                <Pencil className="h-3 w-3 mr-1" />modifié
+              <span className="st st-amb !text-[10.5px] !px-2 !py-0.5 flex-shrink-0">
+                <Pencil className="h-3 w-3" />
+                modifié
               </span>
             )}
             {!isDeleted && isDirty && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-700 flex-shrink-0">
-                non sauvegardé
-              </span>
+              <span className="st st-blu !text-[10.5px] !px-2 !py-0.5 flex-shrink-0">non sauvegardé</span>
             )}
           </div>
-          {!isDeleted && (isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />)}
+          {!isDeleted && (isExpanded ? <ChevronUp className="h-4 w-4 text-mut2 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-mut2 flex-shrink-0" />)}
         </button>
         <button
           type="button"
           title={isDeleted ? 'Restaurer' : 'Supprimer du PDF'}
           onClick={onToggleDelete}
           disabled={isPending}
-          className={`px-3 py-3 flex-shrink-0 transition-colors ${isDeleted ? 'text-green-500 hover:text-green-700 dark:hover:text-green-400 bg-red-50 dark:bg-red-900/20' : 'text-gray-300 hover:text-red-500 dark:hover:text-red-400 bg-gray-50 dark:bg-gray-800/60'}`}
+          className={`px-3 py-3 flex-shrink-0 transition-colors ${isDeleted ? 'text-grn-fg bg-red-bg' : 'text-mut2 hover:text-redt bg-srf2'}`}
         >
           {isDeleted ? <RotateCcw className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
         </button>
       </div>
 
       {isExpanded && !isDeleted && (
-        <div className="p-4 bg-white dark:bg-gray-900">
+        <div className="p-4 bg-sur border-t border-lin2">
           <textarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full text-sm font-mono border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y"
+            className="f-ta font-mono !text-[12.5px]"
             rows={10}
           />
           <div className="flex items-center justify-between mt-2">
@@ -2248,7 +2354,7 @@ function SortableEditorRow({
               <button
                 type="button"
                 onClick={onReset}
-                className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                className="inline-flex items-center gap-1.5 text-[12px] text-mut2 hover:text-mut"
                 disabled={isPending}
               >
                 <RotateCcw className="h-3.5 w-3.5" />
@@ -2507,8 +2613,8 @@ function ArticleAnnexEditor({
           type="text"
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
-          placeholder={isAnnex ? 'Titre de la nouvelle annexe...' : 'Titre du nouvel article...'}
-          className="flex-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          placeholder={isAnnex ? 'Titre de la nouvelle annexe…' : 'Titre du nouvel article…'}
+          className="f-in flex-1"
           onKeyDown={(e) => e.key === 'Enter' && handleAddCustom(isAnnex)}
           autoFocus
         />
@@ -2518,7 +2624,7 @@ function ArticleAnnexEditor({
         <button
           type="button"
           onClick={() => { setShow(false); setNewTitle(''); }}
-          className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          className="text-[12px] text-mut2 hover:text-mut"
         >
           Annuler
         </button>
@@ -2527,7 +2633,7 @@ function ArticleAnnexEditor({
       <button
         type="button"
         onClick={() => { setShow(true); setNewTitle(''); }}
-        className="inline-flex items-center gap-1.5 mt-2 text-xs text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-200"
+        className="inline-flex items-center gap-1.5 mt-2 text-[12px] font-semibold text-prit hover:underline"
       >
         <Plus className="h-3.5 w-3.5" />
         {isAnnex ? 'Ajouter une annexe' : 'Ajouter un article'}
@@ -2537,16 +2643,15 @@ function ArticleAnnexEditor({
 
   const content = (
     <>
-      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">
-        Edition des articles et annexes
-      </p>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-        Glissez pour reordonner, modifiez le contenu ou ajoutez des articles/annexes pour ce contrat uniquement.
+      <p className="ml mb-1">Édition des articles et annexes</p>
+      <p className="f-hint !mt-0 mb-4">
+        Glissez pour réordonner, modifiez le contenu ou ajoutez des articles/annexes pour ce contrat
+        uniquement.
       </p>
 
       {/* Articles */}
       <div className="mb-4">
-        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Articles</h4>
+        <h4 className="ml mb-2">Articles</h4>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd(false)}>
           <SortableContext items={articleKeys} strategy={verticalListSortingStrategy}>
             <div className="space-y-2">
@@ -2587,7 +2692,7 @@ function ArticleAnnexEditor({
 
       {/* Annexes */}
       <div>
-        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Annexes</h4>
+        <h4 className="ml mb-2">Annexes</h4>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd(true)}>
           <SortableContext items={annexKeys} strategy={verticalListSortingStrategy}>
             <div className="space-y-2">
@@ -2627,13 +2732,13 @@ function ArticleAnnexEditor({
       </div>
 
       {onRegenerateDraft && (
-        <div className="flex justify-end mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex justify-end mt-4 pt-4 border-t border-lin2">
           <Button
             onClick={onRegenerateDraft}
             disabled={isRegenerating}
+            leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
           >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            {isRegenerating ? 'Régénération...' : 'Régénérer le brouillon'}
+            {isRegenerating ? 'Régénération…' : 'Régénérer le brouillon'}
           </Button>
         </div>
       )}
@@ -2641,7 +2746,7 @@ function ArticleAnnexEditor({
   );
 
   if (inline) return content;
-  return <Card className="mb-6">{content}</Card>;
+  return <div className="card mb-4">{content}</div>;
 }
 
 // ─── History Timeline ────────────────────────────────────────────────────────
@@ -2677,14 +2782,13 @@ function HistoryTimeline({
 
   return (
     <>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-          Historique du contrat
-        </h3>
+      <div className="flex items-center justify-between mb-3.5">
+        <h3 className="ct">Activité</h3>
         {hiddenCount > 0 && (
           <button
+            type="button"
             onClick={() => setShowFull((v) => !v)}
-            className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+            className="text-[12px] font-medium text-prit hover:underline"
           >
             {showFull ? 'Vue résumée' : `Voir tout (${statusHistory.length} étapes)`}
           </button>
@@ -2692,54 +2796,49 @@ function HistoryTimeline({
       </div>
 
       {visibleEntries.length > 0 ? (
-        <ol className="relative border-l border-gray-200 dark:border-gray-700 space-y-3 ml-2">
-          {visibleEntries.map((entry) => {
+        <div>
+          {visibleEntries.map((entry, idx) => {
             const cfg = CONTRACT_STATUS_CONFIG[entry.status as ContractRequestStatus];
             const label =
               entry.status === 'commercial_validated' ? 'Création' : (cfg?.label ?? entry.status);
             const isChanges = entry.status === 'partner_requested_changes';
             const isExpanded = expandedComments.has(entry.originalIndex);
+            const isLast = idx === visibleEntries.length - 1;
 
             return (
-              <li key={entry.originalIndex} className="ml-4">
-                <span className="absolute -left-1.5 mt-1 h-3 w-3 rounded-full border-2 border-white dark:border-gray-800 bg-gray-400 dark:bg-gray-500" />
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cfg?.color ?? 'bg-gray-100 text-gray-700'}`}
-                  >
-                    {label}
-                  </span>
-                  <time className="text-xs text-gray-400 dark:text-gray-500">
-                    {new Date(entry.entered_at).toLocaleString('fr-FR', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </time>
+              <div key={entry.originalIndex} className={`ev ${isLast ? '!pb-0' : ''}`}>
+                <span className="evd" />
+                {!isLast && <span className="evl" />}
+                <p className="evt">{label}</p>
+                <p className="evs">
+                  {new Date(entry.entered_at).toLocaleString('fr-FR', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
                   {isChanges && entry.comment && (
                     <button
+                      type="button"
                       onClick={() => toggleComment(entry.originalIndex)}
                       title="Voir le commentaire du partenaire"
-                      className="inline-flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-200"
+                      className="inline-flex items-center gap-1 ml-2 font-semibold text-amb-fg hover:underline"
                     >
-                      <MessageSquare className="h-3.5 w-3.5" />
+                      <MessageSquare className="h-3 w-3" />
                       {isExpanded ? 'Masquer' : 'Commentaire'}
                     </button>
                   )}
-                </div>
+                </p>
                 {isChanges && entry.comment && isExpanded && (
-                  <div className="mt-1.5 ml-1 border-l-2 border-orange-300 dark:border-orange-700 pl-3 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
-                    {entry.comment}
-                  </div>
+                  <div className="quote whitespace-pre-wrap !mt-1.5">{entry.comment}</div>
                 )}
-              </li>
+              </div>
             );
           })}
-        </ol>
+        </div>
       ) : (
-        <p className="text-sm text-gray-400 dark:text-gray-500">Aucun historique disponible.</p>
+        <p className="notec">Aucun historique disponible.</p>
       )}
     </>
   );
@@ -2747,6 +2846,12 @@ function HistoryTimeline({
 
 
 // ── Consultants Section ─────────────────────────────────────────────────────
+
+const CONSULTANT_CHARTER_CHIPS: Record<string, { label: string; cls: string }> = {
+  pending: { label: 'En attente', cls: 'st-sla' },
+  sent: { label: 'Envoyé', cls: 'st-blu' },
+  signed: { label: 'Signé', cls: 'st-grn' },
+};
 
 function ConsultantsSection({ contractRequestId, cr }: { contractRequestId: string; cr: ContractRequest }) {
   const queryClient = useQueryClient();
@@ -2786,60 +2891,64 @@ function ConsultantsSection({ contractRequestId, cr }: { contractRequestId: stri
     onError: (error) => toast.error(getErrorMessage(error)),
   });
 
-  const STATUS_BADGES: Record<string, { label: string; color: string }> = {
-    pending: { label: 'En attente', color: 'bg-gray-100 text-gray-600' },
-    sent: { label: 'Envoye', color: 'bg-blue-100 text-blue-700' },
-    signed: { label: 'Signe', color: 'bg-green-100 text-green-700' },
-  };
-
   return (
-    <Card className="mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-          <User className="h-4 w-4 text-gray-400" />
-          Consultants
-        </h3>
-        <Button variant="secondary" size="sm" onClick={() => setShowAdd(true)}>
-          <Plus className="h-3.5 w-3.5 mr-1" />
+    <div className="card">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="ct">Consultants</h3>
+          <p className="cs">Chartes à faire signer aux intervenants</p>
+        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setShowAdd(true)}
+          leftIcon={<Plus className="h-3.5 w-3.5" />}
+        >
           Ajouter
         </Button>
       </div>
 
       {/* Add form */}
       {showAdd && (
-        <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+        <div className="mt-4 p-3.5 rounded-[10px] bg-srf2 border border-lin2">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
             <input
               type="text"
-              placeholder="Prenom *"
+              placeholder="Prénom *"
               value={addForm.first_name}
               onChange={(e) => setAddForm((f) => ({ ...f, first_name: e.target.value }))}
-              className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+              className="f-in !h-[34px] !text-[12.5px]"
             />
             <input
               type="text"
               placeholder="Nom *"
               value={addForm.last_name}
               onChange={(e) => setAddForm((f) => ({ ...f, last_name: e.target.value }))}
-              className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+              className="f-in !h-[34px] !text-[12.5px]"
             />
             <input
               type="email"
               placeholder="Email *"
               value={addForm.email}
               onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
-              className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+              className="f-in !h-[34px] !text-[12.5px]"
             />
             <input
               type="tel"
-              placeholder="Telephone"
+              placeholder="Téléphone"
               value={addForm.phone}
               onChange={(e) => setAddForm((f) => ({ ...f, phone: e.target.value }))}
-              className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+              className="f-in !h-[34px] !text-[12.5px]"
             />
           </div>
-          <div className="flex justify-end gap-2">
-            <button onClick={() => setShowAdd(false)} className="text-xs text-gray-400 hover:underline">Annuler</button>
+          <div className="flex justify-end items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowAdd(false)}
+              className="text-[12px] text-mut2 hover:text-mut"
+            >
+              Annuler
+            </button>
             <Button
               size="sm"
               onClick={() => addMutation.mutate()}
@@ -2854,9 +2963,10 @@ function ConsultantsSection({ contractRequestId, cr }: { contractRequestId: stri
 
       {/* Pre-fill first consultant from CR data */}
       {consultants.length === 0 && !showAdd && cr.consultant_first_name && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-          Le consultant principal ({cr.consultant_first_name} {cr.consultant_last_name}) sera ajoute automatiquement.
+        <p className="notec mt-3">
+          Le consultant principal ({cr.consultant_first_name} {cr.consultant_last_name}) sera ajouté automatiquement.
           <button
+            type="button"
             onClick={() => {
               setAddForm({
                 first_name: cr.consultant_first_name || '',
@@ -2866,7 +2976,7 @@ function ConsultantsSection({ contractRequestId, cr }: { contractRequestId: stri
               });
               setShowAdd(true);
             }}
-            className="ml-2 text-indigo-600 dark:text-indigo-400 hover:underline"
+            className="ml-2 font-semibold text-prit hover:underline"
           >
             Ajouter maintenant
           </button>
@@ -2875,43 +2985,44 @@ function ConsultantsSection({ contractRequestId, cr }: { contractRequestId: stri
 
       {/* Consultants list */}
       {consultants.length > 0 && (
-        <div className="space-y-2">
+        <div className="mt-2">
           {consultants.map((c) => {
-            const badge = STATUS_BADGES[c.charter_status] || STATUS_BADGES.pending;
+            const chip = CONSULTANT_CHARTER_CHIPS[c.charter_status] || CONSULTANT_CHARTER_CHIPS.pending;
             return (
-              <div
-                key={c.id}
-                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
-              >
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+              <div key={c.id} className="doc">
+                <div className="dico">
+                  <User className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="dn truncate">
                     {c.first_name} {c.last_name}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="ds truncate">
                     {c.email}{c.phone ? ` · ${c.phone}` : ''}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badge.color}`}>
-                    {badge.label}
-                  </span>
-                  {c.charter_status === 'pending' && (
-                    <button
-                      onClick={() => sendChartersMutation.mutate(c.id)}
-                      disabled={sendChartersMutation.isPending}
-                      className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 px-2 py-1 rounded transition-colors disabled:opacity-50"
-                    >
-                      {sendChartersMutation.isPending ? 'Envoi...' : 'Envoyer les chartes'}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => removeMutation.mutate(c.id)}
-                    className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                    title="Supprimer"
+                <span className={`st shrink-0 ${chip.cls}`}>
+                  <span className="dot" />
+                  {chip.label}
+                </span>
+                {c.charter_status === 'pending' && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => sendChartersMutation.mutate(c.id)}
+                    disabled={sendChartersMutation.isPending}
                   >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                    {sendChartersMutation.isPending ? 'Envoi…' : 'Envoyer les chartes'}
+                  </Button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeMutation.mutate(c.id)}
+                  className="p-1 rounded-md text-mut2 hover:text-redt hover:bg-red-bg transition-colors shrink-0"
+                  title="Supprimer"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
             );
           })}
@@ -2919,10 +3030,10 @@ function ConsultantsSection({ contractRequestId, cr }: { contractRequestId: stri
       )}
 
       {consultants.length === 0 && !showAdd && !cr.consultant_first_name && (
-        <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+        <p className="notec text-center py-4">
           Aucun consultant. Ajoutez un consultant pour envoyer les chartes.
         </p>
       )}
-    </Card>
+    </div>
   );
 }
