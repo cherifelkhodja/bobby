@@ -121,6 +121,17 @@
 
 ---
 
+### ADR-010 : Design System v2 (tokens OKLCH + classes composant)
+- **Date** : 2026-07
+- **Décision** : Refonte complète de l'UI selon le prototype « Bobby v2 » (claude.ai/design), implémentée comme design system CSS + Tailwind plutôt que page par page
+- **Raison** : Cohérence visuelle globale (clair/sombre), coût de maintenance réduit, fidélité au prototype
+- **Architecture** :
+  - Tokens CSS OKLCH dans `frontend/src/styles/index.css` (`--bg --sur --srf2 --ink --mut --lin --pri --pris --prit` + palettes chips `amb/blu/ind/red/grn/sla`), basculent via la classe `.dark` ; variantes d'accent `acc-indigo`/`acc-canard` disponibles
+  - Palette Tailwind remappée (primary=azur, gray=ardoise) + couleurs sémantiques `var()` (`bg-sur`, `text-ink`, `border-lin`…) — ⚠️ pas de modificateur d'opacité sur ces couleurs (utiliser `color-mix` en valeur arbitraire)
+  - Classes composant v2 dans `index.css` : chips `st st-*` + `dot`, `kpi/kpis`, tables grille `tbl/thead/row/ahead/arow/tfoot/expand`, stepper `steps/nd/lb`, timeline `ev/evd/evl`, formulaires `f-in/f-lab/f-ta/f-grid`, `tcard`, `drop/filecard/pbar`, pages publiques `p-bg/p-card/p-doc`, layout `top/side/it/gh/cnt`
+  - `CONTRACT_STATUS_CONFIG` porte désormais `stage` (1-6) pour le stepper et les segments de progression du pipeline
+  - Typo : Inter + JetBrains Mono (refs/compteurs)
+
 ## Problèmes connus
 
 | Problème | Impact | Workaround | Priorité |
@@ -194,6 +205,18 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-07-11 (feat: UI v2 — implémentation du prototype « Bobby v2 »)
+
+Refonte visuelle complète du frontend selon le prototype Claude Design « Bobby v2 - Prototype » (~40 fichiers, logique métier intacte).
+
+- **Design system** : tokens OKLCH clair/sombre + classes composant v2 (voir ADR-010) ; palette Tailwind remappée ; toasts sonner thémés
+- **Layout** : topbar 56px (recherche, thème, avatar initiales, déconnexion) + sidebar 232px groupée (Pilotage / Cooptation / Commercial / Contrats / Outils / Admin) avec compteurs temps réel (Demandes, Documents à valider)
+- **Pages restylées** : auth (lgcard), tableau de bord (KPIs + conversion), opportunités (ocard + sk), détail/proposer un candidat, mes cooptations, pipeline demandes (KPIs, onglets, segments d'étape), détail demande (stepper 6 étapes, vigilance avec valider/rejeter, verrou de configuration + dérogation, timeline), tiers & conformité, générateur de CV, devis Thales (stepper + KPIs), gestion opportunités commercial + détail publication, RH (annonces, détail annonce avec lignes dépliables xcard, création/édition), profil, administration (tous les onglets), candidature publique et portail partenaire (p-card, consentement RGPD)
+- **Nouvelle page** : `/documents-a-valider` (ADV/admin) — file des documents `received` agrégée via fan-out React Query sur les tiers, actions Aperçu/Valider/Rejeter, badge sidebar synchronisé
+- **Primitives v2** : Button, Badge (dot), Card, StatCard, Input, SearchInput, FileDropzone, Modal, EmptyState, ErrorBoundary/NetworkStatus tokenisés
+- **Fix** : `tsconfig.json` — suppression de `baseUrl` déprécié (TypeScript 6), `paths` relatif
+- **Vérifications** : `tsc` 0 erreur, ESLint 0 erreur, 282 tests unitaires verts, build Vite OK, screenshots Playwright clair/sombre validés sur 11 écrans
 
 ### 2026-07-10 (feat: consultant candidat/ressource + validation interne du brouillon)
 
