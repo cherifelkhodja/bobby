@@ -7,13 +7,14 @@ import {
   ShieldCheck,
   Upload,
   FileText,
+  Check,
   CheckCircle,
   XCircle,
   X,
-  Clock,
   AlertTriangle,
   Building2,
   Loader2,
+  Lock,
   PenLine,
   ChevronLeft,
   Download,
@@ -21,32 +22,22 @@ import {
 import { toast } from 'sonner';
 
 import { portalApi } from '../api/portal';
-import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { PageSpinner } from '../components/ui/Spinner';
 
-const DOCUMENT_STATUS_ICONS: Record<string, typeof CheckCircle> = {
-  validated: CheckCircle,
-  rejected: XCircle,
-  received: Clock,
-  requested: Upload,
-  expiring_soon: AlertTriangle,
-  expired: XCircle,
-};
-
-const DOCUMENT_STATUS_COLORS: Record<string, string> = {
-  validated: 'text-green-500',
-  rejected: 'text-red-500',
-  received: 'text-blue-500',
-  requested: 'text-gray-400',
-  expiring_soon: 'text-orange-500',
-  expired: 'text-red-400',
+const DOCUMENT_STATUS_CHIPS: Record<string, string> = {
+  validated: 'st-grn',
+  rejected: 'st-red',
+  received: 'st-blu',
+  requested: 'st-amb',
+  expiring_soon: 'st-amb',
+  expired: 'st-red',
 };
 
 const DOCUMENT_STATUS_LABELS: Record<string, string> = {
   validated: 'Validé',
   rejected: 'Rejeté',
-  received: 'En cours de vérification',
+  received: 'Reçu',
   requested: 'En attente',
   expiring_soon: 'Expire bientôt',
   expired: 'Expiré',
@@ -63,59 +54,25 @@ interface Step {
 }
 
 function PortalStepper({ steps }: { steps: Step[] }) {
+  const currentIndex = steps.findIndex((s) => s.status === 'current');
+  const activeIndex = currentIndex >= 0 ? currentIndex : steps.length - 1;
+  const fill = steps.length > 1 ? Math.round((activeIndex / (steps.length - 1)) * 84) : 0;
+
   return (
-    <div className="max-w-3xl mx-auto mb-8">
-      <div className="flex items-start">
-        {steps.map((step, i) => {
-          const Icon = step.icon;
-          const isLast = i === steps.length - 1;
-          return (
-            <div key={i} className={`flex items-start ${isLast ? '' : 'flex-1'} min-w-0`}>
-              {/* Step bubble + label */}
-              <div className="flex flex-col items-center flex-shrink-0">
-                <div
-                  className={[
-                    'flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all',
-                    step.status === 'done'
-                      ? 'bg-green-500 border-green-500 text-white shadow-sm'
-                      : step.status === 'current'
-                      ? 'bg-primary-600 border-primary-600 text-white shadow-md shadow-primary-200 dark:shadow-primary-900/40'
-                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-300 dark:text-gray-500',
-                  ].join(' ')}
-                >
-                  {step.status === 'done' ? (
-                    <CheckCircle className="h-5 w-5" />
-                  ) : (
-                    <Icon className="h-4 w-4" />
-                  )}
-                </div>
-                <span
-                  className={[
-                    'mt-2 text-xs font-medium text-center leading-tight max-w-[72px]',
-                    step.status === 'done'
-                      ? 'text-green-600 dark:text-green-400'
-                      : step.status === 'current'
-                      ? 'text-primary-600 dark:text-primary-400'
-                      : 'text-gray-400 dark:text-gray-500',
-                  ].join(' ')}
-                >
-                  {step.label}
-                </span>
-              </div>
-              {/* Connector — aligned with center of the 40px bubble (mt-5 = 20px) */}
-              {!isLast && (
-                <div
-                  className={[
-                    'flex-1 h-0.5 mx-3 self-start mt-5 transition-colors',
-                    step.status === 'done'
-                      ? 'bg-green-400'
-                      : 'bg-gray-200 dark:bg-gray-700',
-                  ].join(' ')}
-                />
-              )}
-            </div>
-          );
-        })}
+    <div className="steps">
+      <span className="track" />
+      <span className="tfill" style={{ width: `${fill}%` }} />
+      <div className="nodes">
+        {steps.map((step, i) => (
+          <div key={i} className="stw">
+            <span
+              className={`nd ${
+                step.status === 'done' ? 'd' : step.status === 'current' ? 'cur' : ''
+              }`}
+            />
+            <p className="lb">{step.label}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -167,16 +124,16 @@ export default function Portal() {
   if (isError || !portalInfo) {
     return (
       <PortalLayout>
-        <Card className="max-w-lg mx-auto text-center py-12">
-          <XCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            Lien invalide ou expiré
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+        <div className="p-card text-center px-[22px] py-9">
+          <div className="alert red !inline-flex !mt-0">
+            <XCircle className="h-[18px] w-[18px] flex-shrink-0" />
+            <span>Lien invalide ou expiré</span>
+          </div>
+          <p className="notec mt-3.5">
             Ce lien d'accès n'est plus valide. Veuillez contacter votre interlocuteur
             pour obtenir un nouveau lien.
           </p>
-        </Card>
+        </div>
       </PortalLayout>
     );
   }
@@ -222,10 +179,10 @@ export default function Portal() {
   const hasCharters = chartersData && chartersData.length > 0;
   const steps: Step[] = isDocumentUpload
     ? [
-        { label: 'Infos societe', icon: Building2, status: buildStepStatus(0) },
+        { label: 'Infos société', icon: Building2, status: buildStepStatus(0) },
         { label: 'Documents',     icon: Upload,    status: buildStepStatus(1) },
         ...(hasCharters ? [{ label: 'Chartes', icon: ShieldCheck, status: buildStepStatus(2) }] : []),
-        { label: 'Verification',  icon: ShieldCheck, status: buildStepStatus(hasCharters ? 3 : 2) },
+        { label: 'Vérification',  icon: ShieldCheck, status: buildStepStatus(hasCharters ? 3 : 2) },
       ]
     : [
         { label: 'Relecture', icon: FileText, status: 'current' },
@@ -237,34 +194,39 @@ export default function Portal() {
 
   return (
     <PortalLayout>
-      {/* Header */}
-      <div className="max-w-3xl mx-auto mb-8">
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center gap-4 shadow-sm">
-          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center">
-            <Building2 className="h-5 w-5 text-primary-600 dark:text-primary-400" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Portail partenaire</p>
-            <h1 className="text-base font-semibold text-gray-900 dark:text-white truncate">
-              {portalInfo.third_party.company_name ?? portalInfo.third_party.contact_email}
-            </h1>
-          </div>
-        </div>
+      {/* Carte d'accueil */}
+      <div className="p-card">
+        <h1 className="p-h">
+          Bonjour {portalInfo.third_party.company_name ?? portalInfo.third_party.contact_email}
+        </h1>
+        <p className="sub mt-1.5">
+          {isDocumentUpload ? (
+            <>
+              Merci de renseigner les informations de votre structure puis de déposer les
+              documents demandés pour finaliser votre dossier. Formats acceptés :{' '}
+              <b>PDF, JPG, PNG</b> · 10 Mo max.
+            </>
+          ) : (
+            <>
+              Le draft de votre contrat est prêt pour relecture. Consultez le document
+              ci-dessous puis donnez votre décision.
+            </>
+          )}
+        </p>
+        <PortalStepper steps={steps} />
       </div>
-
-      {/* Progress stepper */}
-      <PortalStepper steps={steps} />
 
       {/* Back button — hidden after submission */}
       {displayStep > 0 && !submitted && (
-        <div className="max-w-3xl mx-auto mb-4">
-          <button
+        <div className="mt-3.5">
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={goBack}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+            leftIcon={<ChevronLeft className="h-4 w-4" />}
           >
-            <ChevronLeft className="h-4 w-4" />
             Retour
-          </button>
+          </Button>
         </div>
       )}
 
@@ -286,22 +248,11 @@ export default function Portal() {
 
       {/* Document upload section — step 1 */}
       {isDocumentUpload && displayStep === 1 && docsData && (
-        <div className="max-w-3xl mx-auto">
-          <Card className="mb-6">
-            <div className="flex items-center gap-3 mb-4">
-              <ShieldCheck className="h-6 w-6 text-primary-600" />
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Documents de conformité
-                </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Veuillez téléverser les documents demandés ci-dessous.
-                </p>
-              </div>
-            </div>
-          </Card>
+        <div className="p-card mt-3.5">
+          <h2 className="ct">Documents de conformité</h2>
+          <p className="cs">Veuillez téléverser les documents demandés ci-dessous.</p>
 
-          <div className="space-y-3">
+          <div className="mt-3.5">
             {docsData.documents.map((doc) => (
               <DocumentUploadCard
                 key={doc.id}
@@ -314,132 +265,141 @@ export default function Portal() {
             ))}
 
             {docsData.documents.length === 0 && (
-              <Card className="text-center py-8">
-                <ShieldCheck className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Aucun document demandé pour le moment
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Vous serez notifié si des documents sont nécessaires.
-                </p>
-              </Card>
+              <div className="text-center py-8">
+                <ShieldCheck className="h-9 w-9 text-mut2 mx-auto mb-2.5" />
+                <p className="dn">Aucun document demandé pour le moment</p>
+                <p className="ds mt-1">Vous serez notifié si des documents sont nécessaires.</p>
+              </div>
             )}
           </div>
 
           {docsData.documents.length > 0 && (
-            <SubmitDocumentsButton
-              token={token!}
-              enabled={allDocsHandled && !hasExpiredDoc}
-              expiredBlocked={hasExpiredDoc}
-              onSubmitted={() => {
-                localStorage.setItem(`portal-submitted-${token}`, 'true');
-                setSubmitted(true);
-                setForceStep(null);
-              }}
-            />
+            <>
+              <p className="p-note">
+                Conformément au RGPD, ne transmettez jamais : pièce d'identité, titre de
+                séjour, bulletin de paie ou contrat de travail.
+              </p>
+              <SubmitDocumentsButton
+                token={token!}
+                enabled={allDocsHandled && !hasExpiredDoc}
+                expiredBlocked={hasExpiredDoc}
+                onSubmitted={() => {
+                  localStorage.setItem(`portal-submitted-${token}`, 'true');
+                  setSubmitted(true);
+                  setForceStep(null);
+                }}
+              />
+            </>
           )}
         </div>
       )}
 
       {/* Chartes step — shown after document submission */}
       {isDocumentUpload && hasCharters && displayStep === 2 && (
-        <div className="max-w-3xl mx-auto">
-          <Card>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Chartes et engagements
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Veuillez prendre connaissance des chartes suivantes et confirmer votre acceptation.
-            </p>
-            <div className="space-y-4">
-              {chartersData?.map((charter) => (
-                <div
-                  key={charter.id}
-                  className={`p-4 rounded-lg border ${
-                    charter.acknowledged
-                      ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'
-                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {charter.name}
-                        <span className="ml-2 text-xs text-gray-400">{charter.version}</span>
-                      </p>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        try {
-                          const { url } = await portalApi.getCharterDownloadUrl(token!, charter.id);
-                          window.open(url, '_blank');
-                        } catch {
-                          toast.error('Impossible de télécharger la charte. Veuillez réessayer.');
-                        }
-                      }}
-                      className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      Telecharger
-                    </button>
-                  </div>
-                  {!charter.acknowledged ? (
-                    <button
-                      onClick={async () => {
-                        try {
-                          await portalApi.acknowledgeCharter(token!, charter.id);
-                          queryClient.invalidateQueries({ queryKey: ['portal-charters', token] });
-                        } catch {
-                          toast.error("Impossible d'enregistrer votre acceptation. Veuillez réessayer.");
-                        }
-                      }}
-                      className="mt-2 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-400 transition-colors"
-                    >
-                      <div className="w-5 h-5 border-2 border-gray-300 dark:border-gray-600 rounded flex items-center justify-center">
-                      </div>
-                      J'ai lu et j'accepte cette charte
-                    </button>
-                  ) : (
-                    <p className="mt-2 flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-                      <CheckCircle className="h-4 w-4" />
-                      Acceptee
-                    </p>
-                  )}
+        <div className="p-card mt-3.5">
+          <h2 className="ct">Chartes et engagements</h2>
+          <p className="cs">
+            Veuillez prendre connaissance des chartes suivantes et confirmer votre acceptation.
+          </p>
+          <div className="mt-3.5">
+            {chartersData?.map((charter) => (
+              <div key={charter.id} className="p-doc flex-wrap">
+                <div className="dico">
+                  <ShieldCheck className="h-4 w-4" />
                 </div>
-              ))}
-            </div>
-          </Card>
+                <div className="flex-1 min-w-0">
+                  <p className="dn">{charter.name}</p>
+                  <p className="ds mt-0.5">Version {charter.version}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const { url } = await portalApi.getCharterDownloadUrl(token!, charter.id);
+                      window.open(url, '_blank');
+                    } catch {
+                      toast.error('Impossible de télécharger la charte. Veuillez réessayer.');
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 text-[12px] font-semibold text-prit hover:underline flex-shrink-0"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Télécharger
+                </button>
+                {charter.acknowledged ? (
+                  <span className="st st-grn flex-shrink-0">
+                    <span className="dot" />
+                    Acceptée
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await portalApi.acknowledgeCharter(token!, charter.id);
+                        queryClient.invalidateQueries({ queryKey: ['portal-charters', token] });
+                      } catch {
+                        toast.error("Impossible d'enregistrer votre acceptation. Veuillez réessayer.");
+                      }
+                    }}
+                    className="ckrow w-full pl-[46px] pt-1 text-left"
+                  >
+                    <span className="ck">
+                      <Check className="h-3 w-3" strokeWidth={3} />
+                    </span>
+                    J'ai lu et j'accepte cette charte
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Verification message — final step (all docs uploaded + charters acknowledged) */}
       {isDocumentUpload && displayStep === (hasCharters ? 3 : 2) && (
-        <div className="max-w-3xl mx-auto">
-          <Card className="text-center py-10">
-            <ShieldCheck className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Documents transmis avec succès
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Vos documents sont en cours de vérification par notre équipe.
-              Vous serez contacté si des informations complémentaires sont nécessaires.
-            </p>
-          </Card>
+        <div className="p-card mt-3.5 text-center px-[22px] py-9">
+          <div className="okbox !inline-flex !m-0 !mb-3.5">
+            <CheckCircle className="h-4 w-4 flex-shrink-0" />
+            <span>Documents transmis avec succès</span>
+          </div>
+          <p className="notec">
+            Vos documents sont en cours de vérification par notre équipe.
+            Vous serez contacté si des informations complémentaires sont nécessaires.
+          </p>
+        </div>
+      )}
+
+      {/* Review du contrat — à venir (flux documents) */}
+      {isDocumentUpload && (
+        <div className="p-card mt-3.5">
+          <div className="flex items-center gap-3">
+            <div className="dico">
+              <Lock className="h-4 w-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="dn">Review du contrat</p>
+              <p className="ds mt-0.5">
+                Le draft du contrat vous sera soumis ici pour relecture et approbation, une
+                fois votre dossier validé.
+              </p>
+            </div>
+            <span className="st st-sla flex-shrink-0">
+              <span className="dot" />À venir
+            </span>
+          </div>
         </div>
       )}
 
       {/* Contract review section */}
       {isContractReview && (
-        <div className="max-w-3xl mx-auto">
-          <ContractReviewSection token={token!} contractDraft={contractDraft} />
-        </div>
+        <ContractReviewSection token={token!} contractDraft={contractDraft} />
       )}
     </PortalLayout>
   );
 }
 
-const INPUT_CLS =
-  'w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500';
+const INPUT_CLS = 'f-in';
 
 // INSEE nomenclature — catégories juridiques (source : INPI / FORME_JURIDIQUE_LABELS backend)
 const LEGAL_FORM_COMMON = [
@@ -570,7 +530,7 @@ function CivilitySelect({ value, onChange }: { value: Civility | ''; onChange: (
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as Civility)}
-        className={INPUT_CLS}
+        className={`${INPUT_CLS} !px-2.5`}
       >
         <option value="">—</option>
         <option value="M.">M.</option>
@@ -599,16 +559,19 @@ function ContactSection({
     onChange({ ...contact, [key]: e.target.value });
 
   return (
-    <div className="border-t border-gray-100 dark:border-gray-700 pt-5 mt-6">
-      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4 pl-3 border-l-2 border-primary-500">{title}</p>
+    <div className="border-t border-lin2 pt-4 mt-5">
+      <p className="ct text-[13.5px] mb-3.5">{title}</p>
       {checkboxLabel && onToggleSameAsRep !== undefined && (
-        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-3 cursor-pointer select-none">
+        <label className="ckrow mb-3 select-none">
           <input
             type="checkbox"
+            className="sr-only"
             checked={sameAsRep}
             onChange={onToggleSameAsRep}
-            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
           />
+          <span className={`ck ${sameAsRep ? 'on' : ''}`}>
+            <Check className="h-3 w-3" strokeWidth={3} />
+          </span>
           {checkboxLabel}
         </label>
       )}
@@ -617,25 +580,25 @@ function ContactSection({
           <div className="md:col-span-2">
             <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-end">
               <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Civilité *</label>
+                <label className="f-lab">Civilité *</label>
                 <CivilitySelect value={contact.civility} onChange={(v) => onChange({ ...contact, civility: v })} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Prénom *</label>
+                <label className="f-lab">Prénom *</label>
                 <input type="text" value={contact.first_name} onChange={set('first_name')} placeholder="Prénom" className={INPUT_CLS} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Nom *</label>
+                <label className="f-lab">Nom *</label>
                 <input type="text" value={contact.last_name} onChange={set('last_name')} placeholder="Nom" className={INPUT_CLS} />
               </div>
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">E-mail *</label>
+            <label className="f-lab">E-mail *</label>
             <input type="email" value={contact.email} onChange={set('email')} placeholder="Ex : jean.dupont@entreprise.fr" className={INPUT_CLS} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone</label>
+            <label className="f-lab">Téléphone</label>
             <PhoneInput
               international
               defaultCountry="FR"
@@ -881,333 +844,293 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
   });
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <Card>
-        <div className="flex items-center gap-3 mb-6">
-          <Building2 className="h-6 w-6 text-primary-600" />
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Informations de votre structure
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Renseignez vos coordonnées légales pour démarrer la collecte de documents.
-            </p>
+    <div className="p-card mt-3.5">
+      <h2 className="ct">Informations de votre structure</h2>
+      <p className="cs">
+        Renseignez vos coordonnées légales pour démarrer la collecte de documents.
+      </p>
+
+      {/* Entity category */}
+      <div className="mt-4">
+        <span className="f-lab">Structure juridique *</span>
+        {isPortageSalarial ? (
+          <div className="tcard on">
+            <p className="tt">Société de portage salarial</p>
+            <p className="td2">Votre structure est une société de portage salarial</p>
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {(
+              [
+                { value: 'ei', label: 'Entreprise individuelle', sub: 'EI, Micro-entreprise' },
+                { value: 'societe', label: 'Société', sub: 'SAS, SASU, EURL, SARL…' },
+              ] as const
+            ).map(({ value, label, sub }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setEntityCategory(value)}
+                className={`tcard text-left ${entityCategory === value ? 'on' : ''}`}
+              >
+                <p className="tt">{label}</p>
+                <p className="td2">{sub}</p>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
-        {/* Entity category */}
-        <div className="mb-5">
-          <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Structure juridique *
-          </p>
-          {isPortageSalarial ? (
-            <div className="p-3 rounded-lg border-2 border-primary-500 bg-primary-50 dark:bg-primary-900/20">
-              <p className="text-sm font-medium text-gray-900 dark:text-white">Société de portage salarial</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Votre structure est une société de portage salarial</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {(
-                [
-                  { value: 'ei', label: 'Entreprise individuelle', sub: 'EI, Micro-entreprise' },
-                  { value: 'societe', label: 'Société', sub: 'SAS, SASU, EURL, SARL…' },
-                ] as const
-              ).map(({ value, label, sub }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setEntityCategory(value)}
-                  className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                    entityCategory === value
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sub}</p>
-                </button>
-              ))}
-            </div>
-          )}
+      {/* Identité */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div>
+          <label className="f-lab">SIRET *</label>
+          <div className="relative">
+            <input
+              type="text"
+              maxLength={14}
+              value={form.siret}
+              onChange={(e) => handleSiretChange(e.target.value)}
+              placeholder="Ex : 44035388200012"
+              className={INPUT_CLS}
+            />
+            {siretLoading && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-prit" />
+            )}
+          </div>
+          <p className="f-hint">Les informations seront pré-remplies automatiquement.</p>
         </div>
-
-        {/* Identité */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="f-lab">
+            {!isSocieteOrPortage ? 'Nom commercial / Enseigne *' : 'Raison sociale *'}
+          </label>
+          <input
+            type="text"
+            {...field('company_name')}
+            placeholder={!isSocieteOrPortage ? 'Ex : Jean Dupont Consulting' : 'Ex : Acme SAS'}
+            className={INPUT_CLS}
+          />
+        </div>
+        {isSocieteOrPortage && (
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              SIRET *
-            </label>
+            <label className="f-lab">Ville du greffe *</label>
+            <input
+              type="text"
+              {...field('rcs_city')}
+              placeholder="Ex : Paris"
+              className={INPUT_CLS}
+            />
+          </div>
+        )}
+        <div>
+          <label className="f-lab">Forme juridique *</label>
+          <select
+            value={form.legal_form}
+            onChange={(e) => setForm((f) => ({ ...f, legal_form: e.target.value }))}
+            className={`${INPUT_CLS} !px-2.5`}
+          >
+            <option value="">— Sélectionner —</option>
+            {form.legal_form &&
+              !LEGAL_FORM_COMMON.includes(form.legal_form) &&
+              !LEGAL_FORM_ALL.includes(form.legal_form) && (
+                <option value={form.legal_form}>{form.legal_form}</option>
+              )}
+            <optgroup label="Formes courantes">
+              {LEGAL_FORM_COMMON.map((v) => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Autres formes">
+              {LEGAL_FORM_ALL.map((v) => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </optgroup>
+          </select>
+        </div>
+        {isSocieteOrPortage && (
+          <div>
+            <label className="f-lab">Capital social</label>
             <div className="relative">
               <input
                 type="text"
-                maxLength={14}
-                value={form.siret}
-                onChange={(e) => handleSiretChange(e.target.value)}
-                placeholder="Ex : 44035388200012"
+                inputMode="numeric"
+                value={form.capital}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, capital: formatCapital(e.target.value) }))
+                }
+                placeholder="Ex : 10 000"
                 className={INPUT_CLS}
               />
-              {siretLoading && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary-500" />
-              )}
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11.5px] text-mut2 pointer-events-none">
+                EUR
+              </span>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Les informations seront pré-remplies automatiquement.
-            </p>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {!isSocieteOrPortage ? 'Nom commercial / Enseigne *' : 'Raison sociale *'}
-            </label>
-            <input
-              type="text"
-              {...field('company_name')}
-              placeholder={!isSocieteOrPortage ? 'Ex : Jean Dupont Consulting' : 'Ex : Acme SAS'}
-              className={INPUT_CLS}
-            />
-          </div>
-          {isSocieteOrPortage && (
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Ville du greffe *
-              </label>
-              <input
-                type="text"
-                {...field('rcs_city')}
-                placeholder="Ex : Paris"
-                className={INPUT_CLS}
-              />
-            </div>
-          )}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Forme juridique *
-            </label>
-            <select
-              value={form.legal_form}
-              onChange={(e) => setForm((f) => ({ ...f, legal_form: e.target.value }))}
-              className={INPUT_CLS}
-            >
-              <option value="">— Sélectionner —</option>
-              {form.legal_form &&
-                !LEGAL_FORM_COMMON.includes(form.legal_form) &&
-                !LEGAL_FORM_ALL.includes(form.legal_form) && (
-                  <option value={form.legal_form}>{form.legal_form}</option>
-                )}
-              <optgroup label="Formes courantes">
-                {LEGAL_FORM_COMMON.map((v) => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Autres formes">
-                {LEGAL_FORM_ALL.map((v) => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-              </optgroup>
-            </select>
-          </div>
-          {isSocieteOrPortage && (
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Capital social
-              </label>
-              <div className="relative">
+        )}
+        <div>
+          <label className="f-lab">N° TVA intracommunautaire</label>
+          <input
+            type="text"
+            value={form.vat_number}
+            readOnly
+            tabIndex={-1}
+            placeholder="Calculé automatiquement à partir du SIRET"
+            className={`${INPUT_CLS} !text-mut cursor-not-allowed`}
+          />
+        </div>
+        <div>
+          <label className="f-lab">Code APE / NAF</label>
+          <input
+            type="text"
+            maxLength={6}
+            value={form.ape_code}
+            onChange={(e) => setForm((f) => ({ ...f, ape_code: e.target.value }))}
+            placeholder="Ex : 6202A"
+            className={INPUT_CLS}
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="f-lab">Numéro et voie *</label>
+          <input type="text" {...field('head_office_street')} placeholder="Ex : 12 rue de la Paix" className={INPUT_CLS} />
+        </div>
+        <div>
+          <label className="f-lab">Code postal *</label>
+          <input
+            type="text"
+            maxLength={5}
+            {...field('head_office_postal_code')}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, head_office_postal_code: e.target.value.replace(/\D/g, '') }))
+            }
+            placeholder="Ex : 75001"
+            className={INPUT_CLS}
+          />
+        </div>
+        <div>
+          <label className="f-lab">Ville *</label>
+          <input type="text" {...field('head_office_city')} placeholder="Ex : Paris" className={INPUT_CLS} />
+        </div>
+      </div>
+
+      {/* Signataire du contrat (= représentant légal) */}
+      <div className="border-t border-lin2 pt-4 mt-5">
+        <p className="ct text-[13.5px] mb-3.5">Signataire du contrat</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="md:col-span-2">
+            <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-end">
+              <div>
+                <label className="f-lab">Civilité *</label>
+                <CivilitySelect value={signatory.civility} onChange={(v) => setSignatory((c) => ({ ...c, civility: v }))} />
+              </div>
+              <div>
+                <label className="f-lab">Prénom *</label>
                 <input
                   type="text"
-                  inputMode="numeric"
-                  value={form.capital}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, capital: formatCapital(e.target.value) }))
-                  }
-                  placeholder="Ex : 10 000"
+                  value={signatory.first_name}
+                  onChange={(e) => setSignatory((c) => ({ ...c, first_name: e.target.value }))}
+                  placeholder="Prénom"
                   className={INPUT_CLS}
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
-                  EUR
-                </span>
+              </div>
+              <div>
+                <label className="f-lab">Nom *</label>
+                <input
+                  type="text"
+                  value={signatory.last_name}
+                  onChange={(e) => setSignatory((c) => ({ ...c, last_name: e.target.value }))}
+                  placeholder="Nom"
+                  className={INPUT_CLS}
+                />
               </div>
             </div>
-          )}
+          </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              N° TVA intracommunautaire
-            </label>
+            <label className="f-lab">E-mail *</label>
             <input
-              type="text"
-              value={form.vat_number}
-              readOnly
-              tabIndex={-1}
-              placeholder="Calculé automatiquement à partir du SIRET"
-              className={`${INPUT_CLS} bg-gray-50 dark:bg-gray-700 cursor-not-allowed`}
+              type="email"
+              value={signatory.email}
+              onChange={(e) => setSignatory((c) => ({ ...c, email: e.target.value }))}
+              placeholder="Ex : jean.dupont@entreprise.fr"
+              className={INPUT_CLS}
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Code APE / NAF
-            </label>
+            <label className="f-lab">Téléphone</label>
+            <PhoneInput
+              international
+              defaultCountry="FR"
+              value={signatory.phone}
+              onChange={(val) => setSignatory((c) => ({ ...c, phone: val || '' }))}
+              className="phone-input-container"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="f-lab">Qualité *</label>
             <input
               type="text"
-              maxLength={6}
-              value={form.ape_code}
-              onChange={(e) => setForm((f) => ({ ...f, ape_code: e.target.value }))}
-              placeholder="Ex : 6202A"
+              {...field('representative_title')}
+              placeholder={!isSocieteOrPortage ? 'Ex : Entrepreneur individuel' : 'Ex : Président'}
               className={INPUT_CLS}
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Numéro et voie *
-            </label>
-            <input type="text" {...field('head_office_street')} placeholder="Ex : 12 rue de la Paix" className={INPUT_CLS} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Code postal *
-            </label>
-            <input
-              type="text"
-              maxLength={5}
-              {...field('head_office_postal_code')}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, head_office_postal_code: e.target.value.replace(/\D/g, '') }))
-              }
-              placeholder="Ex : 75001"
-              className={INPUT_CLS}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Ville *
-            </label>
-            <input type="text" {...field('head_office_city')} placeholder="Ex : Paris" className={INPUT_CLS} />
-          </div>
-        </div>
-
-        {/* Signataire du contrat (= représentant légal) */}
-        <div className="border-t border-gray-100 dark:border-gray-700 pt-5 mt-6">
-          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4 pl-3 border-l-2 border-primary-500">
-            Signataire du contrat
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="md:col-span-2">
-              <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-end">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Civilité *</label>
-                  <CivilitySelect value={signatory.civility} onChange={(v) => setSignatory((c) => ({ ...c, civility: v }))} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Prénom *</label>
-                  <input
-                    type="text"
-                    value={signatory.first_name}
-                    onChange={(e) => setSignatory((c) => ({ ...c, first_name: e.target.value }))}
-                    placeholder="Prénom"
-                    className={INPUT_CLS}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Nom *</label>
-                  <input
-                    type="text"
-                    value={signatory.last_name}
-                    onChange={(e) => setSignatory((c) => ({ ...c, last_name: e.target.value }))}
-                    placeholder="Nom"
-                    className={INPUT_CLS}
-                  />
-                </div>
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">E-mail *</label>
+            <label className="ckrow select-none">
               <input
-                type="email"
-                value={signatory.email}
-                onChange={(e) => setSignatory((c) => ({ ...c, email: e.target.value }))}
-                placeholder="Ex : jean.dupont@entreprise.fr"
-                className={INPUT_CLS}
+                type="checkbox"
+                className="sr-only"
+                checked={signatoryIsDirector}
+                onChange={() => setSignatoryIsDirector((v) => !v)}
               />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Téléphone</label>
-              <PhoneInput
-                international
-                defaultCountry="FR"
-                value={signatory.phone}
-                onChange={(val) => setSignatory((c) => ({ ...c, phone: val || '' }))}
-                className="phone-input-container"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Qualité *
-              </label>
-              <input
-                type="text"
-                {...field('representative_title')}
-                placeholder={!isSocieteOrPortage ? 'Ex : Entrepreneur individuel' : 'Ex : Président'}
-                className={INPUT_CLS}
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={signatoryIsDirector}
-                  onChange={() => setSignatoryIsDirector((v) => !v)}
-                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="text-xs text-gray-700 dark:text-gray-300">
-                  Cette personne est le dirigeant de la société
-                </span>
-              </label>
-            </div>
+              <span className={`ck ${signatoryIsDirector ? 'on' : ''}`}>
+                <Check className="h-3 w-3" strokeWidth={3} />
+              </span>
+              Cette personne est le dirigeant de la société
+            </label>
           </div>
         </div>
+      </div>
 
-        {/* Contact ADV */}
-        <ContactSection
-          title="Contact ADV"
-          contact={advContact}
-          onChange={setAdvContact}
-          checkboxLabel="Même personne que le signataire du contrat"
-          sameAsRep={advIsSame}
-          onToggleSameAsRep={() => setAdvIsSame((v) => !v)}
-        />
+      {/* Contact ADV */}
+      <ContactSection
+        title="Contact ADV"
+        contact={advContact}
+        onChange={setAdvContact}
+        checkboxLabel="Même personne que le signataire du contrat"
+        sameAsRep={advIsSame}
+        onToggleSameAsRep={() => setAdvIsSame((v) => !v)}
+      />
 
-        {/* Contact commercial */}
-        <ContactSection
-          title="Contact commercial"
-          contact={billingContact}
-          onChange={setBillingContact}
-          checkboxLabel="Même personne que le signataire du contrat"
-          sameAsRep={billingIsSame}
-          onToggleSameAsRep={() => setBillingIsSame((v) => !v)}
-        />
+      {/* Contact commercial */}
+      <ContactSection
+        title="Contact commercial"
+        contact={billingContact}
+        onChange={setBillingContact}
+        checkboxLabel="Même personne que le signataire du contrat"
+        sameAsRep={billingIsSame}
+        onToggleSameAsRep={() => setBillingIsSame((v) => !v)}
+      />
 
-        <div className="flex justify-end gap-3 mt-6">
-          <Button variant="secondary" onClick={handleSaveDraft} disabled={isSaving || isSubmitting} isLoading={isSaving}>
-            Enregistrer
-          </Button>
-          <Button onClick={handleSubmit} disabled={!isValid || isSubmitting || isSaving} isLoading={isSubmitting}>
-            Valider et continuer
-          </Button>
-        </div>
-      </Card>
+      <div className="flex justify-end gap-3 mt-6">
+        <Button variant="secondary" onClick={handleSaveDraft} disabled={isSaving || isSubmitting} isLoading={isSaving}>
+          Enregistrer
+        </Button>
+        <Button onClick={handleSubmit} disabled={!isValid || isSubmitting || isSaving} isLoading={isSubmitting}>
+          Valider et continuer
+        </Button>
+      </div>
     </div>
   );
 }
 
 function PortalLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-        <div className="max-w-3xl mx-auto flex items-center gap-3">
-          <FileText className="h-6 w-6 text-primary-600" />
-          <span className="text-lg font-semibold text-gray-900 dark:text-white">
-            Bobby
-          </span>
+    <div className="p-bg">
+      <div className="p-wrap">
+        <div className="p-top">
+          <span className="logo">Bobby · Portail partenaire</span>
         </div>
-      </header>
-      <main className="px-6 py-8">{children}</main>
+        {children}
+        <p className="p-foot">Lien d'accès sécurisé et personnel · ne le partagez pas</p>
+      </div>
     </div>
   );
 }
@@ -1243,39 +1166,29 @@ function SubmitDocumentsButton({
   });
 
   return (
-    <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
-      <div className="flex flex-col items-center gap-3 text-center">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Une fois tous vos documents déposés, validez votre dépôt pour notifier notre équipe.
+    <div className="mt-5 border-t border-lin2 pt-5 text-center">
+      <p className="notec">
+        Une fois tous vos documents déposés, validez votre dépôt pour notifier notre équipe.
+      </p>
+      <Button
+        className="mt-3.5 min-w-48"
+        onClick={() => submitMutation.mutate()}
+        disabled={!enabled || submitMutation.isPending}
+        isLoading={submitMutation.isPending}
+        leftIcon={<CheckCircle className="h-4 w-4" />}
+      >
+        Valider le dépôt des documents
+      </Button>
+      {expiredBlocked && (
+        <p className="f-hint !text-redt mt-2.5">
+          Un ou plusieurs documents sont expirés. Veuillez les remplacer avant de valider.
         </p>
-        <Button
-          onClick={() => submitMutation.mutate()}
-          disabled={!enabled || submitMutation.isPending}
-          className="min-w-48"
-        >
-          {submitMutation.isPending ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Envoi en cours…
-            </>
-          ) : (
-            <>
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Valider le dépôt des documents
-            </>
-          )}
-        </Button>
-        {expiredBlocked && (
-          <p className="text-xs text-red-500 dark:text-red-400">
-            Un ou plusieurs documents sont expirés. Veuillez les remplacer avant de valider.
-          </p>
-        )}
-        {!enabled && !expiredBlocked && (
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            Chaque document doit être téléversé ou signalé comme indisponible avec une raison.
-          </p>
-        )}
-      </div>
+      )}
+      {!enabled && !expiredBlocked && (
+        <p className="f-hint mt-2.5">
+          Chaque document doit être téléversé ou signalé comme indisponible avec une raison.
+        </p>
+      )}
     </div>
   );
 }
@@ -1301,10 +1214,6 @@ function DocumentUploadCard({
   const [unavailChecked, setUnavailChecked] = useState(doc.is_unavailable);
   const [unavailReason, setUnavailReason] = useState(doc.unavailability_reason ?? '');
 
-  const Icon = DOCUMENT_STATUS_ICONS[doc.status] ?? FileText;
-  const iconColor = doc.is_unavailable
-    ? 'text-gray-400'
-    : DOCUMENT_STATUS_COLORS[doc.status] ?? 'text-gray-400';
   const statusLabel = doc.is_unavailable
     ? 'Document indisponible'
     : DOCUMENT_STATUS_LABELS[doc.status] ?? doc.status;
@@ -1384,175 +1293,191 @@ function DocumentUploadCard({
   });
 
   return (
-    <Card className="relative">
-      {/* ── X delete button (top-right) ── */}
-      {doc.status === 'received' && !unavailChecked && (
-        confirmDelete ? (
-          <div className="absolute top-3 right-3 flex items-center gap-2">
-            <button
-              onClick={() => deleteMutation.mutate()}
-              disabled={deleteMutation.isPending}
-              className="text-xs text-red-500 dark:text-red-400 hover:underline disabled:opacity-50"
-            >
-              {deleteMutation.isPending ? 'Suppression…' : 'Confirmer'}
-            </button>
-            <button onClick={() => setConfirmDelete(false)}
-              className="text-xs text-gray-400 hover:underline">
-              Annuler
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setConfirmDelete(true)}
-            title="Supprimer ce document"
-            className="absolute top-3 right-3 p-1 rounded-full text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )
-      )}
+    <div
+      className="p-doc flex-wrap items-start"
+      onDragOver={needsUpload ? (e) => { e.preventDefault(); setDragOver(true); } : undefined}
+      onDragLeave={needsUpload ? () => setDragOver(false) : undefined}
+      onDrop={needsUpload ? handleDrop : undefined}
+    >
+      <div className="dico mt-0.5">
+        <FileText className="h-4 w-4" />
+      </div>
 
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
-          <Icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${iconColor}`} />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                {doc.display_name}
-              </p>
-              {doc.validity_label && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
-                  {doc.validity_label}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{statusLabel}</p>
-            {doc.file_name && !doc.is_unavailable && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Fichier : {doc.file_name}</p>
-            )}
-            {doc.rejection_reason && (
-              <p className="text-xs text-red-600 dark:text-red-400 mt-1">Motif du rejet : {doc.rejection_reason}</p>
-            )}
-
-            {/* AI-extracted data */}
-            {!doc.is_unavailable && doc.document_type !== 'rib' && (doc.document_date || doc.extracted_info?.expiry_date) && (
-              <div className="mt-2 space-y-1">
-                {doc.document_date && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    <span className="font-medium text-gray-600 dark:text-gray-300">Date du document :</span>{' '}
-                    {new Date(doc.document_date).toLocaleDateString('fr-FR')}
-                  </p>
-                )}
-                {doc.extracted_info?.expiry_date && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    <span className="font-medium text-gray-600 dark:text-gray-300">Valide jusqu'au :</span>{' '}
-                    {new Date(doc.extracted_info.expiry_date).toLocaleDateString('fr-FR')}
-                  </p>
-                )}
-                {doc.is_valid_at_upload === true && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-700">
-                    <CheckCircle className="h-3 w-3" /> Valide
-                  </span>
-                )}
-                {doc.is_valid_at_upload === false && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-700">
-                    <XCircle className="h-3 w-3" /> Document périmé
-                  </span>
-                )}
-              </div>
-            )}
-            {!doc.is_unavailable && doc.document_type === 'rib' && doc.extracted_info && (
-              <div className="mt-2 space-y-0.5">
-                {doc.extracted_info.beneficiaire && (
-                  <p className="text-xs text-gray-600 dark:text-gray-300">
-                    <span className="font-medium">Bénéficiaire :</span> {doc.extracted_info.beneficiaire}
-                  </p>
-                )}
-                {doc.extracted_info.iban && (
-                  <p className="text-xs text-gray-600 dark:text-gray-300 font-mono">
-                    <span className="font-sans font-medium">IBAN :</span> {doc.extracted_info.iban}
-                  </p>
-                )}
-                {doc.extracted_info.bic && (
-                  <p className="text-xs text-gray-600 dark:text-gray-300 font-mono">
-                    <span className="font-sans font-medium">BIC :</span> {doc.extracted_info.bic}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="dn">{doc.display_name}</p>
+          {doc.validity_label && <span className="st st-amb">{doc.validity_label}</span>}
         </div>
+        <p className="ds mt-0.5 truncate">
+          {doc.file_name && !doc.is_unavailable ? doc.file_name : statusLabel}
+        </p>
+        {doc.rejection_reason && (
+          <p className="text-[11.5px] text-redt mt-1">Motif du rejet : {doc.rejection_reason}</p>
+        )}
 
-        {/* "Changer" button for received documents */}
-        {doc.status === 'received' && !showReplace && !unavailChecked && !confirmDelete && (
-          <button onClick={() => setShowReplace(true)}
-            className="ml-3 mr-6 flex-shrink-0 text-xs text-primary-600 dark:text-primary-400 hover:underline">
-            Changer
-          </button>
+        {/* AI-extracted data */}
+        {!doc.is_unavailable && doc.document_type !== 'rib' && (doc.document_date || doc.extracted_info?.expiry_date) && (
+          <div className="mt-1.5 space-y-1">
+            {doc.document_date && (
+              <p className="ds">
+                <span className="font-semibold text-ink">Date du document :</span>{' '}
+                {new Date(doc.document_date).toLocaleDateString('fr-FR')}
+              </p>
+            )}
+            {doc.extracted_info?.expiry_date && (
+              <p className="ds">
+                <span className="font-semibold text-ink">Valide jusqu'au :</span>{' '}
+                {new Date(doc.extracted_info.expiry_date).toLocaleDateString('fr-FR')}
+              </p>
+            )}
+            {doc.is_valid_at_upload === true && (
+              <span className="st st-grn">
+                <span className="dot" />Valide
+              </span>
+            )}
+            {doc.is_valid_at_upload === false && (
+              <span className="st st-red">
+                <span className="dot" />Document périmé
+              </span>
+            )}
+          </div>
+        )}
+        {!doc.is_unavailable && doc.document_type === 'rib' && doc.extracted_info && (
+          <div className="mt-1.5 space-y-0.5">
+            {doc.extracted_info.beneficiaire && (
+              <p className="ds">
+                <span className="font-semibold text-ink">Bénéficiaire :</span> {doc.extracted_info.beneficiaire}
+              </p>
+            )}
+            {doc.extracted_info.iban && (
+              <p className="ds font-mono">
+                <span className="font-sans font-semibold text-ink">IBAN :</span> {doc.extracted_info.iban}
+              </p>
+            )}
+            {doc.extracted_info.bic && (
+              <p className="ds font-mono">
+                <span className="font-sans font-semibold text-ink">BIC :</span> {doc.extracted_info.bic}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Right side — status chip / upload button / actions */}
+      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+        {unavailChecked ? (
+          <span className="st st-sla">
+            <span className="dot" />Indisponible
+          </span>
+        ) : (
+          doc.status !== 'requested' && (
+            <span className={`st ${DOCUMENT_STATUS_CHIPS[doc.status] ?? 'st-sla'}`}>
+              <span className="dot" />
+              {DOCUMENT_STATUS_LABELS[doc.status] ?? doc.status}
+            </span>
+          )
+        )}
+
+        {needsUpload &&
+          (uploadMutation.isPending ? (
+            <span className="p-up !cursor-default inline-flex items-center gap-1.5">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Envoi en cours…
+            </span>
+          ) : (
+            <label className={`p-up cursor-pointer ${dragOver ? '!border-pri !bg-pris' : ''}`}>
+              Déposer le fichier
+              <input
+                type="file"
+                className="hidden"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }}
+              />
+            </label>
+          ))}
+
+        {/* "Changer" / delete actions for received documents */}
+        {doc.status === 'received' && !unavailChecked && !showReplace && (
+          <div className="flex items-center gap-2.5">
+            {confirmDelete ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => deleteMutation.mutate()}
+                  disabled={deleteMutation.isPending}
+                  className="text-[11.5px] font-semibold text-redt hover:underline disabled:opacity-50"
+                >
+                  {deleteMutation.isPending ? 'Suppression…' : 'Confirmer'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  className="text-[11.5px] text-mut2 hover:underline"
+                >
+                  Annuler
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowReplace(true)}
+                  className="text-[11.5px] font-semibold text-prit hover:underline"
+                >
+                  Changer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  title="Supprimer ce document"
+                  className="p-0.5 rounded-md text-mut2 hover:text-redt hover:bg-red-bg transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </>
+            )}
+          </div>
         )}
         {showReplace && (
-          <button onClick={() => setShowReplace(false)}
-            className="ml-3 mr-6 flex-shrink-0 text-xs text-gray-400 hover:underline">
+          <button
+            type="button"
+            onClick={() => setShowReplace(false)}
+            className="text-[11.5px] text-mut2 hover:underline"
+          >
             Annuler
           </button>
         )}
       </div>
 
-      {/* ── Banner for temporarily validated docs ── */}
+      {/* Banner for temporarily validated docs */}
       {isTempValidated && (
-        <p className="mt-3 text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 py-2">
-          Votre interlocuteur a pris acte de l'indisponibilité de ce document. Si vous l'avez obtenu depuis, vous pouvez le déposer ici.
-        </p>
-      )}
-
-      {/* ── Upload zone ── */}
-      {needsUpload && (
-        <div
-          className={`mt-3 border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
-            dragOver ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-300 dark:border-gray-600'
-          }`}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-        >
-          {uploadMutation.isPending ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Envoi en cours...</p>
-          ) : (
-            <>
-              <Upload className="h-6 w-6 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Glissez un fichier ici ou{' '}
-                <label className="text-primary-600 hover:text-primary-700 cursor-pointer">
-                  parcourir
-                  <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }} />
-                </label>
-              </p>
-              <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG — max 10 Mo</p>
-            </>
-          )}
+        <div className="w-full pl-[46px] mt-1">
+          <div className="infob">
+            Votre interlocuteur a pris acte de l'indisponibilité de ce document. Si vous
+            l'avez obtenu depuis, vous pouvez le déposer ici.
+          </div>
         </div>
       )}
 
-      {/* ── "Je ne dispose pas de ce document" checkbox ── */}
+      {/* "Je ne dispose pas de ce document" */}
       {!isTempValidated && (doc.status === 'requested' || doc.status === 'rejected' || doc.is_unavailable) && !showReplace && (
-        <div className="mt-3 border-t border-gray-100 dark:border-gray-700 pt-3">
-          <label className="flex items-start gap-2 cursor-pointer select-none">
+        <div className="w-full pl-[46px] mt-1">
+          <label className="ckrow select-none">
             <input
               type="checkbox"
+              className="sr-only"
               checked={unavailChecked}
               onChange={(e) => handleCheckboxChange(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               disabled={availabilityMutation.isPending}
             />
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              Je ne dispose pas de ce document
+            <span className={`ck ${unavailChecked ? 'on' : ''}`}>
+              <Check className="h-3 w-3" strokeWidth={3} />
             </span>
+            Je ne dispose pas de ce document
           </label>
 
           {unavailChecked && (
-            <div className="mt-2 ml-6 space-y-1">
+            <div className="mt-2">
               <textarea
                 value={unavailReason}
                 onChange={(e) => setUnavailReason(e.target.value)}
@@ -1560,12 +1485,12 @@ function DocumentUploadCard({
                 placeholder="Précisez la raison (ex : document en cours d'obtention, non applicable à notre situation…)"
                 rows={3}
                 maxLength={500}
-                className="w-full text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                className="f-ta !min-h-[64px]"
               />
               <div className="flex items-center justify-between min-h-[1.25rem]">
-                <span className="text-xs text-gray-400">{unavailReason.length}/500</span>
+                <span className="f-hint !mt-0.5">{unavailReason.length}/500</span>
                 {availabilityMutation.isPending && (
-                  <span className="text-xs text-gray-400 flex items-center gap-1">
+                  <span className="f-hint !mt-0.5 flex items-center gap-1">
                     <Loader2 className="h-3 w-3 animate-spin" /> Enregistrement…
                   </span>
                 )}
@@ -1574,7 +1499,7 @@ function DocumentUploadCard({
           )}
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -1612,97 +1537,88 @@ function ContractReviewSection({
   if (submitted) {
     const isApproved = submitted === 'approved';
     return (
-      <Card className="text-center py-10">
-        <div className={`mx-auto mb-4 flex items-center justify-center h-16 w-16 rounded-full ${isApproved ? 'bg-green-100 dark:bg-green-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
-          {isApproved
-            ? <CheckCircle className="h-8 w-8 text-green-500" />
-            : <AlertTriangle className="h-8 w-8 text-orange-500" />
-          }
-        </div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-          {isApproved ? 'Contrat approuvé' : 'Modifications demandées'}
-        </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
+      <div className="p-card mt-3.5 text-center px-[22px] py-9">
+        {isApproved ? (
+          <div className="okbox !inline-flex !m-0 !mb-3.5">
+            <CheckCircle className="h-4 w-4 flex-shrink-0" />
+            <span>Contrat approuvé</span>
+          </div>
+        ) : (
+          <div className="alert !inline-flex !mt-0 !mb-3.5">
+            <AlertTriangle className="h-[18px] w-[18px] flex-shrink-0" />
+            <span>Modifications demandées</span>
+          </div>
+        )}
+        <p className="notec max-w-sm mx-auto">
           {isApproved
             ? 'Votre validation a bien été enregistrée. Nous allons procéder à l\'envoi du contrat en signature.'
             : 'Vos commentaires ont bien été transmis à notre équipe. Nous reviendrons vers vous après correction du contrat.'
           }
         </p>
-      </Card>
+      </div>
     );
   }
 
   return (
     <div>
-      <Card className="mb-6">
-        <div className="flex items-center gap-3 mb-4">
-          <FileText className="h-6 w-6 text-primary-600" />
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Relecture du contrat
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Veuillez relire le contrat ci-dessous et donner votre décision.
+      <div className="p-card mt-3.5">
+        <h2 className="ct">Relecture du contrat</h2>
+        <p className="cs">Veuillez relire le contrat ci-dessous et donner votre décision.</p>
+
+        <div className="p-doc mt-3.5">
+          <div className="dico">
+            <FileText className="h-4 w-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="dn">Draft du contrat</p>
+            <p className="ds mt-0.5">
+              {contractDraft?.download_url
+                ? 'Relisez le document puis donnez votre décision ci-dessous.'
+                : "Le document n'est pas encore disponible."}
             </p>
           </div>
-        </div>
-
-        {contractDraft?.download_url ? (
-          <div className="mt-2">
-            <iframe
-              src={contractDraft.download_url}
-              title="Brouillon du contrat"
-              className="w-full rounded-lg border border-gray-200 dark:border-gray-700"
-              style={{ height: '75vh', minHeight: '500px' }}
-            />
+          {contractDraft?.download_url && (
             <a
               href={contractDraft.download_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-xs text-gray-500 hover:text-primary-600 mt-2"
+              className="inline-flex items-center gap-1 text-[12px] font-semibold text-prit hover:underline flex-shrink-0"
             >
-              <FileText className="h-3.5 w-3.5" />
-              Ouvrir dans un nouvel onglet
+              <Download className="h-3.5 w-3.5" />
+              Télécharger
             </a>
-          </div>
-        ) : (
-          <p className="text-sm text-gray-400 dark:text-gray-500 italic mt-2">
-            Le document n'est pas encore disponible.
-          </p>
+          )}
+        </div>
+
+        {contractDraft?.download_url && (
+          <iframe
+            src={contractDraft.download_url}
+            title="Brouillon du contrat"
+            className="w-full rounded-xl border border-lin"
+            style={{ height: '75vh', minHeight: '500px' }}
+          />
         )}
-      </Card>
+      </div>
 
-      <Card>
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-          Votre décision
-        </h3>
+      <div className="p-card mt-3.5">
+        <h3 className="ct">Votre décision</h3>
 
-        <div className="flex gap-3 mb-4">
+        <div className="f-grid mt-3.5">
           <button
+            type="button"
             onClick={() => setDecision('approved')}
-            className={`flex-1 p-4 rounded-lg border-2 text-center transition-colors ${
-              decision === 'approved'
-                ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                : 'border-gray-200 dark:border-gray-700 hover:border-green-300'
-            }`}
+            className={`tcard text-center ${decision === 'approved' ? 'on' : ''}`}
           >
-            <CheckCircle className={`h-6 w-6 mx-auto mb-2 ${decision === 'approved' ? 'text-green-500' : 'text-gray-400'}`} />
-            <p className="text-sm font-medium text-gray-900 dark:text-white">
-              Approuver
-            </p>
+            <CheckCircle className={`h-5 w-5 mx-auto mb-1.5 ${decision === 'approved' ? 'text-prit' : 'text-mut2'}`} />
+            <p className="tt">Approuver</p>
           </button>
           <button
+            type="button"
             onClick={() => setDecision('changes_requested')}
-            className={`flex-1 p-4 rounded-lg border-2 text-center transition-colors ${
-              decision === 'changes_requested'
-                ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
-                : 'border-gray-200 dark:border-gray-700 hover:border-orange-300'
-            }`}
+            className={`tcard text-center ${decision === 'changes_requested' ? 'on' : ''}`}
           >
-            <AlertTriangle className={`h-6 w-6 mx-auto mb-2 ${decision === 'changes_requested' ? 'text-orange-500' : 'text-gray-400'}`} />
-            <p className="text-sm font-medium text-gray-900 dark:text-white">
-              Demander des modifications
-            </p>
+            <AlertTriangle className={`h-5 w-5 mx-auto mb-1.5 ${decision === 'changes_requested' ? 'text-prit' : 'text-mut2'}`} />
+            <p className="tt">Demander des modifications</p>
           </button>
         </div>
 
@@ -1710,22 +1626,23 @@ function ContractReviewSection({
           <textarea
             value={comments}
             onChange={(e) => setComments(e.target.value)}
-            placeholder="Décrivez les modifications souhaitées..."
-            className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 mb-4"
+            placeholder="Décrivez les modifications souhaitées…"
+            className="f-ta mt-3.5"
             rows={4}
           />
         )}
 
         {decision && (
           <Button
+            className="w-full mt-4"
             onClick={() => reviewMutation.mutate()}
             disabled={reviewMutation.isPending || (decision === 'changes_requested' && !comments.trim())}
-            className="w-full"
+            isLoading={reviewMutation.isPending}
           >
-            {reviewMutation.isPending ? 'Envoi...' : 'Confirmer ma décision'}
+            Confirmer ma décision
           </Button>
         )}
-      </Card>
+      </div>
     </div>
   );
 }
