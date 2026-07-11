@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { useAuthStore } from '../stores/authStore';
 import { usersApi } from '../api/users';
 import { getErrorMessage } from '../api/client';
-import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 
@@ -83,65 +82,58 @@ export function Profile() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-8">Mon profil</h1>
+    <div className="max-w-[680px]">
+      <p className="bc">Compte</p>
+      <h1 className="h1">Mon profil</h1>
 
-      <div className="space-y-6">
-        <Card>
-          <CardHeader
-            title="Informations personnelles"
-            subtitle="Mettez à jour vos informations"
-          />
-          <form
-            onSubmit={profileForm.handleSubmit(onUpdateProfile)}
-            className="space-y-4"
-          >
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Prénom"
-                error={profileForm.formState.errors.first_name?.message}
-                {...profileForm.register('first_name')}
-              />
-              <Input
-                label="Nom"
-                error={profileForm.formState.errors.last_name?.message}
-                {...profileForm.register('last_name')}
-              />
-            </div>
-
-            <Input label="Email" value={user?.email} disabled />
-
+      <div className="card mt-[18px]">
+        <h3 className="ct">Informations personnelles</h3>
+        <p className="cs mb-3.5">Mettez à jour vos informations</p>
+        <form onSubmit={profileForm.handleSubmit(onUpdateProfile)}>
+          <div className="f-grid">
             <Input
-              label="ID BoondManager"
+              label="Prénom"
+              error={profileForm.formState.errors.first_name?.message}
+              {...profileForm.register('first_name')}
+            />
+            <Input
+              label="Nom"
+              error={profileForm.formState.errors.last_name?.message}
+              {...profileForm.register('last_name')}
+            />
+          </div>
+
+          <div className="mt-3.5">
+            <Input label="Email" value={user?.email} disabled />
+          </div>
+
+          <div className="mt-3.5">
+            <Input
+              label="ID Ressource BoondManager"
               placeholder="Optionnel"
               helperText="Votre identifiant dans BoondManager"
               {...profileForm.register('boond_resource_id')}
             />
+          </div>
 
-            <div className="pt-2">
-              <Button type="submit" isLoading={isUpdating}>
-                Enregistrer
-              </Button>
-            </div>
-          </form>
-        </Card>
+          <Button type="submit" isLoading={isUpdating} className="mt-4">
+            Enregistrer
+          </Button>
+        </form>
+      </div>
 
-        <Card>
-          <CardHeader
-            title="Sécurité"
-            subtitle="Changez votre mot de passe"
+      <div className="card mt-4">
+        <h3 className="ct">Sécurité</h3>
+        <p className="cs mb-3.5">Changez votre mot de passe</p>
+        <form onSubmit={passwordForm.handleSubmit(onChangePassword)}>
+          <Input
+            label="Mot de passe actuel"
+            type="password"
+            error={passwordForm.formState.errors.current_password?.message}
+            {...passwordForm.register('current_password')}
           />
-          <form
-            onSubmit={passwordForm.handleSubmit(onChangePassword)}
-            className="space-y-4"
-          >
-            <Input
-              label="Mot de passe actuel"
-              type="password"
-              error={passwordForm.formState.errors.current_password?.message}
-              {...passwordForm.register('current_password')}
-            />
 
+          <div className="mt-3.5">
             <Input
               label="Nouveau mot de passe"
               type="password"
@@ -149,21 +141,21 @@ export function Profile() {
               error={passwordForm.formState.errors.new_password?.message}
               {...passwordForm.register('new_password')}
             />
+          </div>
 
+          <div className="mt-3.5">
             <Input
               label="Confirmer le nouveau mot de passe"
               type="password"
               error={passwordForm.formState.errors.confirm_password?.message}
               {...passwordForm.register('confirm_password')}
             />
+          </div>
 
-            <div className="pt-2">
-              <Button type="submit" isLoading={isChangingPassword}>
-                Changer le mot de passe
-              </Button>
-            </div>
-          </form>
-        </Card>
+          <Button type="submit" isLoading={isChangingPassword} className="mt-4">
+            Changer le mot de passe
+          </Button>
+        </form>
       </div>
     </div>
   );

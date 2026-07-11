@@ -84,17 +84,17 @@ export function TemplatesTab() {
             return (
               <div
                 key={template.name}
-                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg"
+                className="flex items-center justify-between p-4 bg-srf2 border border-lin2 rounded-[10px]"
               >
                 <div className="flex items-center space-x-4">
-                  <div className={`p-3 rounded-lg ${existingTemplate ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-200 dark:bg-gray-700'}`}>
-                    <FileSpreadsheet className={`h-6 w-6 ${existingTemplate ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`} />
+                  <div className={`p-3 rounded-[9px] ${existingTemplate ? 'bg-grn-bg' : 'bg-lin2'}`}>
+                    <FileSpreadsheet className={`h-6 w-6 ${existingTemplate ? 'text-grn-fg' : 'text-mut2'}`} />
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-gray-100">{template.displayName}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{template.description}</p>
+                    <p className="dn">{template.displayName}</p>
+                    <p className="ds">{template.description}</p>
                     {existingTemplate?.updated_at && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      <p className="text-[11.5px] text-mut2 mt-1">
                         Mis à jour le {new Date(existingTemplate.updated_at).toLocaleDateString('fr-FR')}
                       </p>
                     )}
@@ -121,11 +121,9 @@ export function TemplatesTab() {
           })}
         </div>
 
-        <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-          <p className="text-sm text-green-700 dark:text-green-400">
-            <strong>Format requis :</strong> Les templates doivent être au format .xlsx et utiliser
-            les placeholders entre doubles accolades (ex: {'{{ consultant_name }}'}, {'{{ tjm }}'}).
-          </p>
+        <div className="infob mt-6">
+          <strong>Format requis :</strong> Les templates doivent être au format .xlsx et utiliser
+          les placeholders entre doubles accolades (ex: {'{{ consultant_name }}'}, {'{{ tjm }}'}).
         </div>
       </Card>
     </div>

@@ -18,6 +18,7 @@ import {
 import { Button } from '../ui/Button';
 
 /** Chip v2 pour le score de matching : ≥80 vert, 50-79 ambre, <50 rouge. */
+// eslint-disable-next-line react-refresh/only-export-components
 export function matchingScoreChip(score: number): string {
   if (score >= 80) return 'st-grn';
   if (score >= 50) return 'st-amb';
@@ -25,6 +26,7 @@ export function matchingScoreChip(score: number): string {
 }
 
 /** Chip v2 pour la note de qualité CV (/20). */
+// eslint-disable-next-line react-refresh/only-export-components
 export function cvQualityScoreChip(score: number): string {
   if (score >= 16) return 'st-grn';
   if (score >= 12) return 'st-blu';

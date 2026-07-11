@@ -73,63 +73,62 @@ export function BoondTab() {
 
         <div className="space-y-4">
           {/* Connection Status */}
-          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-srf2 border border-lin2 rounded-[10px]">
             <div className="flex items-center space-x-3">
               {boondStatus?.configured ? (
                 boondStatus.connected ? (
-                  <CheckCircle className="h-6 w-6 text-success" />
+                  <CheckCircle className="h-6 w-6 text-grn-fg" />
                 ) : (
-                  <XCircle className="h-6 w-6 text-error" />
+                  <XCircle className="h-6 w-6 text-red-fg" />
                 )
               ) : (
-                <AlertCircle className="h-6 w-6 text-warning" />
+                <AlertCircle className="h-6 w-6 text-amb-fg" />
               )}
               <div>
-                <p className="font-medium text-gray-900 dark:text-gray-100">
+                <p className="text-[13.5px] font-semibold text-ink">
                   {boondStatus?.configured
                     ? boondStatus.connected
                       ? 'Connecte'
                       : 'Deconnecte'
                     : 'Non configure'}
                 </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{boondStatus?.api_url}</p>
+                <p className="text-[12.5px] text-mut">{boondStatus?.api_url}</p>
               </div>
             </div>
-            <div
-              className={`px-3 py-1 rounded-full text-sm font-medium ${
+            <span
+              className={`st ${
                 boondStatus?.configured
                   ? boondStatus.connected
-                    ? 'bg-success-light text-success dark:bg-success/20'
-                    : 'bg-error-light text-error dark:bg-error/20'
-                  : 'bg-warning-light text-warning dark:bg-warning/20'
+                    ? 'st-grn'
+                    : 'st-red'
+                  : 'st-amb'
               }`}
             >
+              <span className="dot" />
               {boondStatus?.configured
                 ? boondStatus.connected
                   ? 'En ligne'
                   : 'Hors ligne'
                 : 'Configuration requise'}
-            </div>
+            </span>
           </div>
 
           {/* Error Message */}
           {boondStatus?.error && (
-            <div className="p-4 bg-error-light dark:bg-error/20 rounded-lg">
-              <p className="text-error text-sm">{boondStatus.error}</p>
+            <div className="p-4 bg-red-bg rounded-[10px]">
+              <p className="text-red-fg text-[13px]">{boondStatus.error}</p>
             </div>
           )}
 
           {/* Stats */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Opportunites synchronisees</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {boondStatus?.opportunities_count || 0}
-              </p>
+            <div className="kpi">
+              <p className="kl">Opportunites synchronisees</p>
+              <p className="kv">{boondStatus?.opportunities_count || 0}</p>
             </div>
-            <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Derniere synchronisation</p>
-              <p className="text-lg font-medium text-gray-900 dark:text-gray-100">
+            <div className="kpi">
+              <p className="kl">Derniere synchronisation</p>
+              <p className="text-[15px] font-semibold text-ink mt-1.5">
                 {formatDate(boondStatus?.last_sync || null)}
               </p>
             </div>
@@ -156,7 +155,7 @@ export function BoondTab() {
             </Button>
           </div>
           {!boondStatus?.configured && (
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-2 text-[12.5px] text-mut">
               Configurez les identifiants BoondManager dans les variables d'environnement
               (BOOND_USERNAME, BOOND_PASSWORD)
             </p>

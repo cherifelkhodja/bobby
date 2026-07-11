@@ -10,7 +10,6 @@
  */
 
 import { useState } from 'react';
-import { Users, FileText, Plug, BarChart3, ScrollText, Building2 } from 'lucide-react';
 
 import { UsersTab } from './UsersTab';
 import { TemplatesTab } from './TemplatesTab';
@@ -24,16 +23,15 @@ type TabType = 'users' | 'templates' | 'stats' | 'api' | 'contract-articles' | '
 interface TabConfig {
   id: TabType;
   label: string;
-  icon: typeof Users;
 }
 
 const TABS: TabConfig[] = [
-  { id: 'users', label: 'Utilisateurs', icon: Users },
-  { id: 'templates', label: 'Templates', icon: FileText },
-  { id: 'contract-articles', label: 'Contrats', icon: ScrollText },
-  { id: 'contract-companies', label: 'Sociétés', icon: Building2 },
-  { id: 'stats', label: 'Stats', icon: BarChart3 },
-  { id: 'api', label: 'API', icon: Plug },
+  { id: 'users', label: 'Utilisateurs' },
+  { id: 'templates', label: 'Templates' },
+  { id: 'contract-articles', label: 'Contrats' },
+  { id: 'contract-companies', label: 'Sociétés' },
+  { id: 'stats', label: 'Stats' },
+  { id: 'api', label: 'API' },
 ];
 
 export function Admin() {
@@ -41,31 +39,21 @@ export function Admin() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Administration</h1>
-      </div>
+      <p className="bc">Admin</p>
+      <h1 className="h1">Administration</h1>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
-        <nav className="-mb-px flex space-x-8">
-          {TABS.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.id
-                    ? 'border-primary text-primary dark:text-primary-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-              >
-                <Icon className="h-4 w-4 inline-block mr-2" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
+      <div className="tabs mt-4">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`tab ${activeTab === tab.id ? 'on' : ''}`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Tab Content */}
