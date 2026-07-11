@@ -256,6 +256,18 @@ export default function ContractDetail() {
     },
   });
 
+  // ADV approves the draft on the partner's behalf (fully manual flow).
+  const approveDraftInternalMutation = useMutation({
+    mutationFn: () => contractsApi.approveDraftInternal(id!),
+    onSuccess: () => {
+      toast.success('Brouillon validé (à la place du partenaire).');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['contracts', id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
   const deleteContractMutation = useMutation({
     mutationFn: ({ contractId }: { contractId: string }) =>
       contractsApi.deleteContract(id!, contractId),
@@ -635,6 +647,17 @@ export default function ContractDetail() {
               >
                 <actionConfig.icon className="h-4 w-4 mr-2" />
                 {actionMutation.isPending ? 'En cours...' : actionConfig.label}
+              </Button>
+            )}
+            {isAdv && (cr.status === 'draft_generated' || cr.status === 'draft_sent_to_partner') && (
+              <Button
+                variant="secondary"
+                onClick={() => approveDraftInternalMutation.mutate()}
+                disabled={approveDraftInternalMutation.isPending}
+                title="Valider le brouillon sans passer par le fournisseur"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                {approveDraftInternalMutation.isPending ? 'Validation...' : 'Valider à la place du partenaire'}
               </Button>
             )}
             {cr.status === 'partner_approved' && isAdv && (

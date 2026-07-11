@@ -35,6 +35,7 @@ from app.contract_management.application.use_cases.validate_commercial import (
 )
 from app.contract_management.domain.exceptions import (
     ComplianceBlockError,
+    ContractRequestNotFoundError,
     InvalidContractStatusError,
 )
 from app.contract_management.domain.value_objects.contract_request_status import (
@@ -345,7 +346,8 @@ async def create_manual_contract_request(
     try:
         cr = await use_case.execute(
             ManualContractRequestCommand(
-                boond_resource_id=body.boond_resource_id,
+                boond_consultant_id=body.boond_consultant_id,
+                consultant_type=body.consultant_type,
                 commercial_email=creator_email,
                 company_id=body.company_id,
                 client_name=body.client_name,
@@ -368,7 +370,11 @@ async def create_manual_contract_request(
         AuditResource.CONTRACT_REQUEST,
         user_id=user_id,
         resource_id=str(cr.id),
-        details={"trigger_type": "manual", "boond_resource_id": body.boond_resource_id},
+        details={
+            "trigger_type": "manual",
+            "boond_consultant_id": body.boond_consultant_id,
+            "consultant_type": body.consultant_type,
+        },
     )
 
     name = await _resolve_commercial_name(db, cr.commercial_email)
@@ -1429,6 +1435,93 @@ async def send_draft_to_partner(
         msg=f"Le projet de contrat{client_label} a été transmis au partenaire pour relecture et validation.",
         from_email=company_email_from,
         company_name=company_name,
+    )
+
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
+
+
+@router.post(
+    "/{contract_request_id}/approve-draft-internal",
+    response_model=ContractRequestResponse,
+    summary="Approve the draft internally, on the partner's behalf (ADV/admin)",
+)
+async def approve_draft_internal(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Approve the draft without soliciting the partner (fully manual flow).
+
+    Assigns the definitive reference, regenerates the draft with it, and moves to
+    PARTNER_APPROVED. The signature that follows is also ADV-side (checklist upload
+    + mark-as-signed), so the partner is never contacted. ADV/admin only.
+    """
+    from app.contract_management.application.use_cases.approve_draft_internally import (
+        ApproveDraftInternallyUseCase,
+    )
+    from app.contract_management.application.use_cases.regenerate_draft import (
+        DraftRegenerator,
+    )
+    from app.contract_management.infrastructure.adapters.html_pdf_contract_generator import (
+        HtmlPdfContractGenerator,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_annex_template_repo import (
+        AnnexTemplateRepository,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_article_template_repo import (
+        ArticleTemplateRepository,
+    )
+    from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
+        ContractRepository,
+    )
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+    cr_repo = ContractRequestRepository(db)
+    contract_repo = ContractRepository(db)
+
+    draft_regenerator = DraftRegenerator(
+        contract_request_repository=cr_repo,
+        contract_repository=contract_repo,
+        third_party_repository=ThirdPartyRepository(db),
+        contract_generator=HtmlPdfContractGenerator(),
+        article_template_repository=ArticleTemplateRepository(db),
+        annex_template_repository=AnnexTemplateRepository(db),
+        s3_service=S3StorageClient(settings),
+        settings=settings,
+        db=db,
+    )
+
+    use_case = ApproveDraftInternallyUseCase(
+        contract_request_repository=cr_repo,
+        draft_regenerator=draft_regenerator,
+    )
+
+    try:
+        cr = await use_case.execute(contract_request_id)
+    except ContractRequestNotFoundError:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+    except InvalidContractStatusError:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "La validation interne n'est possible que sur un brouillon généré "
+                "(ou envoyé au partenaire)."
+            ),
+        )
+    except Exception as exc:
+        logger.error(
+            "approve_draft_internal_failed", error=str(exc), cr_id=str(contract_request_id)
+        )
+        raise HTTPException(status_code=400, detail="La validation interne du brouillon a échoué.")
+
+    audit_logger.log(
+        AuditAction.DRAFT_GENERATED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(contract_request_id),
+        details={"action": "approve_draft_internal"},
     )
 
     name = await _resolve_commercial_name(db, cr.commercial_email)

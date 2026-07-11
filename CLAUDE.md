@@ -461,7 +461,7 @@ nouveau → en_cours → entretien → accepté
 ### Contract Management (`/api/v1/contract-requests`)
 - `GET /companies` - List contract companies (active)
 - `GET /` - List contract requests (commercial: own, adv/admin: all)
-- `POST /manual` - Create a contract request from scratch, entering the Boond resource ID (ADV/admin, no webhook)
+- `POST /manual` - Create a contract request from scratch, entering the Boond consultant ID + type candidate/resource (ADV/admin, no webhook)
 - `GET /next-reference` - Get next contract request reference
 - `GET /siret-lookup/{siret}` - SIRET auto-fill INSEE+INPI for ADV manual entry (ADV/admin)
 - `GET /{id}` - Get contract request detail
@@ -477,6 +477,7 @@ nouveau → en_cours → entretien → accepté
 - `DELETE /{id}` - Cancel contract request (ADV/admin)
 - `POST /{id}/generate-draft` - Generate DOCX draft (ADV/admin)
 - `POST /{id}/send-draft-to-partner` - Send draft via magic link (ADV/admin)
+- `POST /{id}/approve-draft-internal` - Approve the draft on the partner's behalf, no email (ADV/admin, fully manual flow)
 - `POST /{id}/send-for-signature` - Send to YouSign (ADV/admin)
 - `POST /{id}/mark-as-signed` - Mark contract as signed (ADV/admin)
 - `POST /{id}/push-to-crm` - Push to BoondManager (ADV/admin, full sync)

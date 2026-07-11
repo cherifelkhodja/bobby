@@ -14,7 +14,8 @@ logger = structlog.get_logger()
 class ManualContractRequestCommand:
     """Data for a manual contract request creation."""
 
-    boond_resource_id: int
+    boond_consultant_id: int
+    consultant_type: str = "candidate"  # "candidate" or "resource"
     commercial_email: str = ""
     company_id: UUID | None = None
     client_name: str | None = None
@@ -50,15 +51,18 @@ class CreateManualContractRequestUseCase:
         consultant_phone = command.consultant_phone
         commercial_email = command.commercial_email
 
-        # Best-effort Boond enrichment from the resource id (never blocks creation).
+        # Best-effort Boond enrichment from the consultant id (never blocks creation).
         if self._crm is not None:
             info = None
             try:
-                info = await self._crm.get_candidate_info(command.boond_resource_id, "resource")
+                info = await self._crm.get_candidate_info(
+                    command.boond_consultant_id, command.consultant_type
+                )
             except Exception as exc:
                 logger.warning(
                     "manual_cr_boond_lookup_failed",
-                    resource_id=command.boond_resource_id,
+                    consultant_id=command.boond_consultant_id,
+                    consultant_type=command.consultant_type,
                     error=str(exc),
                 )
             if info:
@@ -79,11 +83,16 @@ class CreateManualContractRequestUseCase:
 
         reference = await self._cr_repo.get_next_provisional_reference()
 
+        # Route the entered Boond id to the right field so the post-signing sync
+        # knows whether to convert a candidate → resource (candidate) or skip it
+        # (resource). `resource_id = boond_resource_id or boond_candidate_id`.
+        is_resource = command.consultant_type == "resource"
         cr = ContractRequest(
             provisional_reference=reference,
             trigger_type="manual",
-            boond_resource_id=command.boond_resource_id,
-            boond_consultant_type="resource",
+            boond_resource_id=command.boond_consultant_id if is_resource else None,
+            boond_candidate_id=None if is_resource else command.boond_consultant_id,
+            boond_consultant_type=command.consultant_type,
             commercial_email=commercial_email or "",
             company_id=command.company_id,
             client_name=command.client_name,
@@ -100,6 +109,7 @@ class CreateManualContractRequestUseCase:
             "manual_contract_request_created",
             cr_id=str(saved.id),
             reference=reference,
-            boond_resource_id=command.boond_resource_id,
+            boond_consultant_id=command.boond_consultant_id,
+            consultant_type=command.consultant_type,
         )
         return saved

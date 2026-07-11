@@ -195,6 +195,24 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-07-10 (feat: consultant candidat/ressource + validation interne du brouillon)
+
+Deux compléments au flux manuel, pour un parcours **100 % sans fournisseur** de la création à la signature.
+
+**1. Consultant candidat OU ressource (création manuelle)**
+- Le schéma `ManualContractRequestCreate` remplace `boond_resource_id` par `boond_consultant_id` + `consultant_type` (`candidate` | `resource`, défaut `candidate`).
+- Le use case route l'ID vers le bon champ : `candidate` → `boond_candidate_id` (converti candidat→ressource à la signature) ; `resource` → `boond_resource_id` (conversion sautée). Enrichissement Boond via `get_candidate_info(id, consultant_type)`.
+- Front : sélecteur Candidat/Ressource dans la modale « Nouveau contrat ».
+
+**2. Validation du brouillon à la place du partenaire (ADV)**
+- Nouvelle transition **`DRAFT_GENERATED → PARTNER_APPROVED`** dans la machine à états (en plus de `DRAFT_SENT_TO_PARTNER → PARTNER_APPROVED`).
+- **Use case** `ApproveDraftInternallyUseCase` : transite en `PARTNER_APPROVED`, assigne la **référence définitive** (`XXX-CC-NNNN`) et **régénère le brouillon** — miroir de l'approbation partenaire, mais déclenché en interne, **sans email**. Autorisé depuis `DRAFT_GENERATED` ou `DRAFT_SENT_TO_PARTNER`.
+- **Endpoint** `POST /contract-requests/{id}/approve-draft-internal` (ADV/admin).
+- Front : bouton **« Valider à la place du partenaire »** (à côté de « Envoyer au partenaire ») en `draft_generated`/`draft_sent_to_partner`.
+- La signature qui suit est déjà côté ADV (checklist + upload + `mark-as-signed`) → le fournisseur n'est jamais sollicité. La synchro Boond finale reste correcte (candidat→ressource si `candidate`, sinon liaison directe via l'ID ressource).
+
+**Tests** : `test_approve_draft_internally.py` (transitions autorisées/refusées, référence définitive, régénération), `test_create_manual_contract_request.py` mis à jour (candidat vs ressource, endpoint Boond appelé selon le type). 103 tests unitaires verts. Front `tsc`/`eslint`/`build` OK.
+
 ### 2026-07-10 (feat: création manuelle d'un dossier de contrat — sans déclencheur Boond)
 
 Complément de la saisie manuelle : l'ADV peut désormais **créer un dossier de contrat à la main**, sans webhook Boond, en **saisissant l'ID Boond de la ressource**.

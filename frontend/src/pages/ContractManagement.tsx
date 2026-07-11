@@ -34,7 +34,11 @@ export function ContractManagement() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [cancelTarget, setCancelTarget] = useState<{ id: string; reference: string } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ boond_resource_id: '', company_id: '' });
+  const [createForm, setCreateForm] = useState<{
+    boond_consultant_id: string;
+    consultant_type: 'candidate' | 'resource';
+    company_id: string;
+  }>({ boond_consultant_id: '', consultant_type: 'candidate', company_id: '' });
   const pageSize = 20;
   // The group tabs (Tous / En cours / Finalisés) span several statuses, and the API
   // status_filter only accepts a single status — so group filtering, counts and
@@ -84,20 +88,21 @@ export function ContractManagement() {
   const createManualMutation = useMutation({
     mutationFn: () =>
       contractsApi.createManual({
-        boond_resource_id: parseInt(createForm.boond_resource_id, 10),
+        boond_consultant_id: parseInt(createForm.boond_consultant_id, 10),
+        consultant_type: createForm.consultant_type,
         company_id: createForm.company_id || undefined,
       }),
     onSuccess: (cr) => {
       toast.success('Dossier de contrat créé.');
       setShowCreate(false);
-      setCreateForm({ boond_resource_id: '', company_id: '' });
+      setCreateForm({ boond_consultant_id: '', consultant_type: 'candidate', company_id: '' });
       queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
       navigate(`/contracts/${cr.id}`);
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
 
-  const createResourceIdValid = /^\d+$/.test(createForm.boond_resource_id.trim());
+  const createConsultantIdValid = /^\d+$/.test(createForm.boond_consultant_id.trim());
 
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('fr-FR', {
@@ -329,19 +334,44 @@ export function ContractManagement() {
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Créez un dossier de contrat sans déclencheur Boond. Saisissez l'ID Boond de la
-            ressource : l'identité du consultant est récupérée automatiquement depuis Boond.
+            Créez un dossier de contrat sans déclencheur Boond. Saisissez l'ID Boond du
+            consultant : son identité est récupérée automatiquement depuis Boond.
           </p>
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              ID Boond de la ressource *
+              Le consultant est un… *
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { key: 'candidate' as const, label: 'Candidat', hint: 'Converti en ressource à la signature' },
+                { key: 'resource' as const, label: 'Ressource', hint: 'Déjà une ressource dans Boond' },
+              ]).map(({ key, label, hint }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setCreateForm((f) => ({ ...f, consultant_type: key }))}
+                  className={`text-left rounded-lg border px-3 py-2 transition-colors ${
+                    createForm.consultant_type === key
+                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                  }`}
+                >
+                  <span className="block text-sm font-medium text-gray-900 dark:text-white">{label}</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400">{hint}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              ID Boond du consultant *
             </label>
             <input
               type="text"
               inputMode="numeric"
-              value={createForm.boond_resource_id}
+              value={createForm.boond_consultant_id}
               onChange={(e) =>
-                setCreateForm((f) => ({ ...f, boond_resource_id: e.target.value.replace(/[^\d]/g, '') }))
+                setCreateForm((f) => ({ ...f, boond_consultant_id: e.target.value.replace(/[^\d]/g, '') }))
               }
               placeholder="Ex : 4242"
               className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
@@ -379,7 +409,7 @@ export function ContractManagement() {
             </Button>
             <Button
               onClick={() => createManualMutation.mutate()}
-              disabled={!createResourceIdValid || createManualMutation.isPending}
+              disabled={!createConsultantIdValid || createManualMutation.isPending}
               isLoading={createManualMutation.isPending}
             >
               Créer le dossier

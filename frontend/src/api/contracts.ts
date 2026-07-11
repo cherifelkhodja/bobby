@@ -164,6 +164,14 @@ export const contractsApi = {
     return response.data;
   },
 
+  // Approve the draft on the partner's behalf (fully manual flow, no fournisseur).
+  approveDraftInternal: async (id: string): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      `/contract-requests/${id}/approve-draft-internal`,
+    );
+    return response.data;
+  },
+
   deleteContract: async (crId: string, contractId: string): Promise<{ status: string; message: string }> => {
     const response = await apiClient.delete(`/contract-requests/${crId}/contracts/${contractId}`);
     return response.data;
@@ -389,7 +397,8 @@ export interface SiretLookupResult {
 
 // Manual creation of a contract request (no Boond webhook).
 export interface ManualContractInput {
-  boond_resource_id: number;
+  boond_consultant_id: number;
+  consultant_type: 'candidate' | 'resource';
   company_id?: string | null;
   client_name?: string | null;
   mission_title?: string | null;
