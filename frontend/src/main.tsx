@@ -6,7 +6,23 @@ import { Toaster } from 'sonner';
 
 import App from './App';
 import { ThemeProvider } from './components/ThemeProvider';
+import { useTheme } from './hooks/useTheme';
 import './styles/index.css';
+
+// eslint-disable-next-line react-refresh/only-export-components
+function ThemedToaster() {
+  const { resolvedTheme } = useTheme();
+  return (
+    <Toaster
+      position="top-right"
+      richColors
+      theme={resolvedTheme}
+      toastOptions={{
+        style: { borderRadius: '12px', fontFamily: "'Inter', system-ui, sans-serif" },
+      }}
+    />
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,7 +48,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <App />
-          <Toaster position="top-right" richColors />
+          <ThemedToaster />
         </BrowserRouter>
       </QueryClientProvider>
     </ThemeProvider>

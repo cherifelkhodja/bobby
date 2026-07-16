@@ -6,8 +6,9 @@ import { useQuery } from '@tanstack/react-query';
 import { BarChart3 } from 'lucide-react';
 
 import { cvTransformerApi } from '../../api/cvTransformer';
-import { Card, CardHeader } from '../../components/ui/Card';
 import { PageSpinner } from '../../components/ui/Spinner';
+
+const GRID_COLS = 'grid-cols-[1fr_160px]';
 
 export function StatsTab() {
   const { data: stats, isLoading } = useQuery({
@@ -20,68 +21,35 @@ export function StatsTab() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader
-          title="Statistiques CV Generator"
-          subtitle="Nombre de CVs transformés par utilisateur"
-        />
+    <div>
+      <div className="kpi max-w-[340px] mb-4">
+        <p className="kl">Total des transformations CV</p>
+        <p className="kv">{stats?.total || 0}</p>
+        <p className="ks">tous utilisateurs confondus</p>
+      </div>
 
-        <div className="mb-6 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
-          <div className="flex items-center">
-            <BarChart3 className="h-8 w-8 text-primary-600 dark:text-primary-400 mr-4" />
-            <div>
-              <p className="text-sm text-primary-600 dark:text-primary-400">Total des transformations</p>
-              <p className="text-3xl font-bold text-primary-700 dark:text-primary-300">{stats?.total || 0}</p>
+      {stats?.by_user && stats.by_user.length > 0 ? (
+        <div className="tbl">
+          <div className={`thead ${GRID_COLS}`}>
+            <span>Utilisateur</span>
+            <span className="text-right">CVs transformés</span>
+          </div>
+          {stats.by_user.map((userStat) => (
+            <div key={userStat.user_id} className={`row ${GRID_COLS}`}>
+              <div className="min-w-0">
+                <p className="nm truncate">{userStat.user_name}</p>
+                <p className="ns truncate">{userStat.user_email}</p>
+              </div>
+              <span className="cell font-semibold text-right">{userStat.count}</span>
             </div>
-          </div>
+          ))}
         </div>
-
-        {stats?.by_user && stats.by_user.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Utilisateur
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    CVs transformés
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {stats.by_user.map((userStat) => (
-                  <tr key={userStat.user_id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {userStat.user_name}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {userStat.user_email}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        {userStat.count}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <BarChart3 className="mx-auto h-12 w-12 text-gray-400" />
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Aucune transformation pour le moment
-            </p>
-          </div>
-        )}
-      </Card>
+      ) : (
+        <div className="card text-center py-12">
+          <BarChart3 className="mx-auto h-10 w-10 text-mut2" />
+          <p className="dn mt-3">Aucune transformation pour le moment</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -11,11 +11,8 @@ import { z } from 'zod';
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import {
-  Briefcase,
-  MapPin,
-  Calendar,
-  Upload,
   Check,
+  CheckCircle,
   AlertCircle,
   Loader2,
   FileText,
@@ -24,6 +21,7 @@ import {
 } from 'lucide-react';
 import { publicApplicationApi } from '../api/hr';
 import { useFormCache } from '../hooks/useFormCache';
+import { Button } from '../components/ui/Button';
 import {
   AVAILABILITY_OPTIONS,
   ENGLISH_LEVELS,
@@ -55,6 +53,23 @@ const applicationSchema = z.object({
 
 type ApplicationFormData = z.infer<typeof applicationSchema>;
 
+function PublicShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="p-bg">
+      <div className="p-wrap max-w-[640px]">
+        <div className="p-top">
+          <span className="logo">Gemini Consulting · Carrières</span>
+        </div>
+        {children}
+        <p className="p-foot">
+          Candidature sécurisée · vos données ne sont jamais partagées hors du processus de
+          recrutement
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function PublicApplication() {
   const { token } = useParams<{ token: string }>();
   const [cvFile, setCvFile] = useState<File | null>(null);
@@ -63,6 +78,7 @@ export default function PublicApplication() {
   const [showEnglishTooltip, setShowEnglishTooltip] = useState<string | null>(null);
   const [isFreelance, setIsFreelance] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false);
+  const [rgpdAccepted, setRgpdAccepted] = useState(false);
   const checkboxesInitializedRef = useRef(false);
 
   // Form cache (persists data across page reloads for 48h)
@@ -235,436 +251,346 @@ export default function PublicApplication() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-blue-500 mx-auto" />
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Chargement de l'offre...</p>
+      <PublicShell>
+        <div className="p-card text-center px-[22px] py-9">
+          <Loader2 className="h-8 w-8 animate-spin text-prit mx-auto" />
+          <p className="notec mt-3.5">Chargement de l'offre…</p>
         </div>
-      </div>
+      </PublicShell>
     );
   }
 
   // Error state
   if (error || !posting) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
-          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-            Offre non disponible
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
+      <PublicShell>
+        <div className="p-card text-center px-[22px] py-9">
+          <div className="alert red !inline-flex !mt-0">
+            <AlertCircle className="h-[18px] w-[18px] flex-shrink-0" />
+            <span>Offre non disponible</span>
+          </div>
+          <p className="notec mt-3.5">
             Cette offre d'emploi n'existe pas ou n'est plus disponible.
           </p>
         </div>
-      </div>
+      </PublicShell>
     );
   }
 
   // Success state
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
-          <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
+      <PublicShell>
+        <div className="p-card text-center px-[22px] py-9">
+          <div className="okbox !inline-flex !m-0 !mb-3.5">
+            <CheckCircle className="h-4 w-4 flex-shrink-0" />
+            <span>Candidature envoyée !</span>
           </div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-            Candidature envoyée
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">{submissionMessage}</p>
+          <p className="notec">
+            Votre CV est en cours d'analyse. L'équipe RH revient vers vous sous 5 jours ouvrés.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            className="mt-4"
+            onClick={() => {
+              setCvFile(null);
+              setRgpdAccepted(false);
+              setSubmitted(false);
+            }}
+          >
+            Nouvelle candidature
+          </Button>
         </div>
-      </div>
+      </PublicShell>
     );
   }
 
+  const locationLabel =
+    posting.location_city || posting.location_region || posting.location_country;
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Job Info Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            {posting.title}
-          </h1>
+    <PublicShell>
+      {/* Annonce */}
+      <div className="p-card">
+        <h1 className="p-h">{posting.title}</h1>
+        <p className="sub mt-1">
+          Gemini Consulting
+          {locationLabel ? ` · ${locationLabel}` : ''}
+          {posting.start_date
+            ? ` · démarrage ${new Date(posting.start_date).toLocaleDateString('fr-FR')}`
+            : ''}
+        </p>
 
-          <div className="flex flex-wrap gap-4 mb-6">
-            <div className="flex items-center text-gray-600 dark:text-gray-400">
-              <MapPin className="h-5 w-5 mr-2" />
-              {posting.location_city || posting.location_region || posting.location_country}
-            </div>
-            {posting.remote && (
-              <div className="flex items-center text-gray-600 dark:text-gray-400">
-                <Briefcase className="h-5 w-5 mr-2" />
-                {REMOTE_LABELS[posting.remote] || posting.remote}
-              </div>
-            )}
-            {posting.start_date && (
-              <div className="flex items-center text-gray-600 dark:text-gray-400">
-                <Calendar className="h-5 w-5 mr-2" />
-                Début: {new Date(posting.start_date).toLocaleDateString('fr-FR')}
-              </div>
-            )}
-          </div>
-
-          {/* Contract Types */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {posting.contract_types.map((type) => (
-              <span
-                key={type}
-                className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-sm"
-              >
-                {CONTRACT_TYPE_LABELS[type] || type}
-              </span>
-            ))}
-            {posting.experience_level && (
-              <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 rounded-full text-sm">
-                {EXPERIENCE_LABELS[posting.experience_level] || posting.experience_level}
-              </span>
-            )}
-          </div>
-
-          {/* TJM Range */}
-          {(posting.salary_min_daily || posting.salary_max_daily) && (
-            <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <p className="text-green-800 dark:text-green-300 font-medium">
-                TJM: {posting.salary_min_daily}€ - {posting.salary_max_daily}€ / jour
-              </p>
-            </div>
+        <div className="flex flex-wrap gap-2 mt-3">
+          {posting.contract_types.map((type) => (
+            <span key={type} className="st st-sla">
+              {CONTRACT_TYPE_LABELS[type] || type}
+            </span>
+          ))}
+          {posting.remote && (
+            <span className="st st-sla">{REMOTE_LABELS[posting.remote] || posting.remote}</span>
           )}
-
-          {/* Description */}
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Description
-            </h2>
-            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-              {posting.description}
-            </p>
-          </div>
-
-          {/* Qualifications */}
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Profil recherché
-            </h2>
-            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-              {posting.qualifications}
-            </p>
-          </div>
-
-          {/* Skills */}
-          {posting.skills.length > 0 && (
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Compétences
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {posting.skills.map((skill, index) => (
-                  <span
-                    key={index}
-                    className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-sm"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            </div>
+          {posting.experience_level && (
+            <span className="st st-sla">
+              {EXPERIENCE_LABELS[posting.experience_level] || posting.experience_level}
+            </span>
+          )}
+          {(posting.salary_min_daily || posting.salary_max_daily) && (
+            <span className="st st-sla">
+              TJM {posting.salary_min_daily}–{posting.salary_max_daily} € / jour
+            </span>
           )}
         </div>
 
-        {/* Application Form */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-            Postuler à cette offre
-          </h2>
+        <div className="border-t border-lin2 mt-4 pt-4">
+          <h2 className="ct">Description</h2>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-mut whitespace-pre-wrap">
+            {posting.description}
+          </p>
+        </div>
 
-          {/* Cache restoration indicator */}
-          {formCache.hasCachedData && (
-            <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2">
-              <Check className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              <p className="text-sm text-blue-800 dark:text-blue-300">
-                Vos informations précédentes ont été restaurées.
-              </p>
+        <div className="mt-4">
+          <h2 className="ct">Profil recherché</h2>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-mut whitespace-pre-wrap">
+            {posting.qualifications}
+          </p>
+        </div>
+
+        {posting.skills.length > 0 && (
+          <div className="mt-4">
+            <h2 className="ct">Compétences</h2>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {posting.skills.map((skill, index) => (
+                <span key={index} className="sk">
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Formulaire de candidature */}
+      <div className="p-card mt-3.5">
+        <h3 className="ct">Vos informations</h3>
+
+        {/* Cache restoration indicator */}
+        {formCache.hasCachedData && (
+          <div className="infob mt-3.5">Vos informations précédentes ont été restaurées.</div>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)}>
+          {/* Civility */}
+          <div className="mt-3.5">
+            <span className="f-lab">Civilité</span>
+            <div className="flex gap-2">
+              {(['M', 'Mme'] as const).map((civ) => (
+                <label
+                  key={civ}
+                  className="tg cursor-pointer has-[:checked]:border-pri has-[:checked]:bg-pris has-[:checked]:text-prit has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-pri"
+                >
+                  <input type="radio" value={civ} {...register('civility')} className="sr-only" />
+                  {civ === 'M' ? 'M.' : 'Mme'}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Identité & contact */}
+          <div className="f-grid mt-3.5">
+            <div>
+              <label className="f-lab" htmlFor="pa-first-name">
+                Prénom *
+              </label>
+              <input
+                id="pa-first-name"
+                type="text"
+                {...register('first_name')}
+                className="f-in"
+                placeholder="Jean"
+              />
+              {errors.first_name && (
+                <p className="f-hint !text-redt">{errors.first_name.message}</p>
+              )}
+            </div>
+            <div>
+              <label className="f-lab" htmlFor="pa-last-name">
+                Nom *
+              </label>
+              <input
+                id="pa-last-name"
+                type="text"
+                {...register('last_name')}
+                className="f-in"
+                placeholder="DUPONT"
+              />
+              {errors.last_name && <p className="f-hint !text-redt">{errors.last_name.message}</p>}
+            </div>
+            <div>
+              <label className="f-lab" htmlFor="pa-email">
+                Email *
+              </label>
+              <input
+                id="pa-email"
+                type="email"
+                {...register('email')}
+                className="f-in"
+                placeholder="jean.dupont@email.com"
+              />
+              {errors.email && <p className="f-hint !text-redt">{errors.email.message}</p>}
+            </div>
+            <div>
+              <label className="f-lab">Téléphone *</label>
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field: { onChange, value } }) => (
+                  <PhoneInput
+                    international
+                    defaultCountry="FR"
+                    value={value}
+                    onChange={(val) => onChange(val || '')}
+                    className="phone-input-container"
+                  />
+                )}
+              />
+              {errors.phone && <p className="f-hint !text-redt">{errors.phone.message}</p>}
+            </div>
+          </div>
+
+          {/* Job Title */}
+          <div className="mt-3.5">
+            <label className="f-lab" htmlFor="pa-job-title">
+              Titre du poste actuel/recherché *
+            </label>
+            <input
+              id="pa-job-title"
+              type="text"
+              {...register('job_title')}
+              className="f-in"
+              placeholder="Développeur Full Stack"
+            />
+            {errors.job_title && <p className="f-hint !text-redt">{errors.job_title.message}</p>}
+          </div>
+
+          {/* Statut professionnel */}
+          <h3 className="ct mt-5">Votre statut professionnel</h3>
+          <div className="f-grid mt-3">
+            {allowsFreelance && (
+              <button
+                type="button"
+                onClick={() => setIsFreelance((v) => !v)}
+                className={`tcard text-left ${isFreelance ? 'on' : ''}`}
+              >
+                <p className="tt">Freelance</p>
+                <p className="td2">Vous facturez en TJM</p>
+              </button>
+            )}
+            {allowsEmployee && (
+              <button
+                type="button"
+                onClick={() => setIsEmployee((v) => !v)}
+                className={`tcard text-left ${isEmployee ? 'on' : ''}`}
+              >
+                <p className="tt">Salarié</p>
+                <p className="td2">Vous visez un CDI</p>
+              </button>
+            )}
+          </div>
+          {allowsFreelance && (
+            <p className="f-hint">
+              Portage salarial accepté (uniquement via une vraie société de portage).
+            </p>
+          )}
+          {!isFreelance && !isEmployee && (
+            <p className="f-hint !text-redt">Veuillez sélectionner au moins un statut</p>
+          )}
+
+          {/* Freelance Fields - TJM */}
+          {showFreelanceFields && (
+            <div className="f-grid mt-3.5">
+              <div>
+                <label className="f-lab" htmlFor="pa-tjm-current">
+                  TJM actuel (€ / jour) *
+                </label>
+                <input
+                  id="pa-tjm-current"
+                  type="number"
+                  {...register('tjm_current', { valueAsNumber: true })}
+                  className="f-in"
+                  placeholder="450"
+                  min={0}
+                />
+                {errors.tjm_current && (
+                  <p className="f-hint !text-redt">{errors.tjm_current.message}</p>
+                )}
+              </div>
+              <div>
+                <label className="f-lab" htmlFor="pa-tjm-desired">
+                  TJM souhaité (€ / jour) *
+                </label>
+                <input
+                  id="pa-tjm-desired"
+                  type="number"
+                  {...register('tjm_desired', { valueAsNumber: true })}
+                  className="f-in"
+                  placeholder="500"
+                  min={0}
+                />
+                {errors.tjm_desired && (
+                  <p className="f-hint !text-redt">{errors.tjm_desired.message}</p>
+                )}
+              </div>
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Civility */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Civilité
-              </label>
-              <div className="flex gap-6">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="M"
-                    {...register('civility')}
-                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  />
-                  <span className="text-sm text-gray-900 dark:text-white">M.</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="Mme"
-                    {...register('civility')}
-                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  />
-                  <span className="text-sm text-gray-900 dark:text-white">Mme</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Name Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Employee Fields - Salary */}
+          {showEmployeeFields && (
+            <div className="f-grid mt-3.5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Prénom *
+                <label className="f-lab" htmlFor="pa-salary-current">
+                  Salaire actuel (€ / an) *
                 </label>
                 <input
-                  type="text"
-                  {...register('first_name')}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Jean"
+                  id="pa-salary-current"
+                  type="number"
+                  {...register('salary_current', { valueAsNumber: true })}
+                  className="f-in"
+                  placeholder="45000"
+                  min={0}
                 />
-                {errors.first_name && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {errors.first_name.message}
-                  </p>
+                {errors.salary_current && (
+                  <p className="f-hint !text-redt">{errors.salary_current.message}</p>
                 )}
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Nom *
+                <label className="f-lab" htmlFor="pa-salary-desired">
+                  Salaire souhaité (€ / an) *
                 </label>
                 <input
-                  type="text"
-                  {...register('last_name')}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="DUPONT"
+                  id="pa-salary-desired"
+                  type="number"
+                  {...register('salary_desired', { valueAsNumber: true })}
+                  className="f-in"
+                  placeholder="50000"
+                  min={0}
                 />
-                {errors.last_name && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {errors.last_name.message}
-                  </p>
+                {errors.salary_desired && (
+                  <p className="f-hint !text-redt">{errors.salary_desired.message}</p>
                 )}
               </div>
             </div>
+          )}
 
-            {/* Contact Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  {...register('email')}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="jean.dupont@email.com"
-                />
-                {errors.email && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {errors.email.message}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Téléphone *
-                </label>
-                <Controller
-                  name="phone"
-                  control={control}
-                  render={({ field: { onChange, value } }) => (
-                    <PhoneInput
-                      international
-                      defaultCountry="FR"
-                      value={value}
-                      onChange={(val) => onChange(val || '')}
-                      className="phone-input-container"
-                    />
-                  )}
-                />
-                {errors.phone && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {errors.phone.message}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Job Title */}
+          {/* Disponibilité & anglais */}
+          <div className="f-grid mt-3.5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Titre du poste actuel/recherché *
-              </label>
-              <input
-                type="text"
-                {...register('job_title')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Développeur Full Stack"
-              />
-              {errors.job_title && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                  {errors.job_title.message}
-                </p>
-              )}
-            </div>
-
-            {/* Employment Status - Checkboxes */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Statut professionnel *
-              </label>
-              <div className="space-y-2">
-                {/* Freelance checkbox - only show if allowed by contract types */}
-                {allowsFreelance && (
-                  <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={isFreelance}
-                      onChange={(e) => setIsFreelance(e.target.checked)}
-                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <div>
-                      <span className="font-medium text-gray-900 dark:text-white">Freelance</span>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Vous êtes indépendant ou en portage salarial (uniquement les vraies sociétés de portage sont acceptées)
-                      </p>
-                    </div>
-                  </label>
-                )}
-                {/* Employee checkbox - only show if allowed by contract types */}
-                {allowsEmployee && (
-                  <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={isEmployee}
-                      onChange={(e) => setIsEmployee(e.target.checked)}
-                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <div>
-                      <span className="font-medium text-gray-900 dark:text-white">Salarié</span>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Vous recherchez un contrat CDI ou CDD
-                      </p>
-                    </div>
-                  </label>
-                )}
-              </div>
-              {!isFreelance && !isEmployee && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                  Veuillez sélectionner au moins un statut
-                </p>
-              )}
-            </div>
-
-            {/* Freelance Fields - TJM */}
-            {showFreelanceFields && (
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg space-y-4">
-                <h3 className="font-medium text-blue-900 dark:text-blue-300">
-                  Tarif journalier (Freelance)
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      TJM actuel (€/jour) *
-                    </label>
-                    <input
-                      type="number"
-                      {...register('tjm_current', { valueAsNumber: true })}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="450"
-                      min={0}
-                    />
-                    {errors.tjm_current && (
-                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                        {errors.tjm_current.message}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      TJM souhaité (€/jour) *
-                    </label>
-                    <input
-                      type="number"
-                      {...register('tjm_desired', { valueAsNumber: true })}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="500"
-                      min={0}
-                    />
-                    {errors.tjm_desired && (
-                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                        {errors.tjm_desired.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Employee Fields - Salary */}
-            {showEmployeeFields && (
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg space-y-4">
-                <h3 className="font-medium text-green-900 dark:text-green-300">
-                  Salaire annuel brut (Salarié)
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Salaire actuel (€/an) *
-                    </label>
-                    <input
-                      type="number"
-                      {...register('salary_current', { valueAsNumber: true })}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="45000"
-                      min={0}
-                    />
-                    {errors.salary_current && (
-                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                        {errors.salary_current.message}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Salaire souhaité (€/an) *
-                    </label>
-                    <input
-                      type="number"
-                      {...register('salary_desired', { valueAsNumber: true })}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="50000"
-                      min={0}
-                    />
-                    {errors.salary_desired && (
-                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                        {errors.salary_desired.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Availability */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="f-lab" htmlFor="pa-availability">
                 Disponibilité *
               </label>
-              <select
-                {...register('availability')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">-- Sélectionner --</option>
+              <select id="pa-availability" {...register('availability')} className="f-in !px-2.5">
+                <option value="">— Sélectionner —</option>
                 {AVAILABILITY_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -672,44 +598,42 @@ export default function PublicApplication() {
                 ))}
               </select>
               {errors.availability && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                  {errors.availability.message}
-                </p>
+                <p className="f-hint !text-redt">{errors.availability.message}</p>
               )}
             </div>
-
-            {/* English Level */}
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <div className="flex items-center gap-1.5">
+                <label className="f-lab" htmlFor="pa-english-level">
                   Niveau d'anglais *
                 </label>
-                <div className="relative">
+                <div className="relative mb-1.5">
                   <button
                     type="button"
                     onClick={() => setShowEnglishTooltip(showEnglishTooltip ? null : 'all')}
-                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    className="text-mut2 hover:text-ink transition-colors"
+                    aria-label="Aide sur les niveaux d'anglais"
                   >
                     <HelpCircle className="h-4 w-4" />
                   </button>
                   {showEnglishTooltip && (
-                    <div className="absolute left-0 top-6 z-50 w-80 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg">
+                    <div className="absolute right-0 sm:left-0 sm:right-auto top-6 z-50 w-72 card !p-3.5">
                       <div className="flex justify-between items-center mb-2">
-                        <span className="font-medium text-gray-900 dark:text-white text-sm">Niveaux d'anglais</span>
+                        <span className="dn">Niveaux d'anglais</span>
                         <button
                           type="button"
                           onClick={() => setShowEnglishTooltip(null)}
-                          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                          className="text-mut2 hover:text-ink transition-colors"
+                          aria-label="Fermer"
                         >
                           <X className="h-4 w-4" />
                         </button>
                       </div>
-                      <div className="space-y-2 text-xs">
+                      <div className="space-y-2">
                         {ENGLISH_LEVELS.map((level) => (
-                          <div key={level.value}>
-                            <span className="font-medium text-gray-800 dark:text-gray-200">{level.label}:</span>
-                            <span className="text-gray-600 dark:text-gray-400 ml-1">{level.description}</span>
-                          </div>
+                          <p key={level.value} className="text-[11.5px] leading-relaxed">
+                            <span className="font-semibold text-ink">{level.label} :</span>{' '}
+                            <span className="text-mut">{level.description}</span>
+                          </p>
                         ))}
                       </div>
                     </div>
@@ -717,10 +641,11 @@ export default function PublicApplication() {
                 </div>
               </div>
               <select
+                id="pa-english-level"
                 {...register('english_level')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="f-in !px-2.5"
               >
-                <option value="">-- Sélectionner --</option>
+                <option value="">— Sélectionner —</option>
                 {ENGLISH_LEVELS.map((level) => (
                   <option key={level.value} value={level.value}>
                     {level.label}
@@ -728,123 +653,77 @@ export default function PublicApplication() {
                 ))}
               </select>
               {errors.english_level && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                  {errors.english_level.message}
-                </p>
+                <p className="f-hint !text-redt">{errors.english_level.message}</p>
               )}
             </div>
+          </div>
 
-            {/* CV Upload */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                CV (PDF ou Word, max 10 Mo) *
-              </label>
-              <div className="mt-1">
-                {cvFile ? (
-                  <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                    <FileText className="h-8 w-8 text-green-600 dark:text-green-400" />
-                    <div className="flex-1">
-                      <p className="font-medium text-green-800 dark:text-green-300">
-                        {cvFile.name}
-                      </p>
-                      <p className="text-sm text-green-600 dark:text-green-400">
-                        {(cvFile.size / 1024 / 1024).toFixed(2)} Mo
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setCvFile(null)}
-                      className="p-1 hover:bg-green-100 dark:hover:bg-green-800/30 rounded"
-                    >
-                      <X className="h-5 w-5 text-green-600 dark:text-green-400" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors">
-                    <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Cliquez pour télécharger ou glissez-déposez
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-500">
-                      PDF ou Word (max 10 Mo)
-                    </p>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      onChange={handleFileChange}
-                    />
-                  </label>
-                )}
+          {/* CV Upload */}
+          <h3 className="ct mt-5">Votre CV *</h3>
+          {cvFile ? (
+            <div className="filecard mt-3">
+              <div className="dico">
+                <FileText className="h-4 w-4" />
               </div>
+              <div className="flex-1 min-w-0">
+                <p className="dn truncate">{cvFile.name}</p>
+                <p className="ds">{(cvFile.size / 1024 / 1024).toFixed(2)} Mo</p>
+              </div>
+              <Button type="button" variant="secondary" size="sm" onClick={() => setCvFile(null)}>
+                Retirer
+              </Button>
             </div>
+          ) : (
+            <label className="drop block !p-6 mt-3 cursor-pointer">
+              <p className="dropt !mt-0">
+                <b className="text-prit">Cliquez pour choisir</b> ou glissez-déposez
+              </p>
+              <p className="drops">PDF ou DOCX · 10 Mo max</p>
+              <input
+                type="file"
+                className="hidden"
+                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={handleFileChange}
+              />
+            </label>
+          )}
 
-            {/* Error Message */}
-            {submitMutation.isError && (
-              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                <p className="text-red-800 dark:text-red-200">{submissionMessage}</p>
-              </div>
-            )}
+          {/* Consentement RGPD */}
+          <label className="ckrow mt-4 select-none">
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={rgpdAccepted}
+              onChange={(e) => setRgpdAccepted(e.target.checked)}
+            />
+            <span className={`ck ${rgpdAccepted ? 'on' : ''}`}>
+              <Check className="h-3 w-3" strokeWidth={3} />
+            </span>
+            <span>
+              J'accepte que mes données soient traitées dans le cadre de ce recrutement (RGPD —
+              conservation 2 ans max).
+            </span>
+          </label>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={submitMutation.isPending || !cvFile}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-            >
-              {submitMutation.isPending ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Envoi en cours...
-                </>
-              ) : (
-                <>
-                  <Check className="h-5 w-5" />
-                  Envoyer ma candidature
-                </>
-              )}
-            </button>
-          </form>
-        </div>
+          {/* Error Message */}
+          {submitMutation.isError && (
+            <div className="alert red">
+              <AlertCircle className="h-[18px] w-[18px] flex-shrink-0" />
+              <span>{submissionMessage}</span>
+            </div>
+          )}
+
+          {/* Submit Button */}
+          <Button
+            type="submit"
+            className="w-full mt-[18px]"
+            disabled={submitMutation.isPending || !cvFile || !rgpdAccepted}
+            isLoading={submitMutation.isPending}
+          >
+            {submitMutation.isPending ? 'Envoi en cours…' : 'Envoyer ma candidature'}
+          </Button>
+        </form>
       </div>
-
-      {/* Custom styles for phone input */}
-      <style>{`
-        .PhoneInput {
-          display: flex;
-          align-items: center;
-        }
-        .PhoneInputCountry {
-          padding: 0.5rem;
-          border: 1px solid #d1d5db;
-          border-right: none;
-          border-radius: 0.5rem 0 0 0.5rem;
-          background: white;
-        }
-        .dark .PhoneInputCountry {
-          border-color: #4b5563;
-          background: #374151;
-        }
-        .PhoneInputInput {
-          flex: 1;
-          padding: 0.5rem 1rem;
-          border: 1px solid #d1d5db;
-          border-radius: 0 0.5rem 0.5rem 0;
-          background: white;
-          color: #111827;
-        }
-        .dark .PhoneInputInput {
-          border-color: #4b5563;
-          background: #374151;
-          color: white;
-        }
-        .PhoneInputInput:focus {
-          outline: none;
-          ring: 2px;
-          ring-color: #3b82f6;
-          border-color: transparent;
-        }
-      `}</style>
-    </div>
+    </PublicShell>
   );
 }

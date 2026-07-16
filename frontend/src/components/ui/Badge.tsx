@@ -7,6 +7,8 @@ interface BadgeProps {
   variant?: BadgeVariant;
   children?: React.ReactNode;
   className?: string;
+  /** Affiche le point coloré v2 devant le libellé (défaut : true) */
+  dot?: boolean;
 }
 
 const statusConfig: Record<
@@ -14,36 +16,36 @@ const statusConfig: Record<
   { className: string; label: string }
 > = {
   pending: {
-    className: 'bg-warning-light text-warning-dark dark:bg-warning-dark/20 dark:text-warning',
+    className: 'bg-amb-bg text-amb-fg',
     label: 'En attente',
   },
   in_review: {
-    className: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400',
+    className: 'bg-blu-bg text-blu-fg',
     label: "En cours d'examen",
   },
   interview: {
-    className: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400',
+    className: 'bg-ind-bg text-ind-fg',
     label: 'En entretien',
   },
   accepted: {
-    className: 'bg-success-light text-success-dark dark:bg-success-dark/20 dark:text-success',
+    className: 'bg-grn-bg text-grn-fg',
     label: 'Accepté',
   },
   rejected: {
-    className: 'bg-error-light text-error-dark dark:bg-error-dark/20 dark:text-error',
+    className: 'bg-red-bg text-red-fg',
     label: 'Refusé',
   },
 };
 
 const variantClasses: Record<BadgeVariant, string> = {
-  default: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
-  primary: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400',
-  success: 'bg-success-light text-success-dark dark:bg-success-dark/20 dark:text-success',
-  warning: 'bg-warning-light text-warning-dark dark:bg-warning-dark/20 dark:text-warning',
-  error: 'bg-error-light text-error-dark dark:bg-error-dark/20 dark:text-error',
+  default: 'bg-sla-bg text-sla-fg',
+  primary: 'bg-blu-bg text-blu-fg',
+  success: 'bg-grn-bg text-grn-fg',
+  warning: 'bg-amb-bg text-amb-fg',
+  error: 'bg-red-bg text-red-fg',
 };
 
-export function Badge({ status, variant, children, className: extraClassName }: BadgeProps) {
+export function Badge({ status, variant, children, className: extraClassName, dot = true }: BadgeProps) {
   let className: string;
   let label: string | undefined;
 
@@ -57,8 +59,9 @@ export function Badge({ status, variant, children, className: extraClassName }: 
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${className} ${extraClassName || ''}`}
+      className={`inline-flex items-center gap-[7px] rounded-full px-[11px] py-1 text-xs font-medium whitespace-nowrap ${className} ${extraClassName || ''}`}
     >
+      {dot && <span className="h-1.5 w-1.5 rounded-full bg-current shrink-0" aria-hidden="true" />}
       {children || label}
     </span>
   );

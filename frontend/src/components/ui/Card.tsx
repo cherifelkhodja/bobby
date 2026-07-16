@@ -15,7 +15,7 @@ export function Card({ children, className = '', padding = 'md', onClick }: Card
 
   return (
     <div
-      className={`bg-white dark:bg-gray-800 rounded-xl shadow-soft dark:shadow-none dark:border dark:border-gray-700 ${paddingClasses[padding]} ${className}`}
+      className={`bg-sur border border-lin rounded-[14px] shadow-soft ${paddingClasses[padding]} ${className}`}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -36,8 +36,8 @@ export function CardHeader({ title, subtitle, action }: CardHeaderProps) {
   return (
     <div className="flex items-center justify-between mb-4">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-        {subtitle && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>}
+        <h3 className="text-[14.5px] font-bold text-ink">{title}</h3>
+        {subtitle && <p className="text-xs text-mut mt-1">{subtitle}</p>}
       </div>
       {action && <div>{action}</div>}
     </div>

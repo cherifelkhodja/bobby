@@ -2,145 +2,1428 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════════
+   Bobby v2 — design tokens (portés du prototype « Bobby v2 - Prototype »)
+   Thème clair sur :root, thème sombre sur .dark (classe posée par useTheme).
+   Accent « azur » par défaut (variantes indigo/canard disponibles).
+   ═══════════════════════════════════════════════════════════════════ */
+
 @layer base {
+  :root {
+    --bg: oklch(97% 0.008 255);
+    --sur: #fff;
+    --srf2: oklch(98.5% 0.004 255);
+    --ink: oklch(23% 0.03 260);
+    --mut: oklch(52% 0.03 258);
+    --mut2: oklch(61% 0.025 256);
+    --lin: oklch(92% 0.012 255);
+    --lin2: oklch(95% 0.008 255);
+    --pris: oklch(94% 0.03 262);
+    --prit: oklch(44% 0.17 262);
+    --shd: 0 1px 2px rgba(20, 30, 60, 0.05);
+    --amb-bg: oklch(96% 0.045 80);
+    --amb-fg: oklch(50% 0.12 70);
+    --blu-bg: oklch(94% 0.03 262);
+    --blu-fg: oklch(44% 0.17 262);
+    --ind-bg: oklch(94% 0.035 292);
+    --ind-fg: oklch(44% 0.17 292);
+    --red-bg: oklch(95% 0.025 22);
+    --red-fg: oklch(48% 0.18 22);
+    --grn-bg: oklch(95% 0.04 155);
+    --grn-fg: oklch(44% 0.11 155);
+    --sla-bg: oklch(94.5% 0.008 255);
+    --sla-fg: oklch(45% 0.03 258);
+    --redt: oklch(52% 0.19 22);
+    --pri: oklch(50% 0.17 262);
+  }
+
+  .dark {
+    --bg: oklch(16.5% 0.02 258);
+    --sur: oklch(21% 0.022 258);
+    --srf2: oklch(24% 0.02 258);
+    --ink: oklch(94% 0.008 255);
+    --mut: oklch(70% 0.02 258);
+    --mut2: oklch(62% 0.02 258);
+    --lin: oklch(28.5% 0.02 258);
+    --lin2: oklch(25.5% 0.02 258);
+    --pris: oklch(30% 0.07 262);
+    --prit: oklch(76% 0.11 262);
+    --shd: none;
+    --amb-bg: oklch(30% 0.055 78);
+    --amb-fg: oklch(82% 0.1 82);
+    --blu-bg: oklch(30% 0.06 262);
+    --blu-fg: oklch(80% 0.1 262);
+    --ind-bg: oklch(30% 0.06 292);
+    --ind-fg: oklch(80% 0.1 292);
+    --red-bg: oklch(29% 0.06 25);
+    --red-fg: oklch(80% 0.1 22);
+    --grn-bg: oklch(28% 0.05 155);
+    --grn-fg: oklch(80% 0.1 155);
+    --sla-bg: oklch(28% 0.015 258);
+    --sla-fg: oklch(76% 0.02 258);
+    --redt: oklch(72% 0.15 22);
+  }
+
+  /* Variantes d'accent (posables sur <html>) */
+  .acc-indigo {
+    --pri: oklch(48% 0.17 292);
+  }
+  .acc-canard {
+    --pri: oklch(48% 0.1 215);
+  }
+
   html {
     font-family: 'Inter var', 'Inter', system-ui, sans-serif;
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
-    @apply dark:bg-gray-900 dark:text-gray-100;
+    @apply antialiased;
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  a {
+    color: var(--pri);
+  }
+  a:hover {
+    color: var(--prit);
   }
 }
 
 @layer components {
+  /* ── Boutons ────────────────────────────────────────────────────── */
   .btn {
-    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium
-           transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
-           disabled:cursor-not-allowed disabled:opacity-50;
-    @apply dark:focus:ring-offset-gray-900;
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 9px;
+    border: 0;
+    background: var(--pri);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: filter 0.15s ease, opacity 0.15s ease;
+  }
+  .btn:hover {
+    filter: brightness(1.08);
+  }
+  .btn:focus-visible {
+    outline: 2px solid var(--pri);
+    outline-offset: 2px;
+  }
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .btn2 {
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 9px;
+    border: 1px solid var(--lin);
+    background: var(--sur);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease;
+  }
+  .btn2:hover {
+    background: var(--srf2);
+  }
+  .btn2:focus-visible {
+    outline: 2px solid var(--pri);
+    outline-offset: 2px;
+  }
+  .btn2:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .btn2.amb {
+    border-color: color-mix(in oklab, var(--amb-fg) 40%, transparent);
+    color: var(--amb-fg);
+  }
+
+  .btn.sm,
+  .btn2.sm {
+    height: 30px;
+    padding: 0 12px;
+    font-size: 12px;
   }
 
   .btn-primary {
-    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+    @apply btn;
   }
-
   .btn-secondary {
-    @apply btn bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-primary-500;
-    @apply dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700;
+    @apply btn2;
   }
-
   .btn-danger {
-    @apply btn bg-error text-white hover:bg-error-dark focus:ring-error;
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 9px;
+    border: 0;
+    background: var(--redt);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-danger:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
-  .input {
-    @apply block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
-           placeholder-gray-400 shadow-sm transition-colors
-           focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500
-           disabled:cursor-not-allowed disabled:bg-gray-100;
-    @apply dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder-gray-500
-           dark:disabled:bg-gray-700;
+  .dis {
+    opacity: 0.45;
+    pointer-events: none;
   }
 
-  .input-error {
-    @apply border-error focus:border-error focus:ring-error;
+  /* ── Formulaires ────────────────────────────────────────────────── */
+  .label,
+  .f-lab {
+    font-size: 12px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    display: block;
+    color: var(--ink);
   }
 
-  .label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
-    @apply dark:text-gray-300;
+  .input,
+  .f-in {
+    width: 100%;
+    box-sizing: border-box;
+    height: 38px;
+    border-radius: 9px;
+    border: 1px solid var(--lin);
+    background: var(--srf2);
+    padding: 0 12px;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 400;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .input::placeholder,
+  .f-in::placeholder,
+  .f-ta::placeholder {
+    color: var(--mut2);
+  }
+  .input:focus,
+  .f-in:focus,
+  .f-ta:focus {
+    border-color: var(--pri);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--pri) 15%, transparent);
+  }
+  .input:disabled,
+  .f-in:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
   }
 
-  .card {
-    @apply bg-white rounded-xl shadow-soft p-6;
-    @apply dark:bg-gray-800 dark:shadow-none dark:border dark:border-gray-700;
+  .f-ta {
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 9px;
+    border: 1px solid var(--lin);
+    background: var(--srf2);
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 400;
+    color: var(--ink);
+    outline: none;
+    resize: vertical;
+    min-height: 70px;
+    line-height: 1.5;
   }
 
-  .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  .f-hint {
+    font-size: 11.5px;
+    color: var(--mut2);
+    margin: 5px 0 0;
   }
 
-  .badge-pending {
-    @apply badge bg-warning-light text-warning-dark;
-    @apply dark:bg-warning-dark/20 dark:text-warning;
+  .f-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
   }
 
-  .badge-in-review {
-    @apply badge bg-primary-100 text-primary-700;
-    @apply dark:bg-primary-900/30 dark:text-primary-400;
+  .input-error,
+  .input-error:focus {
+    border-color: var(--redt);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--redt) 15%, transparent);
   }
 
-  .badge-interview {
-    @apply badge bg-primary-100 text-primary-700;
-    @apply dark:bg-primary-900/30 dark:text-primary-400;
+  /* Cases à cocher v2 */
+  .ckrow {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 12.5px;
+    color: var(--mut);
+    cursor: pointer;
+  }
+  .ck {
+    width: 16px;
+    height: 16px;
+    border-radius: 5px;
+    border: 1.5px solid var(--lin);
+    background: var(--sur);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: transparent;
+  }
+  .ck.on {
+    background: var(--pri);
+    border-color: var(--pri);
+    color: #fff;
   }
 
-  .badge-accepted {
-    @apply badge bg-success-light text-success-dark;
-    @apply dark:bg-success-dark/20 dark:text-success;
+  /* Toggle chips (types de contrat…) */
+  .tg {
+    border: 1px solid var(--lin);
+    border-radius: 9px;
+    padding: 8px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--sur);
+    color: var(--mut);
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+  .tg.on {
+    border-color: var(--pri);
+    background: var(--pris);
+    color: var(--prit);
   }
 
-  .badge-rejected {
-    @apply badge bg-error-light text-error-dark;
-    @apply dark:bg-error-dark/20 dark:text-error;
+  /* Select box compact */
+  .selbox {
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--lin);
+    background: var(--sur);
+    padding: 0 10px 0 12px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ink);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    cursor: pointer;
   }
 
-  /* Dark mode for common elements */
-  .dark-card {
-    @apply bg-white dark:bg-gray-800;
-  }
-
-  .dark-border {
-    @apply border-gray-200 dark:border-gray-700;
-  }
-
-  .dark-text {
-    @apply text-gray-900 dark:text-gray-100;
-  }
-
-  .dark-text-secondary {
-    @apply text-gray-500 dark:text-gray-400;
-  }
-
-  .dark-bg-hover {
-    @apply hover:bg-gray-50 dark:hover:bg-gray-700;
-  }
-
-  /* Filter select - consistent styling for filter dropdowns */
   .filter-select {
-    @apply appearance-none bg-no-repeat bg-right pr-7
-           px-2 py-1.5 text-xs border border-gray-300 rounded
-           bg-white text-gray-900 cursor-pointer
-           hover:border-gray-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none;
-    @apply dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:border-gray-500;
+    appearance: none;
+    background-color: var(--sur);
+    border: 1px solid var(--lin);
+    border-radius: 9px;
+    height: 34px;
+    padding: 0 28px 0 12px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ink);
+    cursor: pointer;
+    background-repeat: no-repeat;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-    background-position: right 0.5rem center;
+    background-position: right 0.6rem center;
     background-size: 12px;
     min-width: max-content;
   }
-
+  .filter-select:focus {
+    border-color: var(--pri);
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--pri) 15%, transparent);
+  }
   .dark .filter-select {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   }
 
+  /* ── Cartes ─────────────────────────────────────────────────────── */
+  .card {
+    background: var(--sur);
+    border: 1px solid var(--lin);
+    border-radius: 14px;
+    padding: 18px 20px;
+    box-shadow: var(--shd);
+  }
+
+  .hdcard {
+    background: var(--sur);
+    border: 1px solid var(--lin);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-top: 18px;
+    box-shadow: var(--shd);
+  }
+
+  .ct {
+    font-size: 14.5px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--ink);
+  }
+  .cs {
+    font-size: 12px;
+    color: var(--mut);
+    margin: 3px 0 0;
+  }
+
+  /* ── Page chrome ────────────────────────────────────────────────── */
+  .bc {
+    font-size: 12px;
+    color: var(--mut2);
+    margin: 0 0 6px;
+  }
+  .h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+  }
+  .sub {
+    font-size: 13px;
+    color: var(--mut);
+    margin: 5px 0 0;
+  }
+
+  /* ── KPIs ───────────────────────────────────────────────────────── */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin: 22px 0 18px;
+  }
+  @media (max-width: 1100px) {
+    .kpis {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  .kpi {
+    background: var(--sur);
+    border: 1px solid var(--lin);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .kl {
+    font-size: 12.5px;
+    color: var(--mut);
+    margin: 0;
+    font-weight: 500;
+  }
+  .kv {
+    font-size: 26px;
+    font-weight: 700;
+    margin: 6px 0 3px;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .kv.red {
+    color: var(--redt);
+  }
+  .ks {
+    font-size: 11.5px;
+    color: var(--mut2);
+    margin: 0;
+  }
+
+  /* ── Onglets ────────────────────────────────────────────────────── */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .tab {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--mut);
+    padding: 7px 12px;
+    border-radius: 8px;
+    white-space: nowrap;
+    cursor: pointer;
+    border: 1px solid transparent;
+    background: transparent;
+  }
+  .tab.on {
+    background: var(--sur);
+    border-color: var(--lin);
+    color: var(--ink);
+    font-weight: 600;
+    box-shadow: var(--shd);
+  }
+  .sort {
+    margin-left: auto;
+    font-size: 12.5px;
+    color: var(--mut);
+    white-space: nowrap;
+  }
+
+  /* ── Tables (grilles) ───────────────────────────────────────────── */
+  .tbl {
+    background: var(--sur);
+    border: 1px solid var(--lin);
+    border-radius: 14px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    box-shadow: var(--shd);
+  }
+  .thead,
+  .row,
+  .ahead,
+  .arow,
+  .tfoot,
+  .expand {
+    min-width: 900px;
+    box-sizing: border-box;
+  }
+  .thead {
+    display: grid;
+    gap: 10px;
+    padding: 11px 20px;
+    border-bottom: 1px solid var(--lin2);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mut2);
+  }
+  .row {
+    display: grid;
+    gap: 10px;
+    padding: 15px 20px;
+    border-top: 1px solid var(--lin2);
+    align-items: center;
+  }
+  .row.click {
+    cursor: pointer;
+  }
+  .row.click:hover {
+    background: var(--srf2);
+  }
+  .ahead {
+    display: grid;
+    gap: 10px;
+    padding: 11px 20px;
+    border-bottom: 1px solid var(--lin2);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--mut2);
+  }
+  .arow {
+    display: grid;
+    gap: 10px;
+    padding: 13px 20px;
+    border-top: 1px solid var(--lin2);
+    align-items: center;
+    cursor: pointer;
+  }
+  .arow:hover {
+    background: var(--srf2);
+  }
+  .tfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    border-top: 1px solid var(--lin2);
+    font-size: 11.5px;
+    color: var(--mut2);
+    background: var(--srf2);
+  }
+  .expand {
+    border-top: 1px solid var(--lin2);
+    background: var(--srf2);
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 14px;
+  }
+
+  .ref {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--mut);
+  }
+  .nm {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+    white-space: nowrap;
+    color: var(--ink);
+  }
+  .ns {
+    font-size: 12px;
+    color: var(--mut);
+    margin: 3px 0 0;
+    white-space: nowrap;
+  }
+  .cell {
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .tjm {
+    font-weight: 600;
+    font-size: 13.5px;
+    color: var(--ink);
+  }
+  .chev {
+    color: var(--mut2);
+  }
+
+  /* ── Chips de statut ────────────────────────────────────────────── */
+  .st {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 11px;
+    border-radius: 99px;
+    white-space: nowrap;
+  }
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 99px;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+  .st-amb {
+    background: var(--amb-bg);
+    color: var(--amb-fg);
+  }
+  .st-blu {
+    background: var(--blu-bg);
+    color: var(--blu-fg);
+  }
+  .st-ind {
+    background: var(--ind-bg);
+    color: var(--ind-fg);
+  }
+  .st-red {
+    background: var(--red-bg);
+    color: var(--red-fg);
+  }
+  .st-grn {
+    background: var(--grn-bg);
+    color: var(--grn-fg);
+  }
+  .st-sla {
+    background: var(--sla-bg);
+    color: var(--sla-fg);
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full text-xs font-medium;
+    gap: 7px;
+    padding: 4px 11px;
+    white-space: nowrap;
+  }
+  .badge-pending {
+    @apply badge;
+    background: var(--amb-bg);
+    color: var(--amb-fg);
+  }
+  .badge-in-review {
+    @apply badge;
+    background: var(--blu-bg);
+    color: var(--blu-fg);
+  }
+  .badge-interview {
+    @apply badge;
+    background: var(--ind-bg);
+    color: var(--ind-fg);
+  }
+  .badge-accepted {
+    @apply badge;
+    background: var(--grn-bg);
+    color: var(--grn-fg);
+  }
+  .badge-rejected {
+    @apply badge;
+    background: var(--red-bg);
+    color: var(--red-fg);
+  }
+
+  .newb {
+    font-size: 10.5px;
+    font-weight: 600;
+    background: var(--blu-bg);
+    color: var(--blu-fg);
+    padding: 2px 7px;
+    border-radius: 99px;
+  }
+
+  .sk {
+    background: var(--pris);
+    color: var(--prit);
+    border-radius: 7px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    display: inline-block;
+  }
+
+  /* ── Progression / documents ────────────────────────────────────── */
+  .prog {
+    display: flex;
+    gap: 3px;
+    margin-top: 8px;
+  }
+  .seg {
+    height: 4px;
+    flex: 1;
+    border-radius: 3px;
+    background: var(--lin2);
+    max-width: 32px;
+  }
+  .seg.f {
+    background: var(--pri);
+  }
+  .seg.fr {
+    background: var(--redt);
+  }
+  .docs {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mut);
+  }
+  .dbar {
+    height: 4px;
+    width: 74px;
+    border-radius: 3px;
+    background: var(--lin2);
+    margin-top: 6px;
+    overflow: hidden;
+  }
+  .dfill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--grn-fg);
+  }
+  .dfill.r {
+    background: var(--redt);
+  }
+
+  /* ── Meta / colonnes ────────────────────────────────────────────── */
+  .meta {
+    display: flex;
+    gap: 34px;
+    flex-wrap: wrap;
+  }
+  .ml {
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--mut2);
+    margin: 0 0 3px;
+  }
+  .mv {
+    font-size: 13.5px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--ink);
+  }
+  .cols {
+    display: grid;
+    grid-template-columns: 1.55fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+    align-items: start;
+  }
+  @media (max-width: 1100px) {
+    .cols {
+      grid-template-columns: 1fr;
+    }
+  }
+  .cfgrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px 16px;
+    margin-top: 14px;
+  }
+
+  /* ── Documents (lignes) ─────────────────────────────────────────── */
+  .doc {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 0;
+    border-top: 1px solid var(--lin2);
+  }
+  .dico {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: var(--lin2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--mut);
+    flex-shrink: 0;
+  }
+  .dn {
+    font-size: 13.5px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--ink);
+  }
+  .ds {
+    font-size: 11.5px;
+    color: var(--mut);
+    margin: 3px 0 0;
+    line-height: 1.45;
+  }
+  .qrow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-top: 1px solid var(--lin2);
+  }
+
+  .lock {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: var(--srf2);
+    border: 1px dashed var(--lin);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 12.5px;
+    color: var(--mut);
+    line-height: 1.55;
+    margin-top: 12px;
+  }
+  .force {
+    font-weight: 600;
+    color: var(--redt);
+    cursor: pointer;
+  }
+
+  /* ── Timeline activité ──────────────────────────────────────────── */
+  .ev {
+    position: relative;
+    padding: 0 0 15px 22px;
+  }
+  .evd {
+    position: absolute;
+    left: 0;
+    top: 3px;
+    width: 9px;
+    height: 9px;
+    border-radius: 99px;
+    background: var(--pri);
+  }
+  .evl {
+    position: absolute;
+    left: 4px;
+    top: 15px;
+    bottom: 2px;
+    width: 1px;
+    background: var(--lin);
+  }
+  .evt {
+    margin: 0;
+    font-weight: 600;
+    font-size: 12.5px;
+    color: var(--ink);
+  }
+  .evs {
+    margin: 2px 0 0;
+    font-size: 11.5px;
+    color: var(--mut);
+  }
+
+  /* ── Stepper ────────────────────────────────────────────────────── */
+  .steps {
+    position: relative;
+    margin-top: 24px;
+  }
+  .track {
+    position: absolute;
+    top: 5px;
+    left: 8%;
+    right: 8%;
+    height: 2px;
+    background: var(--lin);
+  }
+  .tfill {
+    position: absolute;
+    top: 5px;
+    left: 8%;
+    height: 2px;
+    background: var(--pri);
+  }
+  .nodes {
+    display: flex;
+    position: relative;
+  }
+  .stw {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+  .nd {
+    width: 12px;
+    height: 12px;
+    border-radius: 99px;
+    background: var(--sur);
+    border: 2px solid var(--lin);
+    box-sizing: border-box;
+  }
+  .nd.d {
+    background: var(--pri);
+    border-color: var(--pri);
+  }
+  .nd.cur {
+    border-color: var(--pri);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--pri) 18%, transparent);
+  }
+  .nd.bl {
+    background: var(--redt);
+    border-color: var(--redt);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--redt) 15%, transparent);
+  }
+  .lb {
+    font-size: 9.5px;
+    font-weight: 600;
+    color: var(--mut2);
+    margin: 6px 0 0;
+    text-align: center;
+  }
+
+  /* ── Alertes / infos ────────────────────────────────────────────── */
+  .alert {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--amb-bg);
+    border: 1px solid color-mix(in oklab, var(--amb-fg) 25%, transparent);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin: 18px 0 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--amb-fg);
+  }
+  .alert.red {
+    background: var(--red-bg);
+    border-color: color-mix(in oklab, var(--red-fg) 25%, transparent);
+    color: var(--red-fg);
+  }
+  .alink {
+    margin-left: auto;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .infob {
+    background: var(--blu-bg);
+    border: 1px solid color-mix(in oklab, var(--blu-fg) 25%, transparent);
+    color: var(--blu-fg);
+    border-radius: 12px;
+    padding: 13px 16px;
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  .okbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--grn-bg);
+    border: 1px solid color-mix(in oklab, var(--grn-fg) 25%, transparent);
+    color: var(--grn-fg);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 14px;
+  }
+  .quote {
+    border: 1px solid var(--lin);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    color: var(--mut);
+    margin-top: 12px;
+    font-style: italic;
+    line-height: 1.5;
+  }
+  .notec {
+    font-size: 12.5px;
+    color: var(--mut);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  /* ── Cartes sélectionnables (templates, type de tiers…) ─────────── */
+  .tcards {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .tcard {
+    border: 1px solid var(--lin);
+    border-radius: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    background: var(--sur);
+  }
+  .tcard.on {
+    border-color: var(--pri);
+    background: var(--pris);
+    box-shadow: 0 0 0 1px var(--pri);
+  }
+  .tt {
+    font-size: 13.5px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--ink);
+  }
+  .td2 {
+    font-size: 11.5px;
+    color: var(--mut);
+    margin: 4px 0 0;
+    line-height: 1.45;
+  }
+
+  /* ── Opportunités ───────────────────────────────────────────────── */
+  .ocard {
+    background: var(--sur);
+    border: 1px solid var(--lin);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 14px;
+    box-shadow: var(--shd);
+  }
+  .oti {
+    font-size: 16.5px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .odesc {
+    font-size: 13px;
+    color: var(--mut);
+    margin: 8px 0 12px;
+    line-height: 1.6;
+    max-width: 760px;
+  }
+  .om {
+    font-size: 12px;
+    color: var(--mut2);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .omi {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .crow {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 15px 20px;
+    border-top: 1px solid var(--lin2);
+  }
+
+  /* ── Upload / fichiers ──────────────────────────────────────────── */
+  .drop {
+    border: 2px dashed var(--lin);
+    border-radius: 12px;
+    padding: 36px;
+    text-align: center;
+    cursor: pointer;
+    background: var(--srf2);
+  }
+  .drop:hover,
+  .drop.active {
+    border-color: var(--pri);
+  }
+  .dropt {
+    font-size: 13.5px;
+    color: var(--mut);
+    margin: 12px 0 4px;
+  }
+  .drops {
+    font-size: 12px;
+    color: var(--mut2);
+    margin: 0;
+  }
+  .filecard {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--srf2);
+    border: 1px solid var(--lin);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .pbar {
+    height: 8px;
+    border-radius: 99px;
+    background: var(--lin2);
+    overflow: hidden;
+    margin-top: 10px;
+  }
+  .pfill {
+    height: 100%;
+    border-radius: 99px;
+    background: var(--pri);
+    transition: width 0.6s ease;
+  }
+
+  /* ── Analyse candidature (RH) ───────────────────────────────────── */
+  .xcard {
+    background: var(--sur);
+    border: 1px solid var(--lin);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .xh {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .xt {
+    font-size: 13px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--ink);
+  }
+  .xp {
+    font-size: 12.5px;
+    color: var(--mut);
+    margin: 0 0 8px;
+    line-height: 1.5;
+  }
+  .xl {
+    font-size: 11px;
+    font-weight: 700;
+    margin: 10px 0 4px;
+    color: var(--ink);
+  }
+  .xl.g {
+    color: var(--grn-fg);
+  }
+  .xl.o {
+    color: var(--amb-fg);
+  }
+  .xul {
+    margin: 0;
+    padding-left: 16px;
+    font-size: 12px;
+    color: var(--mut);
+    line-height: 1.6;
+    list-style: disc;
+  }
+
+  /* ── Segmented control ──────────────────────────────────────────── */
+  .seg2 {
+    display: flex;
+    gap: 2px;
+    background: var(--lin2);
+    border-radius: 9px;
+    padding: 3px;
+  }
+  .seg2b {
+    width: 26px;
+    height: 24px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--mut2);
+    cursor: pointer;
+  }
+  .seg2b.on {
+    background: var(--sur);
+    color: var(--prit);
+    box-shadow: var(--shd);
+  }
+
+  /* ── Auth (connexion / inscription) ─────────────────────────────── */
+  .lgwrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    padding: 20px;
+  }
+  .lgcard {
+    width: 400px;
+    max-width: 92vw;
+    background: var(--sur);
+    border: 1px solid var(--lin);
+    border-radius: 16px;
+    padding: 32px;
+    box-sizing: border-box;
+    box-shadow: var(--shd);
+  }
+
+  /* ── Layout applicatif ──────────────────────────────────────────── */
+  .top {
+    height: 56px;
+    background: var(--sur);
+    border-bottom: 1px solid var(--lin);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  .logo {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--pri);
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .srch {
+    width: 280px;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--lin);
+    background: var(--srf2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    color: var(--mut);
+    font-size: 13px;
+    box-sizing: border-box;
+  }
+  .thm {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--lin);
+    background: var(--sur);
+    color: var(--mut);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .thm:hover {
+    background: var(--srf2);
+  }
+  .av {
+    width: 30px;
+    height: 30px;
+    border-radius: 99px;
+    background: var(--pri);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .side {
+    width: 232px;
+    background: var(--sur);
+    border-right: 1px solid var(--lin);
+    padding: 14px 12px;
+    box-sizing: border-box;
+    flex-shrink: 0;
+  }
+  .gh {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--mut2);
+    padding: 16px 10px 6px;
+  }
+  .it {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 9px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--mut);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .it:hover {
+    background: var(--srf2);
+    color: var(--ink);
+  }
+  .it.on {
+    background: var(--pris);
+    color: var(--prit);
+    font-weight: 600;
+  }
+  .cnt {
+    margin-left: auto;
+    font-size: 10.5px;
+    font-weight: 600;
+    background: var(--lin2);
+    color: var(--mut);
+    padding: 2px 7px;
+    border-radius: 99px;
+  }
+  .cnt.hot {
+    background: var(--pri);
+    color: #fff;
+  }
+
+  /* ── Pages publiques (portail / candidature) ────────────────────── */
+  .p-bg {
+    min-height: 100vh;
+    background: var(--bg);
+    padding: 0 16px 48px;
+  }
+  .p-wrap {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .p-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 0;
+  }
+  .p-card {
+    background: var(--sur);
+    border: 1px solid var(--lin);
+    border-radius: 16px;
+    padding: 22px;
+    box-shadow: var(--shd);
+  }
+  .p-h {
+    font-size: 19px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .p-doc {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-top: 1px solid var(--lin2);
+  }
+  .p-up {
+    border: 1.5px dashed var(--lin);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--prit);
+    cursor: pointer;
+    white-space: nowrap;
+    background: var(--srf2);
+  }
+  .p-note {
+    font-size: 11.5px;
+    color: var(--mut);
+    line-height: 1.55;
+    margin: 16px 0 0;
+  }
+  .p-foot {
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--mut2);
+    margin-top: 16px;
+    line-height: 1.6;
+  }
+
+  /* ── Divers ─────────────────────────────────────────────────────── */
+  .dark-card {
+    background: var(--sur);
+  }
+  .dark-border {
+    border-color: var(--lin);
+  }
+  .dark-text {
+    color: var(--ink);
+  }
+  .dark-text-secondary {
+    color: var(--mut);
+  }
+  .dark-bg-hover:hover {
+    background: var(--srf2);
+  }
+
   /* ── Phone input (react-phone-number-input) ── */
 
-  /* Outer wrapper — single unified border */
   .phone-input-container {
-    @apply flex items-stretch border border-gray-300 rounded-lg bg-white overflow-hidden
-           transition-colors dark:border-gray-600 dark:bg-gray-800;
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--lin);
+    border-radius: 9px;
+    background: var(--srf2);
+    overflow: hidden;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
 
   .phone-input-container:focus-within {
-    @apply border-primary-500 ring-1 ring-primary-500;
+    border-color: var(--pri);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--pri) 15%, transparent);
   }
 
   /* Country selector (flag + chevron) */
   .phone-input-container .PhoneInputCountry {
-    @apply relative flex items-center gap-1.5 px-2.5
-           bg-gray-50 border-r border-gray-200 flex-shrink-0 cursor-pointer
-           dark:bg-gray-900 dark:border-gray-700;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0 0.625rem;
+    background: var(--lin2);
+    border-right: 1px solid var(--lin);
+    flex-shrink: 0;
+    cursor: pointer;
   }
 
   /* Invisible <select> overlay for accessibility */
@@ -175,25 +1458,29 @@
   .phone-input-container .PhoneInputCountrySelectArrow {
     width: 0.4rem;
     height: 0.4rem;
-    border-right: 1.5px solid #9ca3af;
-    border-bottom: 1.5px solid #9ca3af;
+    border-right: 1.5px solid var(--mut2);
+    border-bottom: 1.5px solid var(--mut2);
     transform: rotate(45deg) translateY(-2px);
     flex-shrink: 0;
-  }
-
-  .dark .phone-input-container .PhoneInputCountrySelectArrow {
-    border-color: #6b7280;
   }
 
   /* The actual phone number <input>
      — must override @tailwindcss/forms which adds borders on all inputs */
   .phone-input-container .PhoneInputInput {
-    @apply flex-1 min-w-0 border-0 bg-transparent px-3 py-2 text-sm
-           text-gray-900 placeholder-gray-400 outline-none ring-0
-           focus:border-0 focus:ring-0 focus:outline-none
-           dark:text-gray-100 dark:placeholder-gray-500;
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    padding: 0 12px;
+    height: 36px;
+    font-size: 13.5px;
+    color: var(--ink);
+    outline: none;
     /* hard reset — tailwindcss/forms targets [type=tel] */
     border-width: 0 !important;
     box-shadow: none !important;
+  }
+  .phone-input-container .PhoneInputInput::placeholder {
+    color: var(--mut2);
   }
 }

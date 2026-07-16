@@ -1,7 +1,8 @@
 /**
- * StatCard - Reusable statistics card component
+ * StatCard - Reusable statistics card component (KPI v2)
  *
- * Displays a statistic value with label and optional icon.
+ * Displays a statistic value with label and optional subtext,
+ * following the Bobby v2 KPI card design.
  */
 
 import type { LucideIcon } from 'lucide-react';
@@ -13,7 +14,7 @@ interface StatCardProps {
   value: string | number;
   /** Optional icon */
   icon?: LucideIcon;
-  /** Color theme for the icon background */
+  /** Color theme applied to the value */
   color?: 'blue' | 'green' | 'yellow' | 'red' | 'purple' | 'gray';
   /** Optional subtext */
   subtext?: string;
@@ -21,13 +22,13 @@ interface StatCardProps {
   isLoading?: boolean;
 }
 
-const colorClasses = {
-  blue: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
-  green: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400',
-  yellow: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400',
-  red: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400',
-  purple: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400',
-  gray: 'bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400',
+const valueColorClasses = {
+  blue: 'text-ink',
+  green: 'text-grn-fg',
+  yellow: 'text-amb-fg',
+  red: 'text-redt',
+  purple: 'text-ind-fg',
+  gray: 'text-ink',
 };
 
 export function StatCard({
@@ -39,31 +40,19 @@ export function StatCard({
   isLoading,
 }: StatCardProps) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <div className="flex items-center">
-        {Icon && (
-          <div className={`p-3 rounded-lg ${colorClasses[color]}`}>
-            <Icon className="h-6 w-6" />
-          </div>
-        )}
-        <div className={Icon ? 'ml-4' : ''}>
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-            {label}
-          </p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {isLoading ? (
-              <span className="inline-block w-12 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-            ) : (
-              value ?? '-'
-            )}
-          </p>
-          {subtext && (
-            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-              {subtext}
-            </p>
-          )}
-        </div>
+    <div className="bg-sur border border-lin rounded-xl px-[18px] py-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[12.5px] font-medium text-mut m-0">{label}</p>
+        {Icon && <Icon className="h-4 w-4 text-mut2 shrink-0 mt-0.5" />}
       </div>
+      <p className={`text-[26px] font-bold tracking-[-0.02em] mt-1.5 mb-[3px] ${valueColorClasses[color]}`}>
+        {isLoading ? (
+          <span className="inline-block w-12 h-8 bg-lin2 rounded animate-pulse" />
+        ) : (
+          value ?? '-'
+        )}
+      </p>
+      {subtext && <p className="text-[11.5px] text-mut2 m-0">{subtext}</p>}
     </div>
   );
 }
@@ -82,7 +71,7 @@ const columnClasses = {
 
 export function StatCardGrid({ children, columns = 3 }: StatCardGridProps) {
   return (
-    <div className={`grid grid-cols-1 ${columnClasses[columns]} gap-4`}>
+    <div className={`grid grid-cols-1 ${columnClasses[columns]} gap-3.5`}>
       {children}
     </div>
   );

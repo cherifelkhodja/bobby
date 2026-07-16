@@ -26,14 +26,14 @@ describe('Button', () => {
       render(<Button>Primary</Button>);
 
       const button = screen.getByRole('button');
-      expect(button.className).toContain('bg-primary-600');
+      expect(button.className).toContain('bg-pri');
     });
 
     it('should apply secondary variant classes', () => {
       render(<Button variant="secondary">Secondary</Button>);
 
       const button = screen.getByRole('button');
-      expect(button.className).toContain('bg-white');
+      expect(button.className).toContain('bg-sur');
       expect(button.className).toContain('border');
     });
 
@@ -42,21 +42,21 @@ describe('Button', () => {
 
       const button = screen.getByRole('button');
       expect(button.className).toContain('bg-transparent');
-      expect(button.className).toContain('border-primary-600');
+      expect(button.className).toContain('border-pri');
     });
 
     it('should apply danger variant classes', () => {
       render(<Button variant="danger">Danger</Button>);
 
       const button = screen.getByRole('button');
-      expect(button.className).toContain('bg-error');
+      expect(button.className).toContain('bg-redt');
     });
 
     it('should apply ghost variant classes', () => {
       render(<Button variant="ghost">Ghost</Button>);
 
       const button = screen.getByRole('button');
-      expect(button.className).toContain('hover:bg-gray-100');
+      expect(button.className).toContain('hover:bg-srf2');
     });
   });
 
@@ -65,24 +65,24 @@ describe('Button', () => {
       render(<Button>Medium</Button>);
 
       const button = screen.getByRole('button');
-      expect(button.className).toContain('px-4');
-      expect(button.className).toContain('py-2');
+      expect(button.className).toContain('h-9');
+      expect(button.className).toContain('px-3.5');
     });
 
     it('should apply small size classes', () => {
       render(<Button size="sm">Small</Button>);
 
       const button = screen.getByRole('button');
+      expect(button.className).toContain('h-[30px]');
       expect(button.className).toContain('px-3');
-      expect(button.className).toContain('py-1.5');
     });
 
     it('should apply large size classes', () => {
       render(<Button size="lg">Large</Button>);
 
       const button = screen.getByRole('button');
-      expect(button.className).toContain('px-6');
-      expect(button.className).toContain('py-3');
+      expect(button.className).toContain('h-11');
+      expect(button.className).toContain('px-5');
     });
   });
 
@@ -157,7 +157,7 @@ describe('Button', () => {
 
       const button = screen.getByRole('button');
       expect(button.className).toContain('disabled:cursor-not-allowed');
-      expect(button.className).toContain('disabled:opacity-50');
+      expect(button.className).toContain('disabled:opacity-45');
     });
   });
 

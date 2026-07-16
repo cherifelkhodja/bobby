@@ -148,15 +148,15 @@ function TagPanel({
   };
 
   return (
-    <div className="mt-3 border border-dashed border-teal-200 dark:border-teal-800 rounded-md p-3 bg-teal-50/50 dark:bg-teal-900/20">
-      <p className="text-xs font-semibold text-teal-700 dark:text-teal-400 mb-2 flex items-center gap-1.5">
+    <div className="mt-3 border border-dashed border-[color-mix(in_oklab,var(--pri)_35%,transparent)] rounded-md p-3 bg-pris">
+      <p className="text-xs font-semibold text-prit mb-2 flex items-center gap-1.5">
         <Tag className="w-3.5 h-3.5" />
         Balises disponibles — cliquez pour insérer à la position du curseur
       </p>
       <div className="space-y-2">
         {TAG_CATEGORIES.map((cat) => (
           <div key={cat.category}>
-            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">
+            <p className="text-xs text-mut font-medium mb-1">
               {cat.category}
             </p>
             <div className="flex flex-wrap gap-1">
@@ -166,7 +166,7 @@ function TagPanel({
                   type="button"
                   onClick={() => insertTag(tag)}
                   title={tag}
-                  className="text-xs px-2 py-0.5 rounded bg-white dark:bg-gray-800 border border-teal-200 dark:border-teal-700 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/40 transition-colors font-mono"
+                  className="text-xs px-2 py-0.5 rounded bg-sur border border-[color-mix(in_oklab,var(--pri)_35%,transparent)] text-prit hover:bg-blu-bg transition-colors font-mono"
                 >
                   {label}
                 </button>
@@ -261,8 +261,8 @@ function SortableAnnexRow({
         <span
           className={`flex-shrink-0 w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${
             annexe.is_active
-              ? 'bg-violet-100 dark:bg-violet-900 text-violet-700 dark:text-violet-300'
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600'
+              ? 'bg-ind-bg text-ind-fg'
+              : 'bg-lin2 text-mut2'
           }`}
         >
           {index}
@@ -280,7 +280,7 @@ function SortableAnnexRow({
                 if (e.key === 'Escape') { setTitleDraft(annexe.title); setEditingTitle(false); }
               }}
               autoFocus
-              className="flex-1 min-w-0 px-2 py-0.5 text-sm font-semibold border border-blue-400 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="flex-1 min-w-0 px-2 py-0.5 text-sm font-semibold border border-pri rounded bg-sur text-ink focus:outline-none focus:ring-1 focus:ring-pri"
             />
           ) : (
             <>
@@ -342,7 +342,7 @@ function SortableAnnexRow({
             }}
             disabled={isPending}
             title="Supprimer définitivement"
-            className="p-1.5 rounded text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            className="p-1.5 rounded text-gray-400 hover:text-redt hover:bg-red-bg transition-colors"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -361,7 +361,7 @@ function SortableAnnexRow({
             <button
               type="button"
               onClick={() => setShowTags((v) => !v)}
-              className="flex items-center gap-1 text-xs text-teal-600 dark:text-teal-400 hover:underline ml-2 flex-shrink-0"
+              className="flex items-center gap-1 text-xs text-prit hover:underline ml-2 flex-shrink-0"
             >
               {showTags ? (
                 <>
@@ -377,7 +377,7 @@ function SortableAnnexRow({
 
           <textarea
             ref={textareaRef}
-            className="w-full h-44 px-3 py-2 text-sm font-mono border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-y focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className="f-ta h-44 font-mono !text-[13px]"
             value={currentContent}
             onChange={(e) => onContentChange(e.target.value)}
           />
@@ -446,7 +446,7 @@ function CreateAnnexModal({
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Titre</label>
             <input
-              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="f-in"
               value={title}
               onChange={(e) => handleTitleChange(e.target.value)}
               placeholder="Ex : Conditions spéciales"
@@ -458,7 +458,7 @@ function CreateAnnexModal({
               Clé unique <span className="text-gray-400 font-normal">(identifiant technique)</span>
             </label>
             <input
-              className="w-full px-3 py-2 text-sm font-mono border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="f-in font-mono"
               value={key}
               onChange={(e) => { setKey(e.target.value); setKeyTouched(true); }}
               placeholder="Ex : conditions_speciales"
@@ -469,7 +469,7 @@ function CreateAnnexModal({
               Contenu <span className="text-gray-400 font-normal">(optionnel, modifiable ensuite)</span>
             </label>
             <textarea
-              className="w-full h-28 px-3 py-2 text-sm font-mono border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-y focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="f-ta h-28 font-mono !text-[13px]"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Rédigez le contenu de l'annexe..."

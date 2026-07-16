@@ -9,7 +9,6 @@ import { authApi } from '../api/auth';
 import { getErrorMessage } from '../api/client';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Card } from '../components/ui/Card';
 
 const registerSchema = z
   .object({
@@ -57,16 +56,14 @@ export function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Créer un compte</h1>
-          <p className="text-gray-600 mt-2">
-            Rejoignez la plateforme de cooptation
-          </p>
+    <div className="lgwrap">
+      <div className="lgcard">
+        <div className="text-center mb-[26px]">
+          <p className="logo text-[22px]">Bobby</p>
+          <p className="sub mt-2">Créer un compte</p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5">
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Prénom"
@@ -107,21 +104,18 @@ export function Register() {
             {...register('confirmPassword')}
           />
 
-          <Button type="submit" className="w-full" isLoading={isLoading}>
+          <Button type="submit" className="w-full !mt-4" isLoading={isLoading}>
             S'inscrire
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-600">
+        <p className="notec text-center mt-5">
           Déjà un compte ?{' '}
-          <Link
-            to="/login"
-            className="text-primary-600 hover:text-primary-700 font-medium"
-          >
+          <Link to="/login" className="font-semibold">
             Se connecter
           </Link>
         </p>
-      </Card>
+      </div>
     </div>
   );
 }

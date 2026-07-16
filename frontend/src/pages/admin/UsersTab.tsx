@@ -9,13 +9,33 @@ import { toast } from 'sonner';
 
 import { adminApi } from '../../api/admin';
 import type { User, UserRole } from '../../types';
-import { Card, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { PageSpinner } from '../../components/ui/Spinner';
-import { ROLE_LABELS, ROLE_COLORS } from './constants';
+import { Input } from '../../components/ui/Input';
+import { ROLE_LABELS } from './constants';
 import { InvitationsTab } from './InvitationsTab';
+
+/** Chips de rôle v2 : classe `st-*` + libellé court. */
+const ROLE_CHIPS: Record<UserRole, { cls: string; label: string }> = {
+  admin: { cls: 'st-ind', label: 'Admin' },
+  commercial: { cls: 'st-blu', label: 'Commercial' },
+  rh: { cls: 'st-grn', label: 'RH' },
+  adv: { cls: 'st-amb', label: 'ADV' },
+  user: { cls: 'st-sla', label: 'Collaborateur' },
+};
+
+function RoleChip({ role }: { role: UserRole }) {
+  const chip = ROLE_CHIPS[role];
+  return (
+    <span className={`st ${chip.cls}`}>
+      <span className="dot" />
+      {chip.label}
+    </span>
+  );
+}
+
+const GRID_COLS = 'grid-cols-[1.7fr_130px_110px_130px_80px]';
 
 export function UsersTab() {
   const queryClient = useQueryClient();
@@ -139,173 +159,136 @@ export function UsersTab() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader
-          title="Gestion des utilisateurs"
-          subtitle={`${filteredUsers.length} sur ${data?.total || 0} utilisateurs`}
-        />
-
+    <div className="space-y-8">
+      <div>
         {/* Filters */}
-        <div className="px-6 pb-4 flex flex-wrap gap-4">
-          <div className="flex items-center gap-2">
-            <label htmlFor="role-filter" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Rôle:
-            </label>
-            <select
-              id="role-filter"
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary text-sm"
-            >
-              <option value="all">Tous</option>
-              <option value="user">{ROLE_LABELS.user}</option>
-              <option value="commercial">{ROLE_LABELS.commercial}</option>
-              <option value="rh">{ROLE_LABELS.rh}</option>
-              <option value="admin">{ROLE_LABELS.admin}</option>
-            </select>
-          </div>
+        <div className="flex items-center gap-2 flex-wrap mb-3.5">
+          <label htmlFor="role-filter" className="sr-only">
+            Filtrer par rôle
+          </label>
+          <select
+            id="role-filter"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="filter-select"
+          >
+            <option value="all">Tous les rôles</option>
+            <option value="user">{ROLE_LABELS.user}</option>
+            <option value="commercial">{ROLE_LABELS.commercial}</option>
+            <option value="rh">{ROLE_LABELS.rh}</option>
+            <option value="admin">{ROLE_LABELS.admin}</option>
+          </select>
 
-          <div className="flex items-center gap-2">
-            <label htmlFor="status-filter" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Statut:
-            </label>
-            <select
-              id="status-filter"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary text-sm"
-            >
-              <option value="all">Tous</option>
-              <option value="active">Actif</option>
-              <option value="inactive">Inactif</option>
-              <option value="unverified">Non vérifié</option>
-            </select>
-          </div>
+          <label htmlFor="status-filter" className="sr-only">
+            Filtrer par statut
+          </label>
+          <select
+            id="status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="filter-select"
+          >
+            <option value="all">Tous les statuts</option>
+            <option value="active">Actif</option>
+            <option value="inactive">Inactif</option>
+            <option value="unverified">Non vérifié</option>
+          </select>
 
           {(roleFilter !== 'all' || statusFilter !== 'all') && (
             <button
+              type="button"
               onClick={() => {
                 setRoleFilter('all');
                 setStatusFilter('all');
               }}
-              className="text-sm text-primary dark:text-primary-400 hover:text-primary-dark underline"
+              className="text-[12.5px] font-medium text-prit hover:underline"
             >
               Réinitialiser les filtres
             </button>
           )}
+
+          <span className="sort">
+            {filteredUsers.length} sur {data?.total || 0} utilisateurs
+          </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Utilisateur
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Rôle
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Inscription
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredUsers.map((user) => (
-                <tr
-                  key={user.id}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+        {/* Users table */}
+        <div className="tbl">
+          <div className={`thead ${GRID_COLS}`}>
+            <span>Utilisateur</span>
+            <span>Rôle</span>
+            <span>Vérifié</span>
+            <span>Créé le</span>
+            <span className="text-right">Actions</span>
+          </div>
+          {filteredUsers.map((user) => (
+            <div key={user.id} className={`row ${GRID_COLS}`}>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <p
+                    className="nm truncate cursor-pointer hover:underline"
+                    onClick={() => openDetailsModal(user)}
+                  >
+                    {user.first_name} {user.last_name}
+                  </p>
+                  {!user.is_active && (
+                    <span className="st st-red">
+                      <span className="dot" />
+                      Inactif
+                    </span>
+                  )}
+                </div>
+                <p className="ns truncate">{user.email}</p>
+              </div>
+              <div>
+                <RoleChip role={user.role} />
+              </div>
+              <div>
+                {user.is_verified ? (
+                  <span className="st st-grn">
+                    <span className="dot" />
+                    Oui
+                  </span>
+                ) : (
+                  <span className="st st-amb">
+                    <span className="dot" />
+                    En attente
+                  </span>
+                )}
+              </div>
+              <span className="cell">
+                {new Date(user.created_at).toLocaleDateString('fr-FR')}
+              </span>
+              <div className="text-right">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => openDetailsModal(user)}
                 >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div
-                        className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer hover:text-primary dark:hover:text-primary-400 hover:underline"
-                        onClick={() => openDetailsModal(user)}
-                      >
-                        {user.first_name} {user.last_name}
-                      </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{user.email}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge variant={ROLE_COLORS[user.role]}>
-                      {ROLE_LABELS[user.role]}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      {user.is_active ? (
-                        <Badge variant="success">Actif</Badge>
-                      ) : (
-                        <Badge variant="error">Inactif</Badge>
-                      )}
-                      {!user.is_verified && (
-                        <Badge variant="warning">Non verifie</Badge>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {new Date(user.created_at).toLocaleDateString('fr-FR')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                    <div className="inline-flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setIsRoleModalOpen(true);
-                        }}
-                      >
-                        Rôle
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          toggleActiveMutation.mutate({
-                            userId: user.id,
-                            activate: !user.is_active,
-                          })
-                        }
-                      >
-                        {user.is_active ? 'Désactiver' : 'Activer'}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteClick(user)}
-                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  Modifier
+                </Button>
+              </div>
+            </div>
+          ))}
+          <div className="tfoot">
+            <span>
+              {filteredUsers.length} utilisateur{filteredUsers.length > 1 ? 's' : ''}
+            </span>
+          </div>
         </div>
-      </Card>
+      </div>
 
       {/* Change Role Modal */}
       <Modal
         isOpen={isRoleModalOpen}
         onClose={() => setIsRoleModalOpen(false)}
-        title="Changer le role"
+        title="Changer le rôle"
       >
         {selectedUser && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Modifier le role de{' '}
-              <strong className="text-gray-900 dark:text-gray-100">
+            <p className="text-[13px] text-mut">
+              Modifier le rôle de{' '}
+              <strong className="text-ink">
                 {selectedUser.first_name} {selectedUser.last_name}
               </strong>
             </p>
@@ -313,18 +296,19 @@ export function UsersTab() {
               {(['user', 'commercial', 'rh', 'admin'] as UserRole[]).map((role) => (
                 <button
                   key={role}
+                  type="button"
                   onClick={() =>
                     changeRoleMutation.mutate({ userId: selectedUser.id, role })
                   }
                   disabled={changeRoleMutation.isPending}
-                  className={`w-full p-3 text-left rounded-lg border ${
+                  className={`w-full p-3 text-left rounded-[10px] border transition-colors ${
                     selectedUser.role === role
-                      ? 'border-primary bg-primary-light dark:bg-primary-900/30'
-                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                      ? 'border-pri bg-pris'
+                      : 'border-lin hover:bg-srf2'
                   }`}
                 >
-                  <div className="font-medium text-gray-900 dark:text-gray-100">{ROLE_LABELS[role]}</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <div className="text-[13.5px] font-semibold text-ink">{ROLE_LABELS[role]}</div>
+                  <div className="text-xs text-mut mt-0.5">
                     {role === 'user' && 'Peut soumettre des cooptations'}
                     {role === 'commercial' && 'Peut gerer ses opportunites et voir les cooptations associees'}
                     {role === 'rh' && 'Peut gerer les utilisateurs et voir toutes les cooptations'}
@@ -341,109 +325,126 @@ export function UsersTab() {
       <Modal
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
-        title="Details de l'utilisateur"
+        title="Détails de l'utilisateur"
       >
         {selectedUser && (
           <div className="space-y-4">
             {/* Read-only info */}
-            <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-500 dark:text-gray-400">Statut</span>
-                <div className="flex items-center space-x-2">
+            <div className="p-3 bg-srf2 border border-lin2 rounded-[10px] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[12.5px] text-mut">Statut</span>
+                <div className="flex items-center gap-2">
                   {selectedUser.is_active ? (
-                    <Badge variant="success">Actif</Badge>
+                    <span className="st st-grn">
+                      <span className="dot" />
+                      Actif
+                    </span>
                   ) : (
-                    <Badge variant="error">Inactif</Badge>
+                    <span className="st st-red">
+                      <span className="dot" />
+                      Inactif
+                    </span>
                   )}
                   {!selectedUser.is_verified && (
-                    <Badge variant="warning">Non verifie</Badge>
+                    <span className="st st-amb">
+                      <span className="dot" />
+                      Non vérifié
+                    </span>
                   )}
                 </div>
               </div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-500 dark:text-gray-400">Role</span>
-                <Badge variant={ROLE_COLORS[selectedUser.role]}>
-                  {ROLE_LABELS[selectedUser.role]}
-                </Badge>
+              <div className="flex items-center justify-between">
+                <span className="text-[12.5px] text-mut">Rôle</span>
+                <RoleChip role={selectedUser.role} />
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500 dark:text-gray-400">Inscription</span>
-                <span className="text-sm text-gray-900 dark:text-gray-100">
+                <span className="text-[12.5px] text-mut">Inscription</span>
+                <span className="text-[13px] text-ink">
                   {new Date(selectedUser.created_at).toLocaleDateString('fr-FR')}
                 </span>
               </div>
             </div>
 
             {/* Editable fields */}
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Prenom
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.first_name}
-                    onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
-                    className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Nom
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.last_name}
-                    onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
-                    className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={selectedUser.email}
-                  disabled
-                  className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 shadow-sm cursor-not-allowed"
+            <div className="space-y-3.5">
+              <div className="f-grid">
+                <Input
+                  label="Prénom"
+                  id="edit-first-name"
+                  value={editForm.first_name}
+                  onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+                />
+                <Input
+                  label="Nom"
+                  id="edit-last-name"
+                  value={editForm.last_name}
+                  onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Telephone
-                </label>
-                <input
-                  type="tel"
-                  value={editForm.phone}
-                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                  placeholder="+33 6 12 34 56 78"
-                  className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
-                />
-              </div>
+              <Input label="Email" id="edit-email" type="email" value={selectedUser.email} disabled />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  ID BoondManager
-                </label>
-                <input
-                  type="text"
-                  value={editForm.boond_resource_id}
-                  onChange={(e) => setEditForm({ ...editForm, boond_resource_id: e.target.value })}
-                  placeholder="Non lie a BoondManager"
-                  className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary focus:ring-primary"
-                />
-              </div>
+              <Input
+                label="Téléphone"
+                id="edit-phone"
+                type="tel"
+                value={editForm.phone}
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                placeholder="+33 6 12 34 56 78"
+              />
+
+              <Input
+                label="ID BoondManager"
+                id="edit-boond-id"
+                value={editForm.boond_resource_id}
+                onChange={(e) => setEditForm({ ...editForm, boond_resource_id: e.target.value })}
+                placeholder="Non lie a BoondManager"
+              />
+            </div>
+
+            {/* Secondary actions */}
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setIsDetailsModalOpen(false);
+                  setIsRoleModalOpen(true);
+                }}
+              >
+                Changer le rôle
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                isLoading={toggleActiveMutation.isPending}
+                onClick={() =>
+                  toggleActiveMutation.mutate({
+                    userId: selectedUser.id,
+                    activate: !selectedUser.is_active,
+                  })
+                }
+              >
+                {selectedUser.is_active ? 'Désactiver' : 'Activer'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="!text-redt"
+                onClick={() => {
+                  setIsDetailsModalOpen(false);
+                  handleDeleteClick(selectedUser);
+                }}
+                leftIcon={<Trash2 className="h-3.5 w-3.5" />}
+              >
+                Supprimer
+              </Button>
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex justify-end gap-2 pt-4 border-t border-lin">
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={() => setIsDetailsModalOpen(false)}
               >
                 Annuler
@@ -470,20 +471,20 @@ export function UsersTab() {
       >
         {userToDelete && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-[13px] text-mut">
               Etes-vous sur de vouloir supprimer{' '}
-              <strong className="text-gray-900 dark:text-gray-100">
+              <strong className="text-ink">
                 {userToDelete.first_name} {userToDelete.last_name}
               </strong>{' '}
               ?
             </p>
-            <p className="text-sm text-red-600 dark:text-red-400">
+            <p className="text-[13px] font-medium text-redt">
               Cette action est irreversible.
             </p>
 
-            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex justify-end gap-2 pt-4 border-t border-lin">
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={() => {
                   setIsDeleteModalOpen(false);
                   setUserToDelete(null);

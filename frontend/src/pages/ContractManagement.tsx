@@ -1,17 +1,16 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FileSignature, X, Trash2, User, Building2, Plus } from 'lucide-react';
+import { FileSignature, X, Trash2, Plus, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { contractsApi, contractCompaniesApi } from '../api/contracts';
 import { useAuthStore } from '../stores/authStore';
-import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
 import { getErrorMessage } from '../api/client';
-import type { ContractRequestStatus } from '../types';
+import type { ContractRequest, ContractRequestStatus } from '../types';
 import { CONTRACT_STATUS_CONFIG } from '../types';
 
 const THIRD_PARTY_TYPE_LABELS: Record<string, string> = {
@@ -21,9 +20,51 @@ const THIRD_PARTY_TYPE_LABELS: Record<string, string> = {
   salarie: 'Salarié',
 };
 
-type FilterTab = 'all' | 'active' | 'done';
+type FilterTab = 'all' | 'todo' | 'waiting' | 'done';
 
 const CR_TERMINAL = new Set(['cancelled', 'signed', 'archived', 'redirected_payfit']);
+
+// Statuts où la balle est chez le tiers (collecte, review, signature)
+const WAITING_STATUSES = new Set<ContractRequestStatus>([
+  'collecting_documents',
+  'draft_sent_to_partner',
+  'sent_for_signature',
+]);
+const DONE_STATUSES = new Set<ContractRequestStatus>([
+  'signed',
+  'active',
+  'archived',
+  'redirected_payfit',
+  'cancelled',
+]);
+
+function tabOf(cr: ContractRequest): Exclude<FilterTab, 'all'> {
+  if (DONE_STATUSES.has(cr.status)) return 'done';
+  if (WAITING_STATUSES.has(cr.status)) return 'waiting';
+  return 'todo';
+}
+
+function chipClass(status: ContractRequestStatus): string {
+  return `st ${CONTRACT_STATUS_CONFIG[status]?.color ?? 'bg-sla-bg text-sla-fg'}`;
+}
+
+function StageSegments({ status }: { status: ContractRequestStatus }) {
+  const config = CONTRACT_STATUS_CONFIG[status];
+  const stage = config?.stage ?? 0;
+  const blocked = config?.group === 'blocked';
+  if (stage === 0) return null;
+  return (
+    <div className="prog">
+      {[0, 1, 2, 3, 4, 5].map((j) => {
+        let cls = 'seg';
+        if (j < stage - 1 || stage === 6) cls = 'seg f';
+        else if (j === stage - 1 && blocked) cls = 'seg fr';
+        else if (j === stage - 1 && stage > 1) cls = 'seg f';
+        return <span key={j} className={cls} />;
+      })}
+    </div>
+  );
+}
 
 export function ContractManagement() {
   const navigate = useNavigate();
@@ -40,11 +81,11 @@ export function ContractManagement() {
     company_id: string;
   }>({ boond_consultant_id: '', consultant_type: 'candidate', company_id: '' });
   const pageSize = 20;
-  // The group tabs (Tous / En cours / Finalisés) span several statuses, and the API
-  // status_filter only accepts a single status — so group filtering, counts and
-  // pagination are done client-side over the full list, loaded in one request (capped
-  // at FETCH_LIMIT). Limitation: beyond FETCH_LIMIT rows, counts/pages are capped;
-  // a server-side group-aware filter would be needed to lift the cap.
+  // The group tabs span several statuses, and the API status_filter only accepts a
+  // single status — so group filtering, counts and pagination are done client-side
+  // over the full list, loaded in one request (capped at FETCH_LIMIT). Limitation:
+  // beyond FETCH_LIMIT rows, counts/pages are capped; a server-side group-aware
+  // filter would be needed to lift the cap.
   const FETCH_LIMIT = 500;
 
   const isAdv = user?.role === 'adv' || user?.role === 'admin';
@@ -104,200 +145,246 @@ export function ContractManagement() {
 
   const createConsultantIdValid = /^\d+$/.test(createForm.boond_consultant_id.trim());
 
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+  const formatDate = (dateStr: string | null) =>
+    dateStr
+      ? new Date(dateStr).toLocaleDateString('fr-FR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: '2-digit',
+        })
+      : '—';
 
   if (crLoading) return <PageSpinner />;
 
-  // ── Contract requests list ────────────────────────────────────────
-  const renderContractsList = () => {
-    const items = crData?.items ?? [];
-    const filtered = items.filter((cr) => {
-      if (filterTab === 'all') return true;
-      const g = CONTRACT_STATUS_CONFIG[cr.status]?.group;
-      if (filterTab === 'active') return g === 'active' || g === 'blocked';
-      return g === 'done';
+  const items = crData?.items ?? [];
+
+  // KPIs
+  const activeItems = items.filter((cr) => !DONE_STATUSES.has(cr.status));
+  const waitingCount = items.filter((cr) => tabOf(cr) === 'waiting').length;
+  const todoCount = items.filter((cr) => tabOf(cr) === 'todo').length;
+  const blockedCount = items.filter((cr) => cr.status === 'compliance_blocked').length;
+
+  const counts: Record<FilterTab, number> = {
+    all: items.length,
+    todo: todoCount,
+    waiting: waitingCount,
+    done: items.filter((cr) => tabOf(cr) === 'done').length,
+  };
+
+  const filtered = items
+    .filter((cr) => (filterTab === 'all' ? true : tabOf(cr) === filterTab))
+    .sort((a, b) => {
+      // Tri : échéance de démarrage (nulls en dernier)
+      if (!a.start_date && !b.start_date) return 0;
+      if (!a.start_date) return 1;
+      if (!b.start_date) return -1;
+      return a.start_date.localeCompare(b.start_date);
     });
 
-    const counts = {
-      all: items.length,
-      active: items.filter((cr) => { const g = CONTRACT_STATUS_CONFIG[cr.status]?.group; return g === 'active' || g === 'blocked'; }).length,
-      done: items.filter((cr) => CONTRACT_STATUS_CONFIG[cr.status]?.group === 'done').length,
-    };
+  const paged = filtered.slice(page * pageSize, page * pageSize + pageSize);
 
-    const paged = filtered.slice(page * pageSize, page * pageSize + pageSize);
-
-    return (
-      <>
-        {renderFilterTabs(counts, CONTRACT_STATUS_CONFIG)}
-        {filtered.length === 0 ? (
-          <Card className="text-center py-12">
-            <FileSignature className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">Aucun contrat cadre.</p>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {paged.map((cr) => {
-              const config = CONTRACT_STATUS_CONFIG[cr.status];
-              const consultantName = [cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ');
-              const thirdPartyLabel = cr.third_party_type ? (THIRD_PARTY_TYPE_LABELS[cr.third_party_type] ?? cr.third_party_type) : null;
-              return (
-                <div
-                  key={cr.id}
-                  onClick={() => navigate(`/contracts/${cr.id}`)}
-                  className="group relative bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md transition-all cursor-pointer overflow-hidden"
-                >
-                  {/* Left accent bar */}
-                  <div className={`absolute inset-y-0 left-0 w-1 ${
-                    cr.status === 'cancelled' || cr.status === 'compliance_blocked' ? 'bg-red-400' :
-                    cr.status === 'signed' || cr.status === 'active' ? 'bg-green-400' :
-                    cr.status === 'archived' || cr.status === 'redirected_payfit' ? 'bg-gray-300 dark:bg-gray-600' :
-                    'bg-blue-400'
-                  }`} />
-
-                  <div className="pl-5 pr-4 py-4">
-                    {/* Line 1: Status + Reference + Third party type */}
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${config?.color ?? 'bg-gray-100 text-gray-600'}`}>
-                        {config?.label ?? cr.status_display}
-                      </span>
-                      <span className="text-sm font-mono font-bold text-gray-900 dark:text-white">
-                        {cr.display_reference}
-                      </span>
-                      {thirdPartyLabel && (
-                        <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-full px-2 py-0.5">
-                          {thirdPartyLabel}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Line 2: Fournisseur + date */}
-                    <div className="mt-2 flex items-center justify-between">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Building2 className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-                          {cr.third_party_name || 'Fournisseur en attente'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0 ml-4">
-                        <p className="text-xs text-gray-400 dark:text-gray-500">{formatDate(cr.created_at)}</p>
-                        {isAdv && !CR_TERMINAL.has(cr.status) && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setCancelTarget({ id: cr.id, reference: cr.display_reference }); }}
-                            className="p-1.5 rounded-md text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
-                            title="Annuler"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
-                        {isAdv && cr.status === 'cancelled' && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm(`Supprimer définitivement ${cr.display_reference} ?`)) {
-                                purgeCrMutation.mutate(cr.id);
-                              }
-                            }}
-                            className="p-1.5 rounded-md text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
-                            title="Supprimer définitivement"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Line 3: Consultant */}
-                    {consultantName && (
-                      <div className="mt-1 flex items-center gap-2">
-                        <User className="h-3.5 w-3.5 text-gray-300 dark:text-gray-600 shrink-0" />
-                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {cr.consultant_civility && <span className="mr-0.5">{cr.consultant_civility}</span>}
-                          {consultantName}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {renderPagination(filtered.length)}
-      </>
-    );
-  };
-
-  // ── Shared filter tabs ─────────────────────────────────────────────
-  const renderFilterTabs = (counts: Record<FilterTab, number>, statusConfig: Record<string, { label: string }>) => (
-    <div className="flex items-center gap-4 mb-6">
-      <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-        {([
-          { key: 'all' as FilterTab, label: 'Tous' },
-          { key: 'active' as FilterTab, label: 'En cours' },
-          { key: 'done' as FilterTab, label: 'Finalisés' },
-        ]).map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => { setFilterTab(key); setStatusFilter(''); setPage(0); }}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              filterTab === key
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-          >
-            {label}
-            <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">{counts[key]}</span>
-          </button>
-        ))}
-      </div>
-      <select
-        value={statusFilter}
-        onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
-        className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-      >
-        <option value="">Tous les statuts</option>
-        {Object.entries(statusConfig).map(([value, { label }]) => (
-          <option key={value} value={value}>{label}</option>
-        ))}
-      </select>
-    </div>
-  );
-
-  // ── Shared pagination ──────────────────────────────────────────────
-  const renderPagination = (total: number) => {
-    if (total <= pageSize) return null;
-    return (
-      <div className="flex justify-center mt-8 space-x-2">
-        <Button variant="secondary" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>Précédent</Button>
-        <span className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">Page {page + 1} / {Math.ceil(total / pageSize)}</span>
-        <Button variant="secondary" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((p) => p + 1)}>Suivant</Button>
-      </div>
-    );
-  };
+  const gridCols = 'grid-cols-[72px_1.5fr_110px_90px_90px_210px_60px]';
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <p className="bc">Contrats / Demandes</p>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Gestion des contrats</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {isAdv ? 'Tous les contrats' : 'Vos contrats'}
+          <h1 className="h1">Demandes de contractualisation</h1>
+          <p className="sub">
+            {isAdv
+              ? 'Synchronisées depuis BoondManager · statut 7 « Gagné attente contrat »'
+              : 'Vos demandes de contractualisation'}
           </p>
         </div>
-        {isAdv && (
-          <Button onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nouveau contrat
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(0);
+            }}
+            className="filter-select"
+          >
+            <option value="">Tous les statuts</option>
+            {Object.entries(CONTRACT_STATUS_CONFIG).map(([value, { label }]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          {isAdv && (
+            <Button onClick={() => setShowCreate(true)} leftIcon={<Plus className="h-3.5 w-3.5" />}>
+              Nouveau contrat
+            </Button>
+          )}
+        </div>
       </div>
 
-      {renderContractsList()}
+      <div className="kpis">
+        <div className="kpi">
+          <p className="kl">Demandes actives</p>
+          <p className="kv">{activeItems.length}</p>
+          <p className="ks">sur {items.length} au total</p>
+        </div>
+        <div className="kpi">
+          <p className="kl">En attente du tiers</p>
+          <p className="kv">{waitingCount}</p>
+          <p className="ks">Relances auto J+3 · J+7 · J+14</p>
+        </div>
+        <div className="kpi">
+          <p className="kl">À traiter par l'ADV</p>
+          <p className="kv">{todoCount}</p>
+          <p className="ks">validation, configuration, drafts</p>
+        </div>
+        <div className="kpi">
+          <p className="kl">Bloquées conformité</p>
+          <p className={`kv ${blockedCount > 0 ? 'red' : ''}`}>{blockedCount}</p>
+          <p className="ks">documents manquants ou expirés</p>
+        </div>
+      </div>
+
+      <div className="tabs">
+        {(
+          [
+            { key: 'all' as FilterTab, label: 'Toutes' },
+            { key: 'todo' as FilterTab, label: 'À traiter' },
+            { key: 'waiting' as FilterTab, label: 'En attente du tiers' },
+            { key: 'done' as FilterTab, label: 'Finalisées' },
+          ]
+        ).map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => {
+              setFilterTab(key);
+              setPage(0);
+            }}
+            className={`tab ${filterTab === key ? 'on' : ''}`}
+          >
+            {label} · {counts[key]}
+          </button>
+        ))}
+        <span className="sort">Trier : échéance de démarrage</span>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="card text-center py-12">
+          <FileSignature className="h-10 w-10 text-mut2 mx-auto mb-4" />
+          <p className="dn">Aucune demande</p>
+          <p className="ds mt-1.5">
+            Les demandes arrivent automatiquement depuis BoondManager (statut 7).
+          </p>
+        </div>
+      ) : (
+        <div className="tbl">
+          <div className={`thead ${gridCols}`}>
+            <span>Réf.</span>
+            <span>Consultant / Partenaire</span>
+            <span>Client</span>
+            <span>TJM achat</span>
+            <span>Démarrage</span>
+            <span>Étape</span>
+            <span></span>
+          </div>
+          {paged.map((cr) => {
+            const consultantName =
+              [cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ') ||
+              'Consultant à identifier';
+            const thirdPartyLabel = cr.third_party_type
+              ? THIRD_PARTY_TYPE_LABELS[cr.third_party_type] ?? cr.third_party_type
+              : null;
+            const subParts = [cr.third_party_name, thirdPartyLabel].filter(Boolean);
+            return (
+              <div
+                key={cr.id}
+                className={`row click ${gridCols} group`}
+                onClick={() => navigate(`/contracts/${cr.id}`)}
+              >
+                <span className="ref">{cr.display_reference}</span>
+                <div className="min-w-0">
+                  <p className="nm truncate">
+                    {cr.consultant_civility && `${cr.consultant_civility} `}
+                    {consultantName}
+                  </p>
+                  <p className="ns truncate">
+                    {subParts.length > 0 ? subParts.join(' · ') : 'Partenaire en attente'}
+                  </p>
+                </div>
+                <span className="cell truncate">{cr.client_name || '—'}</span>
+                <span className="tjm">{cr.daily_rate ? `${cr.daily_rate} €` : '—'}</span>
+                <span className="cell">{formatDate(cr.start_date)}</span>
+                <div>
+                  <span className={chipClass(cr.status)}>
+                    <span className="dot" />
+                    {CONTRACT_STATUS_CONFIG[cr.status]?.label ?? cr.status_display}
+                  </span>
+                  <StageSegments status={cr.status} />
+                </div>
+                <div className="flex items-center justify-end gap-1">
+                  {isAdv && !CR_TERMINAL.has(cr.status) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCancelTarget({ id: cr.id, reference: cr.display_reference });
+                      }}
+                      className="p-1 rounded-md text-mut2 opacity-0 group-hover:opacity-100 hover:text-redt hover:bg-red-bg transition-all"
+                      title="Annuler"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                  {isAdv && cr.status === 'cancelled' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Supprimer définitivement ${cr.display_reference} ?`)) {
+                          purgeCrMutation.mutate(cr.id);
+                        }
+                      }}
+                      className="p-1 rounded-md text-mut2 opacity-0 group-hover:opacity-100 hover:text-redt hover:bg-red-bg transition-all"
+                      title="Supprimer définitivement"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                  <ChevronRight className="h-4 w-4 chev shrink-0" />
+                </div>
+              </div>
+            );
+          })}
+          <div className="tfoot">
+            <span>
+              {filtered.length} demande{filtered.length > 1 ? 's' : ''}
+              {statusFilter &&
+                ` · filtre : ${CONTRACT_STATUS_CONFIG[statusFilter as ContractRequestStatus]?.label ?? statusFilter}`}
+            </span>
+            {filtered.length > pageSize && (
+              <span className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="alink disabled:opacity-40"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  ← Précédent
+                </button>
+                <span>
+                  Page {page + 1} / {Math.ceil(filtered.length / pageSize)}
+                </span>
+                <button
+                  type="button"
+                  className="alink disabled:opacity-40"
+                  disabled={(page + 1) * pageSize >= filtered.length}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Suivant →
+                </button>
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Cancel confirmation modal */}
       <Modal
@@ -307,17 +394,23 @@ export function ContractManagement() {
       >
         {cancelTarget && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Voulez-vous vraiment annuler la demande <span className="font-semibold">{cancelTarget.reference}</span> ?
+            <p className="notec">
+              Voulez-vous vraiment annuler la demande{' '}
+              <span className="font-semibold text-ink">{cancelTarget.reference}</span> ?
             </p>
-            <p className="text-sm text-red-600 dark:text-red-400">Cette action est irréversible.</p>
+            <p className="text-[12.5px] text-redt">Cette action est irréversible.</p>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="secondary" onClick={() => setCancelTarget(null)} disabled={cancelCrMutation.isPending}>Non, garder</Button>
               <Button
-                variant="primary"
+                variant="secondary"
+                onClick={() => setCancelTarget(null)}
+                disabled={cancelCrMutation.isPending}
+              >
+                Non, garder
+              </Button>
+              <Button
+                variant="danger"
                 onClick={() => cancelCrMutation.mutate(cancelTarget.id)}
                 isLoading={cancelCrMutation.isPending}
-                className="bg-red-600 hover:bg-red-700 text-white"
               >
                 Oui, annuler
               </Button>
@@ -333,69 +426,74 @@ export function ContractManagement() {
         title="Nouveau contrat (saisie manuelle)"
       >
         <div className="space-y-4">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="notec">
             Créez un dossier de contrat sans déclencheur Boond. Saisissez l'ID Boond du
             consultant : son identité est récupérée automatiquement depuis Boond.
           </p>
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Le consultant est un… *
-            </label>
+            <label className="f-lab">Le consultant est un… *</label>
             <div className="grid grid-cols-2 gap-2">
-              {([
-                { key: 'candidate' as const, label: 'Candidat', hint: 'Converti en ressource à la signature' },
-                { key: 'resource' as const, label: 'Ressource', hint: 'Déjà une ressource dans Boond' },
-              ]).map(({ key, label, hint }) => (
+              {(
+                [
+                  {
+                    key: 'candidate' as const,
+                    label: 'Candidat',
+                    hint: 'Converti en ressource à la signature',
+                  },
+                  {
+                    key: 'resource' as const,
+                    label: 'Ressource',
+                    hint: 'Déjà une ressource dans Boond',
+                  },
+                ]
+              ).map(({ key, label, hint }) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setCreateForm((f) => ({ ...f, consultant_type: key }))}
-                  className={`text-left rounded-lg border px-3 py-2 transition-colors ${
-                    createForm.consultant_type === key
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                      : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-                  }`}
+                  className={`tcard text-left ${createForm.consultant_type === key ? 'on' : ''}`}
                 >
-                  <span className="block text-sm font-medium text-gray-900 dark:text-white">{label}</span>
-                  <span className="block text-xs text-gray-500 dark:text-gray-400">{hint}</span>
+                  <span className="tt">{label}</span>
+                  <span className="td2 block">{hint}</span>
                 </button>
               ))}
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              ID Boond du consultant *
-            </label>
+            <label className="f-lab">ID Boond du consultant *</label>
             <input
               type="text"
               inputMode="numeric"
               value={createForm.boond_consultant_id}
               onChange={(e) =>
-                setCreateForm((f) => ({ ...f, boond_consultant_id: e.target.value.replace(/[^\d]/g, '') }))
+                setCreateForm((f) => ({
+                  ...f,
+                  boond_consultant_id: e.target.value.replace(/[^\d]/g, ''),
+                }))
               }
               placeholder="Ex : 4242"
-              className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              className="f-in"
               autoFocus
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Société émettrice
-            </label>
+            <label className="f-lab">Société émettrice</label>
             <select
               value={createForm.company_id}
               onChange={(e) => setCreateForm((f) => ({ ...f, company_id: e.target.value }))}
-              className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              className="f-in !px-2.5"
             >
               <option value="">Sélectionner (optionnel)…</option>
-              {companies.filter((c) => c.is_active).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.code})
-                </option>
-              ))}
+              {companies
+                .filter((c) => c.is_active)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.code})
+                  </option>
+                ))}
             </select>
           </div>
-          <p className="text-xs text-gray-400 dark:text-gray-500">
+          <p className="f-hint">
             Le type de tiers et les autres informations seront renseignés à l'étape de validation
             commerciale.
           </p>

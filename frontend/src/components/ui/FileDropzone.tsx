@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useRef, useState } from 'react';
-import { Upload, FileText, X, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, FileText, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from './Button';
 
 interface FileDropzoneProps {
@@ -140,29 +140,22 @@ export function FileDropzone({
   // Show selected file
   if (selectedFile) {
     return (
-      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-        <div className="flex items-center min-w-0">
-          <FileText className="h-10 w-10 text-primary-500 flex-shrink-0" />
-          <div className="ml-4 min-w-0">
-            <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
-              {selectedFile.name}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {formatFileSize(selectedFile.size)}
-            </p>
+      <div className="filecard justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="dico">
+            <FileText className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="dn truncate">{selectedFile.name}</p>
+            <p className="ds">{formatFileSize(selectedFile.size)}</p>
           </div>
         </div>
         {onClear && !isLoading && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClear}
-            leftIcon={<X className="h-4 w-4" />}
-          >
+          <Button variant="secondary" size="sm" onClick={onClear}>
             Supprimer
           </Button>
         )}
-        {isLoading && <Loader2 className="h-5 w-5 text-primary-500 animate-spin" />}
+        {isLoading && <Loader2 className="h-5 w-5 text-prit animate-spin" />}
       </div>
     );
   }
@@ -174,42 +167,23 @@ export function FileDropzone({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={handleClick}
-        className={`
-          border-2 border-dashed rounded-lg p-8 text-center transition-colors
-          ${disabled || isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-          ${
-            isDragging
-              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-              : 'border-gray-300 dark:border-gray-600 hover:border-primary-400 dark:hover:border-primary-500'
-          }
-        `}
+        className={`drop ${disabled || isLoading ? 'opacity-50 cursor-not-allowed' : ''} ${
+          isDragging ? 'active' : ''
+        }`}
       >
         {isLoading ? (
           <div className="flex flex-col items-center">
-            <Loader2 className="h-12 w-12 text-primary-500 animate-spin" />
-            <p className="mt-4 text-gray-600 dark:text-gray-400">
-              Traitement en cours...
-            </p>
+            <Loader2 className="h-9 w-9 text-prit animate-spin" />
+            <p className="dropt">Traitement en cours...</p>
           </div>
         ) : (
           <>
-            <Upload
-              className={`h-12 w-12 mx-auto ${
-                isDragging ? 'text-primary-500' : 'text-gray-400'
-              }`}
-            />
-            <p className="text-gray-600 dark:text-gray-400 mt-4">{label}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
-              ou{' '}
-              <span className="text-primary-600 dark:text-primary-400 font-medium">
-                parcourez vos fichiers
-              </span>
+            <Upload className={`h-9 w-9 mx-auto ${isDragging ? 'text-prit' : 'text-mut2'}`} />
+            <p className="dropt">{label}</p>
+            <p className="drops">
+              ou <b className="text-prit font-semibold">parcourez vos fichiers</b>
             </p>
-            {description && (
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                {description}
-              </p>
-            )}
+            {description && <p className="drops mt-1.5">{description}</p>}
           </>
         )}
 
@@ -224,9 +198,9 @@ export function FileDropzone({
       </div>
 
       {errorMessage && (
-        <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center text-red-700 dark:text-red-400">
-          <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
-          <span className="text-sm">{errorMessage}</span>
+        <div className="alert red mt-3.5">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <span>{errorMessage}</span>
         </div>
       )}
     </div>

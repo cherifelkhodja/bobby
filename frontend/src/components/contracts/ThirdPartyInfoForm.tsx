@@ -9,9 +9,9 @@ import { getErrorMessage } from '../../api/client';
 import { Button } from '../ui/Button';
 import type { ThirdPartyWithDocuments } from '../../types';
 
-const INPUT_CLS =
-  'w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300';
-const LABEL_CLS = 'block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1';
+const INPUT_CLS = 'f-in';
+const SELECT_CLS = 'f-in !px-2.5';
+const LABEL_CLS = 'f-lab';
 
 interface Props {
   contractRequestId: string;
@@ -154,7 +154,7 @@ export function ThirdPartyInfoForm({ contractRequestId, initial, onSaved, onCanc
             Rechercher
           </Button>
         </div>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+        <p className="f-hint">
           Renseignez le SIRET puis « Rechercher » pour préremplir automatiquement (INSEE + INPI).
         </p>
       </div>
@@ -166,7 +166,7 @@ export function ThirdPartyInfoForm({ contractRequestId, initial, onSaved, onCanc
           <select
             value={form.entity_category}
             onChange={(e) => set('entity_category', e.target.value)}
-            className={INPUT_CLS}
+            className={SELECT_CLS}
           >
             <option value="societe">Société (SAS, SARL, EURL…)</option>
             <option value="ei">Entreprise individuelle / Micro</option>
@@ -225,10 +225,8 @@ export function ThirdPartyInfoForm({ contractRequestId, initial, onSaved, onCanc
       </div>
 
       {/* Head office */}
-      <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
-        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-          Siège social
-        </p>
+      <div className="border-t border-lin2 pt-4">
+        <p className="ml mb-3">Siège social</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
             <label className={LABEL_CLS}>Adresse (rue) *</label>
@@ -271,17 +269,15 @@ export function ThirdPartyInfoForm({ contractRequestId, initial, onSaved, onCanc
       </div>
 
       {/* Legal representative */}
-      <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
-        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-          Représentant légal
-        </p>
+      <div className="border-t border-lin2 pt-4">
+        <p className="ml mb-3">Représentant légal</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className={LABEL_CLS}>Civilité *</label>
             <select
               value={form.representative_civility ?? 'M.'}
               onChange={(e) => set('representative_civility', e.target.value)}
-              className={INPUT_CLS}
+              className={SELECT_CLS}
             >
               <option value="M.">M.</option>
               <option value="Mme">Mme</option>
@@ -352,12 +348,12 @@ export function ThirdPartyInfoForm({ contractRequestId, initial, onSaved, onCanc
         phone={form.signatory_phone ?? ''}
         onPhone={(v) => set('signatory_phone', v)}
         extra={
-          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 mt-3">
+          <label className="flex items-center gap-2.5 text-[12.5px] text-mut mt-3 cursor-pointer">
             <input
               type="checkbox"
               checked={!!form.signatory_is_director}
               onChange={(e) => set('signatory_is_director', e.target.checked)}
-              className="rounded border-gray-300 dark:border-gray-600"
+              className="rounded border-lin text-pri focus:ring-pri"
             />
             Cette personne est le dirigeant de la société
           </label>
@@ -399,7 +395,7 @@ export function ThirdPartyInfoForm({ contractRequestId, initial, onSaved, onCanc
       />
 
       {errors.length > 0 && (
-        <ul className="text-xs text-red-600 dark:text-red-400 list-disc list-inside space-y-0.5">
+        <ul className="text-[12px] text-redt list-disc list-inside space-y-0.5">
           {errors.map((e) => (
             <li key={e}>{e}</li>
           ))}
@@ -454,17 +450,15 @@ function ContactBlock({
   extra,
 }: ContactBlockProps) {
   return (
-    <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+    <div className="border-t border-lin2 pt-4">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-          {title}
-        </p>
-        <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+        <p className="ml !mb-0">{title}</p>
+        <label className="flex items-center gap-2 text-[12px] text-mut cursor-pointer">
           <input
             type="checkbox"
             checked={sameChecked}
             onChange={(e) => onSameChange(e.target.checked)}
-            className="rounded border-gray-300 dark:border-gray-600"
+            className="rounded border-lin text-pri focus:ring-pri"
           />
           Identique au représentant légal
         </label>
@@ -476,7 +470,7 @@ function ContactBlock({
             <select
               value={civility ?? 'M.'}
               onChange={(e) => onCivility(e.target.value)}
-              className={INPUT_CLS}
+              className={SELECT_CLS}
             >
               <option value="M.">M.</option>
               <option value="Mme">Mme</option>

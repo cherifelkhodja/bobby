@@ -42,40 +42,28 @@ interface QueryErrorFallbackProps {
 function QueryErrorFallback({ onReset, level }: QueryErrorFallbackProps) {
   if (level === 'component') {
     return (
-      <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center text-yellow-700 dark:text-yellow-400">
-            <WifiOff className="h-4 w-4 mr-2" />
-            <span className="text-sm">Erreur de chargement</span>
-          </div>
-          <button
-            onClick={onReset}
-            className="text-sm text-yellow-600 dark:text-yellow-400 hover:underline"
-          >
-            Réessayer
-          </button>
-        </div>
+      <div className="alert !mt-0">
+        <WifiOff className="h-4 w-4 shrink-0" />
+        <span>Erreur de chargement</span>
+        <button onClick={onReset} className="alink hover:underline">
+          Réessayer
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="p-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+    <div className="card p-8">
       <div className="flex flex-col items-center text-center">
-        <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-full mb-4">
-          <AlertCircle className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
+        <div className="p-3 bg-amb-bg rounded-full mb-4">
+          <AlertCircle className="h-7 w-7 text-amb-fg" />
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+        <h3 className="text-[15px] font-bold text-ink mb-2">
           Impossible de charger les données
         </h3>
-        <p className="text-gray-600 dark:text-gray-400 mb-4">
-          Vérifiez votre connexion internet et réessayez.
-        </p>
-        <button
-          onClick={onReset}
-          className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
+        <p className="notec mb-4">Vérifiez votre connexion internet et réessayez.</p>
+        <button onClick={onReset} className="btn">
+          <RefreshCw className="h-3.5 w-3.5" />
           Réessayer
         </button>
       </div>

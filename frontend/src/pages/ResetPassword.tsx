@@ -4,13 +4,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { ArrowLeft, CheckCircle } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 
 import { authApi } from '../api/auth';
 import { getErrorMessage } from '../api/client';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Card } from '../components/ui/Card';
 
 const resetPasswordSchema = z
   .object({
@@ -61,63 +60,50 @@ export function ResetPassword() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md text-center">
-          <h2 className="text-xl font-bold text-red-600 mb-4">
-            Lien invalide
-          </h2>
-          <p className="text-gray-600 mb-6">
+      <div className="lgwrap">
+        <div className="lgcard text-center">
+          <p className="logo text-[22px] mb-2">Bobby</p>
+          <h2 className="text-[15px] font-bold text-redt mb-3">Lien invalide</h2>
+          <p className="notec mb-6">
             Le lien de réinitialisation est invalide ou a expiré.
           </p>
           <Link to="/forgot-password">
             <Button>Demander un nouveau lien</Button>
           </Link>
-        </Card>
+        </div>
       </div>
     );
   }
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md text-center">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
+      <div className="lgwrap">
+        <div className="lgcard text-center">
+          <CheckCircle className="h-12 w-12 text-grn-fg mx-auto mb-4" />
+          <h2 className="text-[15px] font-bold text-ink mb-3">
             Mot de passe réinitialisé !
           </h2>
-          <p className="text-gray-600 mb-6">
+          <p className="notec mb-6">
             Votre mot de passe a été changé avec succès. Vous pouvez maintenant
             vous connecter avec votre nouveau mot de passe.
           </p>
           <Link to="/login">
             <Button>Se connecter</Button>
           </Link>
-        </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <Link
-          to="/login"
-          className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Retour à la connexion
-        </Link>
-
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Nouveau mot de passe
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Choisissez un nouveau mot de passe sécurisé
-          </p>
+    <div className="lgwrap">
+      <div className="lgcard">
+        <div className="text-center mb-[26px]">
+          <p className="logo text-[22px]">Bobby</p>
+          <p className="sub mt-2">Choisissez un nouveau mot de passe</p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5">
           <Input
             label="Nouveau mot de passe"
             type="password"
@@ -134,11 +120,17 @@ export function ResetPassword() {
             {...register('confirmPassword')}
           />
 
-          <Button type="submit" className="w-full" isLoading={isLoading}>
+          <Button type="submit" className="w-full !mt-4" isLoading={isLoading}>
             Réinitialiser le mot de passe
           </Button>
         </form>
-      </Card>
+
+        <p className="notec text-center mt-5">
+          <Link to="/login" className="font-semibold">
+            ← Retour à la connexion
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

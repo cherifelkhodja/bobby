@@ -23,9 +23,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           className={`input ${error ? 'input-error' : ''} ${className}`}
           {...props}
         />
-        {error && <p className="mt-1 text-sm text-error">{error}</p>}
+        {error && <p className="mt-1.5 text-xs text-redt">{error}</p>}
         {helperText && !error && (
-          <p className="mt-1 text-sm text-gray-500">{helperText}</p>
+          <p className="mt-1.5 text-[11.5px] text-mut2">{helperText}</p>
         )}
       </div>
     );

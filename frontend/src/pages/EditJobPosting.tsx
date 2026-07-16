@@ -12,14 +12,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  ChevronLeft,
-  Loader2,
-  AlertCircle,
-  MapPin,
-  X,
-  Search,
-} from 'lucide-react';
+import { AlertCircle, Check, MapPin, Search, X } from 'lucide-react';
 import {
   hrApi,
   type TurnoverITSkill,
@@ -35,6 +28,8 @@ import {
   EXPERIENCE_LEVELS,
   JOB_POSTING_STATUS_BADGES,
 } from '../constants/hr';
+import { Button } from '../components/ui/Button';
+import { PageSpinner, Spinner } from '../components/ui/Spinner';
 
 type ViewStep = 'loading' | 'form' | 'saving' | 'publishing' | 'error';
 
@@ -438,45 +433,25 @@ export default function EditJobPosting() {
 
   // Loading state
   if (step === 'loading' || postingLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-        <p className="ml-2 text-gray-600 dark:text-gray-400">
-          Chargement du brouillon...
-        </p>
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   // Error state
   if (step === 'error') {
     return (
-      <div className="space-y-6">
-        <Link
-          to="/rh"
-          className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          <ChevronLeft className="h-5 w-5" />
-          Retour
+      <div className="max-w-[840px]">
+        <Link to="/rh" className="bc block cursor-pointer !text-mut2 hover:!text-mut">
+          ← RH / Gestion des annonces
         </Link>
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 flex-shrink-0" />
-            <div>
-              <h3 className="font-semibold text-red-800 dark:text-red-300">Erreur</h3>
-              <p className="text-red-700 dark:text-red-400">
-                {errorMessage || 'Une erreur est survenue'}
-              </p>
-            </div>
-          </div>
-          <div className="mt-4">
-            <Link
-              to="/rh"
-              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
-            >
-              Retour aux opportunités
-            </Link>
-          </div>
+        <h1 className="h1">Modifier l'annonce</h1>
+        <div className="alert red">
+          <AlertCircle className="h-[18px] w-[18px] shrink-0" />
+          <span>{errorMessage || 'Une erreur est survenue'}</span>
+        </div>
+        <div className="flex justify-end mt-4">
+          <Button type="button" variant="secondary" onClick={() => navigate('/rh')}>
+            Retour aux annonces
+          </Button>
         </div>
       </div>
     );
@@ -486,132 +461,411 @@ export default function EditJobPosting() {
   if (step === 'publishing') {
     return (
       <div className="flex flex-col items-center justify-center h-96">
-        <Loader2 className="h-16 w-16 animate-spin text-green-500" />
-        <p className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
-          Publication vers Turnover-IT...
+        <Spinner size="lg" />
+        <p className="mt-4 text-[14.5px] font-semibold text-ink">
+          Publication vers Turnover-IT…
         </p>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">
-          L'annonce sera visible sur les jobboards partenaires
-        </p>
+        <p className="notec mt-1">L'annonce sera visible sur les jobboards partenaires</p>
       </div>
     );
   }
 
   // Form state
+  const salaryDisabled = !hasSalaryContractType || isSalaryByProfile;
+  const tjmDisabled = !hasTjmContractType || isSalaryByProfile;
+  const actionsDisabled =
+    saveMutation.isPending ||
+    publishMutation.isPending ||
+    selectedContractTypes.length === 0 ||
+    !selectedPlace;
+  const boondInfo = posting
+    ? [posting.opportunity_reference, posting.client_name].filter(Boolean).join(' · ')
+    : '';
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <Link
-          to="/rh"
-          className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline mb-4"
-        >
-          <ChevronLeft className="h-5 w-5" />
-          Retour aux opportunités
-        </Link>
-        <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            {posting?.status === 'draft' ? "Modifier le brouillon" : "Modifier l'annonce"}
-          </h1>
-          {posting?.status && JOB_POSTING_STATUS_BADGES[posting.status] && (
-            <span className={`px-2 py-1 text-sm rounded-full ${JOB_POSTING_STATUS_BADGES[posting.status].color}`}>
-              {JOB_POSTING_STATUS_BADGES[posting.status].label}
-            </span>
-          )}
-        </div>
-        <p className="mt-1 text-gray-600 dark:text-gray-400">
-          {posting?.status === 'draft'
-            ? "Modifiez les informations puis enregistrez ou publiez directement"
-            : "Les modifications seront synchronisées avec Turnover-IT"}
-        </p>
+    <div className="max-w-[840px]">
+      <Link to="/rh" className="bc block cursor-pointer !text-mut2 hover:!text-mut">
+        ← RH / Gestion des annonces
+      </Link>
+      <div className="flex items-center gap-3 flex-wrap">
+        <h1 className="h1">Modifier l'annonce</h1>
+        {posting?.status && JOB_POSTING_STATUS_BADGES[posting.status] && (
+          <span
+            className={`st ${
+              posting.status === 'published'
+                ? 'st-grn'
+                : posting.status === 'closed'
+                ? 'st-red'
+                : 'st-sla'
+            }`}
+          >
+            <span className="dot" />
+            {JOB_POSTING_STATUS_BADGES[posting.status].label}
+          </span>
+        )}
       </div>
+      <p className="sub">
+        {posting?.status === 'draft'
+          ? 'Modifiez les informations puis enregistrez ou publiez directement'
+          : 'Les modifications seront synchronisées avec Turnover-IT'}
+      </p>
 
-      {/* Form */}
-      <form onSubmit={(e) => e.preventDefault()} className="space-y-8">
-        {/* Basic Info */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-3">
-            Informations principales
-          </h3>
+      {boondInfo && (
+        <div className="infob mt-3.5">
+          <b>Opportunité BoondManager :</b> {boondInfo} — les champs sont pré-remplis depuis
+          l'annonce enregistrée.
+        </div>
+      )}
 
-          {/* Title */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Titre de l'annonce *
-            </label>
-            <input
-              type="text"
-              {...register('title')}
-              placeholder="Ex: Développeur Senior React/Node.js (H/F)"
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <div className="mt-2 flex justify-between">
-              {errors.title && (
-                <p className="text-sm text-red-600 dark:text-red-400">{errors.title.message}</p>
+      <form onSubmit={(e) => e.preventDefault()}>
+        {/* Informations générales */}
+        <div className="card mt-4">
+          <h3 className="ct">Informations générales</h3>
+          <div className="f-grid mt-3.5">
+            <div className="col-span-full">
+              <label className="f-lab" htmlFor="jp-title">
+                Titre de l'annonce *
+              </label>
+              <input
+                id="jp-title"
+                type="text"
+                className="f-in"
+                placeholder="Ex : Développeur Senior React/Node.js (H/F)"
+                {...register('title')}
+              />
+              <div className="flex justify-between gap-3">
+                {errors.title && <p className="f-hint !text-redt">{errors.title.message}</p>}
+                <p className="f-hint ml-auto">{titleWatch?.length || 0}/100</p>
+              </div>
+            </div>
+
+            <div className="relative">
+              <label className="f-lab" htmlFor="jp-place">
+                Lieu d'exécution *
+              </label>
+              <div className="relative">
+                <MapPin className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-mut2" />
+                <input
+                  id="jp-place"
+                  ref={placeInputRef}
+                  type="text"
+                  value={placeSearch}
+                  onChange={(e) => {
+                    setPlaceSearch(e.target.value);
+                    setShowPlaceDropdown(true);
+                    if (selectedPlace && e.target.value !== selectedPlace.label) {
+                      setSelectedPlace(null);
+                    }
+                  }}
+                  onFocus={() => setShowPlaceDropdown(true)}
+                  placeholder="Code postal / Ville / Département / Région"
+                  className="f-in !pl-9 !pr-9"
+                />
+                {selectedPlace && (
+                  <button
+                    type="button"
+                    onClick={clearPlace}
+                    aria-label="Effacer le lieu"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-mut2 hover:text-mut"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {showPlaceDropdown && placeSearch.length >= 2 && (
+                <div
+                  ref={placeDropdownRef}
+                  className="absolute z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-[10px] border border-lin bg-sur shadow-lg"
+                >
+                  {!placesData?.places.length ? (
+                    <p className="px-3 py-2.5 text-[12.5px] text-mut">Aucun lieu trouvé</p>
+                  ) : (
+                    placesData.places.map((place) => (
+                      <button
+                        key={place.key}
+                        type="button"
+                        onClick={() => selectPlace(place)}
+                        className="block w-full px-3 py-2 text-left text-[13px] text-ink hover:bg-srf2 transition-colors"
+                      >
+                        {place.label}
+                      </button>
+                    ))
+                  )}
+                </div>
               )}
-              <p className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
-                {titleWatch?.length || 0}/100
-              </p>
+              {selectedPlace ? (
+                <p className="f-hint !text-grn-fg">
+                  Lieu sélectionné : {selectedPlace.label}
+                  {selectedPlace.postalCode && ` (${selectedPlace.postalCode})`}
+                </p>
+              ) : (
+                <p className="f-hint">France uniquement — ville, code postal ou région</p>
+              )}
+            </div>
+
+            <div>
+              <label className="f-lab" htmlFor="jp-start-date">
+                Date de démarrage
+              </label>
+              <input
+                id="jp-start-date"
+                type="date"
+                disabled={isAsap}
+                className="f-in"
+                {...register('start_date')}
+              />
+              <div
+                className="ckrow mt-2.5"
+                role="checkbox"
+                aria-checked={isAsap}
+                tabIndex={0}
+                onClick={() => setIsAsap(!isAsap)}
+                onKeyDown={(e) => {
+                  if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    setIsAsap(!isAsap);
+                  }
+                }}
+              >
+                <span className={`ck ${isAsap ? 'on' : ''}`}>
+                  <Check className="h-3 w-3" />
+                </span>
+                <span>ASAP (dès que possible)</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="f-lab" htmlFor="jp-duration">
+                Durée de la mission
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="jp-duration"
+                  type="number"
+                  min={1}
+                  placeholder="6"
+                  value={durationValue}
+                  onChange={(e) =>
+                    setDurationValue(e.target.value ? parseInt(e.target.value, 10) : '')
+                  }
+                  className="f-in"
+                />
+                <select
+                  aria-label="Unité de durée"
+                  value={durationUnit}
+                  onChange={(e) => setDurationUnit(e.target.value as 'months' | 'years')}
+                  className="f-in !px-2.5 !w-28 shrink-0"
+                >
+                  <option value="months">Mois</option>
+                  <option value="years">Années</option>
+                </select>
+              </div>
+              {typeof durationValue === 'number' && durationUnit === 'years' && (
+                <p className="f-hint">= {durationValue * 12} mois</p>
+              )}
             </div>
           </div>
+        </div>
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        {/* Contrat et conditions */}
+        <div className="card mt-4">
+          <h3 className="ct">Contrat et conditions</h3>
+          <p className="f-lab mt-3.5">Types de contrat *</p>
+          <div className="flex flex-wrap gap-2">
+            {CONTRACT_TYPES.map((type) => (
+              <button
+                key={type.value}
+                type="button"
+                aria-pressed={selectedContractTypes.includes(type.value)}
+                onClick={() => toggleContractType(type.value)}
+                className={`tg ${selectedContractTypes.includes(type.value) ? 'on' : ''}`}
+              >
+                {type.label}
+              </button>
+            ))}
+          </div>
+          {selectedContractTypes.length === 0 && (
+            <p className="f-hint !text-redt">Sélectionnez au moins un type de contrat</p>
+          )}
+          <div className="f-grid mt-3.5">
+            <div>
+              <label className="f-lab" htmlFor="jp-remote">
+                Télétravail
+              </label>
+              <select id="jp-remote" className="f-in !px-2.5" {...register('remote')}>
+                <option value="">— Sélectionner —</option>
+                {REMOTE_POLICIES.map((policy) => (
+                  <option key={policy.value} value={policy.value}>
+                    {policy.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="f-lab" htmlFor="jp-experience">
+                Niveau d'expérience
+              </label>
+              <select
+                id="jp-experience"
+                className="f-in !px-2.5"
+                {...register('experience_level')}
+              >
+                <option value="">— Sélectionner —</option>
+                {EXPERIENCE_LEVELS.map((level) => (
+                  <option key={level.value} value={level.value}>
+                    {level.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Rémunération */}
+        <div className="card mt-4">
+          <h3 className="ct">Rémunération</h3>
+          <p className="cs">Les champs sont activés selon les types de contrat sélectionnés</p>
+          <div className="f-grid mt-3.5">
+            <div className={salaryDisabled ? 'dis' : ''}>
+              <label className="f-lab" htmlFor="jp-salary-min">
+                Salaire annuel min (€) — CDI, CDD
+              </label>
+              <input
+                id="jp-salary-min"
+                type="number"
+                min={0}
+                placeholder="35000"
+                disabled={salaryDisabled}
+                className="f-in"
+                {...register('salary_min_annual')}
+              />
+            </div>
+            <div className={salaryDisabled ? 'dis' : ''}>
+              <label className="f-lab" htmlFor="jp-salary-max">
+                Salaire annuel max (€) — CDI, CDD
+              </label>
+              <input
+                id="jp-salary-max"
+                type="number"
+                min={0}
+                placeholder="50000"
+                disabled={salaryDisabled}
+                className="f-in"
+                {...register('salary_max_annual')}
+              />
+            </div>
+            <div className={tjmDisabled ? 'dis' : ''}>
+              <label className="f-lab" htmlFor="jp-tjm-min">
+                TJM min (€/jour) — Freelance
+              </label>
+              <input
+                id="jp-tjm-min"
+                type="number"
+                min={0}
+                placeholder="400"
+                disabled={tjmDisabled}
+                className="f-in"
+                {...register('salary_min_daily')}
+              />
+            </div>
+            <div className={tjmDisabled ? 'dis' : ''}>
+              <label className="f-lab" htmlFor="jp-tjm-max">
+                TJM max (€/jour) — Freelance
+              </label>
+              <input
+                id="jp-tjm-max"
+                type="number"
+                min={0}
+                placeholder="550"
+                disabled={tjmDisabled}
+                className="f-in"
+                {...register('salary_max_daily')}
+              />
+            </div>
+          </div>
+          <div
+            className="ckrow mt-3.5"
+            role="checkbox"
+            aria-checked={isSalaryByProfile}
+            tabIndex={0}
+            onClick={() => setIsSalaryByProfile(!isSalaryByProfile)}
+            onKeyDown={(e) => {
+              if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                setIsSalaryByProfile(!isSalaryByProfile);
+              }
+            }}
+          >
+            <span className={`ck ${isSalaryByProfile ? 'on' : ''}`}>
+              <Check className="h-3 w-3" />
+            </span>
+            <span>
+              Rémunération selon profil (masque les fourchettes sur l'annonce publique)
+            </span>
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="card mt-4">
+          <h3 className="ct">Description</h3>
+          <div className="mt-3.5">
+            <label className="f-lab" htmlFor="jp-description">
               Description du poste *
             </label>
             <textarea
-              {...register('description')}
-              placeholder="Décrivez les missions, responsabilités et contexte du poste..."
+              id="jp-description"
               rows={10}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="f-ta"
+              placeholder="Décrivez les missions, responsabilités et contexte du poste…"
+              {...register('description')}
             />
-            <div className="mt-2 flex justify-between">
+            <div className="flex justify-between gap-3">
               {errors.description && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.description.message}
-                </p>
+                <p className="f-hint !text-redt">{errors.description.message}</p>
               )}
-              <p className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
-                {descriptionWatch?.length || 0}/3000 (min 500)
-              </p>
+              <p className="f-hint ml-auto">{descriptionWatch?.length || 0}/3000 (min 500)</p>
             </div>
           </div>
-
-          {/* Qualifications */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <div className="mt-3.5">
+            <label className="f-lab" htmlFor="jp-qualifications">
               Profil recherché *
             </label>
             <textarea
-              {...register('qualifications')}
-              placeholder="Décrivez le profil idéal, les compétences requises, expérience attendue..."
+              id="jp-qualifications"
               rows={6}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="f-ta"
+              placeholder="Décrivez le profil idéal, les compétences requises, l'expérience attendue…"
+              {...register('qualifications')}
             />
-            <div className="mt-2 flex justify-between">
+            <div className="flex justify-between gap-3">
               {errors.qualifications && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.qualifications.message}
-                </p>
+                <p className="f-hint !text-redt">{errors.qualifications.message}</p>
               )}
-              <p className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
+              <p className="f-hint ml-auto">
                 {qualificationsWatch?.length || 0}/3000 (min 150)
               </p>
             </div>
           </div>
+          <div className="mt-3.5">
+            <label className="f-lab" htmlFor="jp-employer">
+              À propos de l'entreprise
+            </label>
+            <textarea
+              id="jp-employer"
+              rows={4}
+              className="f-ta"
+              placeholder="Présentez brièvement votre entreprise, sa culture, ses valeurs…"
+              {...register('employer_overview')}
+            />
+          </div>
         </div>
 
-        {/* Skills */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-3">
-            Compétences techniques
-          </h3>
-
-          {/* Skill autocomplete */}
-          <div className="relative">
+        {/* Compétences */}
+        <div className="card mt-4">
+          <h3 className="ct">Compétences techniques</h3>
+          <div className="relative mt-3.5">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-mut2" />
               <input
                 ref={skillInputRef}
                 type="text"
@@ -621,29 +875,29 @@ export default function EditJobPosting() {
                   setShowSkillDropdown(true);
                 }}
                 onFocus={() => setShowSkillDropdown(true)}
-                placeholder="Rechercher une compétence Turnover-IT..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Rechercher une compétence Turnover-IT…"
+                aria-label="Rechercher une compétence Turnover-IT"
+                className="f-in !pl-9"
               />
             </div>
-
             {showSkillDropdown && skillSearch.length >= 1 && (
               <div
                 ref={skillDropdownRef}
-                className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                className="absolute z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-[10px] border border-lin bg-sur shadow-lg"
               >
                 {filteredSkills.length === 0 ? (
-                  <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                  <p className="px-3 py-2.5 text-[12.5px] text-mut">
                     {skillsData?.total === 0
                       ? 'Aucune compétence trouvée. Vérifiez la synchronisation des skills.'
                       : 'Aucune compétence correspondante'}
-                  </div>
+                  </p>
                 ) : (
                   filteredSkills.map((skill) => (
                     <button
                       key={skill.slug}
                       type="button"
                       onClick={() => selectSkill(skill)}
-                      className="w-full px-4 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-900/30 text-gray-900 dark:text-white text-sm transition-colors"
+                      className="block w-full px-3 py-2 text-left text-[13px] text-ink hover:bg-srf2 transition-colors"
                     >
                       {skill.name}
                     </button>
@@ -652,23 +906,19 @@ export default function EditJobPosting() {
               </div>
             )}
           </div>
-
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="f-hint">
             Sélectionnez uniquement des compétences de la nomenclature Turnover-IT
           </p>
-
           {selectedSkills.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-2">
+            <div className="flex flex-wrap gap-2 mt-3">
               {selectedSkills.map((slug) => (
-                <span
-                  key={slug}
-                  className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-sm flex items-center gap-2"
-                >
+                <span key={slug} className="sk !inline-flex items-center gap-1.5">
                   {slug}
                   <button
                     type="button"
                     onClick={() => removeSkill(slug)}
-                    className="hover:text-blue-600 dark:hover:text-blue-400"
+                    aria-label={`Retirer ${slug}`}
+                    className="hover:opacity-70"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -678,435 +928,59 @@ export default function EditJobPosting() {
           )}
         </div>
 
-        {/* Location */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-3">
-            Localisation
-          </h3>
-
-          <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Lieu d'exécution *
-            </label>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                ref={placeInputRef}
-                type="text"
-                value={placeSearch}
-                onChange={(e) => {
-                  setPlaceSearch(e.target.value);
-                  setShowPlaceDropdown(true);
-                  if (selectedPlace && e.target.value !== selectedPlace.label) {
-                    setSelectedPlace(null);
-                  }
-                }}
-                onFocus={() => setShowPlaceDropdown(true)}
-                placeholder="Code postal / Ville / Département / Région"
-                className={`w-full pl-10 pr-10 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  selectedPlace
-                    ? 'border-green-500 dark:border-green-500'
-                    : 'border-gray-300 dark:border-gray-600'
-                }`}
-              />
-              {selectedPlace && (
-                <button
-                  type="button"
-                  onClick={clearPlace}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-
-            {showPlaceDropdown && placeSearch.length >= 2 && (
-              <div
-                ref={placeDropdownRef}
-                className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto"
-              >
-                {!placesData?.places.length ? (
-                  <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                    {placeSearch.length < 2
-                      ? 'Tapez au moins 2 caractères'
-                      : 'Aucun lieu trouvé'}
-                  </div>
-                ) : (
-                  placesData.places.map((place) => (
-                    <button
-                      key={place.key}
-                      type="button"
-                      onClick={() => selectPlace(place)}
-                      className="w-full px-4 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-900/30 text-gray-900 dark:text-white text-sm transition-colors"
-                    >
-                      {place.label}
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              France uniquement. Recherchez par ville, code postal ou région.
-            </p>
-
-            {selectedPlace && (
-              <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                <p className="text-sm text-green-800 dark:text-green-300">
-                  <span className="font-medium">Lieu sélectionné :</span> {selectedPlace.label}
-                </p>
-                {selectedPlace.postalCode && (
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                    Code postal : {selectedPlace.postalCode}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Contract & Work */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-3">
-            Contrat et conditions
-          </h3>
-
-          {/* Contract Types */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Types de contrat *
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {CONTRACT_TYPES.map((type) => (
-                <button
-                  key={type.value}
-                  type="button"
-                  onClick={() => toggleContractType(type.value)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    selectedContractTypes.includes(type.value)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  {type.label}
-                </button>
-              ))}
-            </div>
-            {selectedContractTypes.length === 0 && (
-              <p className="text-sm text-red-600 dark:text-red-400 mt-2">
-                Sélectionnez au moins un type de contrat
-              </p>
-            )}
-          </div>
-
-          {/* Remote Policy */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Télétravail
-            </label>
-            <select
-              {...register('remote')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">-- Sélectionner --</option>
-              {REMOTE_POLICIES.map((policy) => (
-                <option key={policy.value} value={policy.value}>
-                  {policy.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Experience Level */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Niveau d'expérience
-            </label>
-            <select
-              {...register('experience_level')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">-- Sélectionner --</option>
-              {EXPERIENCE_LEVELS.map((level) => (
-                <option key={level.value} value={level.value}>
-                  {level.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Dates & Duration */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-3">
-            Dates et durée
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Date de début souhaitée
-              </label>
-              <div className="space-y-2">
-                <input
-                  type="date"
-                  {...register('start_date')}
-                  disabled={isAsap}
-                  className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    isAsap ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                />
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isAsap}
-                    onChange={(e) => setIsAsap(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">ASAP (dès que possible)</span>
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Durée
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={durationValue}
-                  onChange={(e) => setDurationValue(e.target.value ? parseInt(e.target.value, 10) : '')}
-                  placeholder="6"
-                  min={1}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <select
-                  value={durationUnit}
-                  onChange={(e) => setDurationUnit(e.target.value as 'months' | 'years')}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="months">Mois</option>
-                  <option value="years">Années</option>
-                </select>
-              </div>
-              {typeof durationValue === 'number' && durationUnit === 'years' && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  = {durationValue * 12} mois
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Salary */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-3">
-            Rémunération
-          </h3>
-
-          <p className="text-sm text-gray-600 dark:text-gray-400 -mt-2">
-            Les champs sont activés selon les types de contrat sélectionnés
-          </p>
-
-          {/* Salary fields (CDI, CDD) */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Salaire annuel (CDI, CDD)
-              </h4>
-              {!hasSalaryContractType && (
-                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
-                  Désactivé
-                </span>
-              )}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Minimum annuel (EUR)
-                </label>
-                <input
-                  type="number"
-                  {...register('salary_min_annual')}
-                  placeholder="35000"
-                  min={0}
-                  disabled={!hasSalaryContractType || isSalaryByProfile}
-                  className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    !hasSalaryContractType || isSalaryByProfile ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Maximum annuel (EUR)
-                </label>
-                <input
-                  type="number"
-                  {...register('salary_max_annual')}
-                  placeholder="50000"
-                  min={0}
-                  disabled={!hasSalaryContractType || isSalaryByProfile}
-                  className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    !hasSalaryContractType || isSalaryByProfile ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* TJM fields (Freelance, Sous-traitance) */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                TJM (Freelance, Sous-traitance)
-              </h4>
-              {!hasTjmContractType && (
-                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
-                  Désactivé
-                </span>
-              )}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  TJM minimum (EUR/jour)
-                </label>
-                <input
-                  type="number"
-                  {...register('salary_min_daily')}
-                  placeholder="400"
-                  min={0}
-                  disabled={!hasTjmContractType || isSalaryByProfile}
-                  className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    !hasTjmContractType || isSalaryByProfile ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  TJM maximum (EUR/jour)
-                </label>
-                <input
-                  type="number"
-                  {...register('salary_max_daily')}
-                  placeholder="550"
-                  min={0}
-                  disabled={!hasTjmContractType || isSalaryByProfile}
-                  className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    !hasTjmContractType || isSalaryByProfile ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Salary by profile checkbox */}
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isSalaryByProfile}
-                onChange={(e) => setIsSalaryByProfile(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Rémunération selon profil
-              </span>
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">
-              La rémunération sera déterminée en fonction du profil du candidat
-            </p>
-          </div>
-
-          {/* Employer Overview */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              À propos de l'entreprise
-            </label>
-            <textarea
-              {...register('employer_overview')}
-              placeholder="Présentez brièvement votre entreprise, sa culture, ses valeurs..."
-              rows={4}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-
-        {/* Error Message */}
+        {/* Message d'erreur */}
         {(saveMutation.isError || publishMutation.isError) && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
-              <p className="text-red-800 dark:text-red-200">
-                {saveMutation.error
-                  ? getErrorMessage(saveMutation.error, "Erreur lors de la sauvegarde")
-                  : publishMutation.error
-                  ? getErrorMessage(publishMutation.error, "Erreur lors de la publication")
-                  : "Erreur lors de l'opération"}
-              </p>
-            </div>
+          <div className="alert red">
+            <AlertCircle className="h-[18px] w-[18px] shrink-0" />
+            <span>
+              {saveMutation.error
+                ? getErrorMessage(saveMutation.error, "Erreur lors de la sauvegarde")
+                : publishMutation.error
+                ? getErrorMessage(publishMutation.error, "Erreur lors de la publication")
+                : "Erreur lors de l'opération"}
+            </span>
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex gap-3 pt-2">
-          {posting?.status === 'draft' ? (
-            <>
-              <button
-                type="button"
-                onClick={handleSubmit(onSaveDraft)}
-                disabled={saveMutation.isPending || publishMutation.isPending || selectedContractTypes.length === 0 || !selectedPlace}
-                className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-              >
-                {saveMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Enregistrement...
-                  </>
-                ) : (
-                  '💾 Enregistrer brouillon'
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit(onPublish)}
-                disabled={saveMutation.isPending || publishMutation.isPending || selectedContractTypes.length === 0 || !selectedPlace}
-                className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-              >
-                {publishMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Publication...
-                  </>
-                ) : (
-                  '🚀 Publier sur Turnover-IT'
-                )}
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSubmit(onSaveDraft)}
-              disabled={saveMutation.isPending || selectedContractTypes.length === 0 || !selectedPlace}
-              className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-            >
-              {saveMutation.isPending ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Enregistrement...
-                </>
-              ) : (
-                '💾 Enregistrer les modifications'
-              )}
-            </button>
-          )}
-          <Link
-            to={`/rh/annonces/${postingId}`}
-            className="px-6 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-lg transition-colors text-center"
+        <div className="flex justify-end gap-2 mt-[18px]">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => navigate(`/rh/annonces/${postingId}`)}
           >
             Annuler
-          </Link>
+          </Button>
+          {posting?.status === 'draft' ? (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleSubmit(onSaveDraft)}
+                isLoading={saveMutation.isPending}
+                disabled={actionsDisabled}
+              >
+                Enregistrer le brouillon
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSubmit(onPublish)}
+                isLoading={publishMutation.isPending}
+                disabled={actionsDisabled}
+              >
+                Publier l'annonce
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="button"
+              onClick={handleSubmit(onSaveDraft)}
+              isLoading={saveMutation.isPending}
+              disabled={actionsDisabled}
+            >
+              Enregistrer les modifications
+            </Button>
+          )}
         </div>
       </form>
     </div>

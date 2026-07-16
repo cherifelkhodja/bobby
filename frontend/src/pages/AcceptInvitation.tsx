@@ -10,7 +10,6 @@ import { invitationsApi } from '../api/invitations';
 import { getErrorMessage } from '../api/client';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import type { InvitationValidation } from '../types';
 
@@ -124,13 +123,11 @@ export function AcceptInvitation() {
   // Loading state
   if (isValidating) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md text-center">
-          <Loader2 className="h-12 w-12 text-primary-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">
-            Verification de l'invitation...
-          </p>
-        </Card>
+      <div className="lgwrap">
+        <div className="lgcard text-center">
+          <Loader2 className="h-9 w-9 text-prit animate-spin mx-auto mb-4" />
+          <p className="notec">Vérification de l'invitation…</p>
+        </div>
       </div>
     );
   }
@@ -138,19 +135,19 @@ export function AcceptInvitation() {
   // Error state
   if (validationError || !invitation) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md text-center">
-          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-red-600 dark:text-red-400 mb-4">
+      <div className="lgwrap">
+        <div className="lgcard text-center">
+          <AlertCircle className="h-12 w-12 text-redt mx-auto mb-4" />
+          <h2 className="text-[15px] font-bold text-redt mb-3">
             Invitation invalide
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <p className="notec mb-6">
             {validationError || "Cette invitation n'est plus valide ou a expire."}
           </p>
           <Link to="/login">
             <Button>Retour a la connexion</Button>
           </Link>
-        </Card>
+        </div>
       </div>
     );
   }
@@ -158,62 +155,58 @@ export function AcceptInvitation() {
   // Success state
   if (isSuccess) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md text-center">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+      <div className="lgwrap">
+        <div className="lgcard text-center">
+          <CheckCircle className="h-12 w-12 text-grn-fg mx-auto mb-4" />
+          <h2 className="text-[15px] font-bold text-ink mb-3">
             Compte cree !
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <p className="notec mb-6">
             Votre compte a ete cree avec succes. Vous pouvez maintenant vous
             connecter avec votre email et mot de passe.
           </p>
           <Link to="/login">
             <Button>Se connecter</Button>
           </Link>
-        </Card>
+        </div>
       </div>
     );
   }
 
   // Form state
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <UserPlus className="h-12 w-12 text-primary-600 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Rejoignez l'equipe
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Completez votre inscription pour acceder a la plateforme
-          </p>
+    <div className="lgwrap">
+      <div className="lgcard">
+        <div className="text-center mb-[26px]">
+          <p className="logo text-[22px]">Bobby</p>
+          <UserPlus className="h-8 w-8 text-prit mx-auto mt-4 mb-2" />
+          <p className="sub">Completez votre inscription pour acceder a la plateforme</p>
         </div>
 
         {/* Invitation details */}
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-6">
+        <div className="bg-srf2 border border-lin rounded-[10px] p-4 mb-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Email</span>
-            <span className="font-medium text-gray-900 dark:text-white">
+            <span className="text-xs text-mut">Email</span>
+            <span className="text-[13px] font-semibold text-ink">
               {invitation.email}
             </span>
           </div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Role</span>
+            <span className="text-xs text-mut">Role</span>
             <Badge variant="primary">
               {roleLabels[invitation.role] || invitation.role}
             </Badge>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Expire dans</span>
-            <span className="text-sm text-gray-600 dark:text-gray-300 flex items-center">
-              <Clock className="h-4 w-4 mr-1" />
+            <span className="text-xs text-mut">Expire dans</span>
+            <span className="text-xs text-mut flex items-center">
+              <Clock className="h-3.5 w-3.5 mr-1" />
               {invitation.hours_until_expiry} heures
             </span>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5">
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Prenom"
@@ -253,21 +246,18 @@ export function AcceptInvitation() {
             {...register('confirmPassword')}
           />
 
-          <Button type="submit" className="w-full" isLoading={isLoading}>
+          <Button type="submit" className="w-full !mt-4" isLoading={isLoading}>
             Creer mon compte
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+        <p className="notec text-center mt-5">
           Deja un compte ?{' '}
-          <Link
-            to="/login"
-            className="text-primary-600 hover:text-primary-700 font-medium"
-          >
+          <Link to="/login" className="font-semibold">
             Se connecter
           </Link>
         </p>
-      </Card>
+      </div>
     </div>
   );
 }

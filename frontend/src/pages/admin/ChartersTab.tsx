@@ -9,8 +9,8 @@ import { Button } from '../../components/ui/Button';
 import { getErrorMessage } from '../../api/client';
 
 const TARGET_COLORS: Record<string, string> = {
-  partner: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  consultant: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  partner: 'bg-blu-bg text-blu-fg',
+  consultant: 'bg-ind-bg text-ind-fg',
 };
 
 const DOCUMENT_TYPE_LABELS: Record<CharterDocumentType, string> = {
@@ -152,7 +152,7 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
       <button onClick={onDownload} className="text-[10px] text-primary hover:underline truncate max-w-[200px]" title="Telecharger">
         {label}
       </button>
-      <label className="text-[10px] text-gray-400 hover:text-blue-600 cursor-pointer" title="Remplacer">
+      <label className="text-[10px] text-mut2 hover:text-prit cursor-pointer" title="Remplacer">
         [remplacer]
         <input type="file" accept=".pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onReplace(f); e.target.value = ''; }} />
       </label>
@@ -194,13 +194,13 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
                   {DOCUMENT_TYPE_LABELS[charter.document_type] || charter.document_type}
                 </span>
                 {(charter.requires_acknowledgement || charter.document_type === 'engagement') && (
-                  <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded px-1 py-0.5 flex items-center gap-0.5">
+                  <span className="text-[10px] bg-amb-bg text-amb-fg rounded px-1 py-0.5 flex items-center gap-0.5">
                     <FileCheck className="h-2.5 w-2.5" />
                     {charter.document_type === 'engagement' ? 'Signature' : 'AR'}
                   </span>
                 )}
                 {charter.target === 'consultant' && charter.consultant_scope !== 'all' && (
-                  <span className="text-[10px] bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded px-1 py-0.5">
+                  <span className="text-[10px] bg-sla-bg text-sla-fg rounded px-1 py-0.5">
                     {CONSULTANT_SCOPE_LABELS[charter.consultant_scope]}
                   </span>
                 )}
@@ -244,7 +244,7 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
                   deleteMutation.mutate(charter.id);
                 }
               }}
-              className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-colors"
+              className="p-1 rounded hover:bg-red-bg text-mut2 hover:text-redt transition-colors"
               title="Supprimer"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -391,7 +391,7 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
           </div>
 
           {isEngagement && (
-            <p className="mb-3 text-[10px] text-amber-600 dark:text-amber-400">
+            <p className="mb-3 text-[10px] text-amb-fg">
               Les engagements sont signes directement (pas d'accuse de reception).
             </p>
           )}
@@ -448,9 +448,9 @@ export function ChartersTab({ companyId }: ChartersTabProps) {
               />
               <button
                 onClick={() => arFileInputRef.current?.click()}
-                className="flex items-center gap-2 text-xs border border-dashed border-amber-300 dark:border-amber-700 rounded-md px-3 py-2 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors w-full justify-center"
+                className="flex items-center gap-2 text-xs border border-dashed border-[color-mix(in_oklab,var(--amb-fg)_40%,transparent)] rounded-md px-3 py-2 hover:bg-amb-bg transition-colors w-full justify-center"
               >
-                <FileCheck className="h-3.5 w-3.5 text-amber-500" />
+                <FileCheck className="h-3.5 w-3.5 text-amb-fg" />
                 {uploadArFile ? uploadArFile.name : 'Choisir le PDF d\'accuse de reception...'}
               </button>
               <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">

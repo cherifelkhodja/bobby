@@ -1,8 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { TrendingUp, Users, CheckCircle, XCircle } from 'lucide-react';
 
 import { cooptationsApi } from '../api/cooptations';
-import { Card, CardHeader } from '../components/ui/Card';
 import { PageSpinner } from '../components/ui/Spinner';
 
 export function Dashboard() {
@@ -15,71 +13,58 @@ export function Dashboard() {
     return <PageSpinner />;
   }
 
-  const statCards = [
-    {
-      title: 'Total cooptations',
-      value: stats?.total || 0,
-      icon: Users,
-      color: 'text-primary-600',
-      bgColor: 'bg-primary-50',
-    },
-    {
-      title: 'En attente',
-      value: stats?.pending || 0,
-      icon: TrendingUp,
-      color: 'text-warning',
-      bgColor: 'bg-warning-light',
-    },
-    {
-      title: 'Acceptées',
-      value: stats?.accepted || 0,
-      icon: CheckCircle,
-      color: 'text-success',
-      bgColor: 'bg-success-light',
-    },
-    {
-      title: 'Refusées',
-      value: stats?.rejected || 0,
-      icon: XCircle,
-      color: 'text-error',
-      bgColor: 'bg-error-light',
-    },
-  ];
+  const conversionRate = stats?.conversion_rate ?? 0;
+  const inProgress = (stats?.in_review ?? 0) + (stats?.interview ?? 0);
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-8">Tableau de bord</h1>
+      <p className="bc">Pilotage</p>
+      <h1 className="h1">Tableau de bord</h1>
+      <p className="sub">Vos cooptations et leur avancement</p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {statCards.map((stat) => (
-          <Card key={stat.title}>
-            <div className="flex items-center">
-              <div className={`p-3 rounded-lg ${stat.bgColor}`}>
-                <stat.icon className={`h-6 w-6 ${stat.color}`} />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-500">{stat.title}</p>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-              </div>
-            </div>
-          </Card>
-        ))}
+      <div className="kpis">
+        <div className="kpi">
+          <p className="kl">Total cooptations</p>
+          <p className="kv">{stats?.total ?? 0}</p>
+          <p className="ks">candidats proposés</p>
+        </div>
+        <div className="kpi">
+          <p className="kl">En attente</p>
+          <p className="kv text-amb-fg">{stats?.pending ?? 0}</p>
+          <p className="ks">
+            {inProgress > 0 ? `${inProgress} en cours d'examen ou entretien` : 'aucune en cours d’examen'}
+          </p>
+        </div>
+        <div className="kpi">
+          <p className="kl">Acceptées</p>
+          <p className="kv text-grn-fg">{stats?.accepted ?? 0}</p>
+          <p className="ks">primes de cooptation</p>
+        </div>
+        <div className="kpi">
+          <p className="kl">Refusées</p>
+          <p className="kv red">{stats?.rejected ?? 0}</p>
+          <p className="ks">motifs consultables</p>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader
-          title="Taux de conversion"
-          subtitle="Pourcentage de cooptations acceptées"
-        />
-        <div className="flex items-center">
-          <div className="text-4xl font-bold text-primary-600">
-            {stats?.conversion_rate.toFixed(1)}%
-          </div>
-          <div className="ml-4 text-sm text-gray-500">
-            {stats?.accepted} acceptées sur {stats?.total} soumises
-          </div>
+      <div className="card max-w-[520px]">
+        <h3 className="ct">Taux de conversion</h3>
+        <p className="cs mt-1">Pourcentage de cooptations acceptées</p>
+        <div className="flex items-center gap-4 mt-3.5">
+          <span className="text-[34px] font-bold tracking-[-0.02em] text-prit">
+            {conversionRate.toFixed(1).replace('.', ',')} %
+          </span>
+          <span className="cs">
+            {stats?.accepted ?? 0} acceptées sur {stats?.total ?? 0} soumises
+          </span>
         </div>
-      </Card>
+        <div className="dbar !w-full mt-3.5">
+          <div
+            className="dfill !bg-pri"
+            style={{ width: `${Math.min(100, Math.max(0, conversionRate))}%` }}
+          />
+        </div>
+      </div>
     </div>
   );
 }

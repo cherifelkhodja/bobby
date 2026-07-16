@@ -12,12 +12,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  Upload,
   FileSpreadsheet,
   AlertCircle,
   CheckCircle,
   Download,
-  RefreshCw,
   Play,
   Trash2,
   Loader2,
@@ -25,13 +23,16 @@ import {
 import { toast } from 'sonner';
 
 import { quotationGeneratorApi, type PreviewBatchResponse, type BatchProgressResponse, type QuotationPreviewItem } from '../api/quotationGenerator';
-import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { getErrorMessage } from '../api/client';
 
 type Step = 'upload' | 'preview' | 'generating' | 'complete';
+
+// Colonnes des tables (mêmes valeurs sur thead et row)
+const PREVIEW_GRID =
+  'grid-cols-[36px_1.3fr_1.3fr_110px_85px_55px_100px_120px_50px]';
+const COMPLETE_GRID = 'grid-cols-[130px_1.4fr_1.2fr_170px_110px]';
 
 export function QuotationGenerator() {
   const [step, setStep] = useState<Step>('upload');
@@ -139,61 +140,59 @@ export function QuotationGenerator() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="max-w-[900px]">
+      <p className="bc">Outils / Génération Devis Thales</p>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            Génération de Devis Thales
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Générez automatiquement des devis PSTF pour Thales
-          </p>
+          <h1 className="h1">Génération Devis Thales</h1>
+          <p className="sub">Générez automatiquement des devis PSTF pour Thales</p>
         </div>
         {step !== 'upload' && (
-          <Button variant="outline" onClick={handleReset}>
+          <Button variant="secondary" onClick={handleReset}>
             Nouvelle génération
           </Button>
         )}
       </div>
 
-      {/* Progress Steps */}
+      {/* Étapes */}
       <StepIndicator currentStep={step} />
 
-      {/* Step Content */}
-      {step === 'upload' && (
-        <UploadStep
-          isDragging={isDragging}
-          isLoading={uploadMutation.isPending}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onFileSelect={handleFileSelect}
-        />
-      )}
+      {/* Contenu de l'étape */}
+      <div className="mt-5">
+        {step === 'upload' && (
+          <UploadStep
+            isDragging={isDragging}
+            isLoading={uploadMutation.isPending}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onFileSelect={handleFileSelect}
+          />
+        )}
 
-      {step === 'preview' && previewData && batchId && (
-        <PreviewStep
-          data={previewData}
-          batchId={batchId}
-          isGenerating={generateMutation.isPending}
-          onGenerate={() => generateMutation.mutate()}
-          onReset={handleReset}
-          onDataUpdate={setPreviewData}
-        />
-      )}
+        {step === 'preview' && previewData && batchId && (
+          <PreviewStep
+            data={previewData}
+            batchId={batchId}
+            isGenerating={generateMutation.isPending}
+            onGenerate={() => generateMutation.mutate()}
+            onReset={handleReset}
+            onDataUpdate={setPreviewData}
+          />
+        )}
 
-      {step === 'generating' && progressData && (
-        <GeneratingStep progress={progressData} />
-      )}
+        {step === 'generating' && progressData && (
+          <GeneratingStep progress={progressData} />
+        )}
 
-      {step === 'complete' && progressData && batchId && (
-        <CompleteStep
-          progress={progressData}
-          batchId={batchId}
-          onReset={handleReset}
-        />
-      )}
+        {step === 'complete' && progressData && batchId && (
+          <CompleteStep
+            progress={progressData}
+            batchId={batchId}
+            onReset={handleReset}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -206,7 +205,7 @@ interface StepIndicatorProps {
 
 function StepIndicator({ currentStep }: StepIndicatorProps) {
   const steps = [
-    { id: 'upload', label: 'Upload CSV' },
+    { id: 'upload', label: 'Import CSV' },
     { id: 'preview', label: 'Aperçu' },
     { id: 'generating', label: 'Génération' },
     { id: 'complete', label: 'Terminé' },
@@ -215,44 +214,25 @@ function StepIndicator({ currentStep }: StepIndicatorProps) {
   const currentIndex = steps.findIndex((s) => s.id === currentStep);
 
   return (
-    <div className="flex items-center justify-center space-x-4">
-      {steps.map((step, index) => (
-        <div key={step.id} className="flex items-center">
-          <div
-            className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
-              index < currentIndex
-                ? 'bg-primary text-white'
-                : index === currentIndex
-                ? 'bg-primary text-white ring-2 ring-primary ring-offset-2 dark:ring-offset-gray-900'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-            }`}
-          >
-            {index < currentIndex ? (
-              <CheckCircle className="w-5 h-5" />
-            ) : (
-              index + 1
-            )}
-          </div>
-          <span
-            className={`ml-2 text-sm ${
-              index <= currentIndex
-                ? 'text-gray-900 dark:text-gray-100 font-medium'
-                : 'text-gray-500 dark:text-gray-400'
-            }`}
-          >
-            {step.label}
-          </span>
-          {index < steps.length - 1 && (
-            <div
-              className={`w-12 h-0.5 mx-4 ${
-                index < currentIndex
-                  ? 'bg-primary'
-                  : 'bg-gray-200 dark:bg-gray-700'
+    <div className="steps max-w-[440px] mx-auto">
+      <div className="track" />
+      <div className="tfill" style={{ width: `${4.5 + currentIndex * 25}%` }} />
+      <div className="nodes">
+        {steps.map((s, index) => (
+          <div key={s.id} className="stw">
+            <span
+              className={`nd ${
+                index < currentIndex || (index === currentIndex && currentStep === 'complete')
+                  ? 'd'
+                  : index === currentIndex
+                    ? 'cur'
+                    : ''
               }`}
             />
-          )}
-        </div>
-      ))}
+            <p className="lb">{s.label}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -275,72 +255,56 @@ function UploadStep({
   onFileSelect,
 }: UploadStepProps) {
   return (
-    <Card>
-      <CardHeader
-        title="Importer le fichier CSV"
-        subtitle="Glissez-déposez ou cliquez pour sélectionner votre fichier CSV"
-      />
+    <div className="card">
+      <h3 className="ct">1 · Importer le fichier CSV</h3>
+      <p className="cs mb-3">Une ligne par devis (consultant / période)</p>
 
       <div
-        className={`mt-4 border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
-          isDragging
-            ? 'border-primary bg-primary-50 dark:bg-primary-900/20'
-            : 'border-gray-300 dark:border-gray-600'
+        className={`drop ${isDragging ? 'active' : ''} ${
+          isLoading ? 'opacity-60 pointer-events-none' : ''
         }`}
         onDrop={onDrop}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
+        onClick={onFileSelect}
       >
         {isLoading ? (
-          <div className="flex flex-col items-center">
-            <RefreshCw className="w-12 h-12 text-primary animate-spin" />
-            <p className="mt-4 text-gray-600 dark:text-gray-400">
-              Analyse du fichier en cours...
-            </p>
-          </div>
+          <>
+            <Loader2 className="h-9 w-9 mx-auto animate-spin text-prit" />
+            <p className="dropt">Analyse du fichier en cours...</p>
+          </>
         ) : (
           <>
-            <FileSpreadsheet className="w-12 h-12 text-gray-400 mx-auto" />
-            <p className="mt-4 text-gray-600 dark:text-gray-400">
-              Glissez votre fichier CSV ici
+            <FileSpreadsheet
+              className={`h-9 w-9 mx-auto ${isDragging ? 'text-prit' : 'text-mut2'}`}
+            />
+            <p className="dropt">
+              <b className="text-prit font-semibold">Cliquez pour choisir</b> ou glissez-déposez
             </p>
-            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
-              ou
-            </p>
-            <Button
-              variant="outline"
-              className="mt-4"
-              onClick={onFileSelect}
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Parcourir
-            </Button>
+            <p className="drops">.csv · devis PSTF Thales</p>
           </>
         )}
       </div>
 
-      <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex justify-between items-start">
-        <p className="text-sm text-blue-700 dark:text-blue-400">
-          <strong>Colonnes requises :</strong> firstName, lastName, po_start_date, po_end_date,
-          amount_ht_unit, total_uo, C22_domain, C22_activity, complexity
+      <div className="infob mt-3.5 flex items-start justify-between gap-4">
+        <p className="!m-0">
+          <b>Colonnes requises :</b> firstName, lastName, po_start_date, po_end_date,
+          amount_ht_unit, total_uo, C22_domain, C22_activity, complexity.
           <br />
-          <span className="text-blue-600 dark:text-blue-300">
-            Les IDs BoondManager (ressource, opportunité, société, contact) sont auto-récupérés via l'API.
-            <br />
-            max_price optionnel pour 124-Data (auto-calculé depuis la grille tarifaire)
-          </span>
+          Les IDs BoondManager (ressource, opportunité, société, contact) sont auto-récupérés via
+          l'API · max_price optionnel pour 124-Data (auto-calculé depuis la grille tarifaire).
         </p>
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
-          className="ml-4 shrink-0"
+          className="shrink-0"
           onClick={() => quotationGeneratorApi.downloadExampleCsv()}
+          leftIcon={<Download className="h-3.5 w-3.5" />}
         >
-          <Download className="w-4 h-4 mr-2" />
           Exemple CSV
         </Button>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -397,119 +361,96 @@ function PreviewStep({ data, batchId, isGenerating, onGenerate, onReset, onDataU
     }
   };
 
+  const formatAmount = (value: number) =>
+    new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 0,
+    }).format(value);
+
+  const validTotalHt = data.quotations
+    .filter((q) => q.is_valid)
+    .reduce((sum, q) => sum + q.total_ht, 0);
+
   return (
-    <div className="space-y-6">
-      {/* Summary */}
-      <Card>
-        <CardHeader
-          title="Résumé de l'analyse"
-          subtitle="Vérifiez les données avant de lancer la génération"
-        />
-
-        <div className="grid grid-cols-3 gap-4 mt-4">
-          <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg text-center">
-            <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-              {data.total_quotations}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Total devis
-            </p>
-          </div>
-          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
-            <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-              {data.valid_count}
-            </p>
-            <p className="text-sm text-green-600 dark:text-green-400">
-              Valides
-            </p>
-          </div>
-          <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-center">
-            <p className="text-3xl font-bold text-red-600 dark:text-red-400">
-              {data.invalid_count}
-            </p>
-            <p className="text-sm text-red-600 dark:text-red-400">
-              Invalides
-            </p>
-          </div>
+    <div>
+      {/* KPIs */}
+      <div className="kpis !my-4">
+        <div className="kpi">
+          <p className="kl">Lignes traitées</p>
+          <p className="kv">{data.total_quotations}</p>
+          <p className="ks">fichier CSV analysé</p>
         </div>
-
-        {data.invalid_count > 0 && (
-          <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-            <p className="text-sm text-yellow-700 dark:text-yellow-400">
-              <AlertCircle className="w-4 h-4 inline-block mr-2" />
-              Les devis invalides seront ignorés lors de la génération.
-            </p>
-          </div>
-        )}
-
-        <div className="mt-6 flex justify-end space-x-3">
-          <Button variant="outline" onClick={onReset}>
-            Annuler
-          </Button>
-          <Button
-            onClick={onGenerate}
-            isLoading={isGenerating}
-            disabled={data.valid_count === 0}
-            leftIcon={<Play className="w-4 h-4" />}
-          >
-            Générer {data.valid_count} devis
-          </Button>
+        <div className="kpi">
+          <p className="kl">Devis valides</p>
+          <p className="kv text-grn-fg">{data.valid_count}</p>
+          <p className="ks">prêts à être générés</p>
         </div>
-      </Card>
-
-      {/* Quotation List */}
-      <Card>
-        <CardHeader title="Détail des devis" />
-
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  #
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Consultant
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Client
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Période
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  TJM
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Jours
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Total HT
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Statut
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {data.quotations.map((q) => (
-                <QuotationRow
-                  key={q.row_index}
-                  quotation={q}
-                  onSelect={() => setSelectedQuotation(q)}
-                  onContactChange={handleContactChange}
-                  isUpdatingContact={updatingContact === q.row_index}
-                  onDelete={handleDeleteQuotation}
-                  isDeleting={deletingRow === q.row_index}
-                />
-              ))}
-            </tbody>
-          </table>
+        <div className="kpi">
+          <p className="kl">Devis invalides</p>
+          <p className={`kv ${data.invalid_count > 0 ? 'red' : ''}`}>{data.invalid_count}</p>
+          <p className="ks">ignorés à la génération</p>
         </div>
-      </Card>
+        <div className="kpi">
+          <p className="kl">Total HT</p>
+          <p className="kv">{formatAmount(validTotalHt)}</p>
+          <p className="ks">devis valides uniquement</p>
+        </div>
+      </div>
+
+      {data.invalid_count > 0 && (
+        <div className="alert !mt-0 mb-4">
+          <AlertCircle className="h-[18px] w-[18px] flex-shrink-0" />
+          <span>Les devis invalides seront ignorés lors de la génération.</span>
+        </div>
+      )}
+
+      {/* Détail des devis */}
+      <div className="tbl">
+        <div className={`thead ${PREVIEW_GRID}`}>
+          <span>#</span>
+          <span>Consultant</span>
+          <span>Client / Contact</span>
+          <span>Période</span>
+          <span>TJM</span>
+          <span>Jours</span>
+          <span>Total HT</span>
+          <span>Statut</span>
+          <span></span>
+        </div>
+        {data.quotations.map((q) => (
+          <QuotationRow
+            key={q.row_index}
+            quotation={q}
+            onSelect={() => setSelectedQuotation(q)}
+            onContactChange={handleContactChange}
+            isUpdatingContact={updatingContact === q.row_index}
+            onDelete={handleDeleteQuotation}
+            isDeleting={deletingRow === q.row_index}
+          />
+        ))}
+        <div className="tfoot">
+          <span>
+            {data.valid_count} devis valide{data.valid_count > 1 ? 's' : ''} sur{' '}
+            {data.total_quotations} ligne{data.total_quotations > 1 ? 's' : ''}
+          </span>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-end gap-2 mt-4">
+        <Button variant="secondary" onClick={onReset}>
+          Annuler
+        </Button>
+        <Button
+          onClick={onGenerate}
+          isLoading={isGenerating}
+          disabled={data.valid_count === 0}
+          leftIcon={<Play className="h-4 w-4" />}
+        >
+          Générer {data.valid_count} devis
+        </Button>
+      </div>
 
       {/* Quotation Details Modal */}
       <QuotationDetailsModal
@@ -546,24 +487,20 @@ function QuotationRow({ quotation, onSelect, onContactChange, isUpdatingContact,
   };
 
   return (
-    <tr className={quotation.is_valid ? '' : 'bg-red-50 dark:bg-red-900/10'}>
-      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-        {quotation.row_index + 1}
-      </td>
-      <td className="px-4 py-3">
-        <button
-          onClick={onSelect}
-          className="text-left hover:bg-gray-100 dark:hover:bg-gray-700 rounded p-1 -m-1 transition-colors"
-        >
-          <div className="text-sm font-medium text-primary hover:underline">
+    <div className={`row ${PREVIEW_GRID}`}>
+      <span className="ref">{quotation.row_index + 1}</span>
+      <div className="min-w-0">
+        <button type="button" onClick={onSelect} className="text-left max-w-full" title="Voir le détail du devis">
+          <span className="nm block truncate hover:text-prit hover:underline">
             {formatName(quotation.resource_name)}
-          </div>
+          </span>
         </button>
-      </td>
-      <td className="px-4 py-3">
-        <div className="text-sm text-gray-900 dark:text-gray-100">
-          {quotation.company_name}
-        </div>
+        {quotation.resource_trigramme && (
+          <p className="ns truncate">{quotation.resource_trigramme}</p>
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="cell truncate">{quotation.company_name}</p>
         {quotation.available_contacts && quotation.available_contacts.length > 1 ? (
           <select
             value={quotation.contact_id}
@@ -574,7 +511,7 @@ function QuotationRow({ quotation, onSelect, onContactChange, isUpdatingContact,
               }
             }}
             disabled={isUpdatingContact}
-            className="mt-1 text-xs w-full rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 focus:ring-primary focus:border-primary disabled:opacity-50"
+            className="filter-select mt-1.5 w-full !min-w-0 !h-7 !text-[11.5px] disabled:opacity-50"
           >
             {quotation.available_contacts.map((contact) => (
               <option key={contact.id} value={contact.id}>
@@ -583,52 +520,54 @@ function QuotationRow({ quotation, onSelect, onContactChange, isUpdatingContact,
             ))}
           </select>
         ) : (
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            {quotation.contact_name}
-          </div>
+          <p className="ns truncate">{quotation.contact_name}</p>
         )}
-      </td>
-      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+      </div>
+      <span className="cell">
         {quotation.period_name || `${quotation.period.start} → ${quotation.period.end}`}
-      </td>
-      <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-gray-100">
-        {formatCurrency(quotation.tjm)}
-      </td>
-      <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-gray-100">
-        {quotation.quantity}
-      </td>
-      <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-gray-100">
-        {formatCurrency(quotation.total_ht)}
-      </td>
-      <td className="px-4 py-3 text-center">
+      </span>
+      <span className="cell">{formatCurrency(quotation.tjm)}</span>
+      <span className="cell">{quotation.quantity}</span>
+      <span className="tjm">{formatCurrency(quotation.total_ht)}</span>
+      <div className="min-w-0">
         {quotation.is_valid ? (
-          <Badge variant="success">Valide</Badge>
+          <span className="st st-grn">
+            <span className="dot" />
+            Valide
+          </span>
         ) : (
-          <div>
-            <Badge variant="error">Invalide</Badge>
+          <>
+            <span className="st st-red">
+              <span className="dot" />
+              Invalide
+            </span>
             {quotation.validation_errors.length > 0 && (
-              <div className="mt-1 text-xs text-red-600 dark:text-red-400">
+              <p
+                className="ns !text-redt truncate mt-1"
+                title={quotation.validation_errors[0]}
+              >
                 {quotation.validation_errors[0]}
-              </div>
+              </p>
             )}
-          </div>
+          </>
         )}
-      </td>
-      <td className="px-4 py-3 text-center">
+      </div>
+      <div className="text-right">
         <button
+          type="button"
           onClick={() => onDelete(quotation.row_index)}
           disabled={isDeleting}
-          className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50 transition-colors"
-          title="Supprimer"
+          className="p-1.5 rounded-md text-mut2 hover:text-redt hover:bg-red-bg disabled:opacity-50 transition-colors"
+          title="Supprimer la ligne"
         >
           {isDeleting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="h-4 w-4" />
           )}
         </button>
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 }
 
@@ -666,125 +605,91 @@ function QuotationDetailsModal({ quotation, isOpen, onClose }: QuotationDetailsM
   };
 
   const DetailRow = ({ label, value }: { label: string; value: string | number | null | undefined }) => (
-    <div className="py-2 grid grid-cols-2 gap-4 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
-      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</dt>
-      <dd className="text-sm text-gray-900 dark:text-gray-100">{value || '-'}</dd>
+    <div className="py-2 grid grid-cols-2 gap-4 border-b border-lin2 last:border-b-0">
+      <dt className="text-[12.5px] font-medium text-mut">{label}</dt>
+      <dd className="text-[13px] text-ink">{value || '—'}</dd>
     </div>
+  );
+
+  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <section>
+      <p className="ml mb-2">{title}</p>
+      <dl className="bg-srf2 border border-lin2 rounded-[10px] px-3.5 py-1">{children}</dl>
+    </section>
   );
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Détails du devis" size="lg">
-      <div className="space-y-6 max-h-[70vh] overflow-y-auto">
-        {/* Resource Info */}
-        <div>
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
-            <span className="w-2 h-2 bg-primary rounded-full mr-2" />
-            Consultant
-          </h4>
-          <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-            <DetailRow label="Nom" value={formatName(quotation.resource_name)} />
-            <DetailRow label="Trigramme" value={quotation.resource_trigramme} />
-            <DetailRow label="Resource ID" value={quotation.resource_id} />
-          </dl>
-        </div>
+      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+        {/* Consultant */}
+        <Section title="Consultant">
+          <DetailRow label="Nom" value={formatName(quotation.resource_name)} />
+          <DetailRow label="Trigramme" value={quotation.resource_trigramme} />
+          <DetailRow label="Resource ID" value={quotation.resource_id} />
+        </Section>
 
-        {/* BoondManager Relationships */}
-        <div>
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
-            <span className="w-2 h-2 bg-blue-500 rounded-full mr-2" />
-            BoondManager
-          </h4>
-          <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-            <DetailRow label="Opportunité" value={`${quotation.opportunity_id}`} />
-            <DetailRow label="Société" value={`${quotation.company_id} - ${quotation.company_name}`} />
-            <DetailRow label="Détail facturation" value={quotation.company_detail_id} />
-            <DetailRow label="Contact" value={`${quotation.contact_id} - ${quotation.contact_name}`} />
-          </dl>
-        </div>
+        {/* BoondManager */}
+        <Section title="BoondManager">
+          <DetailRow label="Opportunité" value={`${quotation.opportunity_id}`} />
+          <DetailRow label="Société" value={`${quotation.company_id} - ${quotation.company_name}`} />
+          <DetailRow label="Détail facturation" value={quotation.company_detail_id} />
+          <DetailRow label="Contact" value={`${quotation.contact_id} - ${quotation.contact_name}`} />
+        </Section>
 
-        {/* Period & Pricing */}
-        <div>
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
-            <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2" />
-            Période & Tarification
-          </h4>
-          <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-            <DetailRow label="Date du devis" value={quotation.quotation_date} />
-            <DetailRow label="Renouvellement" value={quotation.is_renewal ? 'Oui' : 'Non'} />
-            {quotation.is_renewal && (
-              <DetailRow label="Date début initiale" value={formatDate(quotation.start_project)} />
-            )}
-            <DetailRow label="Date début PO" value={formatDate(quotation.period.start)} />
-            <DetailRow label="Date fin PO" value={formatDate(quotation.period.end)} />
-            <DetailRow label="N° EACQ" value={quotation.eacq_number} />
-            <DetailRow label="TJM" value={formatCurrency(quotation.tjm)} />
-            <DetailRow label="Quantité (jours)" value={quotation.quantity} />
-            <DetailRow label="Total HT" value={formatCurrency(quotation.total_ht)} />
-            <DetailRow label="Total TTC" value={formatCurrency(quotation.total_ttc)} />
-          </dl>
-        </div>
+        {/* Période & tarification */}
+        <Section title="Période & tarification">
+          <DetailRow label="Date du devis" value={quotation.quotation_date} />
+          <DetailRow label="Renouvellement" value={quotation.is_renewal ? 'Oui' : 'Non'} />
+          {quotation.is_renewal && (
+            <DetailRow label="Date début initiale" value={formatDate(quotation.start_project)} />
+          )}
+          <DetailRow label="Date début PO" value={formatDate(quotation.period.start)} />
+          <DetailRow label="Date fin PO" value={formatDate(quotation.period.end)} />
+          <DetailRow label="N° EACQ" value={quotation.eacq_number} />
+          <DetailRow label="TJM" value={formatCurrency(quotation.tjm)} />
+          <DetailRow label="Quantité (jours)" value={quotation.quantity} />
+          <DetailRow label="Total HT" value={formatCurrency(quotation.total_ht)} />
+          <DetailRow label="Total TTC" value={formatCurrency(quotation.total_ttc)} />
+        </Section>
 
-        {/* Thales C22 Fields */}
-        <div>
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
-            <span className="w-2 h-2 bg-purple-500 rounded-full mr-2" />
-            C22 Thales
-          </h4>
-          <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-            <DetailRow label="Domaine C22" value={quotation.c22_domain} />
-            <DetailRow label="Activité C22" value={quotation.c22_activity} />
-            <DetailRow label="Complexité" value={quotation.complexity} />
-            <DetailRow label="GFA (Prix max)" value={formatCurrency(quotation.max_price)} />
-            <DetailRow label="Taux présentiel" value={quotation.in_situ_ratio} />
-          </dl>
-        </div>
+        {/* C22 Thales */}
+        <Section title="C22 Thales">
+          <DetailRow label="Domaine C22" value={quotation.c22_domain} />
+          <DetailRow label="Activité C22" value={quotation.c22_activity} />
+          <DetailRow label="Complexité" value={quotation.complexity} />
+          <DetailRow label="GFA (Prix max)" value={formatCurrency(quotation.max_price)} />
+          <DetailRow label="Taux présentiel" value={quotation.in_situ_ratio} />
+        </Section>
 
-        {/* Subcontracting */}
-        <div>
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
-            <span className="w-2 h-2 bg-pink-500 rounded-full mr-2" />
-            Sous-traitance
-          </h4>
-          <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-            <DetailRow label="Sous-traitance" value={quotation.subcontracting ? 'Oui' : 'Non'} />
-            {quotation.subcontracting && (
-              <>
-                <DetailRow label="Fournisseur Tier 2" value={quotation.tier2_supplier || '-'} />
-                <DetailRow label="Fournisseur Tier 3" value={quotation.tier3_supplier || '-'} />
-              </>
-            )}
-          </dl>
-        </div>
+        {/* Sous-traitance */}
+        <Section title="Sous-traitance">
+          <DetailRow label="Sous-traitance" value={quotation.subcontracting ? 'Oui' : 'Non'} />
+          {quotation.subcontracting && (
+            <>
+              <DetailRow label="Fournisseur Tier 2" value={quotation.tier2_supplier || '—'} />
+              <DetailRow label="Fournisseur Tier 3" value={quotation.tier3_supplier || '—'} />
+            </>
+          )}
+        </Section>
 
-        {/* Other Fields */}
-        <div>
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
-            <span className="w-2 h-2 bg-orange-500 rounded-full mr-2" />
-            Autres informations
-          </h4>
-          <dl className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-            <DetailRow label="Référence SOW" value={quotation.sow_reference} />
-            <DetailRow label="Objet du besoin" value={quotation.object_of_need} />
-            <DetailRow label="Titre du besoin" value={quotation.need_title} />
-            <DetailRow label="Commentaires" value={quotation.comments} />
-          </dl>
-        </div>
+        {/* Autres informations */}
+        <Section title="Autres informations">
+          <DetailRow label="Référence SOW" value={quotation.sow_reference} />
+          <DetailRow label="Objet du besoin" value={quotation.object_of_need} />
+          <DetailRow label="Titre du besoin" value={quotation.need_title} />
+          <DetailRow label="Commentaires" value={quotation.comments} />
+        </Section>
 
-        {/* Validation Status */}
+        {/* Erreurs de validation */}
         {!quotation.is_valid && quotation.validation_errors.length > 0 && (
-          <div>
-            <h4 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center">
-              <span className="w-2 h-2 bg-red-500 rounded-full mr-2" />
-              Erreurs de validation
-            </h4>
-            <ul className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 space-y-1">
+          <section>
+            <p className="ml mb-2 !text-redt">Erreurs de validation</p>
+            <ul className="bg-red-bg text-red-fg rounded-[10px] px-3.5 py-2.5 space-y-1 text-[12.5px]">
               {quotation.validation_errors.map((error, index) => (
-                <li key={index} className="text-sm text-red-600 dark:text-red-400">
-                  • {error}
-                </li>
+                <li key={index}>• {error}</li>
               ))}
             </ul>
-          </div>
+          </section>
         )}
       </div>
     </Modal>
@@ -797,68 +702,47 @@ interface GeneratingStepProps {
 
 function GeneratingStep({ progress }: GeneratingStepProps) {
   return (
-    <Card>
-      <CardHeader
-        title="Génération en cours"
-        subtitle="Les devis sont en cours de création dans BoondManager et de conversion en PDF"
-      />
-
-      <div className="mt-6">
-        {/* Progress Bar */}
-        <div className="relative pt-1">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Progression
-            </span>
-            <span className="text-sm font-medium text-primary">
-              {progress.progress_percentage.toFixed(0)}%
-            </span>
+    <div>
+      <div className="card">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Loader2 className="h-4 w-4 animate-spin text-prit flex-shrink-0" />
+            <div>
+              <h3 className="ct">Génération en cours...</h3>
+              <p className="cs">Création des devis dans BoondManager puis conversion en PDF</p>
+            </div>
           </div>
-          <div className="overflow-hidden h-3 text-xs flex rounded-full bg-gray-200 dark:bg-gray-700">
-            <div
-              className="transition-all duration-500 ease-out flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary"
-              style={{ width: `${progress.progress_percentage}%` }}
-            />
-          </div>
+          <span className="docs">{progress.progress_percentage.toFixed(0)} %</span>
         </div>
-
-        {/* Stats */}
-        <div className="mt-6 grid grid-cols-4 gap-4">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {progress.total}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Total</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-green-600">
-              {progress.completed}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Terminés</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-red-600">
-              {progress.failed}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Échoués</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-yellow-600">
-              {progress.pending}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">En attente</p>
-          </div>
+        <div className="pbar">
+          <div className="pfill" style={{ width: `${progress.progress_percentage}%` }} />
         </div>
+        <p className="f-hint">La page s'actualise automatiquement toutes les 2 secondes</p>
+      </div>
 
-        {/* Animation */}
-        <div className="mt-8 flex items-center justify-center">
-          <RefreshCw className="w-8 h-8 text-primary animate-spin" />
-          <span className="ml-3 text-gray-600 dark:text-gray-400">
-            Génération en cours...
-          </span>
+      <div className="kpis !my-4">
+        <div className="kpi">
+          <p className="kl">Lignes traitées</p>
+          <p className="kv">{progress.total}</p>
+          <p className="ks">devis à générer</p>
+        </div>
+        <div className="kpi">
+          <p className="kl">Devis générés</p>
+          <p className="kv text-grn-fg">{progress.completed}</p>
+          <p className="ks">créés dans BoondManager</p>
+        </div>
+        <div className="kpi">
+          <p className="kl">En attente</p>
+          <p className="kv text-amb-fg">{progress.pending}</p>
+          <p className="ks">dans la file de génération</p>
+        </div>
+        <div className="kpi">
+          <p className="kl">Erreurs</p>
+          <p className={`kv ${progress.failed > 0 ? 'red' : ''}`}>{progress.failed}</p>
+          <p className="ks">devis en échec</p>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -925,142 +809,142 @@ function CompleteStep({ progress, batchId, onReset }: CompleteStepProps) {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Summary Card */}
-      <Card>
-        <CardHeader
-          title={hasErrors ? 'Génération terminée avec des erreurs' : 'Génération terminée'}
-          subtitle={
-            hasErrors
-              ? `${completedCount} devis générés, ${failedCount} échoués`
-              : `${completedCount} devis générés avec succès`
-          }
-        />
+    <div>
+      {/* Résultat */}
+      {hasErrors ? (
+        <div className="alert !mt-0">
+          <AlertCircle className="h-[18px] w-[18px] flex-shrink-0" />
+          <span>
+            Génération terminée avec des erreurs — {completedCount} devis générés, {failedCount} en
+            échec.
+          </span>
+        </div>
+      ) : (
+        <div className="okbox !mt-0">
+          <CheckCircle className="h-4 w-4 flex-shrink-0" />
+          <span>Génération terminée — {completedCount} devis générés avec succès.</span>
+        </div>
+      )}
 
-        <div className="mt-6 flex flex-col items-center">
-          {hasErrors ? (
-            <AlertCircle className="w-16 h-16 text-yellow-500" />
-          ) : (
-            <CheckCircle className="w-16 h-16 text-green-500" />
-          )}
+      {/* KPIs */}
+      <div className="kpis !my-4 !grid-cols-3">
+        <div className="kpi">
+          <p className="kl">Lignes traitées</p>
+          <p className="kv">{totalCount}</p>
+          <p className="ks">dans le fichier importé</p>
+        </div>
+        <div className="kpi">
+          <p className="kl">Devis générés</p>
+          <p className="kv text-grn-fg">{completedCount}</p>
+          <p className="ks">PDF prêts au téléchargement</p>
+        </div>
+        <div className="kpi">
+          <p className="kl">Erreurs</p>
+          <p className={`kv ${failedCount > 0 ? 'red' : ''}`}>{failedCount}</p>
+          <p className="ks">devis en échec</p>
+        </div>
+      </div>
 
-          <div className="mt-6 grid grid-cols-3 gap-8">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                {totalCount}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-green-600">
-                {completedCount}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Réussis</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-red-600">
-                {failedCount}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Échoués</p>
-            </div>
+      {/* Téléchargement individuel */}
+      {batchDetails && batchDetails.quotations.length > 0 && (
+        <div className="tbl">
+          <div className={`thead ${COMPLETE_GRID}`}>
+            <span>Référence</span>
+            <span>Consultant</span>
+            <span>Société</span>
+            <span>Statut</span>
+            <span className="text-right">Action</span>
           </div>
-
-          <div className="mt-8 flex space-x-4">
-            <Button variant="outline" onClick={onReset}>
-              Nouvelle génération
-            </Button>
+          {batchDetails.quotations.map((q) => (
+            <div key={q.row_index} className={`row ${COMPLETE_GRID}`}>
+              <span className="ref">{q.boond_reference || '—'}</span>
+              <div className="min-w-0">
+                <p className="nm truncate">{formatName(q.resource_name)}</p>
+                {q.resource_trigramme && <p className="ns truncate">{q.resource_trigramme}</p>}
+              </div>
+              <span className="cell truncate">{q.company_name || '—'}</span>
+              <div className="min-w-0">
+                {q.status === 'completed' ? (
+                  <span className="st st-grn">
+                    <span className="dot" />
+                    Généré
+                  </span>
+                ) : q.status === 'failed' ? (
+                  <>
+                    <span className="st st-red">
+                      <span className="dot" />
+                      Erreur
+                    </span>
+                    {q.error_message && (
+                      <p className="ns !text-redt truncate mt-1" title={q.error_message}>
+                        {q.error_message}
+                      </p>
+                    )}
+                  </>
+                ) : q.status === 'pending' ? (
+                  <span className="st st-amb">
+                    <span className="dot" />
+                    En attente
+                  </span>
+                ) : (
+                  <span className="st st-blu">
+                    <span className="dot" />
+                    En cours
+                  </span>
+                )}
+              </div>
+              <div className="text-right">
+                {q.status === 'completed' ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    isLoading={downloadingRow === q.row_index}
+                    onClick={() =>
+                      handleDownloadIndividual(q.row_index, q.boond_reference || `row_${q.row_index}`)
+                    }
+                    leftIcon={<Download className="h-3 w-3" />}
+                  >
+                    PDF
+                  </Button>
+                ) : (
+                  <span className="cell text-mut2">—</span>
+                )}
+              </div>
+            </div>
+          ))}
+          <div className="tfoot">
+            <span>
+              {completedCount} devis générés sur {totalCount} ligne{totalCount > 1 ? 's' : ''}
+            </span>
             {completedCount > 0 && (
-              <Button
+              <button
+                type="button"
+                className="alink disabled:opacity-40"
                 onClick={handleDownloadZip}
-                isLoading={isDownloadingZip}
-                leftIcon={<Download className="w-4 h-4" />}
+                disabled={isDownloadingZip}
               >
-                Télécharger ZIP
-              </Button>
+                {isDownloadingZip ? 'Préparation du ZIP...' : 'Tout télécharger (.zip) →'}
+              </button>
             )}
           </div>
         </div>
-      </Card>
-
-      {/* Quotation Download Table */}
-      {batchDetails && batchDetails.quotations.length > 0 && (
-        <Card>
-          <CardHeader
-            title="Téléchargement individuel"
-            subtitle="Téléchargez les devis individuellement"
-          />
-
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    #
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Consultant
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Référence Devis
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Statut
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {batchDetails.quotations.map((q) => (
-                  <tr key={q.row_index} className={q.status !== 'completed' ? 'bg-red-50 dark:bg-red-900/10' : ''}>
-                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                      {q.row_index + 1}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {formatName(q.resource_name)}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {q.resource_trigramme}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
-                      {q.boond_reference || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {q.status === 'completed' ? (
-                        <Badge variant="success">Généré</Badge>
-                      ) : (
-                        <Badge variant="error">Erreur</Badge>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {q.status === 'completed' ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          isLoading={downloadingRow === q.row_index}
-                          onClick={() => handleDownloadIndividual(q.row_index, q.boond_reference || `row_${q.row_index}`)}
-                          leftIcon={<Download className="w-3 h-3" />}
-                        >
-                          PDF
-                        </Button>
-                      ) : q.error_message ? (
-                        <span className="text-xs text-red-500" title={q.error_message}>
-                          {q.error_message.substring(0, 30)}...
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
       )}
+
+      {/* Actions */}
+      <div className="flex justify-end gap-2 mt-4">
+        <Button variant="secondary" onClick={onReset}>
+          Nouvelle génération
+        </Button>
+        {completedCount > 0 && (
+          <Button
+            onClick={handleDownloadZip}
+            isLoading={isDownloadingZip}
+            leftIcon={<Download className="h-4 w-4" />}
+          >
+            Télécharger le ZIP
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

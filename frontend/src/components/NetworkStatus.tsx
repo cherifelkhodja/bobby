@@ -42,21 +42,21 @@ export function NetworkStatus() {
 
   return (
     <div
-      className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-all duration-300 ${
+      className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl border shadow-lg flex items-center gap-2 transition-all duration-300 ${
         isOnline
-          ? 'bg-green-500 text-white'
-          : 'bg-yellow-500 text-yellow-900'
+          ? 'bg-grn-bg text-grn-fg border-[color-mix(in_oklab,var(--grn-fg)_25%,transparent)]'
+          : 'bg-amb-bg text-amb-fg border-[color-mix(in_oklab,var(--amb-fg)_25%,transparent)]'
       }`}
     >
       {isOnline ? (
         <>
-          <Wifi className="h-5 w-5" />
-          <span className="text-sm font-medium">Connexion rétablie</span>
+          <Wifi className="h-4 w-4" />
+          <span className="text-[13px] font-medium">Connexion rétablie</span>
         </>
       ) : (
         <>
-          <WifiOff className="h-5 w-5" />
-          <span className="text-sm font-medium">
+          <WifiOff className="h-4 w-4" />
+          <span className="text-[13px] font-medium">
             Vous êtes hors ligne
           </span>
         </>

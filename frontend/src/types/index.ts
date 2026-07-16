@@ -725,23 +725,23 @@ export type ContractRequestStatus =
   | 'redirected_payfit'
   | 'cancelled';
 
-export const CONTRACT_STATUS_CONFIG: Record<ContractRequestStatus, { label: string; color: string; group: 'active' | 'done' | 'blocked' }> = {
-  pending_commercial_validation: { label: 'Saisie commerciale', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300', group: 'active' },
-  commercial_validated: { label: 'Validé', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300', group: 'active' },
-  collecting_documents: { label: 'Collecte documents', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300', group: 'active' },
-  reviewing_compliance: { label: 'En vérification', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300', group: 'active' },
-  compliance_blocked: { label: 'Bloqué conformité', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300', group: 'blocked' },
-  configuring_contract: { label: 'Configuration', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300', group: 'active' },
-  draft_generated: { label: 'Brouillon généré', color: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300', group: 'active' },
-  draft_sent_to_partner: { label: 'Envoyé partenaire', color: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300', group: 'active' },
-  partner_approved: { label: 'Approuvé', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300', group: 'active' },
-  partner_requested_changes: { label: 'Modifications demandées', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300', group: 'blocked' },
-  sent_for_signature: { label: 'En signature', color: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300', group: 'active' },
-  signed: { label: 'Signé', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300', group: 'active' },
-  active: { label: 'Actif', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300', group: 'active' },
-  archived: { label: 'Archivé', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300', group: 'done' },
-  redirected_payfit: { label: 'Redirigé PayFit', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300', group: 'done' },
-  cancelled: { label: 'Annulé', color: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400', group: 'done' },
+export const CONTRACT_STATUS_CONFIG: Record<ContractRequestStatus, { label: string; color: string; group: 'active' | 'done' | 'blocked'; stage: 0 | 1 | 2 | 3 | 4 | 5 | 6 }> = {
+  pending_commercial_validation: { label: 'Validation commerciale', color: 'bg-sla-bg text-sla-fg', group: 'active', stage: 1 },
+  commercial_validated: { label: 'Validé commercial', color: 'bg-blu-bg text-blu-fg', group: 'active', stage: 2 },
+  collecting_documents: { label: 'Collecte documents', color: 'bg-amb-bg text-amb-fg', group: 'active', stage: 2 },
+  reviewing_compliance: { label: 'En vérification', color: 'bg-amb-bg text-amb-fg', group: 'active', stage: 2 },
+  compliance_blocked: { label: 'Bloquée · conformité', color: 'bg-red-bg text-red-fg', group: 'blocked', stage: 2 },
+  configuring_contract: { label: 'À configurer', color: 'bg-blu-bg text-blu-fg', group: 'active', stage: 3 },
+  draft_generated: { label: 'Draft généré', color: 'bg-blu-bg text-blu-fg', group: 'active', stage: 4 },
+  draft_sent_to_partner: { label: 'Review partenaire', color: 'bg-blu-bg text-blu-fg', group: 'active', stage: 4 },
+  partner_approved: { label: 'Approuvé partenaire', color: 'bg-ind-bg text-ind-fg', group: 'active', stage: 5 },
+  partner_requested_changes: { label: 'Modifications demandées', color: 'bg-amb-bg text-amb-fg', group: 'blocked', stage: 4 },
+  sent_for_signature: { label: 'Signature · YouSign', color: 'bg-ind-bg text-ind-fg', group: 'active', stage: 5 },
+  signed: { label: 'Signée', color: 'bg-grn-bg text-grn-fg', group: 'active', stage: 6 },
+  active: { label: 'Active', color: 'bg-grn-bg text-grn-fg', group: 'active', stage: 6 },
+  archived: { label: 'Archivée', color: 'bg-sla-bg text-sla-fg', group: 'done', stage: 6 },
+  redirected_payfit: { label: 'Redirigée Payfit', color: 'bg-sla-bg text-sla-fg', group: 'done', stage: 0 },
+  cancelled: { label: 'Annulée', color: 'bg-red-bg text-red-fg', group: 'done', stage: 0 },
 };
 
 export type TriggerType = 'positioning_7' | 'candidat_11' | 'ressource_4' | 'ressource_5' | 'manual';

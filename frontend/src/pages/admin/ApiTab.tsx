@@ -247,7 +247,7 @@ export function ApiTab() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-pri" />
       </div>
     );
   }
@@ -257,7 +257,7 @@ export function ApiTab() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-[13px] text-mut">
             Statut et test des connexions aux services externes
           </p>
         </div>
@@ -289,36 +289,36 @@ export function ApiTab() {
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
                   <div
-                    className={`p-3 rounded-lg ${
+                    className={`p-3 rounded-[9px] ${
                       service.configured
                         ? testResult?.success
-                          ? 'bg-green-100 dark:bg-green-900/30'
+                          ? 'bg-grn-bg'
                           : testResult && !testResult.success
-                            ? 'bg-red-100 dark:bg-red-900/30'
-                            : 'bg-blue-100 dark:bg-blue-900/30'
-                        : 'bg-gray-100 dark:bg-gray-700'
+                            ? 'bg-red-bg'
+                            : 'bg-blu-bg'
+                        : 'bg-lin2'
                     }`}
                   >
                     <Icon
                       className={`h-6 w-6 ${
                         service.configured
                           ? testResult?.success
-                            ? 'text-green-600 dark:text-green-400'
+                            ? 'text-grn-fg'
                             : testResult && !testResult.success
-                              ? 'text-red-600 dark:text-red-400'
-                              : 'text-blue-600 dark:text-blue-400'
-                          : 'text-gray-400 dark:text-gray-500'
+                              ? 'text-red-fg'
+                              : 'text-blu-fg'
+                          : 'text-mut2'
                       }`}
                     />
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-900 dark:text-white">
+                    <h3 className="text-[13.5px] font-semibold text-ink">
                       {config?.name || service.service}
                     </h3>
                     {service.masked_key && (
                       <div className="mt-1 flex items-center gap-1">
-                        <Key className="h-3 w-3 text-gray-400" />
-                        <code className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                        <Key className="h-3 w-3 text-mut2" />
+                        <code className="text-xs text-mut font-mono">
                           {service.masked_key}
                         </code>
                       </div>
@@ -336,13 +336,13 @@ export function ApiTab() {
               {/* Gemini Model Selector */}
               {service.service === 'gemini' && (
                 <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="f-lab">
                     Modèle
                   </label>
                   <select
                     value={geminiModel}
                     onChange={(e) => setGeminiModel(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="f-in !px-2.5"
                   >
                     {GEMINI_MODELS.map((model) => (
                       <option key={model.value} value={model.value}>
@@ -356,10 +356,10 @@ export function ApiTab() {
               {/* Test Result */}
               {testResult && (
                 <div
-                  className={`mt-4 p-3 rounded-lg text-sm flex items-center gap-2 ${
+                  className={`mt-4 p-3 rounded-[10px] text-[13px] flex items-center gap-2 ${
                     testResult.success
-                      ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300'
-                      : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300'
+                      ? 'bg-grn-bg text-grn-fg'
+                      : 'bg-red-bg text-red-fg'
                   }`}
                 >
                   {testResult.success ? (
@@ -404,14 +404,14 @@ export function ApiTab() {
       {/* CV Generator Settings */}
       <Card>
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-            <Sparkles className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+          <div className="p-3 rounded-[9px] bg-amb-bg">
+            <Sparkles className="h-6 w-6 text-amb-fg" />
           </div>
           <div>
-            <h3 className="font-medium text-gray-900 dark:text-white">
+            <h3 className="text-[13.5px] font-semibold text-ink">
               IA pour CV Generator
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-[12.5px] text-mut">
               Choisir le modèle Claude pour le CV Generator
             </p>
           </div>
@@ -423,7 +423,7 @@ export function ApiTab() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="f-lab">
             Modèle Claude
           </label>
           <select
@@ -432,7 +432,7 @@ export function ApiTab() {
               setBetaModel(e.target.value);
               setBetaTestResult(null);
             }}
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+            className="f-in !px-2.5"
           >
             {(betaData?.available_models || []).map((m: CvAiModelInfo) => (
               <option key={m.id} value={m.id}>
@@ -445,10 +445,10 @@ export function ApiTab() {
         {/* Test Result */}
         {betaTestResult && (
           <div
-            className={`mt-4 p-3 rounded-lg text-sm flex items-center gap-2 ${
+            className={`mt-4 p-3 rounded-[10px] text-[13px] flex items-center gap-2 ${
               betaTestResult.success
-                ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300'
-                : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300'
+                ? 'bg-grn-bg text-grn-fg'
+                : 'bg-red-bg text-red-fg'
             }`}
           >
             {betaTestResult.success ? (
@@ -492,14 +492,14 @@ export function ApiTab() {
       {/* INSEE Sirene Settings */}
       <Card>
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-            <Key className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+          <div className="p-3 rounded-[9px] bg-blu-bg">
+            <Key className="h-6 w-6 text-blu-fg" />
           </div>
           <div>
-            <h3 className="font-medium text-gray-900 dark:text-white">
+            <h3 className="text-[13.5px] font-semibold text-ink">
               INSEE Sirene API
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-[12.5px] text-mut">
               Utilisée pour l'auto-remplissage SIRET dans le portail partenaire
             </p>
           </div>
@@ -510,17 +510,17 @@ export function ApiTab() {
           )}
         </div>
 
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Clé API configurée via la variable <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">SIRENE_API_KEY</code> (ou AWS Secrets Manager).
+        <p className="text-[12.5px] text-mut mb-4">
+          Clé API configurée via la variable <code className="text-xs bg-lin2 text-ink px-1 py-0.5 rounded">SIRENE_API_KEY</code> (ou AWS Secrets Manager).
         </p>
 
         {/* Test Result */}
         {sireneTestResult && (
           <div
-            className={`mb-4 p-3 rounded-lg text-sm flex items-center gap-2 ${
+            className={`mb-4 p-3 rounded-[10px] text-[13px] flex items-center gap-2 ${
               sireneTestResult.success
-                ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300'
-                : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300'
+                ? 'bg-grn-bg text-grn-fg'
+                : 'bg-red-bg text-red-fg'
             }`}
           >
             {sireneTestResult.success ? (
@@ -550,14 +550,14 @@ export function ApiTab() {
       {/* INPI RNE Settings */}
       <Card>
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
-            <Key className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+          <div className="p-3 rounded-[9px] bg-ind-bg">
+            <Key className="h-6 w-6 text-ind-fg" />
           </div>
           <div>
-            <h3 className="font-medium text-gray-900 dark:text-white">
+            <h3 className="text-[13.5px] font-semibold text-ink">
               INPI RNE API
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-[12.5px] text-mut">
               Ville du greffe, capital social et forme juridique
             </p>
           </div>
@@ -568,17 +568,17 @@ export function ApiTab() {
           )}
         </div>
 
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Token Bearer configuré via la variable <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">INPI_TOKEN</code> (AWS Secrets Manager).
+        <p className="text-[12.5px] text-mut mb-4">
+          Token Bearer configuré via la variable <code className="text-xs bg-lin2 text-ink px-1 py-0.5 rounded">INPI_TOKEN</code> (AWS Secrets Manager).
         </p>
 
         {/* Test Result */}
         {inpiTestResult && (
           <div
-            className={`mb-4 p-3 rounded-lg text-sm flex items-center gap-2 ${
+            className={`mb-4 p-3 rounded-[10px] text-[13px] flex items-center gap-2 ${
               inpiTestResult.success
-                ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300'
-                : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300'
+                ? 'bg-grn-bg text-grn-fg'
+                : 'bg-red-bg text-red-fg'
             }`}
           >
             {inpiTestResult.success ? (
@@ -604,20 +604,16 @@ export function ApiTab() {
 
       {/* Secrets Source Info */}
       {statusData?.secrets_source === 'aws' ? (
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-green-600 dark:text-green-400" />
-            <p className="text-sm text-green-800 dark:text-green-300">
-              <strong>AWS Secrets Manager actif</strong> - Les clés API sont chargées depuis AWS Secrets Manager de maniere securisee.
-            </p>
-          </div>
+        <div className="okbox !mt-0">
+          <Shield className="h-5 w-5 shrink-0" />
+          <span>
+            <strong>AWS Secrets Manager actif</strong> - Les clés API sont chargées depuis AWS Secrets Manager de maniere securisee.
+          </span>
         </div>
       ) : (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <p className="text-sm text-blue-800 dark:text-blue-300">
-            <strong>Note :</strong> Les clés API sont configurées via les variables d'environnement du
-            serveur. Pour une sécurité renforcée, activez AWS Secrets Manager (AWS_SECRETS_ENABLED=true).
-          </p>
+        <div className="infob">
+          <strong>Note :</strong> Les clés API sont configurées via les variables d'environnement du
+          serveur. Pour une sécurité renforcée, activez AWS Secrets Manager (AWS_SECRETS_ENABLED=true).
         </div>
       )}
 
@@ -626,23 +622,23 @@ export function ApiTab() {
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/50" onClick={() => setShowSkillsModal(false)} />
-            <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="relative bg-sur border border-lin rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
               {/* Modal Header */}
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="px-6 py-4 border-b border-lin">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <h3 className="text-[15px] font-bold text-ink">
                     Skills Turnover-IT
                   </h3>
                   <button
                     onClick={() => setShowSkillsModal(false)}
-                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                    className="text-mut2 hover:text-ink transition-colors"
                   >
                     <XCircle className="h-6 w-6" />
                   </button>
                 </div>
 
                 {/* Metadata */}
-                <div className="mt-2 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                <div className="mt-2 flex items-center gap-4 text-[12.5px] text-mut">
                   <span>
                     <strong>{skillsData?.total || 0}</strong> skills
                   </span>
@@ -657,13 +653,13 @@ export function ApiTab() {
                 {/* Search and Sync */}
                 <div className="mt-4 flex gap-2">
                   <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-mut2" />
                     <input
                       type="text"
                       placeholder="Rechercher un skill..."
                       value={skillsSearch}
                       onChange={(e) => setSkillsSearch(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="f-in !pl-10"
                     />
                   </div>
                   <Button
@@ -682,16 +678,16 @@ export function ApiTab() {
               <div className="flex-1 overflow-y-auto px-6 py-4">
                 {isLoadingSkills ? (
                   <div className="flex items-center justify-center h-32">
-                    <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                    <Loader2 className="h-6 w-6 animate-spin text-pri" />
                   </div>
                 ) : skillsData?.skills.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <div className="text-center py-8 text-mut">
                     {skillsSearch ? (
                       <p>Aucun skill trouvé pour "{skillsSearch}"</p>
                     ) : (
                       <div>
                         <p className="mb-2">Aucun skill synchronisé</p>
-                        <p className="text-sm">Cliquez sur "Synchroniser" pour récupérer les skills depuis Turnover-IT</p>
+                        <p className="text-[12.5px]">Cliquez sur "Synchroniser" pour récupérer les skills depuis Turnover-IT</p>
                       </div>
                     )}
                   </div>
@@ -700,7 +696,7 @@ export function ApiTab() {
                     {skillsData?.skills.map((skill) => (
                       <span
                         key={skill.slug}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
+                        className="sk"
                         title={`Slug: ${skill.slug}`}
                       >
                         {skill.name}
@@ -711,7 +707,7 @@ export function ApiTab() {
               </div>
 
               {/* Modal Footer */}
-              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="px-6 py-4 border-t border-lin">
                 <Button
                   variant="outline"
                   onClick={() => setShowSkillsModal(false)}

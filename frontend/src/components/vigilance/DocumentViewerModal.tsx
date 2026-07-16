@@ -1,21 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import {
-  Calendar,
-  CalendarCheck,
-  CalendarX,
-  CheckCircle,
-  Download,
-  FileText,
-  Timer,
-  X,
-  XCircle,
-} from 'lucide-react';
+import { CheckCircle, Download, FileText, X, XCircle } from 'lucide-react';
 
 import { vigilanceApi } from '../../api/vigilance';
 import { Button } from '../ui/Button';
 import { PageSpinner } from '../ui/Spinner';
-import { getDocumentBadgeConfig } from '../../types';
-import type { VigilanceDocument } from '../../types';
+import type { DocumentStatus, VigilanceDocument } from '../../types';
 import { daysUntil, formatDate } from './dateUtils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -26,21 +15,43 @@ export function ExpiryBadge({ expiresAt }: { expiresAt: string | null }) {
 
   if (days < 0)
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 px-2 py-0.5 text-xs font-medium">
-        <CalendarX className="h-3 w-3" /> Expiré il y a {Math.abs(days)}j
+      <span className="st st-red">
+        <span className="dot" />
+        Expiré il y a {Math.abs(days)} j
       </span>
     );
   if (days <= 30)
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 px-2 py-0.5 text-xs font-medium">
-        <Timer className="h-3 w-3" /> Expire dans {days}j
+      <span className="st st-amb">
+        <span className="dot" />
+        Expire dans {days} j
       </span>
     );
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 text-xs font-medium">
-      <CalendarCheck className="h-3 w-3" /> Valide encore {days}j
+    <span className="st st-grn">
+      <span className="dot" />
+      Valide encore {days} j
     </span>
   );
+}
+
+const DOC_CHIP: Record<DocumentStatus, { label: string; cls: string }> = {
+  requested: { label: 'Demandé', cls: 'st-sla' },
+  received: { label: 'Reçu', cls: 'st-blu' },
+  validated: { label: 'Validé', cls: 'st-grn' },
+  rejected: { label: 'Rejeté', cls: 'st-red' },
+  expiring_soon: { label: 'Expire bientôt', cls: 'st-amb' },
+  expired: { label: 'Expiré', cls: 'st-red' },
+};
+
+function docChip(doc: Pick<VigilanceDocument, 'status' | 'is_unavailable'>): {
+  label: string;
+  cls: string;
+} {
+  if (doc.status === 'validated' && doc.is_unavailable) {
+    return { label: 'Validation temporaire', cls: 'st-amb' };
+  }
+  return DOC_CHIP[doc.status] ?? { label: doc.status, cls: 'st-sla' };
 }
 
 // ─── Auto-check labels ────────────────────────────────────────────────────────
@@ -80,6 +91,7 @@ export function DocumentViewerModal({
     doc.file_name?.toLowerCase().endsWith('.pdf') ||
     urlData?.url?.includes('.pdf');
   const canValidate = doc.status === 'received';
+  const chip = docChip(doc);
 
   // Fallback: use values from auto_check_results if dedicated columns are null
   const acr = doc.auto_check_results ?? {};
@@ -88,34 +100,34 @@ export function DocumentViewerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
+      <div className="bg-sur border border-lin rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <FileText className="h-5 w-5 text-primary-500" />
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                {doc.document_type_display}
-              </h3>
-              {doc.file_name && (
-                <p className="text-xs text-gray-500 dark:text-gray-400">{doc.file_name}</p>
-              )}
+        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-lin2 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="dico">
+              <FileText className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="dn truncate">{doc.document_type_display}</p>
+              {doc.file_name && <p className="ds truncate">{doc.file_name}</p>}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {urlData?.url && (
               <a
                 href={urlData.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 transition-colors"
+                className="inline-flex items-center gap-1.5 h-[30px] px-3 rounded-[9px] border border-lin bg-sur text-xs font-medium text-ink hover:bg-srf2 transition-colors"
               >
                 <Download className="h-3.5 w-3.5" /> Télécharger
               </a>
             )}
             <button
+              type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+              aria-label="Fermer"
+              className="p-1.5 rounded-lg text-mut2 hover:text-ink hover:bg-srf2 transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -124,9 +136,9 @@ export function DocumentViewerModal({
 
         <div className="flex flex-1 min-h-0">
           {/* Viewer */}
-          <div className="flex-1 bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden rounded-bl-xl">
+          <div className="flex-1 bg-srf2 flex items-center justify-center overflow-hidden">
             {!doc.s3_key ? (
-              <div className="text-center text-gray-400">
+              <div className="text-center text-mut2">
                 <FileText className="h-12 w-12 mx-auto mb-2 opacity-40" />
                 <p className="text-sm">Aucun fichier disponible</p>
               </div>
@@ -147,115 +159,84 @@ export function DocumentViewerModal({
                 />
               )
             ) : (
-              <p className="text-sm text-gray-500">Impossible de charger le document.</p>
+              <p className="text-sm text-mut">Impossible de charger le document.</p>
             )}
           </div>
 
           {/* Metadata + Actions sidebar */}
-          <div className="w-72 flex-shrink-0 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-y-auto">
+          <div className="w-72 flex-shrink-0 border-l border-lin2 flex flex-col overflow-y-auto">
             {/* Status */}
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Statut</p>
-              {(() => {
-                const cfg = getDocumentBadgeConfig(doc);
-                return (
-                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${cfg.color}`}>
-                    {cfg.label}
-                  </span>
-                );
-              })()}
+            <div className="p-4 border-b border-lin2">
+              <p className="ml !mb-2">Statut</p>
+              <span className={`st ${chip.cls}`}>
+                <span className="dot" />
+                {chip.label}
+              </span>
             </div>
 
             {/* Dates */}
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 space-y-3">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Dates</p>
+            <div className="p-4 border-b border-lin2 space-y-3">
+              <p className="ml">Dates</p>
 
-              <div className="flex items-start gap-2">
-                <Calendar className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Déposé le</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {formatDate(doc.uploaded_at)}
-                  </p>
-                </div>
+              <div>
+                <p className="ds !mt-0">Déposé le</p>
+                <p className="mv">{formatDate(doc.uploaded_at)}</p>
               </div>
 
               {doc.validated_at && (
-                <div className="flex items-start gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Validé le</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {formatDate(doc.validated_at)}
-                    </p>
-                  </div>
+                <div>
+                  <p className="ds !mt-0">Validé le</p>
+                  <p className="mv">{formatDate(doc.validated_at)}</p>
                 </div>
               )}
 
               {doc.rejected_at && (
-                <div className="flex items-start gap-2">
-                  <XCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Rejeté le</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {formatDate(doc.rejected_at)}
-                    </p>
-                  </div>
+                <div>
+                  <p className="ds !mt-0">Rejeté le</p>
+                  <p className="mv">{formatDate(doc.rejected_at)}</p>
                 </div>
               )}
 
               {doc.document_type !== 'rib' && (
                 <>
-                  <div className="flex items-start gap-2">
-                    <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Date du document</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {formatDate(docDate)}
-                      </p>
-                      {doc.is_valid_at_upload === false && (
-                        <span className="inline-flex items-center gap-1 mt-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 px-2 py-0.5 text-xs font-medium">
-                          <XCircle className="h-3 w-3" /> Document invalide à l'émission
+                  <div>
+                    <p className="ds !mt-0">Date du document</p>
+                    <p className="mv">{formatDate(docDate)}</p>
+                    {doc.is_valid_at_upload === false && (
+                      <div className="mt-1.5">
+                        <span className="st st-red">
+                          <span className="dot" />
+                          Invalide à l'émission
                         </span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex items-start gap-2">
-                    <Timer className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Valide jusqu'au</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {formatDate(expiryDate)}
-                      </p>
-                      {expiryDate && (
-                        <div className="mt-1">
-                          <ExpiryBadge expiresAt={expiryDate} />
-                        </div>
-                      )}
-                    </div>
+                  <div>
+                    <p className="ds !mt-0">Valide jusqu'au</p>
+                    <p className="mv">{formatDate(expiryDate)}</p>
+                    {expiryDate && (
+                      <div className="mt-1.5">
+                        <ExpiryBadge expiresAt={expiryDate} />
+                      </div>
+                    )}
                   </div>
                 </>
               )}
 
               {doc.file_size && (
-                <div className="flex items-start gap-2">
-                  <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Taille</p>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {(doc.file_size / 1024).toFixed(1)} Ko
-                    </p>
-                  </div>
+                <div>
+                  <p className="ds !mt-0">Taille</p>
+                  <p className="mv">{(doc.file_size / 1024).toFixed(1)} Ko</p>
                 </div>
               )}
             </div>
 
             {/* Rejection reason */}
             {doc.rejection_reason && (
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Motif du rejet</p>
-                <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg p-2">
+              <div className="p-4 border-b border-lin2">
+                <p className="ml !mb-2">Motif du rejet</p>
+                <p className="text-[12.5px] leading-relaxed text-red-fg bg-red-bg rounded-lg px-2.5 py-2">
                   {doc.rejection_reason}
                 </p>
               </div>
@@ -263,9 +244,9 @@ export function DocumentViewerModal({
 
             {/* Unavailability reason */}
             {doc.is_unavailable && doc.unavailability_reason && (
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Raison d'indisponibilité</p>
-                <p className="text-sm text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 rounded-lg p-2">
+              <div className="p-4 border-b border-lin2">
+                <p className="ml !mb-2">Raison d'indisponibilité</p>
+                <p className="text-[12.5px] leading-relaxed text-amb-fg bg-amb-bg rounded-lg px-2.5 py-2">
                   {doc.unavailability_reason}
                 </p>
               </div>
@@ -273,8 +254,8 @@ export function DocumentViewerModal({
 
             {/* Auto-check results */}
             {doc.auto_check_results && Object.keys(doc.auto_check_results).length > 0 && (
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Vérifications auto</p>
+              <div className="p-4 border-b border-lin2">
+                <p className="ml !mb-2.5">Vérifications auto</p>
                 <div className="space-y-2">
                   {Object.entries(doc.auto_check_results).map(([k, v]) => {
                     const cfg = AUTO_CHECK_CONFIG[k];
@@ -288,16 +269,16 @@ export function DocumentViewerModal({
                     return (
                       <div key={k} className="flex items-start gap-2">
                         {isPresent ? (
-                          <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                          <CheckCircle className="h-4 w-4 text-grn-fg flex-shrink-0 mt-0.5" />
                         ) : (
-                          <XCircle className="h-4 w-4 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                          <XCircle className="h-4 w-4 text-redt flex-shrink-0 mt-0.5" />
                         )}
                         <div className="min-w-0">
-                          <p className={`text-xs font-medium ${isPresent ? 'text-gray-700 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>
+                          <p className={`text-xs font-medium ${isPresent ? 'text-ink' : 'text-mut'}`}>
                             {label}
                           </p>
                           {displayValue && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{displayValue}</p>
+                            <p className="ds !mt-0.5 truncate">{displayValue}</p>
                           )}
                         </div>
                       </div>
@@ -310,22 +291,22 @@ export function DocumentViewerModal({
             {/* Validation actions */}
             {canValidate && (
               <div className="p-4 mt-auto">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Actions</p>
+                <p className="ml !mb-2.5">Actions</p>
                 <div className="flex flex-col gap-2">
                   <Button
                     onClick={onValidate}
                     disabled={isValidating}
-                    className="w-full justify-center"
+                    className="w-full"
+                    leftIcon={<CheckCircle className="h-4 w-4" />}
                   >
-                    <CheckCircle className="h-4 w-4 mr-1.5" />
-                    {isValidating ? 'Validation...' : 'Valider le document'}
+                    {isValidating ? 'Validation…' : 'Valider le document'}
                   </Button>
                   <Button
                     variant="secondary"
                     onClick={onRejectStart}
-                    className="w-full justify-center text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    className="w-full !text-redt"
+                    leftIcon={<XCircle className="h-4 w-4" />}
                   >
-                    <XCircle className="h-4 w-4 mr-1.5" />
                     Rejeter
                   </Button>
                 </div>

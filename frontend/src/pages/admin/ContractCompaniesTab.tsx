@@ -367,7 +367,7 @@ function LogoManager({ company }: { company: ContractCompany }) {
         <button
           onClick={() => { if (confirm('Supprimer le logo ?')) deleteMutation.mutate(); }}
           disabled={deleteMutation.isPending}
-          className="text-xs px-2.5 py-1.5 border border-red-200 dark:border-red-800 rounded text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+          className="text-xs px-2.5 py-1.5 border border-[color-mix(in_oklab,var(--redt)_35%,transparent)] rounded text-redt hover:bg-red-bg disabled:opacity-50"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
@@ -489,7 +489,7 @@ export function ContractCompaniesTab() {
                         {company.legal_form} {company.name}
                       </span>
                       {company.is_default && (
-                        <span className="flex items-center gap-1 text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 px-2 py-0.5 rounded-full">
+                        <span className="flex items-center gap-1 text-xs bg-amb-bg text-amb-fg px-2 py-0.5 rounded-full">
                           <Star className="h-3 w-3" /> Par défaut
                         </span>
                       )}
@@ -515,7 +515,7 @@ export function ContractCompaniesTab() {
                   </button>
                   <button
                     onClick={() => handleDelete(company)}
-                    className="p-1.5 text-gray-500 hover:text-red-500 rounded"
+                    className="p-1.5 text-gray-500 hover:text-redt rounded"
                     title="Supprimer"
                   >
                     <Trash2 className="h-4 w-4" />
