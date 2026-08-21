@@ -34,6 +34,22 @@ POSITIONING = {
     "consultant_last_name": "Norel",
 }
 
+DELIVERY = {
+    "id": 797,
+    "state": 4,
+    "title": "Expert MIM",
+    "start_date": "2026-09-15",
+    "end_date": "2027-03-14",
+    "sale_daily_rate": 780,
+    "purchase_daily_rate": 520,
+    "days_sold": 22,
+    "free_days": 2,
+    "resource_id": 42,
+    "project_id": 18,
+    "contract_id": 264,
+    "purchase_id": None,
+}
+
 NEED = {
     "id": 88,
     "title": "Développeur backend",
@@ -58,6 +74,7 @@ def _make_use_case(
     positioning=POSITIONING,
     need=NEED,
     consultant=CONSULTANT,
+    delivery=None,
     existing=None,
     trigger_state="7",
     company_id=None,
@@ -73,6 +90,7 @@ def _make_use_case(
     crm.get_positioning = AsyncMock(return_value=positioning)
     crm.get_need = AsyncMock(return_value=need)
     crm.get_candidate_info = AsyncMock(return_value=consultant)
+    crm.get_delivery = AsyncMock(return_value=delivery)
 
     company_repo = AsyncMock()
     company_repo.get_company_by_boond_agency_id = AsyncMock(return_value=company_id)
@@ -248,6 +266,72 @@ class TestPrefill:
         po = await use_case.execute(41)
 
         assert po.commercial_email == "commercial@boond.example"
+
+
+class TestDeliveryPrefill:
+    """La prestation Boond est la meilleure source de préremplissage."""
+
+    @pytest.mark.asyncio
+    async def test_the_delivery_fills_the_free_days(self):
+        """Seule la prestation connaît les jours de gratuité."""
+        use_case, _, _, _ = _make_use_case(
+            positioning={**POSITIONING, "delivery_id": 797}, delivery=DELIVERY
+        )
+
+        po = await use_case.execute(41)
+
+        assert po.free_days == Decimal("2")
+        assert po.days_sold == Decimal("22")
+        assert po.billable_days == Decimal("20")
+
+    @pytest.mark.asyncio
+    async def test_the_delivery_wins_over_the_positioning(self):
+        """Prix, jours et période de la prestation priment."""
+        use_case, _, _, _ = _make_use_case(
+            positioning={**POSITIONING, "delivery_id": 797}, delivery=DELIVERY
+        )
+
+        po = await use_case.execute(41)
+
+        assert po.purchase_daily_rate == Decimal("520")
+        assert po.sale_daily_rate == Decimal("780")
+        assert po.start_date == date(2026, 9, 15)
+        assert po.end_date == date(2027, 3, 14)
+
+    @pytest.mark.asyncio
+    async def test_an_existing_contract_is_recorded(self):
+        """Le contrat déjà rattaché évite d'en créer un second au report."""
+        use_case, _, _, _ = _make_use_case(
+            positioning={**POSITIONING, "delivery_id": 797}, delivery=DELIVERY
+        )
+
+        po = await use_case.execute(41)
+
+        assert po.boond_delivery_id == 797
+        assert po.boond_contract_id == 264
+
+    @pytest.mark.asyncio
+    async def test_an_unreadable_delivery_falls_back_to_the_positioning(self):
+        """Une prestation illisible ne prive pas le dossier de ses valeurs."""
+        use_case, _, crm, _ = _make_use_case(positioning={**POSITIONING, "delivery_id": 797})
+        crm.get_delivery = AsyncMock(side_effect=RuntimeError("Boond 500"))
+
+        po = await use_case.execute(41)
+
+        assert po.purchase_daily_rate == Decimal("500")
+        assert po.days_sold == Decimal("20")
+        assert po.free_days == Decimal("0")
+        assert po.boond_contract_id is None
+
+    @pytest.mark.asyncio
+    async def test_no_delivery_on_the_positioning_is_supported(self):
+        """Sans prestation rattachée, rien n'est lu."""
+        use_case, _, crm, _ = _make_use_case()
+
+        po = await use_case.execute(41)
+
+        crm.get_delivery.assert_not_awaited()
+        assert po.boond_delivery_id is None
 
 
 class TestBoondFailuresAreTolerated:

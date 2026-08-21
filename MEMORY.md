@@ -181,7 +181,7 @@
 | Signature YouSign auto | `create_procedure` non branché (flux manuel `mark-as-signed` seul) ; webhook rendu idempotent mais inerte tant qu'aucun `yousign_procedure_id` n'est associé | Medium |
 | Format références contrat | Code en `:03d` (3 chiffres) vs docstrings `NNNN` (4 chiffres) — trancher avant d'atteindre 1000 réf/an/société | Medium |
 | Colonnes DateTime naïves | `TIMESTAMP WITHOUT TIME ZONE` → `datetime.utcnow()` conservé (asyncpg refuse tz-aware) ; migrer en `timezone=True` pour passer à `datetime.now(UTC)` | Low |
-| Renouvellement de prestation Boond | `POST /deliveries/{id}/renew` (crée achat + commande client) identifié comme la voie native pour reculer l'échéance du contrat à la reconduction ; corps de requête à confirmer avant branchement. `boond_delivery_id` est déjà capté sur le positionnement | Medium |
+| Renouvellement de prestation Boond | `POST /deliveries/{id}/renew` identifié comme la voie native (clone la prestation ; achat et commande client selon paramètres). **Corps de requête toujours à confirmer** — seule la réponse a pu être observée. `boond_delivery_id` est capté et la prestation est lue à la création d'un BDC | Medium |
 | Signature BDC | Circuit manuel (téléchargement, envoi, dépôt du signé), comme le contrat cadre — YouSign non branché | Medium |
 | Repo sans `get_latest_by_candidate_id` | Garde anti double-CR best-effort côté candidat_11 pur (dédup pleine côté ressource) | Low |
 | RLS décorative | `set_rls_context` jamais appelé + policy `app.user_email` non définie + tables `cm_*` récentes sans policy — isolation reposant sur le filtre applicatif | Medium |

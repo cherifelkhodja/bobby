@@ -130,6 +130,49 @@ class BoondCrmAdapter:
             )
             return None
 
+    async def get_delivery(self, delivery_id: int) -> dict[str, Any] | None:
+        """Fetch a delivery (prestation) from BoondManager.
+
+        La prestation est l'équivalent natif du bon de commande côté Boond :
+        elle porte la période, le prix de vente, le coût, les jours vendus et
+        les **jours de gratuité** (`numberOfDaysFree`). C'est donc la meilleure
+        source de préremplissage d'un BDC, meilleure que le positionnement qui
+        ne connaît ni la gratuité ni le contrat en cours.
+
+        Returns:
+            Les données de la prestation, ou None si elle est illisible.
+        """
+        try:
+            response = await self._boond._make_request("GET", f"/deliveries/{delivery_id}")
+            data = response.get("data", {})
+            attributes = data.get("attributes", {})
+            relationships = data.get("relationships", {})
+
+            return {
+                "id": delivery_id,
+                "state": attributes.get("state"),
+                "title": attributes.get("title") or "",
+                "start_date": attributes.get("startDate") or None,
+                "end_date": attributes.get("endDate") or None,
+                # Prix de vente au client et coût d'achat : deux notions
+                # distinctes, comme le TJM et le CJM d'un bon de commande.
+                "sale_daily_rate": attributes.get("averageDailyPriceExcludingTax"),
+                "purchase_daily_rate": (
+                    attributes.get("averageDailyContractCost") or attributes.get("averageDailyCost")
+                ),
+                "days_sold": attributes.get("numberOfDaysInvoicedOrQuantity"),
+                "free_days": attributes.get("numberOfDaysFree"),
+                "resource_id": self._extract_relationship_id(relationships, "dependsOn"),
+                "project_id": self._extract_relationship_id(relationships, "project"),
+                # Contrat déjà rattaché à la prestation : sa présence évite d'en
+                # créer un second sur la même ressource.
+                "contract_id": self._extract_relationship_id(relationships, "contract"),
+                "purchase_id": self._extract_relationship_id(relationships, "purchase"),
+            }
+        except Exception as exc:
+            logger.error("boond_get_delivery_failed", delivery_id=delivery_id, error=str(exc))
+            return None
+
     async def get_need(self, need_id: int) -> dict[str, Any] | None:
         """Fetch a need/opportunity from BoondManager.
 

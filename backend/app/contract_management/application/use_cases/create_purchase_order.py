@@ -1,5 +1,6 @@
 """Use case: Create the first purchase order of a mission from a Boond positioning."""
 
+from decimal import Decimal
 from uuid import UUID
 
 import structlog
@@ -84,6 +85,7 @@ class CreatePurchaseOrderFromPositioningUseCase:
             raise PurchaseOrderAlreadyExistsError(positioning_id, existing.reference)
 
         need = await self._read_need(positioning.get("need_id"))
+        delivery = await self._read_delivery(positioning.get("delivery_id"))
         consultant = await self._read_consultant(
             positioning.get("candidate_id"), positioning.get("consultant_type")
         )
@@ -115,12 +117,20 @@ class CreatePurchaseOrderFromPositioningUseCase:
             client_name=need.get("client_name") or None,
             mission_title=need.get("title") or None,
             mission_description=need.get("description") or None,
-            # `averageDailyCost` est un coût : il prérempli le CJM d'achat, pas
-            # le TJM de vente, qui reste à saisir par l'ADV.
-            purchase_daily_rate=to_decimal(positioning.get("daily_rate")),
-            days_sold=to_decimal(positioning.get("quantity")),
-            start_date=parse_date(positioning.get("start_date")),
-            end_date=parse_date(positioning.get("end_date")),
+            # La prestation prime sur le positionnement quand elle existe :
+            # elle seule connaît les jours de gratuité et le prix de vente.
+            # `averageDailyCost` est un coût : il préremplit le CJM d'achat.
+            purchase_daily_rate=to_decimal(
+                delivery.get("purchase_daily_rate") or positioning.get("daily_rate")
+            ),
+            sale_daily_rate=to_decimal(delivery.get("sale_daily_rate")),
+            days_sold=to_decimal(delivery.get("days_sold") or positioning.get("quantity")),
+            free_days=to_decimal(delivery.get("free_days")) or Decimal("0"),
+            start_date=parse_date(delivery.get("start_date") or positioning.get("start_date")),
+            end_date=parse_date(delivery.get("end_date") or positioning.get("end_date")),
+            # Contrat déjà en place sur la prestation : le report Boond ne doit
+            # pas en superposer un second sur la même ressource.
+            boond_contract_id=delivery.get("contract_id"),
             commercial_email=commercial_email or None,
             created_by=created_by,
         )
@@ -156,6 +166,20 @@ class CreatePurchaseOrderFromPositioningUseCase:
             return await self._crm.get_need(need_id) or {}
         except Exception as exc:
             logger.warning("purchase_order_need_lookup_failed", need_id=need_id, error=str(exc))
+            return {}
+
+    async def _read_delivery(self, delivery_id: object) -> dict:
+        """Lit la prestation Boond ; son absence ne bloque pas la création."""
+        if not delivery_id:
+            return {}
+        try:
+            return await self._crm.get_delivery(delivery_id) or {}
+        except Exception as exc:
+            logger.warning(
+                "purchase_order_delivery_lookup_failed",
+                delivery_id=delivery_id,
+                error=str(exc),
+            )
             return {}
 
     async def _read_consultant(self, consultant_id: object, consultant_type: object) -> dict:

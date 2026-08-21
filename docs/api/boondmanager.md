@@ -347,6 +347,40 @@ async def get_need(self, need_id: int) -> dict[str, Any] | None
 
 **Retourne** : `{"title", "commercial_email", "manager_id", "agency_id"}`
 
+#### GET /deliveries/{id}
+Récupère une **prestation** : l'équivalent natif du bon de commande côté Boond.
+Elle porte la période, le prix de vente, le coût, les jours vendus et les jours de gratuité.
+
+```python
+async def get_delivery(self, delivery_id: int) -> dict[str, Any] | None
+```
+
+**Correspondance avec le bon de commande Bobby** :
+
+| Attribut Boond | Champ Bobby | Rôle |
+|---|---|---|
+| `averageDailyPriceExcludingTax` | `sale_daily_rate` | TJM de vente client (interne) |
+| `averageDailyContractCost` / `averageDailyCost` | `purchase_daily_rate` | CJM d'achat fournisseur |
+| `numberOfDaysInvoicedOrQuantity` | `days_sold` | Jours vendus |
+| `numberOfDaysFree` | `free_days` | Jours de gratuité |
+| `startDate` / `endDate` | `start_date` / `end_date` | Période |
+| `relationships.contract` | `boond_contract_id` | Contrat déjà rattaché à la ressource |
+| `relationships.dependsOn` | ressource | Consultant affecté |
+| `relationships.project` | — | Projet (lui-même rattaché au besoin et au client) |
+
+La prestation prime sur le positionnement au préremplissage : elle seule connaît la
+gratuité, le prix de vente et le contrat en cours.
+
+#### POST /deliveries/{id}/renew
+Renouvellement natif d'une prestation : crée une nouvelle prestation clonée
+(mêmes projet, ressource et contrat), et selon les paramètres l'achat et la
+commande client associés.
+
+> **NEEDS-CONFIRMATION** : le corps de la requête n'est pas encore documenté ici.
+> La réponse observée retourne la prestation créée (`purchase` à `null` dans ce cas).
+> Tant que le corps n'est pas confirmé, Bobby ne l'appelle pas : la reconduction crée
+> son bon de commande Boond sans toucher au contrat existant.
+
 #### GET /resources/{id}/information ou GET /candidates/{id}/information
 Récupère les infos du consultant. Route vers `/resources/` ou `/candidates/` selon `consultant_type`.
 Si inconnu, essaie `/resources/` d'abord puis fallback `/candidates/`.
