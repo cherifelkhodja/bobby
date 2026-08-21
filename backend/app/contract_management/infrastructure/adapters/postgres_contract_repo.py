@@ -108,6 +108,43 @@ class ContractRequestRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
+    async def get_framework_contract_for_third_party(
+        self, third_party_id: UUID
+    ) -> ContractRequest | None:
+        """Retourne le contrat cadre en vigueur d'un fournisseur, s'il existe.
+
+        Un cadre est « en vigueur » dès qu'il a été signé : SIGNED (signature
+        enregistrée), ACTIVE (synchronisé dans Boond) et ARCHIVED (dossier
+        clos par le CRON après six mois sans activité, mais bel et bien signé)
+        comptent tous. C'est ce qui autorise l'envoi d'un bon de commande.
+        """
+        result = await self.session.execute(
+            select(ContractRequestModel)
+            .where(
+                ContractRequestModel.third_party_id == third_party_id,
+                ContractRequestModel.status.in_(
+                    (
+                        ContractRequestStatus.SIGNED.value,
+                        ContractRequestStatus.ACTIVE.value,
+                        ContractRequestStatus.ARCHIVED.value,
+                    )
+                ),
+            )
+            .order_by(ContractRequestModel.created_at.desc())
+            .limit(1)
+        )
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def list_by_third_party(self, third_party_id: UUID) -> list[ContractRequest]:
+        """List every contract request of a supplier, most recent first."""
+        result = await self.session.execute(
+            select(ContractRequestModel)
+            .where(ContractRequestModel.third_party_id == third_party_id)
+            .order_by(ContractRequestModel.created_at.desc())
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
     async def save(self, request: ContractRequest) -> ContractRequest:
         """Save a contract request (create or update)."""
         result = await self.session.execute(

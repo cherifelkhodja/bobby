@@ -138,6 +138,62 @@ class ManualContractRequestCreate(BaseModel):
     consultant_phone: str | None = Field(None, max_length=50)
 
 
+class SupplierDossierCreate(BaseModel):
+    """Ouvrir un dossier de contractualisation pour un fournisseur.
+
+    Point d'entrée manuel du contrat cadre : aucun consultant, aucun
+    positionnement. Le mode de collecte des documents est choisi ici, dès la
+    création, et non plus lors d'une étape de validation séparée.
+    """
+
+    third_party_type: str = Field(
+        ..., pattern=r"^(freelance|sous_traitant|salarie|portage_salarial)$"
+    )
+    contact_email: EmailStr = Field(..., description="Contact contractualisation du fournisseur")
+    company_id: UUID | None = Field(None, description="Société émettrice du contrat")
+    siret: str | None = Field(
+        None,
+        max_length=20,
+        description="SIRET du fournisseur — sert à retrouver une fiche existante",
+    )
+    reuse_third_party_id: UUID | None = Field(
+        None, description="Rattacher explicitement à une fiche fournisseur existante"
+    )
+    notify_third_party: bool = Field(
+        True,
+        description="False = saisie en personne : aucun lien de collecte n'est envoyé au fournisseur",
+    )
+    skip_documents: bool = Field(
+        False,
+        description="True = aucune vigilance documentaire dans Bobby (dérogation tracée)",
+    )
+
+    @model_validator(mode="after")
+    def _skip_requires_manual_entry(self) -> "SupplierDossierCreate":
+        """Ignorer le dépôt n'a de sens que si le fournisseur n'est pas sollicité."""
+        if self.skip_documents and self.notify_third_party:
+            raise ValueError(
+                "skip_documents ne peut être utilisé qu'avec notify_third_party=false "
+                "(saisie en personne)."
+            )
+        return self
+
+
+class SupplierLookupResponse(BaseModel):
+    """Résultat de la recherche d'un fournisseur par SIRET."""
+
+    exists: bool
+    third_party_id: UUID | None = None
+    company_name: str | None = None
+    siren: str | None = None
+    compliance_status: str | None = None
+    has_framework_contract: bool = False
+    framework_contract_id: UUID | None = None
+    framework_contract_reference: str | None = None
+    open_contract_request_id: UUID | None = None
+    open_contract_request_status: str | None = None
+
+
 class ContractConfigRequest(BaseModel):
     """Request to configure a contract.
 

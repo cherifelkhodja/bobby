@@ -20,12 +20,19 @@ from app.contract_management.api.schemas import (
     ContractResponse,
     ManualContractRequestCreate,
     SkipDocumentsRequest,
+    SupplierDossierCreate,
+    SupplierLookupResponse,
 )
 from app.contract_management.application.use_cases.block_compliance import (
     BlockComplianceUseCase,
 )
 from app.contract_management.application.use_cases.configure_contract import (
     ConfigureContractUseCase,
+)
+from app.contract_management.application.use_cases.create_supplier_dossier import (
+    CreateSupplierDossierUseCase,
+    SupplierDossierCommand,
+    siren_from_siret,
 )
 from app.contract_management.application.use_cases.skip_document_collection import (
     SkipDocumentCollectionUseCase,
@@ -380,6 +387,174 @@ async def create_manual_contract_request(
             "trigger_type": "manual",
             "boond_consultant_id": body.boond_consultant_id,
             "consultant_type": body.consultant_type,
+        },
+    )
+
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
+
+
+# Les routes littérales doivent précéder `/{contract_request_id}` : déclarée
+# avant, la route paramétrée capterait « suppliers » et échouerait sur le
+# parsing d'UUID.
+@router.get(
+    "/suppliers/lookup",
+    response_model=SupplierLookupResponse,
+    summary="Rechercher un fournisseur par SIRET avant d'ouvrir un dossier",
+)
+async def lookup_supplier(
+    siret: str,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Dit si un fournisseur est déjà connu, et où en est sa contractualisation.
+
+    Évite d'ouvrir une seconde fiche pour une société déjà enregistrée — c'est
+    ce doublon qui fait redemander au fournisseur des documents de vigilance
+    déjà fournis. ADV/admin uniquement.
+    """
+    siren = siren_from_siret(siret)
+    if not siren:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="SIRET invalide : au moins 9 chiffres sont attendus.",
+        )
+
+    tp_repo = ThirdPartyRepository(db)
+    third_party = await tp_repo.get_by_siren(siren)
+    if not third_party:
+        return SupplierLookupResponse(exists=False, siren=siren)
+
+    cr_repo = ContractRequestRepository(db)
+    framework = await cr_repo.get_framework_contract_for_third_party(third_party.id)
+
+    # Dossier encore en cours pour ce fournisseur : le signaler évite d'en
+    # ouvrir un second en parallèle.
+    open_cr = next(
+        (
+            cr
+            for cr in await cr_repo.list_by_third_party(third_party.id)
+            if cr.status
+            not in (
+                ContractRequestStatus.SIGNED,
+                ContractRequestStatus.ACTIVE,
+                ContractRequestStatus.ARCHIVED,
+                ContractRequestStatus.CANCELLED,
+                ContractRequestStatus.REDIRECTED_PAYFIT,
+            )
+        ),
+        None,
+    )
+
+    return SupplierLookupResponse(
+        exists=True,
+        third_party_id=third_party.id,
+        company_name=third_party.company_name,
+        siren=third_party.siren or siren,
+        compliance_status=third_party.compliance_status.value,
+        has_framework_contract=framework is not None,
+        framework_contract_id=framework.id if framework else None,
+        framework_contract_reference=framework.display_reference if framework else None,
+        open_contract_request_id=open_cr.id if open_cr else None,
+        open_contract_request_status=open_cr.status.value if open_cr else None,
+    )
+
+
+@router.post(
+    "/suppliers",
+    response_model=ContractRequestResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Ouvrir un dossier de contractualisation fournisseur (contrat cadre)",
+)
+async def create_supplier_dossier(
+    body: SupplierDossierCreate,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Ouvre un contrat cadre sans consultant ni positionnement.
+
+    L'ADV saisit le type de tiers, le contact et le mode de collecte : la
+    demande part directement en collecte de documents (portail magic link), ou
+    en revue de conformité si le dépôt est ignoré. ADV/admin uniquement.
+    """
+    from sqlalchemy import select as _select
+
+    settings = get_settings()
+    cr_repo = ContractRequestRepository(db)
+    tp_repo = ThirdPartyRepository(db)
+    ml_repo = MagicLinkRepository(db)
+    doc_repo = DocumentRepository(db)
+
+    from app.infrastructure.email.sender import EmailService
+
+    email_service = EmailService(settings)
+    generate_magic_link_uc = GenerateMagicLinkUseCase(
+        third_party_repository=tp_repo,
+        magic_link_repository=ml_repo,
+        email_service=email_service,
+        portal_base_url=settings.BOBBY_PORTAL_BASE_URL,
+    )
+    request_documents_uc = RequestDocumentsUseCase(
+        third_party_repository=tp_repo,
+        document_repository=doc_repo,
+    )
+    validate_commercial_uc = ValidateCommercialUseCase(
+        contract_request_repository=cr_repo,
+        third_party_repository=tp_repo,
+        find_or_create_third_party_use_case=None,
+        generate_magic_link_use_case=generate_magic_link_uc,
+        request_documents_use_case=request_documents_uc,
+        document_repository=doc_repo,
+    )
+
+    creator_email = ""
+    row = (await db.execute(_select(UserModel.email).where(UserModel.id == user_id))).first()
+    if row and row[0]:
+        creator_email = str(row[0])
+
+    company_email_from, company_name = await _resolve_company_email_ctx(db, body.company_id)
+
+    use_case = CreateSupplierDossierUseCase(
+        contract_request_repository=cr_repo,
+        third_party_repository=tp_repo,
+        validate_commercial_use_case=validate_commercial_uc,
+    )
+
+    try:
+        cr = await use_case.execute(
+            SupplierDossierCommand(
+                third_party_type=body.third_party_type,
+                contact_email=str(body.contact_email),
+                company_id=body.company_id,
+                siret=body.siret,
+                commercial_email=creator_email,
+                notify_third_party=body.notify_third_party,
+                skip_documents=body.skip_documents,
+                reuse_third_party_id=body.reuse_third_party_id,
+                from_email=company_email_from,
+                company_name=company_name,
+            )
+        )
+    except Exception as exc:
+        await db.rollback()
+        logger.error("supplier_dossier_creation_failed", error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La création du dossier fournisseur a échoué.",
+        )
+
+    await db.commit()
+
+    audit_logger.log(
+        AuditAction.CONTRACT_REQUEST_CREATED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(cr.id),
+        details={
+            "source": "supplier_manual",
+            "reference": cr.display_reference,
+            "notify_third_party": body.notify_third_party,
+            "skip_documents": body.skip_documents,
         },
     )
 
