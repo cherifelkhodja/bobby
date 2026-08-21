@@ -101,7 +101,7 @@ class CreatePurchaseOrderFromPositioningUseCase:
             reference=reference,
             company_id=company_id,
             boond_positioning_id=positioning_id,
-            boond_need_id=positioning.get("need_id"),
+            boond_need_id=positioning.get("need_id") or delivery.get("need_id"),
             boond_delivery_id=positioning.get("delivery_id"),
             boond_consultant_id=positioning.get("candidate_id"),
             boond_consultant_type=positioning.get("consultant_type"),
@@ -114,8 +114,10 @@ class CreatePurchaseOrderFromPositioningUseCase:
             or None,
             consultant_email=consultant.get("email"),
             consultant_phone=consultant.get("phone"),
-            client_name=need.get("client_name") or None,
-            mission_title=need.get("title") or None,
+            # Le client de la prestation est celui de la mission gagnée : il
+            # prime sur celui du besoin, qui peut avoir évolué depuis.
+            client_name=delivery.get("client_name") or need.get("client_name") or None,
+            mission_title=need.get("title") or delivery.get("title") or None,
             mission_description=need.get("description") or None,
             # La prestation prime sur le positionnement quand elle existe :
             # elle seule connaît les jours de gratuité et le prix de vente.

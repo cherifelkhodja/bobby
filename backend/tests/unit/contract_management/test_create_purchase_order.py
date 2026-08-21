@@ -46,6 +46,10 @@ DELIVERY = {
     "free_days": 2,
     "resource_id": 42,
     "project_id": 18,
+    "client_id": 33,
+    "client_name": "Pierre et Vacances SA",
+    "need_id": 19,
+    "main_manager_id": 2,
     "contract_id": 264,
     "purchase_id": None,
 }
@@ -309,6 +313,30 @@ class TestDeliveryPrefill:
 
         assert po.boond_delivery_id == 797
         assert po.boond_contract_id == 264
+
+    @pytest.mark.asyncio
+    async def test_the_delivery_client_wins_over_the_need(self):
+        """Le client de la prestation est celui de la mission réellement gagnée."""
+        use_case, _, _, _ = _make_use_case(
+            positioning={**POSITIONING, "delivery_id": 797}, delivery=DELIVERY
+        )
+
+        po = await use_case.execute(41)
+
+        assert po.client_name == "Pierre et Vacances SA"
+
+    @pytest.mark.asyncio
+    async def test_the_delivery_supplies_the_need_when_the_positioning_has_none(self):
+        """Le projet de la prestation porte le besoin."""
+        use_case, _, _, _ = _make_use_case(
+            positioning={**POSITIONING, "need_id": None, "delivery_id": 797},
+            delivery=DELIVERY,
+            need=None,
+        )
+
+        po = await use_case.execute(41)
+
+        assert po.boond_need_id == 19
 
     @pytest.mark.asyncio
     async def test_an_unreadable_delivery_falls_back_to_the_positioning(self):

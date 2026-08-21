@@ -147,6 +147,16 @@ class BoondCrmAdapter:
             data = response.get("data", {})
             attributes = data.get("attributes", {})
             relationships = data.get("relationships", {})
+            included = response.get("included", [])
+
+            # Le projet de la prestation porte le client final, le besoin et le
+            # commercial. Les trois sont dans `included` : les lire ici évite
+            # trois appels et reste juste même quand le besoin n'est plus lisible.
+            project_id = self._extract_relationship_id(relationships, "project")
+            project = self._find_included(included, "project", project_id)
+            project_rels = project.get("relationships", {}) if project else {}
+            client_id = self._extract_relationship_id(project_rels, "company")
+            client = self._find_included(included, "company", client_id)
 
             return {
                 "id": delivery_id,
@@ -163,7 +173,11 @@ class BoondCrmAdapter:
                 "days_sold": attributes.get("numberOfDaysInvoicedOrQuantity"),
                 "free_days": attributes.get("numberOfDaysFree"),
                 "resource_id": self._extract_relationship_id(relationships, "dependsOn"),
-                "project_id": self._extract_relationship_id(relationships, "project"),
+                "project_id": project_id,
+                "client_id": client_id,
+                "client_name": (client.get("attributes", {}).get("name") if client else None),
+                "need_id": self._extract_relationship_id(project_rels, "opportunity"),
+                "main_manager_id": self._extract_relationship_id(project_rels, "mainManager"),
                 # Contrat déjà rattaché à la prestation : sa présence évite d'en
                 # créer un second sur la même ressource.
                 "contract_id": self._extract_relationship_id(relationships, "contract"),
@@ -950,6 +964,21 @@ class BoondCrmAdapter:
             company_id=company_id,
             iban_last4=clean_iban[-4:] if len(clean_iban) >= 4 else "****",
         )
+
+    @staticmethod
+    def _find_included(included: list, entity_type: str, entity_id: object) -> dict | None:
+        """Retrouve une entité du bloc `included` par type et identifiant.
+
+        Boond renvoie les identifiants en chaîne dans `included` et parfois en
+        entier dans les relations : la comparaison se fait donc sur le texte.
+        """
+        if entity_id is None:
+            return None
+        wanted = str(entity_id)
+        for entry in included:
+            if entry.get("type") == entity_type and str(entry.get("id", "")) == wanted:
+                return entry
+        return None
 
     @staticmethod
     def _extract_relationship_id(relationships: dict, key: str) -> int | None:
