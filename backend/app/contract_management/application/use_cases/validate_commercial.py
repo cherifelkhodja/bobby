@@ -4,6 +4,9 @@ from uuid import UUID
 
 import structlog
 
+from app.contract_management.application.use_cases.skip_document_collection import (
+    purge_untouched_documents,
+)
 from app.contract_management.domain.exceptions import ContractRequestNotFoundError
 from app.contract_management.domain.value_objects.contract_request_status import (
     ContractRequestStatus,
@@ -13,6 +16,20 @@ from app.third_party.domain.value_objects.magic_link_purpose import MagicLinkPur
 from app.third_party.domain.value_objects.third_party_type import ThirdPartyType
 
 logger = structlog.get_logger()
+
+SKIP_DOCUMENTS_REASON = (
+    "Dépôt des documents de vigilance ignoré à la validation commerciale "
+    "(saisie manuelle ADV, fournisseur non sollicité)."
+)
+
+# Statuts atteints par la validation commerciale sur lesquels un saut de collecte
+# a du sens (le type « salarié » part en PayFit et n'est jamais concerné).
+_SKIPPABLE_STATUSES = frozenset(
+    {
+        ContractRequestStatus.COLLECTING_DOCUMENTS,
+        ContractRequestStatus.REVIEWING_COMPLIANCE,
+    }
+)
 
 
 class ValidateCommercialCommand:
@@ -36,6 +53,7 @@ class ValidateCommercialCommand:
         consultant_email: str | None = None,
         consultant_phone: str | None = None,
         notify_third_party: bool = True,
+        skip_documents: bool = False,
     ) -> None:
         self.contract_request_id = contract_request_id
         self.third_party_type = third_party_type
@@ -49,6 +67,10 @@ class ValidateCommercialCommand:
         # When False, the tiers is NOT emailed a collection link: the ADV will
         # enter the company identity, contacts and documents manually.
         self.notify_third_party = notify_third_party
+        # When True, no vigilance document is collected at all: the request goes
+        # straight to compliance review with a traced override (saisie en
+        # personne). Only meaningful together with notify_third_party=False.
+        self.skip_documents = skip_documents
         self.from_email: str | None = None
         self.company_name: str | None = None
 
@@ -137,6 +159,18 @@ class ValidateCommercialUseCase:
         elif self._generate_magic_link_uc and self._request_documents_uc:
             # Standard flow: create stub ThirdParty, request docs, send magic link
             cr = await self._initiate_document_collection(cr, command)
+
+        # Saisie « en personne » sans vigilance documentaire : la collecte est
+        # sautée dès la validation (dérogation tracée + passage en revue de
+        # conformité), et les éventuels emplacements hérités sont purgés.
+        if command.skip_documents and cr.status in _SKIPPABLE_STATUSES:
+            cr.skip_document_collection(SKIP_DOCUMENTS_REASON)
+            purged = await purge_untouched_documents(self._doc_repo, cr.third_party_id)
+            logger.info(
+                "commercial_validated_documents_skipped",
+                cr_id=str(cr.id),
+                documents_purged=purged,
+            )
 
         saved = await self._cr_repo.save(cr)
 

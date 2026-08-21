@@ -783,6 +783,10 @@ export interface ContractRequest {
   third_party_name: string | null;
   portal_url: string | null;
   compliance_override: boolean;
+  /** Justification de la dérogation, ou motif de blocage si compliance_override est false. */
+  compliance_override_reason: string | null;
+  /** Dépôt des documents de vigilance volontairement ignoré (saisie manuelle ADV). */
+  documents_skipped: boolean;
   company_id: string | null;
   contract_config: Record<string, unknown> | null;
   status_history: Array<{ status: ContractRequestStatus; entered_at: string; comment?: string }>;

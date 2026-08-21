@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class ContractRequestResponse(BaseModel):
@@ -46,6 +46,8 @@ class ContractRequestResponse(BaseModel):
     third_party_name: str | None = None
     portal_url: str | None = None
     compliance_override: bool
+    compliance_override_reason: str | None = None
+    documents_skipped: bool = False
     company_id: UUID | None = None
     contract_config: dict | None = None
     status_history: list[dict] = []
@@ -86,6 +88,29 @@ class CommercialValidationRequest(BaseModel):
             "manuelle par l'ADV, sans solliciter le fournisseur."
         ),
     )
+    skip_documents: bool = Field(
+        False,
+        description=(
+            "Ignorer le dépôt des documents de vigilance (saisie en personne). "
+            "La demande passe directement en revue de conformité avec une "
+            "dérogation tracée. Nécessite notify_third_party=False."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _check_skip_documents(self) -> "CommercialValidationRequest":
+        """Interdire de sauter la collecte tout en sollicitant le fournisseur.
+
+        Sauter le dépôt n'a de sens qu'en saisie manuelle : envoyer un lien de
+        collecte à un tiers dont les documents ne seront jamais attendus serait
+        incohérent côté fournisseur.
+        """
+        if self.skip_documents and self.notify_third_party:
+            raise ValueError(
+                "Le dépôt des documents ne peut être ignoré qu'en saisie manuelle "
+                "(notify_third_party=False)."
+            )
+        return self
 
 
 class ManualContractRequestCreate(BaseModel):
@@ -207,6 +232,20 @@ class ComplianceOverrideRequest(BaseModel):
     """Request to override compliance check."""
 
     reason: str = Field(..., min_length=10, max_length=500)
+
+
+class SkipDocumentsRequest(BaseModel):
+    """Request to skip (or restore) the vigilance document collection."""
+
+    reason: str | None = Field(
+        None,
+        max_length=500,
+        description=("Justification tracée du saut de collecte. Ignorée quand restore=True."),
+    )
+    restore: bool = Field(
+        False,
+        description="True pour rétablir le dépôt des documents précédemment ignoré.",
+    )
 
 
 class CustomArticleItem(BaseModel):

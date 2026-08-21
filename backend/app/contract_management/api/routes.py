@@ -19,12 +19,16 @@ from app.contract_management.api.schemas import (
     ContractRequestResponse,
     ContractResponse,
     ManualContractRequestCreate,
+    SkipDocumentsRequest,
 )
 from app.contract_management.application.use_cases.block_compliance import (
     BlockComplianceUseCase,
 )
 from app.contract_management.application.use_cases.configure_contract import (
     ConfigureContractUseCase,
+)
+from app.contract_management.application.use_cases.skip_document_collection import (
+    SkipDocumentCollectionUseCase,
 )
 from app.contract_management.application.use_cases.start_compliance_review import (
     StartComplianceReviewUseCase,
@@ -192,6 +196,8 @@ def _cr_to_response(
         third_party_name=third_party_name,
         portal_url=portal_url,
         compliance_override=cr.compliance_override,
+        compliance_override_reason=cr.compliance_override_reason,
+        documents_skipped=cr.documents_skipped,
         company_id=cr.company_id,
         contract_config=cr.contract_config,
         status_history=cr.status_history or [],
@@ -633,6 +639,7 @@ async def validate_commercial(
             consultant_email=body.consultant_email,
             consultant_phone=body.consultant_phone,
             notify_third_party=body.notify_third_party,
+            skip_documents=body.skip_documents,
         )
         cmd.from_email = company_email_from
         cmd.company_name = company_name
@@ -649,7 +656,21 @@ async def validate_commercial(
     )
 
     client_label = f" pour <strong>{cr.client_name}</strong>" if cr.client_name else ""
-    if cr.status == ContractRequestStatus.COLLECTING_DOCUMENTS:
+    if cr.documents_skipped:
+        await _notify_commercial(
+            email_service,
+            to=cr.commercial_email,
+            ref=cr.display_reference,
+            title="Dossier saisi en interne",
+            msg=(
+                f"Votre validation commerciale a été enregistrée{client_label}. "
+                "Le dossier est saisi en interne (ADV) et le dépôt des documents "
+                "de vigilance a été ignoré : le fournisseur n'est pas sollicité."
+            ),
+            from_email=company_email_from,
+            company_name=company_name,
+        )
+    elif cr.status == ContractRequestStatus.COLLECTING_DOCUMENTS:
         if body.notify_third_party:
             collection_msg = (
                 f"Votre validation commerciale a été enregistrée{client_label}. "
@@ -752,16 +773,19 @@ async def save_third_party_info(
     await tp_repo.save(tp)
 
     # Create vigilance document slots based on entity_category (idempotent) so the
-    # ADV can upload the legal documents from the contract page.
-    doc_repo = DocumentRepository(db)
-    request_documents_uc = RequestDocumentsUseCase(
-        third_party_repository=tp_repo,
-        document_repository=doc_repo,
-    )
-    try:
-        await request_documents_uc.execute(tp.id, entity_category=body.entity_category)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    # ADV can upload the legal documents from the contract page. Skipped when the
+    # ADV explicitly opted out of the document collection (saisie en personne) —
+    # sinon la saisie du tiers recréerait la collecte qu'on vient d'ignorer.
+    if not cr.documents_skipped:
+        doc_repo = DocumentRepository(db)
+        request_documents_uc = RequestDocumentsUseCase(
+            third_party_repository=tp_repo,
+            document_repository=doc_repo,
+        )
+        try:
+            await request_documents_uc.execute(tp.id, entity_category=body.entity_category)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
 
     saved = await cr_repo.save(cr)
     await db.commit()
@@ -829,6 +853,15 @@ async def resend_collection_email(
         raise HTTPException(
             status_code=400,
             detail="Le renvoi du lien n'est possible qu'en cours de collecte, vérification ou en conformité bloquée.",
+        )
+
+    if cr.documents_skipped:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Le dépôt des documents a été ignoré pour cette demande. "
+                "Rétablissez la collecte avant de solliciter le tiers."
+            ),
         )
 
     if not cr.third_party_id or not cr.contractualization_contact_email:
@@ -1002,6 +1035,86 @@ async def compliance_override(
 
     name = await _resolve_commercial_name(db, saved.commercial_email)
     return _cr_to_response(saved, commercial_name=name)
+
+
+@router.post(
+    "/{contract_request_id}/skip-documents",
+    response_model=ContractRequestResponse,
+    summary="Skip (or restore) the vigilance document collection",
+)
+async def skip_documents(
+    contract_request_id: UUID,
+    body: SkipDocumentsRequest,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Ignorer le dépôt des documents de vigilance. ADV/admin uniquement.
+
+    Prévu pour la saisie « en personne » : l'ADV renseigne le dossier lui-même,
+    sans passer par le fournisseur, et la vigilance documentaire est traitée hors
+    Bobby. La demande est marquée sans collecte, la conformité est levée par
+    dérogation tracée et le brouillon devient générable immédiatement.
+
+    `restore=true` fait le chemin inverse : la dérogation est annulée et les
+    emplacements de documents sont recréés (si l'identité du tiers est connue).
+    """
+    cr_repo = ContractRequestRepository(db)
+    tp_repo = ThirdPartyRepository(db)
+    doc_repo = DocumentRepository(db)
+    request_documents_uc = RequestDocumentsUseCase(
+        third_party_repository=tp_repo,
+        document_repository=doc_repo,
+    )
+    use_case = SkipDocumentCollectionUseCase(
+        contract_request_repository=cr_repo,
+        document_repository=doc_repo,
+        third_party_repository=tp_repo,
+        request_documents_use_case=request_documents_uc,
+    )
+
+    try:
+        cr = await use_case.execute(
+            contract_request_id,
+            reason=body.reason,
+            restore=body.restore,
+        )
+    except ContractRequestNotFoundError:
+        raise HTTPException(status_code=404, detail="Demande de contrat non trouvée.")
+    except InvalidContractStatusError as exc:
+        logger.warning(
+            "skip_documents_invalid_status",
+            error=str(exc),
+            cr_id=str(contract_request_id),
+        )
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Le statut actuel de la demande ne permet plus de modifier la "
+                "collecte des documents de vigilance."
+            ),
+        )
+    except Exception as exc:
+        logger.error("skip_documents_failed", error=str(exc), cr_id=str(contract_request_id))
+        raise HTTPException(
+            status_code=400,
+            detail="La modification de la collecte des documents a échoué.",
+        )
+
+    await db.commit()
+
+    audit_logger.log(
+        AuditAction.COMPLIANCE_OVERRIDDEN,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(contract_request_id),
+        details={
+            "action": "restore_document_collection" if body.restore else "skip_document_collection",
+            "reason": body.reason,
+        },
+    )
+
+    name = await _resolve_commercial_name(db, cr.commercial_email)
+    return _cr_to_response(cr, commercial_name=name)
 
 
 @router.post(
