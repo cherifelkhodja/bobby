@@ -36,9 +36,6 @@ from app.contract_management.domain.exceptions import (
     PurchaseOrderNotEditableError,
     PurchaseOrderNotFoundError,
 )
-from app.contract_management.domain.value_objects.contract_request_status import (
-    ContractRequestStatus,
-)
 from app.contract_management.domain.value_objects.purchase_order_status import (
     PurchaseOrderStatus,
 )
@@ -55,17 +52,6 @@ from app.third_party.infrastructure.models import ThirdPartyModel
 logger = structlog.get_logger()
 
 router = APIRouter(tags=["Purchase Orders"])
-
-# Un cadre est en vigueur dès qu'il a été signé — ARCHIVED compris, un dossier
-# archivé par le CRON restant un contrat bel et bien signé.
-_SIGNED_FRAMEWORK_STATUSES = frozenset(
-    {
-        ContractRequestStatus.SIGNED,
-        ContractRequestStatus.ACTIVE,
-        ContractRequestStatus.ARCHIVED,
-    }
-)
-
 
 # Dépôt du document signé : mêmes garde-fous que le portail tiers.
 ALLOWED_SIGNED_EXTENSIONS = frozenset({"pdf", "png", "jpg", "jpeg"})
@@ -84,7 +70,7 @@ def _po_to_response(
     framework=None,
 ) -> PurchaseOrderResponse:
     """Convert a PurchaseOrder entity to its API response."""
-    framework_signed = bool(framework and framework.status in _SIGNED_FRAMEWORK_STATUSES)
+    framework_signed = po.is_covered_by(framework)
     return PurchaseOrderResponse(
         id=po.id,
         reference=po.reference,
@@ -561,10 +547,9 @@ async def send_purchase_order_for_signature(
         )
 
     framework = await _load_framework(cr_repo, po)
-    framework_signed = bool(framework and framework.status in _SIGNED_FRAMEWORK_STATUSES)
 
     try:
-        po.send_for_signature(framework_contract_signed=framework_signed)
+        po.send_for_signature(framework_contract_signed=po.is_covered_by(framework))
     except FrameworkContractNotSignedError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     except InvalidPurchaseOrderStatusError as exc:

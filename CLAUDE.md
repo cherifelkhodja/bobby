@@ -463,7 +463,7 @@ nouveau → en_cours → entretien → accepté
 - `GET /` - List contract requests (commercial: own, adv/admin: all)
 - `POST /manual` - Create a contract request from scratch, entering the Boond consultant ID + type candidate/resource (ADV/admin, no webhook)
 - `POST /suppliers` - Open a supplier dossier with no consultant: type, contact, issuing company and collection mode entered up front (ADV/admin)
-- `GET /suppliers/lookup?siret=` - Find an existing supplier by SIRET before creating a duplicate (ADV/admin)
+- `GET /suppliers/lookup?siret=&company_id=` - Find an existing supplier by SIRET before creating a duplicate; the framework contract answer is scoped to the issuing company (ADV/admin)
 - `GET /next-reference` - Get next contract request reference
 - `GET /siret-lookup/{siret}` - SIRET auto-fill INSEE+INPI for ADV manual entry (ADV/admin)
 - `GET /{id}` - Get contract request detail

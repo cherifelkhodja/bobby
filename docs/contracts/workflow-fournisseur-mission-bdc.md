@@ -30,11 +30,16 @@ push Boond restent tels quels. Le BDC s'ajoute à côté.
 
 ### Ce qui existe et ne bouge pas
 
-- `tp_third_parties` — le fournisseur (identité + contacts + conformité).
+- `tp_third_parties` — le fournisseur (identité + contacts + conformité). **Une seule
+  fiche par société**, quelle que soit la société émettrice : l'identité légale et les
+  documents de vigilance sont les mêmes pour tout le groupe.
 - `vig_documents` — la vigilance documentaire, rattachée au fournisseur.
-- `cm_contract_requests` + `cm_contracts` — **le contrat cadre**. Un fournisseur a un
-  cadre actif dès qu'une demande liée à son `third_party_id` est en `signed` ou `active`.
-  Pas de table `framework_contracts` séparée : le cadre *est* la demande signée.
+- `cm_contract_requests` + `cm_contracts` — **le contrat cadre**, propre au couple
+  **fournisseur × société émettrice**. Un fournisseur sous contrat avec l'une des
+  sociétés du groupe doit en signer un autre pour travailler avec une seconde : la
+  recherche d'un cadre en vigueur est donc toujours bornée par `company_id`. Pas de
+  table `framework_contracts` séparée : le cadre *est* la demande signée.
+  Les dossiers antérieurs au multi-sociétés, sans `company_id`, servent de repli.
 - `cm_charter_templates`, `cm_signature_uploads` — chartes et circuit de signature.
 
 ### Nouvelle table : `cm_purchase_orders` (le BDC)
@@ -100,7 +105,8 @@ draft ──> generated ──> sent_for_signature ──> signed ──> active
 | `cancelled` | Annulé avant signature |
 
 **Garde de signature** : `generated → sent_for_signature` est refusé tant que le
-contrat cadre du fournisseur n'est pas `signed` ou `active`. Le BDC reste
+fournisseur n'a pas de contrat cadre signé **avec la société émettrice du bon de
+commande** (`PurchaseOrder.is_covered_by`). Le BDC reste
 préparable pendant la contractualisation du cadre ; l'écran affiche « Contrat cadre
 en cours — envoi possible dès sa signature ».
 
@@ -108,14 +114,17 @@ en cours — envoi possible dès sa signature ».
 
 ## Flux A — Création d'un fournisseur
 
-1. **Nouveau fournisseur** (ADV/admin). Saisie : SIRET (auto-remplissage INSEE + INPI
-   via `GET /contract-requests/siret-lookup/{siret}`), type de tiers, société
-   émettrice, email de contact, et **choix du mode de collecte dès cet écran** :
+1. **Nouveau fournisseur** (ADV/admin). Saisie : **société émettrice d'abord** — elle
+   détermine le cadre recherché —, SIRET (auto-remplissage INSEE + INPI via
+   `GET /contract-requests/siret-lookup/{siret}`), type de tiers, email de contact, et
+   **choix du mode de collecte dès cet écran** :
    - « Le fournisseur remplit via le portail » → magic link, dépôt des documents ;
    - « Je saisis en personne » → l'ADV renseigne l'identité et dépose les documents
      (mécanique `notify_third_party=false` / `skip_documents` existante).
-2. **Contrôle SIREN** : si un tiers porte déjà ce SIREN, Bobby propose de reprendre
-   la fiche existante au lieu d'en créer une seconde (correction des doublons actuels).
+2. **Contrôle SIREN** : si un tiers porte déjà ce SIREN, Bobby reprend la fiche
+   existante au lieu d'en créer une seconde (correction des doublons actuels) et dit
+   où en est sa contractualisation **avec la société sélectionnée** : cadre signé,
+   cadres signés avec d'autres sociétés du groupe, ou aucun.
 3. La suite est le workflow cadre actuel, inchangé : collecte → conformité →
    brouillon → revue partenaire (ou validation interne) → signature → push Boond
    (société fournisseur + contacts + chartes partenaire).

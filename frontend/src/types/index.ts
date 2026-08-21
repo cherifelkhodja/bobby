@@ -1131,6 +1131,19 @@ export interface PurchaseOrderListResponse {
   limit: number;
 }
 
+export interface SupplierFrameworkSummary {
+  contract_request_id: string;
+  reference: string;
+  status: ContractRequestStatus;
+  issuer_company_id: string | null;
+  issuer_company_name: string | null;
+}
+
+/**
+ * Un contrat cadre lie le fournisseur à UNE société émettrice.
+ * `has_framework_contract` répond pour la société interrogée ;
+ * `framework_contracts` liste ceux qu'il a avec les autres sociétés du groupe.
+ */
 export interface SupplierLookupResult {
   exists: boolean;
   third_party_id: string | null;
@@ -1140,6 +1153,7 @@ export interface SupplierLookupResult {
   has_framework_contract: boolean;
   framework_contract_id: string | null;
   framework_contract_reference: string | null;
+  framework_contracts: SupplierFrameworkSummary[];
   open_contract_request_id: string | null;
   open_contract_request_status: ContractRequestStatus | null;
 }

@@ -67,27 +67,67 @@ class TestSupplierAttachment:
     @pytest.mark.asyncio
     async def test_attaches_the_signed_framework_contract(self):
         """Le cadre signé du fournisseur devient le cadre du bon de commande."""
-        po = _make_po()
+        company_id = uuid4()
+        po = _make_po(company_id=company_id)
         framework = ContractRequest(
             provisional_reference="PROV-2026-001",
             status=ContractRequestStatus.ACTIVE,
+            company_id=company_id,
         )
         use_case, _, cr_repo = _make_use_case(po, framework=framework)
         tp_id = uuid4()
 
         result = await use_case.execute(_command(po, third_party_id=tp_id))
 
-        cr_repo.get_framework_contract_for_third_party.assert_awaited_once_with(tp_id)
+        # La recherche est bornée à la société émettrice du bon de commande :
+        # un cadre signé avec une autre société du groupe ne le couvre pas.
+        cr_repo.get_framework_contract_for_third_party.assert_awaited_once_with(tp_id, company_id)
         assert result.third_party_id == tp_id
         assert result.contract_request_id == framework.id
 
     @pytest.mark.asyncio
+    async def test_changing_the_issuing_company_reattaches_the_framework(self):
+        """Changer de société émettrice peut rendre le rattachement caduc."""
+        po = _make_po(company_id=uuid4(), third_party_id=uuid4())
+        framework = ContractRequest(
+            provisional_reference="PROV-2026-004",
+            status=ContractRequestStatus.ACTIVE,
+        )
+        use_case, _, cr_repo = _make_use_case(po, framework=framework)
+        new_company = uuid4()
+
+        result = await use_case.execute(_command(po, company_id=new_company))
+
+        cr_repo.get_framework_contract_for_third_party.assert_awaited_once_with(
+            po.third_party_id, new_company
+        )
+        assert result.contract_request_id == framework.id
+
+    @pytest.mark.asyncio
+    async def test_a_dossier_of_another_company_is_not_attached(self):
+        """Un dossier en cours chez une autre société ne sert pas de repli."""
+        company_id = uuid4()
+        po = _make_po(company_id=company_id)
+        other_company_dossier = ContractRequest(
+            provisional_reference="PROV-2026-005",
+            status=ContractRequestStatus.COLLECTING_DOCUMENTS,
+            company_id=uuid4(),
+        )
+        use_case, _, _ = _make_use_case(po, framework=None, other_requests=[other_company_dossier])
+
+        result = await use_case.execute(_command(po, third_party_id=uuid4()))
+
+        assert result.contract_request_id is None
+
+    @pytest.mark.asyncio
     async def test_falls_back_to_the_dossier_in_progress(self):
         """Sans cadre signé, le dossier en cours est rattaché quand même."""
-        po = _make_po()
+        company_id = uuid4()
+        po = _make_po(company_id=company_id)
         in_progress = ContractRequest(
             provisional_reference="PROV-2026-002",
             status=ContractRequestStatus.COLLECTING_DOCUMENTS,
+            company_id=company_id,
         )
         use_case, _, _ = _make_use_case(po, framework=None, other_requests=[in_progress])
 

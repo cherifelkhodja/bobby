@@ -179,8 +179,24 @@ class SupplierDossierCreate(BaseModel):
         return self
 
 
+class SupplierFrameworkSummary(BaseModel):
+    """Un contrat cadre signé d'un fournisseur, avec la société qui l'a émis."""
+
+    contract_request_id: UUID
+    reference: str
+    status: str
+    issuer_company_id: UUID | None = None
+    issuer_company_name: str | None = None
+
+
 class SupplierLookupResponse(BaseModel):
-    """Résultat de la recherche d'un fournisseur par SIRET."""
+    """Résultat de la recherche d'un fournisseur par SIRET.
+
+    Un contrat cadre lie le fournisseur à **une** société émettrice : les
+    champs `has_framework_contract` et `framework_contract_*` répondent pour la
+    société interrogée, tandis que `framework_contracts` liste tous ses cadres,
+    toutes sociétés du groupe confondues.
+    """
 
     exists: bool
     third_party_id: UUID | None = None
@@ -190,6 +206,7 @@ class SupplierLookupResponse(BaseModel):
     has_framework_contract: bool = False
     framework_contract_id: UUID | None = None
     framework_contract_reference: str | None = None
+    framework_contracts: list[SupplierFrameworkSummary] = []
     open_contract_request_id: UUID | None = None
     open_contract_request_status: str | None = None
 

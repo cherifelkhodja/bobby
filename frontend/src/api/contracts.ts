@@ -55,11 +55,20 @@ export const contractsApi = {
     return response.data;
   },
 
-  /** Recherche un fournisseur par SIRET avant d'ouvrir un dossier. */
-  lookupSupplier: async (siret: string): Promise<SupplierLookupResult> => {
+  /**
+   * Recherche un fournisseur par SIRET avant d'ouvrir un dossier.
+   *
+   * `companyId` cible la société émettrice : le contrat cadre étant propre au
+   * couple fournisseur + société, un cadre signé avec l'une ne dispense pas
+   * d'en signer un avec l'autre.
+   */
+  lookupSupplier: async (
+    siret: string,
+    companyId?: string | null,
+  ): Promise<SupplierLookupResult> => {
     const response = await apiClient.get<SupplierLookupResult>(
       '/contract-requests/suppliers/lookup',
-      { params: { siret } },
+      { params: { siret, ...(companyId ? { company_id: companyId } : {}) } },
     );
     return response.data;
   },

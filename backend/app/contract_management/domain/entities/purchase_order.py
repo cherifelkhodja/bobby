@@ -11,6 +11,9 @@ from app.contract_management.domain.exceptions import (
     InvalidPurchaseOrderStatusError,
     PurchaseOrderIncompleteError,
 )
+from app.contract_management.domain.value_objects.contract_request_status import (
+    ContractRequestStatus,
+)
 from app.contract_management.domain.value_objects.purchase_order_status import (
     PurchaseOrderStatus,
 )
@@ -182,6 +185,29 @@ class PurchaseOrder:
     def is_complete(self) -> bool:
         """Le BDC a-t-il tout ce qu'il faut pour être généré ?"""
         return not self.missing_fields
+
+    def is_covered_by(self, framework) -> bool:
+        """Le contrat cadre passé en argument couvre-t-il ce bon de commande ?
+
+        Deux conditions : le cadre doit être signé, et **émis par la même
+        société**. Un cadre signé avec une société du groupe n'autorise pas une
+        mission émise par une autre — le fournisseur doit en signer un avec
+        chacune. Un dossier antérieur à la gestion multi-sociétés n'en porte
+        pas : il reste accepté, pour ne pas bloquer l'historique.
+
+        Args:
+            framework: la demande de contrat cadre rattachée, ou ``None``.
+        """
+        signed = {
+            ContractRequestStatus.SIGNED,
+            ContractRequestStatus.ACTIVE,
+            ContractRequestStatus.ARCHIVED,
+        }
+        if framework is None or framework.status not in signed:
+            return False
+        if self.company_id is None or framework.company_id is None:
+            return True
+        return framework.company_id == self.company_id
 
     # ── Machine à états ───────────────────────────────────────────────────
 

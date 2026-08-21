@@ -119,7 +119,8 @@ export function ContractManagement() {
   });
 
   const lookupSupplierMutation = useMutation({
-    mutationFn: (siret: string) => contractsApi.lookupSupplier(siret),
+    mutationFn: (siret: string) =>
+      contractsApi.lookupSupplier(siret, supplierForm.company_id || null),
     onSuccess: (result) => {
       setSupplierLookup(result);
       if (result.exists && result.third_party_id) {
@@ -227,6 +228,14 @@ export function ContractManagement() {
   const paged = filtered.slice(page * pageSize, page * pageSize + pageSize);
 
   const gridCols = 'grid-cols-[72px_1.5fr_110px_90px_90px_210px_60px]';
+
+  const selectedCompanyName =
+    companies.find((c) => c.id === supplierForm.company_id)?.name ?? 'cette société';
+  // Cadres signés avec les AUTRES sociétés du groupe : ils n'autorisent rien
+  // ici, mais disent à l'ADV que le fournisseur est déjà connu contractuellement.
+  const otherCompanyFrameworks = (supplierLookup?.framework_contracts ?? []).filter(
+    (f) => f.issuer_company_id !== supplierForm.company_id,
+  );
 
   return (
     <div>
@@ -585,6 +594,31 @@ export function ContractManagement() {
           </p>
 
           <div>
+            <label className="f-lab">Société émettrice *</label>
+            <select
+              value={supplierForm.company_id}
+              onChange={(e) => {
+                setSupplierForm((f) => ({ ...f, company_id: e.target.value }));
+                setSupplierLookup(null);
+              }}
+              className="f-in !px-2.5"
+            >
+              <option value="">Sélectionner…</option>
+              {companies
+                .filter((c) => c.is_active)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.code})
+                  </option>
+                ))}
+            </select>
+            <p className="f-hint">
+              Le contrat cadre lie le fournisseur à cette société : un contrat signé avec
+              l'une du groupe ne couvre pas les missions émises par une autre.
+            </p>
+          </div>
+
+          <div>
             <label className="f-lab">SIRET du fournisseur</label>
             <div className="flex gap-2">
               <input
@@ -603,6 +637,7 @@ export function ContractManagement() {
                 variant="secondary"
                 onClick={() => lookupSupplierMutation.mutate(supplierForm.siret.trim())}
                 disabled={
+                  !supplierForm.company_id ||
                   supplierForm.siret.replace(/\D/g, '').length < 9 ||
                   lookupSupplierMutation.isPending
                 }
@@ -617,13 +652,29 @@ export function ContractManagement() {
           </div>
 
           {supplierLookup && (
-            <div className={`alert ${supplierLookup.has_framework_contract ? '' : ''}`}>
+            <div className="alert">
               {supplierLookup.exists ? (
                 <span>
-                  <b>{supplierLookup.company_name ?? 'Fournisseur connu'}</b> est déjà au panel
-                  {supplierLookup.has_framework_contract
-                    ? ` avec un contrat cadre signé (${supplierLookup.framework_contract_reference}).`
-                    : '.'}
+                  <b>{supplierLookup.company_name ?? 'Fournisseur connu'}</b> est déjà au panel.{' '}
+                  {supplierLookup.has_framework_contract ? (
+                    <>
+                      Contrat cadre signé avec <b>{selectedCompanyName}</b> (
+                      {supplierLookup.framework_contract_reference}).
+                    </>
+                  ) : otherCompanyFrameworks.length > 0 ? (
+                    <>
+                      Sous contrat avec{' '}
+                      <b>
+                        {otherCompanyFrameworks
+                          .map((f) => f.issuer_company_name ?? f.reference)
+                          .join(', ')}
+                      </b>
+                      , mais aucun cadre avec <b>{selectedCompanyName}</b> : ce dossier en
+                      ouvrira un.
+                    </>
+                  ) : (
+                    <>Aucun contrat cadre signé à ce jour.</>
+                  )}
                   {supplierLookup.open_contract_request_id
                     ? ' Un dossier est déjà en cours pour cette société.'
                     : ''}{' '}
@@ -668,24 +719,6 @@ export function ContractManagement() {
               placeholder="contact@fournisseur.fr"
               className="f-in"
             />
-          </div>
-
-          <div>
-            <label className="f-lab">Société émettrice</label>
-            <select
-              value={supplierForm.company_id}
-              onChange={(e) => setSupplierForm((f) => ({ ...f, company_id: e.target.value }))}
-              className="f-in !px-2.5"
-            >
-              <option value="">Sélectionner (optionnel)…</option>
-              {companies
-                .filter((c) => c.is_active)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.code})
-                  </option>
-                ))}
-            </select>
           </div>
 
           <div>
@@ -746,7 +779,11 @@ export function ContractManagement() {
             </Button>
             <Button
               onClick={() => createSupplierMutation.mutate()}
-              disabled={!supplierForm.contact_email.includes('@') || createSupplierMutation.isPending}
+              disabled={
+                !supplierForm.company_id ||
+                !supplierForm.contact_email.includes('@') ||
+                createSupplierMutation.isPending
+              }
               isLoading={createSupplierMutation.isPending}
             >
               Ouvrir le dossier

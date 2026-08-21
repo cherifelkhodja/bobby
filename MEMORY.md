@@ -152,6 +152,7 @@
 - **Documentation complète** : `docs/contracts/workflow-fournisseur-mission-bdc.md`
 - **Points structurants** :
   - Le contrat cadre n'est pas modifié : le cadre **est** la `ContractRequest` signée (`signed`/`active`), pas de table `framework_contracts`
+  - Le cadre est propre au couple **fournisseur × société émettrice** : un fournisseur sous contrat avec une société du groupe doit en signer un autre pour travailler avec une seconde. La fiche tiers, elle, reste unique (identité et vigilance communes)
   - Le BDC porte la mission : client, TJM vente (interne), CJM achat, jours vendus, jours de gratuité, dates ; montant = `(jours vendus - gratuité) x CJM`
   - **Le TJM de vente n'apparaît jamais** sur le PDF fournisseur ni dans les données exposées au portail
   - Le premier BDC d'une mission est créé par le **webhook positionnement** (seul webhook Boond conservé, filtré sur un état déclencheur configurable) ; il naît sans fournisseur, « à rattacher » par l'ADV. Saisie manuelle possible en parallèle ; les reconductions sont pilotées depuis Bobby
@@ -231,6 +232,19 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-08-21 (fix: le contrat cadre est propre à une société émettrice)
+
+Un fournisseur peut travailler avec plusieurs sociétés du groupe, et il lui faut **un contrat cadre par société**. La recherche d'un cadre en vigueur ignorait cette dimension : elle répondait « sous contrat » dès qu'un cadre existait avec n'importe quelle société.
+
+Deux conséquences corrigées :
+
+- **Écran d'ouverture d'un fournisseur** : la société émettrice est demandée **avant** le SIRET, la recherche est bornée par elle, et le message distingue les trois cas — cadre signé avec la société choisie, cadres signés seulement avec d'autres sociétés du groupe (le dossier en ouvrira un), ou aucun cadre. Un dossier déjà en cours n'est signalé que s'il concerne la même société.
+- **Garde-fou de signature d'un bon de commande** (le plus gênant) : un BDC émis par une société pouvait partir en signature parce que le fournisseur avait un cadre signé avec une autre. La règle vit désormais dans le domaine (`PurchaseOrder.is_covered_by`) et exige un cadre signé **et** émis par la même société. Le rattachement du cadre au BDC est rejoué quand la société émettrice change, pas seulement le fournisseur.
+
+`get_framework_contract_for_third_party` prend un `company_id` optionnel et s'appuie sur `list_framework_contracts_for_third_party`. Les dossiers antérieurs au multi-sociétés, sans `company_id`, servent de repli pour ne pas rendre l'historique inutilisable, mais un cadre de la bonne société prime toujours.
+
+**Tests** : 11 cas de portée (sélection par société, repli historique, refus d'un cadre d'une autre société, rattachement rejoué au changement de société). 302 tests `contract_management` verts, front `tsc`/`eslint`/build OK.
 
 ### 2026-08-21 (feat: reconduction branchée sur le renouvellement natif Boond)
 

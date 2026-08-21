@@ -21,6 +21,7 @@ from app.contract_management.api.schemas import (
     ManualContractRequestCreate,
     SkipDocumentsRequest,
     SupplierDossierCreate,
+    SupplierFrameworkSummary,
     SupplierLookupResponse,
 )
 from app.contract_management.application.use_cases.block_compliance import (
@@ -405,13 +406,18 @@ async def create_manual_contract_request(
 async def lookup_supplier(
     siret: str,
     user_id: AdvOrAdminUser,
+    company_id: UUID | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     """Dit si un fournisseur est déjà connu, et où en est sa contractualisation.
 
     Évite d'ouvrir une seconde fiche pour une société déjà enregistrée — c'est
     ce doublon qui fait redemander au fournisseur des documents de vigilance
-    déjà fournis. ADV/admin uniquement.
+    déjà fournis.
+
+    Un contrat cadre lie le fournisseur à **une** société émettrice : avec
+    `company_id`, la réponse dit s'il en a un avec celle-ci, et liste dans tous
+    les cas ceux qu'il a avec les autres sociétés du groupe. ADV/admin.
     """
     siren = siren_from_siret(siret)
     if not siren:
@@ -426,10 +432,13 @@ async def lookup_supplier(
         return SupplierLookupResponse(exists=False, siren=siren)
 
     cr_repo = ContractRequestRepository(db)
-    framework = await cr_repo.get_framework_contract_for_third_party(third_party.id)
+    framework = await cr_repo.get_framework_contract_for_third_party(third_party.id, company_id)
+    all_frameworks = await cr_repo.list_framework_contracts_for_third_party(third_party.id)
+    issuer_names = await _issuer_company_names(db, [f.company_id for f in all_frameworks])
 
-    # Dossier encore en cours pour ce fournisseur : le signaler évite d'en
-    # ouvrir un second en parallèle.
+    # Dossier encore en cours pour ce fournisseur chez la même société : le
+    # signaler évite d'en ouvrir un second en parallèle. Un dossier chez une
+    # autre société n'a pas à bloquer celui-ci.
     open_cr = next(
         (
             cr
@@ -442,6 +451,7 @@ async def lookup_supplier(
                 ContractRequestStatus.CANCELLED,
                 ContractRequestStatus.REDIRECTED_PAYFIT,
             )
+            and (company_id is None or cr.company_id in (company_id, None))
         ),
         None,
     )
@@ -455,9 +465,36 @@ async def lookup_supplier(
         has_framework_contract=framework is not None,
         framework_contract_id=framework.id if framework else None,
         framework_contract_reference=framework.display_reference if framework else None,
+        framework_contracts=[
+            SupplierFrameworkSummary(
+                contract_request_id=f.id,
+                reference=f.display_reference,
+                status=f.status.value,
+                issuer_company_id=f.company_id,
+                issuer_company_name=issuer_names.get(f.company_id),
+            )
+            for f in all_frameworks
+        ],
         open_contract_request_id=open_cr.id if open_cr else None,
         open_contract_request_status=open_cr.status.value if open_cr else None,
     )
+
+
+async def _issuer_company_names(db: AsyncSession, company_ids: list) -> dict:
+    """Nom des sociétés émettrices, en une requête."""
+    from sqlalchemy import select as _sel
+
+    from app.contract_management.infrastructure.models import ContractCompanyModel
+
+    wanted = [cid for cid in company_ids if cid]
+    if not wanted:
+        return {}
+    result = await db.execute(
+        _sel(ContractCompanyModel.id, ContractCompanyModel.name).where(
+            ContractCompanyModel.id.in_(wanted)
+        )
+    )
+    return {row[0]: row[1] for row in result.all()}
 
 
 @router.post(
