@@ -8,8 +8,10 @@
 
 ## Principes
 
-Deux objets indépendants, **tous deux créés à la main dans Bobby**. Aucun webhook
-BoondManager ne déclenche quoi que ce soit.
+Deux objets indépendants. Le fournisseur est **toujours créé à la main dans Bobby**.
+La mission a deux portes d'entrée : le **webhook positionnement**, seul webhook Boond
+conservé, qui crée le premier BDC d'une mission, et la saisie manuelle dans Bobby
+(reconductions, et rattrapage si le webhook n'a pas abouti).
 
 | Objet | Porte | Créé par | Signé par |
 |-------|-------|----------|-----------|
@@ -126,19 +128,37 @@ commerciale » disparaît de ce parcours).
 
 ## Flux B — Création d'une mission (BDC)
 
-1. **Nouvelle mission** (ADV/admin). Saisie de l'**ID du positionnement Boond**.
-2. Bobby lit `GET /positionings/{id}` et **contrôle l'état du positionnement**
-   (pull, pas de webhook). Préremplissage : consultant (ID + candidat/ressource + nom),
-   besoin (`opportunity`), CJM (`averageDailyCost`), quantité, dates.
-3. Choix du **fournisseur** dans le panel — cadre actif *ou* en cours de création.
+### Porte d'entrée 1 — webhook positionnement (premier BDC d'une mission)
+
+Le positionnement passe dans l'état déclencheur côté Boond. Bobby reçoit le webhook,
+lit `GET /positionings/{id}` et crée un **BDC en `draft`, sans fournisseur** :
+consultant (ID + candidat/ressource + nom), besoin (`opportunity`), CJM
+(`averageDailyCost`), quantité et dates sont préremplis. Le BDC apparaît dans la
+liste avec la mention **« à rattacher »** et l'ADV est notifié par email.
+
+- **Filtre** : seul l'état déclencheur configuré est traité, tout autre changement
+  d'état est ignoré.
+- **Idempotence** : un seul BDC par positionnement (index partiel sur
+  `boond_positioning_id` hors `cancelled`, comme l'index existant sur les demandes).
+  Les reconductions, créées depuis Bobby, ne sont pas concernées.
+- Ce webhook ne crée plus jamais de demande de contrat cadre.
+
+### Porte d'entrée 2 — saisie manuelle (ADV/admin)
+
+**Nouvelle mission** : saisie de l'**ID du positionnement Boond**, même lecture, même
+contrôle d'état, même préremplissage. Sert aux reconductions et aux rattrapages.
+
+### Suite commune
+
+1. Choix du **fournisseur** dans le panel — cadre actif *ou* en cours de création.
    Alerte si le consultant est déjà rattaché à un autre fournisseur.
-4. Complément : client, intitulé et description de mission, lieu, TJM, CJM,
+2. Complément : client, intitulé et description de mission, lieu, TJM, CJM,
    jours vendus, jours de gratuité, dates. Besoin Boond modifiable, facultatif.
-5. Génération du PDF (moteur HTML → PDF existant, charte « Éditorial »),
+3. Génération du PDF (moteur HTML → PDF existant, charte « Éditorial »),
    numéroté `XXX-BC-NNNN` et référençant le contrat cadre parent.
-6. Envoi en signature au fournisseur. **Aucune validation fournisseur ni consultant
+4. Envoi en signature au fournisseur. **Aucune validation fournisseur ni consultant
    en amont** : le dossier est instruit uniquement côté Bobby.
-7. À la signature, **push Boond** :
+5. À la signature, **push Boond** :
    - conversion candidat → ressource (état 3) si le consultant est encore candidat ;
    - rattachement au fournisseur (`PUT /resources/{id}/administrative`) ;
    - `POST /contracts` : `typeOf` selon le type de tiers, CJM en coût journalier moyen,
@@ -199,5 +219,11 @@ automatique des missions passées vers `cm_purchase_orders`.
    `app_settings` pour ne pas figer la valeur dans le code.
 2. **Reconduction côté Boond** : nouveau bon de commande sur le positionnement
    d'origine + mise à jour des dates du contrat Boond existant.
-3. **Webhooks de création supprimés** : `positioning-update`, `candidate-state-update`,
-   `resource-state-update`. Le webhook YouSign est conservé.
+3. **Webhooks** : `positioning-update` est **conservé** et redirigé vers la création du
+   premier BDC (il ne crée plus de demande de contrat cadre).
+   `candidate-state-update` et `resource-state-update` sont supprimés. Le webhook
+   YouSign est conservé.
+4. **Préremplissage du fournisseur** : la lecture de la société fournisseur d'une
+   ressource Boond (`providerCompany`) a été retirée du code en juillet. Si elle est
+   réintroduite, un BDC créé par webhook pour un consultant déjà rattaché peut
+   présélectionner son fournisseur ; sinon l'ADV le choisit systématiquement.

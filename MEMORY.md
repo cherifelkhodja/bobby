@@ -153,7 +153,7 @@
   - Le contrat cadre n'est pas modifié : le cadre **est** la `ContractRequest` signée (`signed`/`active`), pas de table `framework_contracts`
   - Le BDC porte la mission : client, TJM vente (interne), CJM achat, jours vendus, jours de gratuité, dates ; montant = `(jours vendus - gratuité) x CJM`
   - **Le TJM de vente n'apparaît jamais** sur le PDF fournisseur ni dans les données exposées au portail
-  - Le premier BDC part d'un positionnement Boond existant dont l'état est **contrôlé à la saisie** (lecture, pas de webhook) ; les reconductions sont pilotées depuis Bobby
+  - Le premier BDC d'une mission est créé par le **webhook positionnement** (seul webhook Boond conservé, filtré sur un état déclencheur configurable) ; il naît sans fournisseur, « à rattacher » par l'ADV. Saisie manuelle possible en parallèle ; les reconductions sont pilotées depuis Bobby
   - Pas de tacite reconduction : une reconduction est un nouveau BDC lié par `parent_purchase_order_id`
   - Envoi du BDC en signature bloqué tant que le contrat cadre n'est pas signé
   - Mode « saisie en personne » choisi **dès la création** du fournisseur, portail magic link sinon
@@ -243,7 +243,8 @@ Cadrage complet de la reprise du workflow de contractualisation, écrit avant im
 - **Machine à états BDC** : `draft → generated → sent_for_signature → signed → active → closed`, `cancelled` avant signature. Envoi en signature refusé tant que le contrat cadre n'est pas `signed`/`active`.
 - **Confidentialité des marges** : le TJM de vente reste interne, seul le CJM figure sur le document du fournisseur. Montant du BDC = `(jours vendus - gratuité) x CJM` — lève le `NEEDS-CONFIRMATION` sur `amountExcludingTax` du bon de commande Boond.
 - **Push Boond à la signature du BDC** : conversion candidat → ressource, rattachement fournisseur, `POST /contracts` (CJM + dates), `POST /purchase-orders` (positionnement + montant achat). La création de la société fournisseur et des chartes partenaire reste à la signature du cadre.
-- **Défauts retenus, à confirmer en revue** : état de positionnement attendu = 7 « Gagné attente contrat » (configurable via `app_settings`) ; reconduction Boond = nouveau bon de commande sur le positionnement d'origine + mise à jour des dates du contrat ; suppression des trois webhooks de création (positionnement, candidat, ressource), le webhook YouSign étant conservé.
+- **Webhooks** : `positioning-update` conservé et redirigé vers la création du premier BDC (il ne crée plus de demande de contrat cadre) ; `candidate-state-update` et `resource-state-update` supprimés ; webhook YouSign conservé.
+- **Défauts retenus, à confirmer en revue** : état de positionnement déclencheur = 7 « Gagné attente contrat », stocké dans `app_settings` (`bdc_trigger_positioning_state`) parce que les états Boond sont paramétrables côté client et ont déjà changé deux fois ; reconduction Boond = nouveau bon de commande sur le positionnement d'origine (le positionnement n'est pas dupliqué, l'ancien bon de commande est conservé) + recul de la date de fin du contrat Boond, sous réserve que l'API accepte la mise à jour d'un contrat existant — non vérifié, seul `POST /contracts` est câblé aujourd'hui.
 
 ### 2026-08-21 (feat: chartes, accusés de réception et engagement — charte « Éditorial »)
 
