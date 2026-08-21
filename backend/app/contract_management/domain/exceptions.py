@@ -70,3 +70,46 @@ class FrameworkContractNotSignedError(DomainError):
             f"Le contrat cadre du fournisseur n'est pas signé : le bon de commande "
             f"{reference} ne peut pas encore être envoyé en signature."
         )
+
+
+class PositioningNotFoundError(DomainError):
+    """Raised when a Boond positioning cannot be read."""
+
+    def __init__(self, positioning_id: int) -> None:
+        super().__init__(f"Positionnement {positioning_id} introuvable dans BoondManager.")
+
+
+class PositioningStateMismatchError(DomainError):
+    """Raised when a positioning is not in the state that opens a purchase order."""
+
+    def __init__(self, positioning_id: int, state: object, expected: int) -> None:
+        self.state = state
+        self.expected = expected
+        super().__init__(
+            f"Le positionnement {positioning_id} est à l'état {state}, "
+            f"or un bon de commande n'est ouvert qu'à l'état {expected}."
+        )
+
+
+class PurchaseOrderAlreadyExistsError(DomainError):
+    """Raised when a positioning already has a live purchase order."""
+
+    def __init__(self, positioning_id: int, reference: str) -> None:
+        self.reference = reference
+        super().__init__(
+            f"Le positionnement {positioning_id} a déjà un bon de commande : {reference}."
+        )
+
+
+class InvalidPurchaseOrderDataError(DomainError):
+    """Raised when purchase order mission data is inconsistent."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
+class PurchaseOrderNotEditableError(DomainError):
+    """Raised when editing a purchase order already sent for signature."""
+
+    def __init__(self, reference: str, status: str) -> None:
+        super().__init__(f"Le bon de commande {reference} n'est plus modifiable (état : {status}).")

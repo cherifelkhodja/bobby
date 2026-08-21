@@ -120,9 +120,7 @@ class TestDossierCreation:
         chosen_id = uuid4()
         use_case, saved, tp_repo, _ = _make_use_case(existing_third_party=looked_up)
 
-        await use_case.execute(
-            _command(siret="89421366900017", reuse_third_party_id=chosen_id)
-        )
+        await use_case.execute(_command(siret="89421366900017", reuse_third_party_id=chosen_id))
 
         tp_repo.get_by_siren.assert_not_awaited()
         assert saved[0].third_party_id == chosen_id
@@ -162,9 +160,7 @@ class TestCommercialValidationHandoff:
         """Le mode « saisie en personne » choisi à la création est transmis."""
         use_case, _, _, _ = _make_use_case()
 
-        command = await use_case.execute(
-            _command(notify_third_party=False, skip_documents=True)
-        )
+        command = await use_case.execute(_command(notify_third_party=False, skip_documents=True))
 
         assert command.notify_third_party is False
         assert command.skip_documents is True
