@@ -144,48 +144,128 @@ class BoondCrmAdapter:
         """
         try:
             response = await self._boond._make_request("GET", f"/deliveries/{delivery_id}")
-            data = response.get("data", {})
-            attributes = data.get("attributes", {})
-            relationships = data.get("relationships", {})
-            included = response.get("included", [])
-
-            # Le projet de la prestation porte le client final, le besoin et le
-            # commercial. Les trois sont dans `included` : les lire ici évite
-            # trois appels et reste juste même quand le besoin n'est plus lisible.
-            project_id = self._extract_relationship_id(relationships, "project")
-            project = self._find_included(included, "project", project_id)
-            project_rels = project.get("relationships", {}) if project else {}
-            client_id = self._extract_relationship_id(project_rels, "company")
-            client = self._find_included(included, "company", client_id)
-
-            return {
-                "id": delivery_id,
-                "state": attributes.get("state"),
-                "title": attributes.get("title") or "",
-                "start_date": attributes.get("startDate") or None,
-                "end_date": attributes.get("endDate") or None,
-                # Prix de vente au client et coût d'achat : deux notions
-                # distinctes, comme le TJM et le CJM d'un bon de commande.
-                "sale_daily_rate": attributes.get("averageDailyPriceExcludingTax"),
-                "purchase_daily_rate": (
-                    attributes.get("averageDailyContractCost") or attributes.get("averageDailyCost")
-                ),
-                "days_sold": attributes.get("numberOfDaysInvoicedOrQuantity"),
-                "free_days": attributes.get("numberOfDaysFree"),
-                "resource_id": self._extract_relationship_id(relationships, "dependsOn"),
-                "project_id": project_id,
-                "client_id": client_id,
-                "client_name": (client.get("attributes", {}).get("name") if client else None),
-                "need_id": self._extract_relationship_id(project_rels, "opportunity"),
-                "main_manager_id": self._extract_relationship_id(project_rels, "mainManager"),
-                # Contrat déjà rattaché à la prestation : sa présence évite d'en
-                # créer un second sur la même ressource.
-                "contract_id": self._extract_relationship_id(relationships, "contract"),
-                "purchase_id": self._extract_relationship_id(relationships, "purchase"),
-            }
+            return self._parse_delivery(response)
         except Exception as exc:
             logger.error("boond_get_delivery_failed", delivery_id=delivery_id, error=str(exc))
             return None
+
+    async def renew_delivery(self, delivery_id: int) -> dict[str, Any] | None:
+        """Renouvelle une prestation dans BoondManager.
+
+        Action REST sans corps de requête : Boond duplique la prestation (mêmes
+        projet, ressource et contrat) et crée, selon la configuration du
+        dossier, l'achat fournisseur et la commande client associés.
+
+        La prestation créée reprend la période de l'originale : c'est à
+        l'appelant de la recaler sur les dates du nouveau bon de commande.
+
+        Args:
+            delivery_id: Prestation à renouveler.
+
+        Returns:
+            La prestation créée, ou None si l'appel échoue.
+        """
+        response = await self._boond._make_request("POST", f"/deliveries/{delivery_id}/renew")
+        renewed = self._parse_delivery(response)
+        logger.info(
+            "boond_delivery_renewed",
+            source_delivery_id=delivery_id,
+            new_delivery_id=renewed.get("id") if renewed else None,
+            purchase_id=renewed.get("purchase_id") if renewed else None,
+        )
+        return renewed
+
+    async def update_delivery(  # noqa: PLR0913
+        self,
+        delivery_id: int,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        days_sold: float | None = None,
+        free_days: float | None = None,
+        purchase_daily_rate: float | None = None,
+        sale_daily_rate: float | None = None,
+    ) -> None:
+        """Recale une prestation sur la période et les conditions d'un BDC.
+
+        Sert après un renouvellement, la prestation créée héritant des dates de
+        l'originale. Seuls les champs fournis sont envoyés.
+        """
+        attributes: dict[str, Any] = {}
+        if start_date:
+            attributes["startDate"] = start_date
+        if end_date:
+            attributes["endDate"] = end_date
+        if days_sold is not None:
+            attributes["numberOfDaysInvoicedOrQuantity"] = days_sold
+        if free_days is not None:
+            attributes["numberOfDaysFree"] = free_days
+        if purchase_daily_rate is not None:
+            attributes["averageDailyContractCost"] = purchase_daily_rate
+        if sale_daily_rate is not None:
+            # Le prix de vente est imposé, sinon Boond le recalcule depuis la
+            # grille du projet et écraserait la valeur du bon de commande.
+            attributes["averageDailyPriceExcludingTax"] = sale_daily_rate
+            attributes["forceAverageDailyPriceExcludingTax"] = True
+
+        if not attributes:
+            return
+
+        payload = {"data": {"id": str(delivery_id), "type": "delivery", "attributes": attributes}}
+        await self._boond._make_request("PUT", f"/deliveries/{delivery_id}", json=payload)
+        logger.info(
+            "boond_delivery_updated",
+            delivery_id=delivery_id,
+            fields=sorted(attributes),
+        )
+
+    def _parse_delivery(self, response: dict[str, Any]) -> dict[str, Any] | None:
+        """Traduit une réponse « prestation » de Boond en données exploitables."""
+        data = response.get("data") or {}
+        if not data:
+            return None
+        attributes = data.get("attributes", {})
+        relationships = data.get("relationships", {})
+        included = response.get("included", [])
+
+        # Le projet de la prestation porte le client final, le besoin et le
+        # commercial. Les trois sont dans `included` : les lire ici évite trois
+        # appels et reste juste même quand le besoin n'est plus lisible.
+        project_id = self._extract_relationship_id(relationships, "project")
+        project = self._find_included(included, "project", project_id)
+        project_rels = project.get("relationships", {}) if project else {}
+        client_id = self._extract_relationship_id(project_rels, "company")
+        client = self._find_included(included, "company", client_id)
+
+        try:
+            parsed_id = int(data.get("id"))
+        except (TypeError, ValueError):
+            parsed_id = None
+
+        return {
+            "id": parsed_id,
+            "state": attributes.get("state"),
+            "title": attributes.get("title") or "",
+            "start_date": attributes.get("startDate") or None,
+            "end_date": attributes.get("endDate") or None,
+            # Prix de vente au client et coût d'achat : deux notions distinctes,
+            # comme le TJM et le CJM d'un bon de commande.
+            "sale_daily_rate": attributes.get("averageDailyPriceExcludingTax"),
+            "purchase_daily_rate": (
+                attributes.get("averageDailyContractCost") or attributes.get("averageDailyCost")
+            ),
+            "days_sold": attributes.get("numberOfDaysInvoicedOrQuantity"),
+            "free_days": attributes.get("numberOfDaysFree"),
+            "resource_id": self._extract_relationship_id(relationships, "dependsOn"),
+            "project_id": project_id,
+            "client_id": client_id,
+            "client_name": (client.get("attributes", {}).get("name") if client else None),
+            "need_id": self._extract_relationship_id(project_rels, "opportunity"),
+            "main_manager_id": self._extract_relationship_id(project_rels, "mainManager"),
+            # Contrat déjà rattaché à la prestation : sa présence évite d'en
+            # créer un second sur la même ressource.
+            "contract_id": self._extract_relationship_id(relationships, "contract"),
+            "purchase_id": self._extract_relationship_id(relationships, "purchase"),
+        }
 
     async def get_need(self, need_id: int) -> dict[str, Any] | None:
         """Fetch a need/opportunity from BoondManager.

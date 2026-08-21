@@ -181,7 +181,7 @@
 | Signature YouSign auto | `create_procedure` non branché (flux manuel `mark-as-signed` seul) ; webhook rendu idempotent mais inerte tant qu'aucun `yousign_procedure_id` n'est associé | Medium |
 | Format références contrat | Code en `:03d` (3 chiffres) vs docstrings `NNNN` (4 chiffres) — trancher avant d'atteindre 1000 réf/an/société | Medium |
 | Colonnes DateTime naïves | `TIMESTAMP WITHOUT TIME ZONE` → `datetime.utcnow()` conservé (asyncpg refuse tz-aware) ; migrer en `timezone=True` pour passer à `datetime.now(UTC)` | Low |
-| Renouvellement de prestation Boond | `POST /deliveries/{id}/renew` identifié comme la voie native (clone la prestation ; achat et commande client selon paramètres). **Corps de requête toujours à confirmer** — seule la réponse a pu être observée. `boond_delivery_id` est capté et la prestation est lue à la création d'un BDC | Medium |
+| Recalage d'une prestation renouvelée | `POST /deliveries/{id}/renew` est branché (action REST sans corps). En revanche la forme de `PUT /deliveries/{id}`, qui recale la prestation créée sur la période du nouveau BDC, n'a pas été observée : son échec est signalé sur le bon de commande pour reprise manuelle | Medium |
 | Signature BDC | Circuit manuel (téléchargement, envoi, dépôt du signé), comme le contrat cadre — YouSign non branché | Medium |
 | Repo sans `get_latest_by_candidate_id` | Garde anti double-CR best-effort côté candidat_11 pur (dédup pleine côté ressource) | Low |
 | RLS décorative | `set_rls_context` jamais appelé + policy `app.user_email` non définie + tables `cm_*` récentes sans policy — isolation reposant sur le filtre applicatif | Medium |
@@ -231,6 +231,18 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-08-21 (feat: reconduction branchée sur le renouvellement natif Boond)
+
+`POST /deliveries/{id}/renew` est une **action REST sans corps de requête** (confirmé côté client Boond) : elle duplique la prestation et crée, selon la configuration du dossier, l'achat fournisseur et la commande client.
+
+- `BoondCrmAdapter.renew_delivery` / `update_delivery` ajoutés ; le parsing d'une prestation est partagé entre la lecture et le renouvellement.
+- La synchronisation d'une reconduction passe désormais par ce renouvellement quand la prestation d'origine est connue : la nouvelle prestation est rattachée au BDC, et **l'achat créé par Boond est repris tel quel** au lieu d'en créer un second. Sans prestation connue, ou si Boond n'a pas produit d'achat, le chemin `POST /purchase-orders` prend le relais.
+- Boond duplique à l'identique : la prestation créée est **recalée** sur les dates, quantités et taux du nouveau bon de commande. `forceAverageDailyPriceExcludingTax` accompagne le prix de vente, sinon Boond le recalcule depuis la grille du projet.
+- Le recalage est non bloquant : prestation et achat existent déjà, un échec est signalé sur le dossier pour reprise manuelle plutôt que de faire échouer le report.
+- Le bandeau front passe de « Synchronisation en échec » à un intitulé neutre, ce champ portant désormais aussi des avertissements.
+
+**Tests** : 6 cas sur le chemin de reconduction (renouvellement natif, reprise de l'achat, repli, recalage, échec de recalage, réponse vide). 289 tests `contract_management` verts, ruff/mypy propres, front `tsc`/`eslint` OK.
 
 ### 2026-08-21 (feat: reprise du workflow fournisseur + mission — implémentation ADR-012)
 

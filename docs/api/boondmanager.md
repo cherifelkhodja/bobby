@@ -372,14 +372,33 @@ La prestation prime sur le positionnement au préremplissage : elle seule conna�
 gratuité, le prix de vente et le contrat en cours.
 
 #### POST /deliveries/{id}/renew
-Renouvellement natif d'une prestation : crée une nouvelle prestation clonée
-(mêmes projet, ressource et contrat), et selon les paramètres l'achat et la
-commande client associés.
+Renouvellement natif d'une prestation. **Action REST sans corps de requête** : ni JSON,
+ni paramètres d'URL. Boond duplique la prestation (mêmes projet, ressource et contrat)
+et crée, selon la configuration du dossier, l'achat fournisseur et la commande client.
 
-> **NEEDS-CONFIRMATION** : le corps de la requête n'est pas encore documenté ici.
-> La réponse observée retourne la prestation créée (`purchase` à `null` dans ce cas).
-> Tant que le corps n'est pas confirmé, Bobby ne l'appelle pas : la reconduction crée
-> son bon de commande Boond sans toucher au contrat existant.
+```python
+async def renew_delivery(self, delivery_id: int) -> dict[str, Any] | None
+```
+
+La prestation créée **reprend la période de l'originale** : elle doit être recalée sur
+les dates du nouveau bon de commande.
+
+#### PUT /deliveries/{id}
+Recale une prestation sur la période et les conditions d'un bon de commande.
+
+```python
+async def update_delivery(
+    self, delivery_id: int, start_date=None, end_date=None,
+    days_sold=None, free_days=None, purchase_daily_rate=None, sale_daily_rate=None,
+) -> None
+```
+
+`forceAverageDailyPriceExcludingTax` est posé avec le prix de vente, sinon Boond le
+recalcule depuis la grille du projet et écrase la valeur du bon de commande.
+
+> **NEEDS-CONFIRMATION** : contrairement au renouvellement, la forme de cette mise à
+> jour n'a pas été observée. L'échec du recalage n'invalide pas la synchronisation :
+> il est signalé sur le bon de commande pour reprise manuelle.
 
 #### GET /resources/{id}/information ou GET /candidates/{id}/information
 Récupère les infos du consultant. Route vers `/resources/` ou `/candidates/` selon `consultant_type`.

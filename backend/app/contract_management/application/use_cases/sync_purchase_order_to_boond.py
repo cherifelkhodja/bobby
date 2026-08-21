@@ -88,11 +88,12 @@ class SyncPurchaseOrderToBoondUseCase:
                 po.reference, "aucun positionnement Boond n'est rattaché"
             )
 
+        warnings: list[str] = []
         try:
             resource_id = await self._resolve_resource(po)
             await self._link_provider(po, resource_id, third_party.boond_provider_id)
             await self._create_contract(po, resource_id)
-            await self._create_purchase_order(po, third_party.boond_provider_id)
+            await self._create_purchase_order(po, third_party.boond_provider_id, warnings)
         except PurchaseOrderBoondSyncError:
             raise
         except Exception as exc:
@@ -110,6 +111,12 @@ class SyncPurchaseOrderToBoondUseCase:
             po.mark_active()
         else:
             po.boond_sync_error = None
+
+        # Le report a abouti, mais quelque chose reste à reprendre à la main :
+        # le message est porté par le même champ que les erreurs, seul canal
+        # visible de l'ADV sur le dossier.
+        if warnings:
+            po.boond_sync_error = " ".join(warnings)
 
         saved = await self._po_repo.save(po)
         logger.info(
@@ -208,10 +215,23 @@ class SyncPurchaseOrderToBoondUseCase:
         )
         po.boond_contract_id = contract_id
 
-    async def _create_purchase_order(self, po: PurchaseOrder, provider_id: int) -> None:
-        """Crée le bon de commande Boond, au montant d'achat de la mission."""
+    async def _create_purchase_order(
+        self, po: PurchaseOrder, provider_id: int, warnings: list[str]
+    ) -> None:
+        """Crée le bon de commande Boond, au montant d'achat de la mission.
+
+        Une reconduction passe d'abord par le renouvellement natif de la
+        prestation, qui produit lui-même l'achat fournisseur et la commande
+        client. On ne crée un bon de commande que si ce renouvellement n'en a
+        pas produit — ou s'il n'y a pas de prestation à renouveler.
+        """
         if po.boond_purchase_order_id:
             return
+
+        if po.parent_purchase_order_id and po.boond_delivery_id:
+            await self._renew_delivery(po, warnings)
+            if po.boond_purchase_order_id:
+                return
 
         boond_po_id = await self._crm.create_purchase_order(
             provider_id=provider_id,
@@ -220,6 +240,54 @@ class SyncPurchaseOrderToBoondUseCase:
             amount=float(po.total_amount),
         )
         po.boond_purchase_order_id = boond_po_id
+
+    async def _renew_delivery(self, po: PurchaseOrder, warnings: list[str]) -> None:
+        """Renouvelle la prestation Boond et la recale sur la nouvelle période.
+
+        Boond duplique la prestation à l'identique : sans recalage, la nouvelle
+        porterait les dates de la précédente.
+        """
+        renewed = await self._crm.renew_delivery(po.boond_delivery_id)
+        if not renewed or not renewed.get("id"):
+            raise PurchaseOrderBoondSyncError(
+                po.reference, "le renouvellement de la prestation n'a rien retourné"
+            )
+
+        source_delivery_id = po.boond_delivery_id
+        po.boond_delivery_id = renewed["id"]
+        if renewed.get("purchase_id"):
+            po.boond_purchase_order_id = renewed["purchase_id"]
+        if renewed.get("contract_id"):
+            po.boond_contract_id = renewed["contract_id"]
+
+        try:
+            await self._crm.update_delivery(
+                delivery_id=po.boond_delivery_id,
+                start_date=_iso(po.start_date),
+                end_date=_iso(po.end_date),
+                days_sold=float(po.days_sold) if po.days_sold is not None else None,
+                free_days=float(po.free_days or 0),
+                purchase_daily_rate=(
+                    float(po.purchase_daily_rate) if po.purchase_daily_rate is not None else None
+                ),
+                sale_daily_rate=(
+                    float(po.sale_daily_rate) if po.sale_daily_rate is not None else None
+                ),
+            )
+        except Exception as exc:
+            # La prestation existe et l'achat est créé : l'échec du recalage ne
+            # doit pas invalider la synchronisation, mais l'ADV doit le savoir.
+            logger.warning(
+                "purchase_order_delivery_alignment_failed",
+                purchase_order_id=str(po.id),
+                delivery_id=po.boond_delivery_id,
+                error=_readable_error(exc),
+            )
+            warnings.append(
+                f"Prestation {po.boond_delivery_id} renouvelée depuis {source_delivery_id}, "
+                "mais ses dates et quantités n'ont pas pu être mises à jour : "
+                "à recaler dans BoondManager."
+            )
 
     async def _contract_type_of(self, po: PurchaseOrder) -> int:
         """Type de contrat Boond, déduit du type de tiers du fournisseur."""

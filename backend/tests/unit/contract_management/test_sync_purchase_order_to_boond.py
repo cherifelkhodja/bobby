@@ -67,6 +67,8 @@ def _make_use_case(po, *, provider_id=777, third_party_type="sous_traitant"):
     crm.update_resource_administrative = AsyncMock()
     crm.create_boond_contract = AsyncMock(return_value=555)
     crm.create_purchase_order = AsyncMock(return_value=666)
+    crm.renew_delivery = AsyncMock(return_value={"id": 798, "purchase_id": 900, "contract_id": 264})
+    crm.update_delivery = AsyncMock()
 
     use_case = SyncPurchaseOrderToBoondUseCase(
         purchase_order_repository=po_repo,
@@ -246,6 +248,90 @@ class TestIdempotence:
 
 class TestRenewals:
     """Une reconduction ne superpose pas un second contrat Boond."""
+
+    @pytest.mark.asyncio
+    async def test_a_renewal_uses_the_native_delivery_renewal(self):
+        """Boond sait renouveler une prestation : on passe par là."""
+        po = _signed_po(parent_purchase_order_id=uuid4(), boond_delivery_id=797)
+        use_case, crm, _ = _make_use_case(po)
+
+        result = await use_case.execute(po.id)
+
+        crm.renew_delivery.assert_awaited_once_with(797)
+        assert result.boond_delivery_id == 798
+        # L'achat créé par Boond est repris tel quel, sans en créer un second.
+        crm.create_purchase_order.assert_not_awaited()
+        assert result.boond_purchase_order_id == 900
+
+    @pytest.mark.asyncio
+    async def test_the_renewed_delivery_is_realigned_on_the_new_period(self):
+        """Boond duplique à l'identique : sans recalage, les dates seraient fausses."""
+        po = _signed_po(
+            parent_purchase_order_id=uuid4(),
+            boond_delivery_id=797,
+            sale_daily_rate=Decimal("780"),
+        )
+        use_case, crm, _ = _make_use_case(po)
+
+        await use_case.execute(po.id)
+
+        kwargs = crm.update_delivery.await_args.kwargs
+        assert kwargs["delivery_id"] == 798
+        assert kwargs["start_date"] == "2026-09-01"
+        assert kwargs["end_date"] == "2027-02-28"
+        assert kwargs["days_sold"] == 20.0
+        assert kwargs["free_days"] == 2.0
+        assert kwargs["purchase_daily_rate"] == 500.0
+        assert kwargs["sale_daily_rate"] == 780.0
+
+    @pytest.mark.asyncio
+    async def test_a_renewal_without_purchase_falls_back_to_creating_one(self):
+        """Si Boond n'a pas produit l'achat, on le crée par la voie habituelle."""
+        po = _signed_po(parent_purchase_order_id=uuid4(), boond_delivery_id=797)
+        use_case, crm, _ = _make_use_case(po)
+        crm.renew_delivery = AsyncMock(return_value={"id": 798, "purchase_id": None})
+
+        result = await use_case.execute(po.id)
+
+        crm.create_purchase_order.assert_awaited_once()
+        assert result.boond_purchase_order_id == 666
+
+    @pytest.mark.asyncio
+    async def test_a_failed_realignment_warns_without_failing_the_sync(self):
+        """La prestation et l'achat existent : l'échec du recalage n'invalide rien."""
+        po = _signed_po(parent_purchase_order_id=uuid4(), boond_delivery_id=797)
+        use_case, crm, _ = _make_use_case(po)
+        crm.update_delivery = AsyncMock(side_effect=RuntimeError("Boond 405"))
+
+        result = await use_case.execute(po.id)
+
+        assert result.status == PurchaseOrderStatus.ACTIVE
+        assert "recaler dans BoondManager" in result.boond_sync_error
+        assert "798" in result.boond_sync_error
+
+    @pytest.mark.asyncio
+    async def test_an_empty_renewal_response_is_an_error(self):
+        """Sans prestation en retour, il n'y a rien à rattacher."""
+        po = _signed_po(parent_purchase_order_id=uuid4(), boond_delivery_id=797)
+        use_case, crm, _ = _make_use_case(po)
+        crm.renew_delivery = AsyncMock(return_value=None)
+
+        with pytest.raises(PurchaseOrderBoondSyncError):
+            await use_case.execute(po.id)
+
+        crm.create_purchase_order.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_renewal_without_a_delivery_creates_a_plain_purchase_order(self):
+        """Sans prestation connue, la reconduction retombe sur le chemin standard."""
+        po = _signed_po(parent_purchase_order_id=uuid4())
+        use_case, crm, _ = _make_use_case(po)
+
+        result = await use_case.execute(po.id)
+
+        crm.renew_delivery.assert_not_awaited()
+        crm.create_purchase_order.assert_awaited_once()
+        assert result.boond_purchase_order_id == 666
 
     @pytest.mark.asyncio
     async def test_a_renewal_does_not_create_a_second_contract(self):

@@ -399,7 +399,7 @@ export function PurchaseOrderDetail() {
       {po.boond_sync_error && (
         <div className="alert">
           <AlertTriangle className="h-[18px] w-[18px] shrink-0" />
-          <span>Synchronisation BoondManager en échec : {po.boond_sync_error}</span>
+          <span>BoondManager : {po.boond_sync_error}</span>
         </div>
       )}
 
