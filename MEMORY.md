@@ -132,6 +132,17 @@
   - `CONTRACT_STATUS_CONFIG` porte désormais `stage` (1-6) pour le stepper et les segments de progression du pipeline
   - Typo : Inter + JetBrains Mono (refs/compteurs)
 
+### ADR-011 : Gabarit de contrat porté en CSS paged media (pas de moteur JS)
+- **Date** : 2026-08
+- **Décision** : Porter les maquettes de contrat Claude Design vers un gabarit Jinja2 rendu par WeasyPrint, en réécrivant la mise en page en CSS paged media, plutôt que de rendre le `.dc.html` tel quel via un navigateur headless
+- **Raison** : Les `.dc.html` dépendent de `doc-page.js` et du runtime `x-dc` (React) pour paginer ; les exécuter imposerait Chromium/Playwright en production alors que la chaîne WeasyPrint est déjà en place, plus légère et déjà branchée sur S3/YouSign
+- **Conséquences** :
+  - la maquette reste la source de vérité **visuelle**, le gabarit la source de vérité **technique** — tout écart de rendu se corrige côté gabarit
+  - les fonctionnalités CSS non supportées (grid, étirement de tableau à hauteur imposée, `height: 100%` contre un bloc absolu) sont contournées par tables + positionnement absolu, et **commentées sur place** pour éviter qu'un futur portage les réintroduise
+  - les polices de la charte doivent être versionnées dans `backend/templates/fonts/` : l'image Docker ne les embarque pas et la substitution est silencieuse
+  - le contenu juridique reste en base (articles/annexes éditables par l'ADV) ; le gabarit ne porte que la forme
+
+
 ## Problèmes connus
 
 | Problème | Impact | Workaround | Priorité |
@@ -205,6 +216,21 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-08-21 (feat: refonte graphique du contrat de sous-traitance — charte « Éditorial »)
+
+Portage de la maquette Claude Design **« Contrat de sous-traitance.dc.html »** (projet *Refonte templates Craftmania et Leonum*) dans le gabarit PDF `backend/templates/contrat_at.html`. Le rendu passe d'un document Calibri centré à la charte éditoriale : couverture pleine page, en-têtes d'article numérotés, cartes de parties et de signature, annexes en pages dédiées.
+
+- **Traduction maquette → WeasyPrint** : la maquette s'appuie sur le composant JS `<doc-page>` et sur `x-dc` (React), que WeasyPrint n'exécute pas. La pagination est reprise en CSS paged media (`@page` + `position: running()` pour le pied de page courant, `@page :first` pour la couverture sans pied).
+- **Contraintes moteur** contournées et documentées dans le gabarit :
+  - CSS Grid et Flexbox → `<table>` (support partiel/absent de grid dans WeasyPrint) ;
+  - WeasyPrint n'étire ni un tableau ni une cellule à une hauteur imposée : la couverture fixe sa hauteur (264 mm), cale son bloc légal en `position: absolute; bottom: 0` et centre le héros par `translateY(-50%)` ;
+  - cartes de signature : le cadre est porté par le `<td>` (les cellules d'une ligne partagent leur hauteur) et non par un `<div>` interne.
+- **Polices embarquées** : `backend/templates/fonts/` (Space Grotesk + Hanken Grotesk, graisses 400/500/600/700, SIL OFL 1.1). L'image Docker n'installe que Liberation/DejaVu/Carlito — sans ces fichiers WeasyPrint substituait silencieusement une autre police.
+- **Palette par société** : `_resolve_brand_theme()` (`html_pdf_contract_generator.py`) injecte `brand` / `brand_strong` / `brand_tint` / `brand_grad`. Craftmania, Leonum et Wohm gardent les couleurs de la maquette ; toute autre société obtient une palette dérivée de son `color_code` (`cm_contract_companies`), donc une société créée en base reste correctement brandée.
+- **Contenu inchangé** : les articles et annexes restent pilotés par la base (`cm_contract_article_templates` / `cm_contract_annex_templates`), avec la renumérotation hors préambule, les sous-titres auto-numérotés `N.X`, les listes et les tableaux markdown.
+- **Dépendances** : `weasyprint` et `jinja2` ajoutés à `backend/pyproject.toml`. Ils étaient importés à l'exécution mais déclarés uniquement dans le `Dockerfile` — un `pip install -e .` donnait une app qui plantait à la génération du brouillon.
+- **Tests** : `backend/tests/unit/contract_management/test_contract_template_rendering.py` (24 cas — palette de marque, présence et déclaration des polices, rendu PDF multi-pages vérifié par extraction de texte). Le rendu est `importorskip` sur WeasyPrint/pymupdf pour ne pas casser une CI sans les libs système. 122 tests unitaires `contract_management` verts, ruff OK.
 
 ### 2026-08-21 (fix: saisie manuelle des infos du tiers — « value is not a valid email address »)
 

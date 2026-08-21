@@ -94,6 +94,85 @@ def _expand_civility_in_name(value: str) -> str:
     return value
 
 
+# ── Identité visuelle (charte « Éditorial ») ─────────────────────────────────
+# Palettes reprises de la maquette Claude Design « Contrat de sous-traitance ».
+# Clé = fragment recherché dans le nom de la société émettrice (minuscules).
+_BRAND_THEMES: dict[str, dict[str, str]] = {
+    "craftmania": {
+        "brand": "#e24a1a",
+        "brand_strong": "#c1301c",
+        "brand_tint": "#fbede6",
+        "brand_grad": "linear-gradient(118deg,#ff8702,#e7521c 52%,#c50b2a)",
+    },
+    "leonum": {
+        "brand": "#e95a6b",
+        "brand_strong": "#ce4257",
+        "brand_tint": "#fceced",
+        "brand_grad": "linear-gradient(118deg,#f58393,#e95a6b 54%,#d23b52)",
+    },
+    "wohm": {
+        "brand": "#2e9acd",
+        "brand_strong": "#1f7fae",
+        "brand_tint": "#e9f4fb",
+        "brand_grad": "linear-gradient(118deg,#55b5e2,#2e9acd 52%,#176e9d)",
+    },
+}
+
+
+def _parse_hex(value: str) -> tuple[int, int, int] | None:
+    """Parse '#rgb' or '#rrggbb' into an (r, g, b) tuple, or None if unparsable."""
+    if not value:
+        return None
+    digits = value.strip().lstrip("#")
+    if len(digits) == 3:
+        digits = "".join(c * 2 for c in digits)
+    if len(digits) != 6:
+        return None
+    try:
+        return (int(digits[0:2], 16), int(digits[2:4], 16), int(digits[4:6], 16))
+    except ValueError:
+        return None
+
+
+def _shade(rgb: tuple[int, int, int], ratio: float) -> str:
+    """Blend a colour toward black (ratio < 0) or white (ratio > 0).
+
+    ratio=-0.2 darkens by 20 %, ratio=0.9 gives a 90 %-white tint.
+    """
+    target = 255 if ratio > 0 else 0
+    amount = abs(ratio)
+    channels = (round(c + (target - c) * amount) for c in rgb)
+    return "#" + "".join(f"{max(0, min(255, c)):02x}" for c in channels)
+
+
+def _resolve_brand_theme(company_name: str, color_code: str) -> dict[str, str]:
+    """Return the brand colour set for the issuing company.
+
+    Known brands use the palette hand-tuned in the design; any other company
+    gets a coherent palette derived from its configured ``color_code`` so a
+    newly created company still renders a correctly branded contract.
+    """
+    lower = (company_name or "").lower()
+    for keyword, theme in _BRAND_THEMES.items():
+        if keyword in lower:
+            return dict(theme)
+
+    rgb = _parse_hex(color_code)
+    if not rgb:
+        return dict(_BRAND_THEMES["craftmania"])
+
+    strong = _shade(rgb, -0.18)
+    return {
+        "brand": "#" + "".join(f"{c:02x}" for c in rgb),
+        "brand_strong": strong,
+        "brand_tint": _shade(rgb, 0.92),
+        "brand_grad": (
+            f"linear-gradient(118deg,{_shade(rgb, 0.22)},"
+            f"{'#' + ''.join(f'{c:02x}' for c in rgb)} 52%,{_shade(rgb, -0.3)})"
+        ),
+    }
+
+
 def _get_logo_filename(company_name: str) -> str:
     """Return the logo filename (relative to TEMPLATE_DIR) for the given company name."""
     lower = company_name.lower() if company_name else ""
@@ -140,6 +219,16 @@ class HtmlPdfContractGenerator:
             filename = _get_logo_filename(company_name)
             if filename:
                 template_context["logo_filename"] = filename
+
+        # Inject the brand palette the template interpolates into its CSS.
+        # Done here rather than in the use case so every caller (including the
+        # ones building a context by hand) gets a correctly branded contract.
+        theme = _resolve_brand_theme(
+            template_context.get("issuer_company_name", ""),
+            template_context.get("issuer_color_code", ""),
+        )
+        for key, value in theme.items():
+            template_context.setdefault(key, value)
 
         # Render HTML
         env = Environment(
