@@ -8,6 +8,7 @@ import {
   Download,
   FileSignature,
   RefreshCw,
+  RotateCcw,
   Send,
   Upload,
   X,
@@ -19,6 +20,7 @@ import { vigilanceApi } from '../api/vigilance';
 import { getErrorMessage } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import { Button } from '../components/ui/Button';
+import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
 import type { PurchaseOrder } from '../types';
 import { PURCHASE_ORDER_STATUS_CONFIG } from '../types';
@@ -96,6 +98,14 @@ export function PurchaseOrderDetail() {
 
   const [form, setForm] = useState<MissionForm | null>(null);
   const [supplierId, setSupplierId] = useState('');
+  const [showRenew, setShowRenew] = useState(false);
+  const [renewForm, setRenewForm] = useState({
+    start_date: '',
+    end_date: '',
+    days_sold: '',
+    free_days: '0',
+    purchase_daily_rate: '',
+  });
   const signedInputRef = useRef<HTMLInputElement>(null);
 
   const { data: po, isLoading } = useQuery({
@@ -151,6 +161,24 @@ export function PurchaseOrderDetail() {
     onSuccess: () => {
       toast.success('Bon de commande signé enregistré.');
       invalidate();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const renewMutation = useMutation({
+    mutationFn: () =>
+      purchaseOrdersApi.renew(id!, {
+        start_date: renewForm.start_date,
+        end_date: renewForm.end_date,
+        days_sold: num(renewForm.days_sold),
+        free_days: num(renewForm.free_days) ?? 0,
+        purchase_daily_rate: num(renewForm.purchase_daily_rate),
+      }),
+    onSuccess: (renewal) => {
+      toast.success(`Reconduction ouverte : ${renewal.reference}.`);
+      setShowRenew(false);
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      navigate(`/contracts/bdc/${renewal.id}`);
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -303,6 +331,23 @@ export function PurchaseOrderDetail() {
               leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
             >
               Reporter dans BoondManager
+            </Button>
+          )}
+          {isAdv && (po.status === 'active' || po.status === 'closed') && (
+            <Button
+              onClick={() => {
+                setRenewForm({
+                  start_date: '',
+                  end_date: '',
+                  days_sold: po.days_sold?.toString() ?? '',
+                  free_days: '0',
+                  purchase_daily_rate: po.purchase_daily_rate?.toString() ?? '',
+                });
+                setShowRenew(true);
+              }}
+              leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
+            >
+              Reconduire
             </Button>
           )}
           {isAdv && po.is_editable && (
@@ -559,6 +604,90 @@ export function PurchaseOrderDetail() {
           </ul>
         </div>
       )}
+
+      <Modal
+        isOpen={showRenew}
+        onClose={() => setShowRenew(false)}
+        title={`Reconduire ${po.reference}`}
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="ds">
+            La reconduction ouvre un nouveau bon de commande, numéroté à la suite, qui reprend le
+            consultant, le fournisseur et la mission. Seule la période change — et les conditions,
+            si elles ont été revues.
+          </p>
+          <div className="f-grid">
+            <div>
+              <label className="f-lab" htmlFor="renew-start">Nouvelle date de début</label>
+              <input
+                id="renew-start"
+                type="date"
+                className="f-in"
+                value={renewForm.start_date}
+                onChange={(e) => setRenewForm({ ...renewForm, start_date: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="f-lab" htmlFor="renew-end">Nouvelle date de fin</label>
+              <input
+                id="renew-end"
+                type="date"
+                className="f-in"
+                value={renewForm.end_date}
+                onChange={(e) => setRenewForm({ ...renewForm, end_date: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="f-lab" htmlFor="renew-days">Jours vendus</label>
+              <input
+                id="renew-days"
+                type="number"
+                step="0.5"
+                className="f-in"
+                value={renewForm.days_sold}
+                onChange={(e) => setRenewForm({ ...renewForm, days_sold: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="f-lab" htmlFor="renew-free">Jours de gratuité</label>
+              <input
+                id="renew-free"
+                type="number"
+                step="0.5"
+                className="f-in"
+                value={renewForm.free_days}
+                onChange={(e) => setRenewForm({ ...renewForm, free_days: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="f-lab" htmlFor="renew-cjm">CJM (€)</label>
+              <input
+                id="renew-cjm"
+                type="number"
+                step="0.01"
+                className="f-in"
+                value={renewForm.purchase_daily_rate}
+                onChange={(e) =>
+                  setRenewForm({ ...renewForm, purchase_daily_rate: e.target.value })
+                }
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setShowRenew(false)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={() => renewMutation.mutate()}
+              disabled={!renewForm.start_date || !renewForm.end_date || renewMutation.isPending}
+              isLoading={renewMutation.isPending}
+            >
+              Ouvrir la reconduction
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <div className="card">
         <h2 className="ct">BoondManager</h2>

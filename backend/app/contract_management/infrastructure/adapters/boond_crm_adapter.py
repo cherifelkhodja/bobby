@@ -64,9 +64,10 @@ class BoondCrmAdapter:
                 or self._extract_relationship_id(relationships, "resource")
                 or self._extract_relationship_id(relationships, "candidate")
             )
-            need_id = self._extract_relationship_id(
-                relationships, "opportunity"
-            ) or self._extract_relationship_id(relationships, "delivery")
+            delivery_id = self._extract_relationship_id(relationships, "delivery")
+            # Le besoin reste la référence ; sur certains positionnements Boond
+            # ne renvoie que la prestation, d'où le repli historique.
+            need_id = self._extract_relationship_id(relationships, "opportunity") or delivery_id
 
             # Detect consultant type and extract name from included data.
             # Boond can include the consultant as type "resource" (already a
@@ -100,6 +101,7 @@ class BoondCrmAdapter:
                 candidate_id=candidate_id,
                 consultant_type=consultant_type,
                 need_id=need_id,
+                delivery_id=delivery_id,
                 consultant_name=f"{consultant_first_name} {consultant_last_name}".strip(),
                 relationship_keys=list(relationships.keys()),
             )
@@ -110,6 +112,9 @@ class BoondCrmAdapter:
                 "candidate_id": candidate_id,
                 "consultant_type": consultant_type,
                 "need_id": need_id,
+                # Prestation Boond : support du renouvellement natif
+                # (POST /deliveries/{id}/renew).
+                "delivery_id": delivery_id,
                 "daily_rate": attributes.get("averageDailyCost"),
                 "quantity": attributes.get("numberOfDaysInvoicedOrQuantity"),
                 "start_date": attributes.get("startDate"),

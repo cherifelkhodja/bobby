@@ -244,6 +244,33 @@ class TestIdempotence:
         assert result.boond_purchase_order_id == 666
 
 
+class TestRenewals:
+    """Une reconduction ne superpose pas un second contrat Boond."""
+
+    @pytest.mark.asyncio
+    async def test_a_renewal_does_not_create_a_second_contract(self):
+        """Le consultant reste sous le même contrat de sous-traitance."""
+        po = _signed_po(parent_purchase_order_id=uuid4())
+        use_case, crm, _ = _make_use_case(po)
+
+        result = await use_case.execute(po.id)
+
+        crm.create_boond_contract.assert_not_awaited()
+        assert result.boond_contract_id is None
+
+    @pytest.mark.asyncio
+    async def test_a_renewal_still_creates_its_own_purchase_order(self):
+        """Chaque période est un engagement d'achat distinct."""
+        po = _signed_po(parent_purchase_order_id=uuid4())
+        use_case, crm, _ = _make_use_case(po)
+
+        result = await use_case.execute(po.id)
+
+        crm.create_purchase_order.assert_awaited_once()
+        assert result.boond_purchase_order_id == 666
+        assert result.status == PurchaseOrderStatus.ACTIVE
+
+
 class TestErrorReporting:
     """Une erreur Boond doit rester lisible et rejouable."""
 

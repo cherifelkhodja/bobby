@@ -95,6 +95,11 @@ async def archive_inactive_contract_requests():
 
     Runs daily at 3h. A contract request in ACTIVE status is archived
     when it has not been updated for more than 6 months.
+
+    Un contrat cadre qui porte encore des missions n'est jamais archivé : les
+    bons de commande vivent leur propre cycle et ne touchent pas à la demande,
+    qui paraîtrait donc inactive alors que la relation fournisseur est bien en
+    cours.
     """
     from datetime import datetime, timedelta
 
@@ -103,13 +108,25 @@ async def archive_inactive_contract_requests():
     from app.contract_management.domain.value_objects.contract_request_status import (
         ContractRequestStatus,
     )
+    from app.contract_management.domain.value_objects.purchase_order_status import (
+        PurchaseOrderStatus,
+    )
     from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
         ContractRequestRepository,
     )
     from app.contract_management.infrastructure.models import (
         ContractRequestModel,
+        PurchaseOrderModel,
     )
     from app.infrastructure.database.connection import async_session_factory
+
+    LIVE_PURCHASE_ORDER_STATUSES = (
+        PurchaseOrderStatus.DRAFT.value,
+        PurchaseOrderStatus.GENERATED.value,
+        PurchaseOrderStatus.SENT_FOR_SIGNATURE.value,
+        PurchaseOrderStatus.SIGNED.value,
+        PurchaseOrderStatus.ACTIVE.value,
+    )
 
     # NEEDS-CONFIRMATION: `datetime.utcnow()` (naïf) conservé — comparé à
     # `cr.updated_at` (supposé naïf). Passer à `datetime.now(UTC)`
@@ -127,8 +144,25 @@ async def archive_inactive_contract_requests():
         )
         active_crs = result.scalars().all()
 
+        # Contrats cadres portant encore au moins une mission vivante.
+        with_live_orders = set(
+            (
+                await session.execute(
+                    select(PurchaseOrderModel.contract_request_id).where(
+                        PurchaseOrderModel.contract_request_id.is_not(None),
+                        PurchaseOrderModel.status.in_(LIVE_PURCHASE_ORDER_STATUSES),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
         archived_count = 0
         for cr_model in active_crs:
+            if cr_model.id in with_live_orders:
+                continue
+
             cr = cr_repo._to_entity(cr_model)
 
             # Archive if the CR has been inactive for more than 6 months.

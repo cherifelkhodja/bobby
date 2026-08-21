@@ -100,6 +100,7 @@ class CreatePurchaseOrderFromPositioningUseCase:
             company_id=company_id,
             boond_positioning_id=positioning_id,
             boond_need_id=positioning.get("need_id"),
+            boond_delivery_id=positioning.get("delivery_id"),
             boond_consultant_id=positioning.get("candidate_id"),
             boond_consultant_type=positioning.get("consultant_type"),
             consultant_civility=consultant.get("civility"),

@@ -173,8 +173,28 @@ class SyncPurchaseOrderToBoondUseCase:
             )
 
     async def _create_contract(self, po: PurchaseOrder, resource_id: int) -> None:
-        """Crée le contrat Boond portant le CJM et les dates de la mission."""
+        """Crée le contrat Boond portant le CJM et les dates de la mission.
+
+        Rien n'est créé pour une reconduction : le consultant reste sous le même
+        contrat de sous-traitance, seule son échéance recule. En créer un second
+        superposerait deux contrats actifs sur la même ressource et fausserait
+        les coûts calculés par Boond.
+
+        # NEEDS-CONFIRMATION : le renouvellement natif de la prestation
+        # (POST /deliveries/{id}/renew, qui crée l'achat et la commande client)
+        # est la voie visée pour reculer cette échéance ; le corps de requête
+        # attendu reste à confirmer avant de le brancher.
+        """
         if po.boond_contract_id:
+            return
+
+        if po.parent_purchase_order_id:
+            logger.info(
+                "purchase_order_renewal_keeps_existing_contract",
+                purchase_order_id=str(po.id),
+                reference=po.reference,
+                delivery_id=po.boond_delivery_id,
+            )
             return
 
         contract_id = await self._crm.create_boond_contract(

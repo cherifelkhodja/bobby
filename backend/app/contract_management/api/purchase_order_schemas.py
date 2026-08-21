@@ -53,6 +53,22 @@ class PurchaseOrderUpdate(BaseModel):
     commercial_email: str | None = Field(None, max_length=255)
 
 
+class PurchaseOrderRenew(BaseModel):
+    """Reconduire une mission par un nouveau bon de commande.
+
+    Seules la période et les conditions qui changent sont transmises : le reste
+    (consultant, fournisseur, mission, positionnement) est repris du bon de
+    commande d'origine.
+    """
+
+    start_date: date
+    end_date: date
+    days_sold: Decimal | None = None
+    free_days: Decimal | None = None
+    purchase_daily_rate: Decimal | None = None
+    sale_daily_rate: Decimal | None = None
+
+
 class PurchaseOrderResponse(BaseModel):
     """Bon de commande, enrichi des données calculées et du contexte cadre."""
 

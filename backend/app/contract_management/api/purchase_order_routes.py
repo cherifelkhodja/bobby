@@ -12,6 +12,7 @@ from app.config import get_settings
 from app.contract_management.api.purchase_order_schemas import (
     PurchaseOrderCreate,
     PurchaseOrderListResponse,
+    PurchaseOrderRenew,
     PurchaseOrderResponse,
     PurchaseOrderUpdate,
 )
@@ -716,3 +717,69 @@ async def push_purchase_order_to_boond(
         },
     )
     return await _respond(db, cr_repo, po)
+
+
+@router.post(
+    "/{purchase_order_id}/renew",
+    response_model=PurchaseOrderResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Reconduire la mission par un nouveau bon de commande",
+)
+async def renew_purchase_order(
+    purchase_order_id: UUID,
+    body: PurchaseOrderRenew,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Ouvre le bon de commande suivant d'une mission qui se poursuit.
+
+    Pas de tacite reconduction : chaque prolongation est un document distinct,
+    numéroté à la suite et signé pour lui-même. Le positionnement Boond
+    d'origine est conservé. ADV/admin uniquement.
+    """
+    from app.contract_management.application.use_cases.renew_purchase_order import (
+        RenewPurchaseOrderCommand,
+        RenewPurchaseOrderUseCase,
+    )
+
+    po_repo = PurchaseOrderRepository(db)
+    cr_repo = ContractRequestRepository(db)
+
+    use_case = RenewPurchaseOrderUseCase(
+        purchase_order_repository=po_repo,
+        contract_request_repository=cr_repo,
+    )
+
+    try:
+        renewal = await use_case.execute(
+            RenewPurchaseOrderCommand(
+                purchase_order_id=purchase_order_id,
+                start_date=body.start_date,
+                end_date=body.end_date,
+                days_sold=body.days_sold,
+                free_days=body.free_days,
+                purchase_daily_rate=body.purchase_daily_rate,
+                sale_daily_rate=body.sale_daily_rate,
+                created_by=user_id,
+            )
+        )
+    except PurchaseOrderNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except InvalidPurchaseOrderDataError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    await db.commit()
+
+    audit_logger.log(
+        AuditAction.CONTRACT_REQUEST_CREATED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(renewal.id),
+        details={
+            "kind": "purchase_order",
+            "source": "renewal",
+            "reference": renewal.reference,
+            "parent_id": str(purchase_order_id),
+        },
+    )
+    return await _respond(db, cr_repo, renewal)

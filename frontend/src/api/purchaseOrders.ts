@@ -69,6 +69,22 @@ export const purchaseOrdersApi = {
     return response.data;
   },
 
+  /** Reconduit la mission : nouveau bon de commande, numéroté à la suite. */
+  renew: async (
+    id: string,
+    data: {
+      start_date: string;
+      end_date: string;
+      days_sold?: number | null;
+      free_days?: number | null;
+      purchase_daily_rate?: number | null;
+      sale_daily_rate?: number | null;
+    },
+  ): Promise<PurchaseOrder> => {
+    const response = await apiClient.post<PurchaseOrder>(`/purchase-orders/${id}/renew`, data);
+    return response.data;
+  },
+
   cancel: async (id: string): Promise<PurchaseOrder> => {
     const response = await apiClient.post<PurchaseOrder>(`/purchase-orders/${id}/cancel`);
     return response.data;
