@@ -341,3 +341,109 @@ class ContractConsultantModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+
+
+class PurchaseOrderModel(Base):
+    """Purchase order (bon de commande) SQLAlchemy model.
+
+    Une mission d'un consultant chez un client, rattachée au fournisseur et à
+    son contrat cadre. `third_party_id` et `contract_request_id` sont nullables :
+    un BDC créé par le webhook positionnement naît « à rattacher », l'ADV
+    choisit ensuite le fournisseur.
+    """
+
+    __tablename__ = "cm_purchase_orders"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    reference: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        unique=True,
+        comment="Référence séquentielle du bon de commande (XXX-BC-NNN)",
+    )
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="draft")
+    company_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cm_contract_companies.id"), nullable=True
+    )
+    third_party_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tp_third_parties.id"), nullable=True
+    )
+    contract_request_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("cm_contract_requests.id"),
+        nullable=True,
+        comment="Contrat cadre de rattachement",
+    )
+    parent_purchase_order_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("cm_purchase_orders.id"),
+        nullable=True,
+        comment="BDC d'origine en cas de reconduction",
+    )
+
+    # Consultant
+    boond_consultant_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    boond_consultant_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    consultant_civility: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    consultant_first_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    consultant_last_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    consultant_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    consultant_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Origine Boond
+    boond_positioning_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    boond_need_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    boond_delivery_id: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="Prestation Boond, support du renouvellement (POST /deliveries/{id}/renew)",
+    )
+
+    # Mission
+    client_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mission_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    mission_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mission_site_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mission_address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    mission_postal_code: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    mission_city: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # Conditions financières
+    sale_daily_rate: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 2),
+        nullable=True,
+        comment="TJM de vente client — interne, jamais imprimé sur le document fournisseur",
+    )
+    purchase_daily_rate: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 2),
+        nullable=True,
+        comment="CJM d'achat fournisseur — le seul taux du bon de commande",
+    )
+    days_sold: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    free_days: Mapped[Decimal] = mapped_column(
+        Numeric(6, 2), nullable=False, default=0, server_default=text("0")
+    )
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    # Documents et signature
+    s3_key_draft: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    s3_key_signed: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    yousign_envelope_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    sent_for_signature_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Synchronisation Boond
+    boond_contract_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    boond_purchase_order_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    boond_sync_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    commercial_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_by: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    status_history: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
