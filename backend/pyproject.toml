@@ -35,6 +35,9 @@ dependencies = [
     "slowapi>=0.1.9",
     # Scheduling (CRON jobs)
     "apscheduler>=3.10.0",
+    # Génération PDF des contrats (gabarit Jinja2 rendu par WeasyPrint)
+    "jinja2>=3.1.0",
+    "weasyprint>=62.0",
 ]
 
 [project.optional-dependencies]

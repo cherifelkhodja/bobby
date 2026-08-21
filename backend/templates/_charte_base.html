@@ -1,0 +1,219 @@
+{#
+  Gabarit de base des chartes internes multipages (charte « Éditorial »).
+
+  Porté depuis les maquettes Claude Design « Charte informatique.dc.html » et
+  « Charte des achats responsables.dc.html ». Les maquettes paginent avec le
+  composant JS <doc-page> ; WeasyPrint n'exécute pas de JS, la pagination est
+  donc reprise en CSS paged media.
+
+  Ce sont des documents UNILATÉRAUX : un seul bloc « Pour la Direction » et
+  aucune mention de signature électronique (règle de la charte documentaire).
+
+  Blocs à définir par les gabarits enfants :
+    doc_label      — libellé du document dans le pied de page courant
+    doc_mention    — mention de droite du pied de page (« Confidentiel »…)
+    cover_title    — titre de couverture
+    cover_sub      — sous-titre de couverture
+    cover_meta     — les trois cellules de métadonnées de la couverture
+    body           — corps du document
+#}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<style>
+{% include "_marque.css.html" %}
+
+  /* ===== PAGE ===== */
+  @page {
+    size: A4;
+    margin: 16mm 18mm 20mm 18mm;
+    @bottom-center { content: element(rfoot); vertical-align: bottom; }
+  }
+  /* Couverture : pas de pied de page courant. */
+  @page :first {
+    margin-bottom: 16mm;
+    @bottom-center { content: none; }
+  }
+
+  body { font-size: 13px; line-height: 1.64; }
+
+  /* ===== PIED DE PAGE COURANT ===== */
+  .rfoot {
+    position: running(rfoot);
+    width: 174mm;                       /* 210mm - 18mm - 18mm */
+    padding-top: 9px;
+    border-top: 1px solid #e5e3df;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 10px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: #a09f9a;
+  }
+  .rfoot table { width: 100%; border-collapse: collapse; }
+  .rfoot td { padding: 0; vertical-align: middle; }
+  .rfoot .nm { font-weight: 700; color: {{ brand_strong | default('#c1301c') }}; }
+  .rfoot .c { color: {{ brand_strong | default('#c1301c') }}; text-align: right; }
+
+  /* ===== COUVERTURE ===== */
+  /* Même contrainte que le contrat : WeasyPrint n'étire ni tableau ni cellule à
+     une hauteur imposée. La couverture fixe sa hauteur, cale son bloc bas en
+     absolu et centre le héros par translation. */
+  .cover-flow { position: relative; height: 264mm; page-break-after: always; }
+  /* Hauteur explicite obligatoire : sans elle la bande est haute de 0, `top: 50%`
+     vaut 0 et la translation remonte le héros par-dessus le logo.
+     712px = 264mm (997.8px) - 76px d'en-tête - 210px réservés au bloc bas. */
+  .cover-hero-band { position: absolute; top: 76px; height: 712px; left: 0; right: 0; }
+  .cover-hero-cell { position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); }
+  .cov-foot { position: absolute; bottom: 0; left: 0; right: 0; }
+
+  .cov-hero { padding: 22px 0; }
+  .cov-eyebrow {
+    font-family: 'Space Grotesk', sans-serif; font-size: 12.5px; letter-spacing: .15em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; font-weight: 600; margin-bottom: 18px;
+  }
+  .cov-title {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: {% block cover_title_size %}50px{% endblock %};
+    line-height: 1.03; letter-spacing: -.03em; color: #201f1e; margin: 0; max-width: 600px;
+  }
+  .cov-sub { font-size: 18px; color: #5c5b58; margin-top: 20px; max-width: 520px; line-height: 1.45; }
+  .cov-tag {
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px; letter-spacing: .08em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; margin-top: 24px; font-weight: 500;
+  }
+  .cov-rule {
+    height: 3px; border-radius: 2px; margin-bottom: 22px;
+    background: {{ brand_grad | default('linear-gradient(118deg,#ff8702,#e7521c 52%,#c50b2a)') }};
+  }
+  .cov-meta { width: 100%; border-collapse: separate; border-spacing: 13px 0; margin: 0 -13px; }
+  .cov-meta td { width: 33.33%; padding: 0; vertical-align: top; }
+  .cov-meta .k {
+    font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: .08em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; font-weight: 600;
+  }
+  .cov-meta .k .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 2px; margin-right: 7px;
+    background: {{ brand_grad | default('linear-gradient(118deg,#ff8702,#e7521c 52%,#c50b2a)') }};
+  }
+  .cov-meta .v {
+    font-size: 14px; color: #201f1e; font-weight: 500; margin-top: 9px;
+    padding-bottom: 8px; border-bottom: 1px solid #e5e3df; line-height: 1.3;
+  }
+
+  /* ===== SECTIONS ===== */
+  /* Grid remplacé par une table : support partiel de CSS Grid dans WeasyPrint. */
+  .sec {
+    width: 100%; border-collapse: collapse; border-bottom: 2px solid #201f1e;
+    margin: 26px 0 15px; page-break-after: avoid;
+  }
+  .sec td { padding: 0 0 11px; vertical-align: baseline; }
+  .sec .n {
+    width: 56px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 28px;
+    color: {{ brand | default('#e24a1a') }}; line-height: .85;
+  }
+  .sec .t {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 20px;
+    letter-spacing: -.01em; color: #201f1e;
+  }
+  .h2 {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 20px; letter-spacing: -.01em;
+    color: #201f1e; border-bottom: 2px solid #201f1e; padding-bottom: 11px; margin: 0 0 15px;
+    page-break-after: avoid;
+  }
+  .subh {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: {% block subh_size %}14px{% endblock %};
+    color: {{ brand_strong | default('#c1301c') }}; margin: 16px 0 7px; page-break-after: avoid;
+  }
+  .p { font-size: 13px; line-height: {% block body_leading %}1.64{% endblock %}; color: #33322f; margin: 0 0 10px; orphans: 3; widows: 3; }
+  .p b, .p strong { font-weight: 600; color: #201f1e; }
+  .li li { font-size: {% block list_size %}12.5px{% endblock %}; line-height: 1.55; }
+
+  /* ===== SIGNATURE ===== */
+  .sigblock { margin-top: 24px; }
+  .sigblock-hd { font-size: 23px; margin: 0 0 14px; }
+  /* max-width est sans effet sur une cellule (l'algorithme de table prime) :
+     la largeur de la maquette est portée par la table elle-même. */
+  .sigrow { width: 480px; }
+  .sigcard { padding: 22px 24px; }
+  .sigcard-id { margin-top: 8px; min-height: 34px; }
+  .sigzone { margin-top: 16px; height: 96px; }
+  .sigmeta { margin-top: 14px; }
+</style>
+</head>
+<body>
+
+<!-- ===== PIED DE PAGE COURANT ===== -->
+<div class="rfoot">
+  <table><tr>
+    <td><span class="nm">{{ issuer_company_name | upper }}</span> · {% block doc_label %}{% endblock %}</td>
+    <td class="c">{% block doc_mention %}Confidentiel{% endblock %}</td>
+  </tr></table>
+</div>
+
+<!-- ===== COUVERTURE ===== -->
+<div class="cover-flow">
+  {% if logo_b64 %}
+    <img class="cov-logo" src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="{{ issuer_company_name }}">
+  {% elif logo_filename %}
+    <img class="cov-logo" src="{{ logo_filename }}" alt="{{ issuer_company_name }}">
+  {% endif %}
+  <div class="cov-key"></div>
+
+  <div class="cover-hero-band"><div class="cover-hero-cell">
+    <div class="cov-hero">
+      <div class="cov-eyebrow">{% block cover_eyebrow %}Charte interne{% endblock %}</div>
+      <h1 class="cov-title">{% block cover_title %}{% endblock %}</h1>
+      <div class="cov-sub">{% block cover_sub %}{% endblock %}</div>
+      <div class="cov-tag">Document interne — Non contractuel · Version {{ charter_version | default('2026.1') }}</div>
+    </div>
+  </div></div>
+
+  <div class="cov-foot">
+    <div class="cov-rule"></div>
+    <table class="cov-meta"><tr>{% block cover_meta %}{% endblock %}</tr></table>
+  </div>
+</div>
+
+<!-- ===== ÉMETTEUR ===== -->
+<div class="ident">
+  <div class="ident-pr">Document établi par</div>
+  <div class="ident-tx">
+    La société <b>{{ issuer_company_name }}</b>, {{ issuer_legal_form }} au capital de <b>{{ issuer_capital | capital }}</b>,
+    dont le siège social est situé <b>{{ issuer_head_office }}</b>,
+    immatriculée au R.C.S. de {{ issuer_rcs_city }} sous le numéro <b>{{ issuer_rcs_number | siren }}</b>,
+    {%- if issuer_representative_is_entity %}
+      représentée par la société <b>{{ issuer_representative_name }}</b>, en qualité de {{ issuer_representative_quality }}
+    {%- else %}
+      représentée par <b>{{ issuer_representative_name | expand_civility }}</b>, en qualité de {{ issuer_representative_quality }}
+    {%- endif -%}
+    {%- if issuer_tva_number %} — TVA intracommunautaire <b>{{ issuer_tva_number }}</b>{% endif %}.
+  </div>
+</div>
+
+{% block body %}{% endblock %}
+
+<!-- ===== SIGNATURE (document unilatéral : Direction uniquement) ===== -->
+<div class="sigblock">
+  <div class="sigblock-hd">Signature</div>
+  <table class="sigrow"><tr>
+    <td class="sigcard">
+      <div class="sigcard-role">Pour la Direction</div>
+      <div class="sigcard-id"><table>
+        <tr class="sl"><td class="k">Société</td><td class="v"><b>{{ issuer_company_name | upper }}</b></td></tr>
+        <tr class="sl"><td class="k">Représentée par</td><td class="v">
+          {%- if issuer_representative_is_entity -%}
+            {{ issuer_representative_name }}, elle-même représentée par <b>{{ issuer_signatory_name | expand_civility }}</b>
+          {%- else -%}
+            <b>{{ issuer_signatory_name | expand_civility }}</b>
+          {%- endif -%}
+        </td></tr>
+        <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ issuer_representative_sub_quality | default(issuer_representative_quality, true) }}</b></td></tr>
+      </table></div>
+      <div class="sigzone"></div>
+      <div class="sigmeta">Le <span class="fillin"></span></div>
+    </td>
+  </tr></table>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,106 @@
+{#
+  Socle de marque commun aux documents PDF (charte « Éditorial »).
+  Inclus dans le <style> de chaque gabarit : polices, couleurs de marque et
+  composants identiques d'une famille de documents à l'autre.
+
+  Les couleurs arrivent par le contexte (`brand`, `brand_strong`, `brand_tint`,
+  `brand_grad`), injectées par `_resolve_brand_theme()`. Les valeurs `default()`
+  reprennent la palette Craftmania pour qu'un gabarit reste rendable même appelé
+  avec un contexte minimal.
+
+  Les échelles typographiques (titres de section, corps) diffèrent d'une famille
+  à l'autre : elles restent dans chaque gabarit, pas ici.
+#}
+/* ===== POLICES EMBARQUÉES ===== */
+/* Chemins résolus via base_url = backend/templates. L'image Docker n'installe
+   ni Space Grotesk ni Hanken Grotesk : sans ces fichiers la substitution est
+   silencieuse. */
+@font-face { font-family: 'Space Grotesk'; font-weight: 400; font-style: normal; src: url(fonts/SpaceGrotesk-400.ttf) format('truetype'); }
+@font-face { font-family: 'Space Grotesk'; font-weight: 500; font-style: normal; src: url(fonts/SpaceGrotesk-500.ttf) format('truetype'); }
+@font-face { font-family: 'Space Grotesk'; font-weight: 600; font-style: normal; src: url(fonts/SpaceGrotesk-600.ttf) format('truetype'); }
+@font-face { font-family: 'Space Grotesk'; font-weight: 700; font-style: normal; src: url(fonts/SpaceGrotesk-700.ttf) format('truetype'); }
+@font-face { font-family: 'Hanken Grotesk'; font-weight: 400; font-style: normal; src: url(fonts/HankenGrotesk-400.ttf) format('truetype'); }
+@font-face { font-family: 'Hanken Grotesk'; font-weight: 500; font-style: normal; src: url(fonts/HankenGrotesk-500.ttf) format('truetype'); }
+@font-face { font-family: 'Hanken Grotesk'; font-weight: 600; font-style: normal; src: url(fonts/HankenGrotesk-600.ttf) format('truetype'); }
+@font-face { font-family: 'Hanken Grotesk'; font-weight: 700; font-style: normal; src: url(fonts/HankenGrotesk-700.ttf) format('truetype'); }
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Hanken Grotesk', 'Carlito', 'Calibri', sans-serif;
+  color: #201f1e;
+}
+
+/* ===== BANDEAU DE MARQUE ===== */
+.cov-logo { height: 48px; width: auto; max-width: 330px; }
+.cov-key {
+  height: 6px; border-radius: 3px; margin-top: 22px;
+  background: {{ brand_grad | default('linear-gradient(118deg,#ff8702,#e7521c 52%,#c50b2a)') }};
+}
+
+/* ===== ENCART « DOCUMENT ÉTABLI PAR » ===== */
+.ident { border: 1px solid #e5e3df; border-radius: 12px; padding: 15px 18px; margin: 0 0 18px; page-break-inside: avoid; }
+.ident-pr {
+  font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: .08em;
+  text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; font-weight: 700; margin-bottom: 8px;
+}
+.ident-tx { font-size: 12.5px; line-height: 1.6; color: #33322f; }
+.ident-tx b { font-weight: 600; color: #201f1e; }
+
+/* ===== LISTES À PUCE DE MARQUE ===== */
+.li { list-style: none; margin: 0 0 12px; padding: 0; }
+.li li {
+  position: relative; padding-left: 20px; color: #33322f;
+  margin-bottom: 6px; page-break-inside: avoid;
+}
+/* Puce carrée : ::before absolu, la maquette utilisait un pseudo-élément flex. */
+.li li::before {
+  content: ""; position: absolute; left: 2px; top: 8px; width: 6px; height: 6px;
+  background: {{ brand | default('#e24a1a') }}; border-radius: 2px;
+}
+.li li b, .li li strong { font-weight: 600; color: #201f1e; }
+
+/* ===== ENCADRÉ ===== */
+.callout {
+  border-left: 3px solid {{ brand | default('#e24a1a') }};
+  background: {{ brand_tint | default('#fbede6') }};
+  padding: 12px 16px; font-size: 12.5px; line-height: 1.6; color: #3f3e3b;
+  margin: 2px 0 12px; border-radius: 0 8px 8px 0; page-break-inside: avoid;
+}
+.callout b, .callout strong { font-weight: 600; color: #201f1e; }
+.mail { font-family: 'Space Grotesk', sans-serif; font-weight: 600; color: {{ brand_strong | default('#c1301c') }}; }
+
+/* ===== BLOC SIGNATURE ===== */
+.sigblock { page-break-inside: avoid; }
+.sigblock-hd {
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -.01em;
+  color: #201f1e;
+}
+/* La maquette pose les cartes en flex ; WeasyPrint n'étire pas un div interne à
+   la hauteur de sa cellule, le cadre est donc porté par le <td> lui-même — les
+   cellules d'une même ligne partagent leur hauteur. */
+.sigrow { border-collapse: separate; border-spacing: 10px 0; margin: 0 -10px; }
+.sigcard {
+  vertical-align: top; border: 1px solid #e5e3df; border-radius: 14px;
+  background: #fdfcfb; page-break-inside: avoid;
+}
+.sigcard-role {
+  font-family: 'Space Grotesk', sans-serif; font-size: 11px; letter-spacing: .1em;
+  text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; font-weight: 700;
+}
+.sigcard-id { font-size: 12.5px; line-height: 1.55; color: #33322f; }
+.sigcard-id table { width: 100%; border-collapse: collapse; }
+.sigcard-id b { font-family: 'Space Grotesk', sans-serif; font-weight: 600; color: #201f1e; }
+.sl .k {
+  width: 112px; font-family: 'Space Grotesk', sans-serif; font-size: 9.5px; letter-spacing: .04em;
+  text-transform: uppercase; color: #8a8984; font-weight: 600;
+  padding: 2.5px 10px 2.5px 0; vertical-align: top;
+}
+.sl .v { padding: 2.5px 0; vertical-align: top; font-size: 12px; line-height: 1.45; }
+.sigzone {
+  border: 1.6px dashed {{ brand | default('#e24a1a') }}; border-radius: 10px;
+  background: {{ brand_tint | default('#fbede6') }};
+}
+.sigmeta { font-size: 12px; color: #5c5b58; }
+.sigmeta b { color: #201f1e; font-weight: 600; }
+.fillin { display: inline-block; min-width: 110px; border-bottom: 1px dashed #cbc9c4; }

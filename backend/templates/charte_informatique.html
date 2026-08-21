@@ -1,0 +1,136 @@
+{# Charte informatique — portée depuis « Charte informatique.dc.html ». #}
+{% extends "_charte_base.html" %}
+
+{% block doc_label %}Charte informatique{% endblock %}
+{% block doc_mention %}Confidentiel{% endblock %}
+{% block cover_title %}Charte informatique{% endblock %}
+{% block cover_sub %}Sécurité des systèmes d'information, protection des données et usages numériques.{% endblock %}
+
+{% block cover_meta %}
+  <td><div class="k"><span class="dot"></span>Périmètre</div><div class="v">{{ issuer_company_name }}</div></td>
+  <td><div class="k"><span class="dot"></span>Applicable à</div><div class="v">Collaborateurs, consultants, prestataires</div></td>
+  <td><div class="k"><span class="dot"></span>Entrée en vigueur</div><div class="v">{{ charter_effective_date | default('1ᵉʳ janvier 2026') }}</div></td>
+{% endblock %}
+
+{% block body %}
+<table class="sec"><tr><td class="n">1</td><td class="t">Champ d'application</td></tr></table>
+<p class="p">La présente charte s'applique à :</p>
+<ul class="li">
+  <li>l'ensemble des collaborateurs de la Société, quel que soit leur statut (CDI, CDD, alternant) ;</li>
+  <li>les dirigeants et le personnel corporate ;</li>
+  <li>les consultants en mission chez un client ou en télétravail ;</li>
+  <li>les prestataires, freelances et sous-traitants intervenant pour le compte de la Société.</li>
+</ul>
+<p class="p">Elle concerne tout équipement ou système utilisé dans un cadre professionnel, qu'il soit fourni par la Société, par un client, ou utilisé à titre personnel dans le cadre d'un usage professionnel autorisé (BYOD — voir section 4).</p>
+
+<table class="sec"><tr><td class="n">2</td><td class="t">Deux situations d'usage distinctes</td></tr></table>
+<div class="subh">a. Consultants en mission chez un client</div>
+<p class="p">Dans cette configuration, le consultant est tenu de :</p>
+<ul class="li">
+  <li>respecter la politique de sécurité informatique du client, ses règles d'utilisation du système d'information et ses procédures internes ;</li>
+  <li>utiliser exclusivement les outils et applications mis à disposition par le client pour les activités liées à la mission ;</li>
+  <li>ne pas installer de logiciels ou applications non autorisés sur le poste client ;</li>
+  <li>ne pas connecter de périphériques personnels (clés USB, disques externes) sans autorisation expresse du client ;</li>
+  <li>garantir la confidentialité des informations et données auxquelles il accède dans le cadre de la mission.</li>
+</ul>
+<div class="callout">Le respect des règles du client s'impose comme une obligation professionnelle. En cas de doute ou de conflit entre les règles du client et celles de la Société, le consultant en informe la direction sans délai.</div>
+<div class="subh">b. Collaborateurs corporate — équipements de la Société</div>
+<p class="p">Les postes sont configurés avec les mesures de sécurité suivantes : chiffrement intégral du disque activé (FileVault sur macOS, BitLocker sur Windows), verrouillage automatique de session après inactivité, mises à jour système et de sécurité automatiques, pare-feu activé, accès restreint aux seuls comptes nominatifs (aucun compte partagé).</p>
+<p class="p">Chaque utilisateur d'un poste s'engage à :</p>
+<ul class="li">
+  <li>utiliser un compte nominatif personnel et ne jamais partager ses identifiants ;</li>
+  <li>verrouiller sa session dès qu'il quitte son poste, même brièvement ;</li>
+  <li>ne pas installer d'applications sans validation préalable de la direction ;</li>
+  <li>utiliser des mots de passe robustes (minimum 12 caractères), idéalement gérés via un gestionnaire approuvé ;</li>
+  <li>activer la double authentification (2FA/MFA) sur tous les services professionnels qui le permettent ;</li>
+  <li>signaler sans délai toute anomalie, perte ou suspicion de compromission d'un équipement.</li>
+</ul>
+
+<table class="sec"><tr><td class="n">3</td><td class="t">Protection des données personnelles (RGPD)</td></tr></table>
+<p class="p">La Société s'engage à respecter le Règlement Général sur la Protection des Données (RGPD). Cette obligation concerne l'ensemble des collaborateurs, qu'ils agissent pour le compte de la Société ou dans le cadre d'une mission client.</p>
+<div class="subh">a. Principes fondamentaux</div>
+<ul class="li">
+  <li><b>Licéité et transparence</b> — les données sont collectées pour des finalités explicites et légitimes ;</li>
+  <li><b>Minimisation</b> — seules les données strictement nécessaires sont collectées ;</li>
+  <li><b>Exactitude</b> — les données sont tenues à jour ;</li>
+  <li><b>Limitation de conservation</b> — les données ne sont conservées que le temps nécessaire ;</li>
+  <li><b>Confidentialité et intégrité</b> — les données sont protégées par des mesures adaptées.</li>
+</ul>
+<div class="subh">b. Traitement des données clients</div>
+<p class="p">Lors de ses missions, la Société peut accéder à des données personnelles appartenant à ses clients. Elle agit alors en tant que <b>sous-traitant</b> au sens du RGPD et s'engage à ne traiter les données que sur instruction du client responsable de traitement, à garantir leur confidentialité et leur sécurité, à assister le client dans le respect de ses obligations, et à restituer ou supprimer les données à l'issue de la prestation. Chaque consultant veille à ne pas extraire, copier ou conserver de données clients sur ses équipements personnels ou des espaces non autorisés.</p>
+<div class="subh">c. Droits des personnes et gestion des demandes</div>
+<p class="p">La Société garantit aux personnes concernées l'exercice de leurs droits (accès, rectification, effacement, opposition, portabilité). Toute demande peut être adressée à la direction ou au référent RGPD désigné. En cas de violation de données susceptible d'engendrer un risque, la Société notifie la CNIL dans les 72 heures et informe les personnes concernées si le risque est élevé.</p>
+
+<table class="sec"><tr><td class="n">4</td><td class="t">Usage d'équipements personnels (BYOD)</td></tr></table>
+<p class="p">L'utilisation d'équipements personnels (ordinateur, téléphone, tablette) dans un cadre professionnel est tolérée sous réserve des conditions suivantes.</p>
+<div class="subh">a. Conditions d'autorisation</div>
+<ul class="li">
+  <li>l'utilisation fait l'objet d'une autorisation préalable de la direction ;</li>
+  <li>l'équipement dispose d'un système d'exploitation à jour, d'un antivirus actif et du chiffrement du disque activé ;</li>
+  <li>l'accès aux ressources professionnelles se fait exclusivement via les canaux sécurisés mis à disposition (VPN, accès web sécurisé).</li>
+</ul>
+<div class="subh">b. Séparation des données</div>
+<ul class="li">
+  <li>les données professionnelles ne sont jamais stockées localement ; seul l'accès via des outils cloud sécurisés approuvés est autorisé ;</li>
+  <li>aucune donnée client n'est téléchargée ou synchronisée sur un équipement personnel.</li>
+</ul>
+<div class="subh">c. Droit d'effacement à distance</div>
+<p class="p">En cas de perte, de vol ou de départ du collaborateur, la Société se réserve le droit de procéder à l'effacement à distance des données professionnelles présentes sur l'équipement, dans le respect du cadre légal. Le collaborateur en est informé préalablement et donne son accord lors de l'autorisation BYOD.</p>
+
+<table class="sec"><tr><td class="n">5</td><td class="t">Usage de l'intelligence artificielle générative</td></tr></table>
+<p class="p">L'essor des outils d'IA générative (ChatGPT, Claude, Copilot, Gemini, Mistral, etc.) impose un cadre d'utilisation strict afin de prévenir les risques de fuite de données, de propriété intellectuelle et de conformité réglementaire.</p>
+<div class="subh">a. Règles générales</div>
+<ul class="li">
+  <li>il est interdit de saisir dans un outil d'IA des données confidentielles, personnelles ou propriétaires (code source client, documents internes, données métier, informations RH) ;</li>
+  <li>les résultats produits par une IA sont toujours vérifiés par le collaborateur avant toute utilisation professionnelle ;</li>
+  <li>l'usage d'outils d'IA pour générer du code, de la documentation ou des livrables est signalé au client si sa politique l'exige.</li>
+</ul>
+<div class="subh">b. En mission client</div>
+<ul class="li">
+  <li>se conformer à la politique du client, qui peut être plus restrictive que celle de la Société ;</li>
+  <li>ne pas utiliser d'outils d'IA non autorisés par le client sur son environnement de travail ;</li>
+  <li>ne jamais soumettre de code source, de données ou de documents du client à un service d'IA externe.</li>
+</ul>
+<div class="subh">c. Outils approuvés &amp; propriété intellectuelle</div>
+<p class="p">La direction maintient et communique une liste des outils d'IA approuvés pour un usage interne, révisée trimestriellement. Seuls ces outils peuvent être utilisés sur les équipements et réseaux de la Société. Les collaborateurs restent vigilants quant aux conditions d'utilisation (propriété des contenus générés, réutilisation des données saisies pour l'entraînement des modèles) ; en cas de doute, la direction est consultée.</p>
+
+<table class="sec"><tr><td class="n">6</td><td class="t">Sécurité des échanges et des données</td></tr></table>
+<div class="subh">Messagerie et communications</div>
+<ul class="li">
+  <li>ne pas ouvrir les pièces jointes ou liens provenant d'expéditeurs inconnus ou suspects ;</li>
+  <li>signaler immédiatement tout message de phishing ou tentative d'hameçonnage ;</li>
+  <li>limiter les destinataires en copie et éviter la transmission d'informations confidentielles par email non sécurisé.</li>
+</ul>
+<div class="subh">Stockage, partage, Wi-Fi</div>
+<ul class="li">
+  <li>utiliser les espaces de stockage partagés et sécurisés ; ne pas recourir à des services cloud personnels (Drive perso, Dropbox) pour des données professionnelles ou clients ;</li>
+  <li>chiffrer les fichiers sensibles avant tout partage par email ou support externe ;</li>
+  <li>éviter les réseaux Wi-Fi publics non sécurisés ; privilégier le réseau du client ou une connexion mobile sécurisée, et utiliser un VPN si requis.</li>
+</ul>
+
+<table class="sec"><tr><td class="n">7</td><td class="t">Usages numériques responsables</td></tr></table>
+<ul class="li">
+  <li>prolonger la durée de vie des équipements — privilégier le reconditionné si possible ;</li>
+  <li>éteindre les équipements en fin de journée plutôt que de les laisser en veille ;</li>
+  <li>limiter le stockage cloud inutile et supprimer les données obsolètes ;</li>
+  <li>préférer le Wi-Fi à la 4G/5G (jusqu'à 23× moins énergivore) ;</li>
+  <li>limiter le nombre de destinataires en copie et alléger les pièces jointes.</li>
+</ul>
+
+<table class="sec"><tr><td class="n">8</td><td class="t">Signalement des incidents</td></tr></table>
+<p class="p">Tout incident ou suspicion d'incident de sécurité est signalé immédiatement : perte ou vol d'un équipement, accès non autorisé ou compromission d'un compte, comportement anormal d'un système, réception d'un message de phishing, suspicion de fuite de données (y compris via un outil d'IA générative).</p>
+<div class="subh">a. Procédure de signalement</div>
+<ul class="li">
+  <li><b>Par email</b> — à l'adresse sécurité dédiée (communiquée lors de l'onboarding), objet « Incident de sécurité » et description factuelle ;</li>
+  <li><b>Par téléphone</b> — au numéro d'urgence communiqué lors de l'onboarding ;</li>
+  <li><b>En mission client</b> — signaler également l'incident au responsable sécurité du client, puis informer la direction en parallèle.</li>
+</ul>
+<div class="subh">b. Traitement de l'incident</div>
+<p class="p">La direction procède à une évaluation dans les 24 heures et décide des mesures correctives. Un compte rendu est adressé au collaborateur à l'origine du signalement. Les incidents impliquant des données personnelles sont traités conformément à la section 3 (notification CNIL sous 72 heures).</p>
+
+<table class="sec"><tr><td class="n">9</td><td class="t">Responsabilités et sanctions</td></tr></table>
+<p class="p">Chaque collaborateur est responsable de la sécurité des informations auxquelles il accède et des équipements qu'il utilise. Le non-respect de la présente charte peut entraîner des mesures disciplinaires proportionnées à la gravité des faits, conformes à l'échelle des sanctions du Règlement Intérieur, sans préjudice des sanctions pénales prévues par la loi. Les manquements les plus graves (fuite de données, compromission délibérée, non-signalement d'un incident connu) peuvent constituer une faute grave au sens du droit du travail.</p>
+
+<table class="sec"><tr><td class="n">10</td><td class="t">Entrée en vigueur et révision</td></tr></table>
+<p class="p">La présente charte entre en vigueur à compter du {{ charter_effective_date | default('1ᵉʳ janvier 2026') }}. Elle est révisée au minimum annuellement pour tenir compte de l'évolution des menaces, des technologies, du cadre réglementaire et des activités de la Société. Toute modification substantielle fait l'objet d'une information aux collaborateurs.</p>
+{% endblock %}

@@ -1,0 +1,146 @@
+{#
+  Gabarit de base des formulaires d'une page (accusés de réception, engagement).
+
+  Porté depuis les maquettes Claude Design « Accusé de réception - … » et
+  « Engagement de confidentialité ». Les maquettes utilisent <doc-page> avec une
+  <section class="page"> pleine page ; WeasyPrint n'exécutant pas de JS, la page
+  est reproduite par `@page { margin: 0 }` et les marges internes du document.
+
+  Ces documents sont SIGNÉS par leur destinataire : la mention Yousign est donc
+  attendue ici, contrairement aux chartes qui sont unilatérales.
+
+  Blocs à définir par les gabarits enfants :
+    kick / title / sub      — en-tête
+    ident_label / id_rows   — encart d'identification du signataire
+    objet                   — corps de l'objet
+    engagement_list         — engagements pris
+    callout                 — mention de conservation / signature
+    sig_role / sig_id       — carte de signature
+#}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<style>
+{% include "_marque.css.html" %}
+
+  /* ===== PAGE ===== */
+  /* Pleine page : les marges sont portées par le document, comme la maquette. */
+  @page { size: A4; margin: 0; }
+
+  body { font-size: 13px; line-height: 1.66; }
+
+  .mh { padding: 40px 66px 0; }
+  .form-body { padding: 18px 66px 14px; }
+
+  /* ===== EN-TÊTE ===== */
+  /* Flex remplacé par une table : logo à gauche, mention à droite. */
+  .cov-top { width: 100%; border-collapse: collapse; }
+  .cov-top td { padding: 0; vertical-align: top; }
+  .cov-logo { height: 36px; max-width: 250px; }
+  .cov-kick {
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px; letter-spacing: .11em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; text-align: right;
+    font-weight: 500; line-height: 1.6;
+  }
+  .cov-key { margin-top: 18px; }
+  .form-title {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px;
+    letter-spacing: -.02em; color: #201f1e; margin: 18px 0 0; line-height: 1.03;
+  }
+  .form-sub { font-size: 16px; color: #5c5b58; margin-top: 9px; }
+
+  /* L'encart émetteur est plus compact que sur les chartes. */
+  .ident { padding: 13px 18px; margin: 0 0 4px; }
+  .ident-pr { font-size: 10px; margin-bottom: 6px; }
+  .ident-tx { font-size: 11.5px; line-height: 1.55; }
+
+  /* ===== SECTIONS DU FORMULAIRE ===== */
+  .lblh {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12px; letter-spacing: .09em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }};
+    margin: 11px 0 8px; padding-bottom: 8px; border-bottom: 1px solid #e5e3df;
+  }
+  .p { font-size: 13px; line-height: 1.66; color: #33322f; margin: 0 0 11px; }
+  .p .q, .p b, .p strong { font-weight: 600; color: #201f1e; }
+  .li li { font-size: 13px; line-height: 1.58; margin-bottom: 5px; }
+  .callout { padding: 11px 16px; margin: 2px 0 9px; }
+
+  /* ===== ENCART D'IDENTIFICATION ===== */
+  /* Grid remplacé par une table (libellé fixe + champ à remplir). */
+  .idbox { border: 1px solid #e5e3df; border-radius: 12px; padding: 4px 20px; }
+  .idbox table { width: 100%; border-collapse: collapse; }
+  .idrow td { padding: 6px 0; border-bottom: 1px solid #e5e3df; vertical-align: middle; }
+  .idrow.last td { border-bottom: 0; }
+  .idrow .k {
+    width: 190px; font-family: 'Space Grotesk', sans-serif; font-size: 11px; letter-spacing: .04em;
+    text-transform: uppercase; color: #8a8984; font-weight: 600; padding-right: 14px;
+  }
+  .idrow .v { height: 20px; font-size: 13px; color: #201f1e; font-weight: 500; }
+
+  /* ===== SIGNATURE ===== */
+  .sigblock { margin-top: 0; }
+  /* max-width est sans effet sur une cellule : la largeur de la maquette est
+     portée par la table elle-même. */
+  .sigrow { width: 460px; }
+  .sigcard { padding: 16px 20px; }
+  .sigcard-id { margin-top: 10px; min-height: 34px; }
+  .sigzone { margin-top: 12px; height: 58px; }
+  .sigmeta { margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<div class="mh">
+  <table class="cov-top"><tr>
+    <td>
+      {% if logo_b64 %}
+        <img class="cov-logo" src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="{{ issuer_company_name }}">
+      {% elif logo_filename %}
+        <img class="cov-logo" src="{{ logo_filename }}" alt="{{ issuer_company_name }}">
+      {% endif %}
+    </td>
+    <td class="cov-kick">{% block kick %}{% endblock %}</td>
+  </tr></table>
+  <div class="cov-key"></div>
+  <h1 class="form-title">{% block title %}{% endblock %}</h1>
+  <div class="form-sub">{% block sub %}{% endblock %}</div>
+</div>
+
+<div class="form-body">
+  <!-- ===== ÉMETTEUR ===== -->
+  <div class="ident">
+    <div class="ident-pr">Document établi par</div>
+    <div class="ident-tx">
+      La société <b>{{ issuer_company_name }}</b>, {{ issuer_legal_form }} au capital de <b>{{ issuer_capital | capital }}</b>,
+      siège social <b>{{ issuer_head_office }}</b> — R.C.S. {{ issuer_rcs_city }} <b>{{ issuer_rcs_number | siren }}</b>{% if issuer_tva_number %} · TVA <b>{{ issuer_tva_number }}</b>{% endif %}.
+    </div>
+  </div>
+
+  <div class="lblh">{% block ident_label %}Identification du collaborateur{% endblock %}</div>
+  <div class="idbox"><table>{% block id_rows %}{% endblock %}</table></div>
+
+  <div class="lblh">Objet</div>
+  {% block objet %}{% endblock %}
+
+  <div class="lblh">Engagement</div>
+  <p class="p">Je déclare :</p>
+  <ul class="li">{% block engagement_list %}{% endblock %}</ul>
+
+  <div class="callout">{% block callout %}{% endblock %}</div>
+
+  <div class="lblh">Signature</div>
+  <div class="sigblock">
+    <table class="sigrow"><tr>
+      <td class="sigcard">
+        <div class="sigcard-role">{% block sig_role %}Le collaborateur{% endblock %}</div>
+        <div class="sigcard-id">{% block sig_id %}{% endblock %}</div>
+        <div class="sigzone"></div>
+        <div class="sigmeta">Le <span class="fillin"></span></div>
+      </td>
+    </tr></table>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,122 @@
+{# Charte des achats responsables — portée depuis « Charte des achats responsables.dc.html ». #}
+{% extends "_charte_base.html" %}
+
+{% block doc_label %}Charte des achats responsables et des partenaires{% endblock %}
+{% block doc_mention %}Document interne{% endblock %}
+{% block cover_title %}Charte des achats responsables et des partenaires{% endblock %}
+{% block cover_title_size %}46px{% endblock %}
+{% block cover_sub %}Éthique, conformité, protection des données et responsabilité sociétale.{% endblock %}
+{% block subh_size %}14.5px{% endblock %}
+{% block body_leading %}1.66{% endblock %}
+{% block list_size %}13px{% endblock %}
+
+{% block cover_meta %}
+  <td><div class="k"><span class="dot"></span>Périmètre</div><div class="v">Partenaires, sous-traitants, fournisseurs</div></td>
+  <td><div class="k"><span class="dot"></span>Émetteur</div><div class="v">{{ issuer_company_name }}</div></td>
+  <td><div class="k"><span class="dot"></span>Entrée en vigueur</div><div class="v">{{ charter_effective_date | default('1ᵉʳ janvier 2026') }}</div></td>
+{% endblock %}
+
+{% block body %}
+<h2 class="h2">Préambule</h2>
+<p class="p">La présente Charte des achats responsables et des partenaires s'inscrit dans la démarche de responsabilité sociétale (RSE) de {{ issuer_company_name }} et vient compléter son Code de conduite, socle de référence commun à l'ensemble des parties prenantes. Elle exprime les attentes de la Société envers ses partenaires dans une logique proportionnée, réaliste et fondée sur le dialogue.</p>
+
+<table class="sec"><tr><td class="n">1</td><td class="t">Objet de la charte</td></tr></table>
+<p class="p">La présente charte définit les principes et attentes de {{ issuer_company_name }} à l'égard de ses partenaires, sous-traitants et fournisseurs, dans le cadre de leurs relations commerciales et professionnelles avec l'entreprise. Elle vise à :</p>
+<ul class="li">
+  <li>partager un <b>cadre de valeurs et de pratiques responsables</b> ;</li>
+  <li>encourager des <b>relations durables et équilibrées</b> ;</li>
+  <li>promouvoir une <b>amélioration continue</b> des pratiques, dans une logique proportionnée et réaliste.</li>
+</ul>
+
+<table class="sec"><tr><td class="n">2</td><td class="t">Périmètre d'application</td></tr></table>
+<p class="p">La présente charte s'adresse à l'ensemble des partenaires de {{ issuer_company_name }}, incluant notamment :</p>
+<ul class="li">
+  <li>les <b>sous-traitants</b> ;</li>
+  <li>les <b>fournisseurs</b> ;</li>
+  <li>les <b>prestataires</b> ;</li>
+  <li>les <b>freelances et consultants indépendants</b> ;</li>
+  <li>toute entité intervenant pour le compte de la Société ou la représentant auprès de tiers.</li>
+</ul>
+<p class="p">La Société attend de ses partenaires qu'ils prennent connaissance de cette charte et qu'ils s'efforcent d'en respecter les principes dans le cadre des prestations réalisées.</p>
+
+<table class="sec"><tr><td class="n">3</td><td class="t">Principes éthiques et loyauté des relations</td></tr></table>
+<p class="p">{{ issuer_company_name }} attache une importance particulière à l'intégrité, à la transparence et à la loyauté dans l'ensemble de ses relations d'affaires. À ce titre, les partenaires sont invités à :</p>
+<ul class="li">
+  <li>adopter un comportement <b>honnête, professionnel et respectueux</b> ;</li>
+  <li>agir de <b>bonne foi</b> dans leurs relations avec la Société ;</li>
+  <li>éviter toute situation susceptible de nuire à la confiance, à la réputation ou aux intérêts légitimes de la Société.</li>
+</ul>
+<p class="p">Toute pratique trompeuse, déloyale ou contraire aux règles éthiques fondamentales est incompatible avec les attentes de la Société.</p>
+
+<table class="sec"><tr><td class="n">4</td><td class="t">Lutte contre la corruption et les pratiques illicites</td></tr></table>
+<p class="p">La Société adopte une politique de <b>tolérance zéro</b> à l'égard de toute forme de corruption, de trafic d'influence ou de pratiques assimilées, en conformité avec la loi n° 2016-1691 du 9 décembre 2016 (loi Sapin II). Les partenaires sont invités à :</p>
+<ul class="li">
+  <li>refuser tout <b>paiement de facilitation</b> ;</li>
+  <li>ne pas proposer, solliciter ou accepter d'<b>avantages indus</b> ;</li>
+  <li>s'abstenir de toute pratique visant à influencer de manière inappropriée une décision commerciale ou contractuelle.</li>
+</ul>
+<p class="p">Ces principes s'appliquent aussi bien dans les relations avec des acteurs publics que privés.</p>
+<div class="subh">a. Cadeaux et invitations</div>
+<p class="p">Les partenaires s'abstiennent d'offrir ou d'accepter des cadeaux, invitations ou avantages disproportionnés susceptibles de créer un sentiment d'obligation ou d'altérer l'impartialité d'une décision. Les attentions de courtoisie d'un montant raisonnable et conformes aux usages professionnels restent tolérées.</p>
+<div class="subh">b. Conflits d'intérêts</div>
+<p class="p">Tout partenaire doit signaler à la Société toute situation susceptible de constituer un conflit d'intérêts, réel ou potentiel, pouvant affecter son objectivité ou son indépendance dans le cadre de la prestation.</p>
+
+<table class="sec"><tr><td class="n">5</td><td class="t">Respect des droits humains et conditions de travail</td></tr></table>
+<p class="p">La Société est attentive au respect des droits fondamentaux des personnes et attend de ses partenaires qu'ils adoptent des pratiques responsables. Les partenaires sont invités à :</p>
+<ul class="li">
+  <li>respecter les <b>droits humains et les libertés fondamentales</b> ;</li>
+  <li>garantir des <b>conditions de travail dignes, sûres</b> et respectueuses de la santé ;</li>
+  <li>lutter contre toute forme de <b>discrimination, de harcèlement</b> ou d'atteinte à la dignité ;</li>
+  <li>proscrire strictement le recours au <b>travail dissimulé, forcé ou au travail des enfants</b>.</li>
+</ul>
+
+<table class="sec"><tr><td class="n">6</td><td class="t">Protection des données et confidentialité</td></tr></table>
+<p class="p">Dans le cadre de leurs relations avec la Société, les partenaires peuvent être amenés à accéder à des informations confidentielles ou à traiter des données à caractère personnel. À ce titre, ils sont invités à :</p>
+<ul class="li">
+  <li>préserver la <b>confidentialité</b> des informations auxquelles ils ont accès ;</li>
+  <li>utiliser ces informations uniquement dans un <b>cadre professionnel légitime</b> ;</li>
+  <li>respecter la réglementation applicable, notamment le <b>RGPD</b> ;</li>
+  <li>mettre en œuvre des mesures de sécurité techniques et organisationnelles appropriées.</li>
+</ul>
+<div class="subh">a. Accord de traitement des données (DPA)</div>
+<p class="p">Lorsqu'un partenaire traite des données à caractère personnel pour le compte de la Société ou de ses clients, un <b>accord de traitement des données (DPA)</b> devra être conclu préalablement au démarrage de la prestation. Il précise les catégories de données, les finalités, les mesures de sécurité exigées et les conditions de restitution ou de suppression en fin de prestation.</p>
+<div class="subh">b. Exigences minimales de sécurité</div>
+<p class="p">Les partenaires accédant aux systèmes d'information de la Société ou de ses clients doivent a minima :</p>
+<ul class="li">
+  <li>utiliser des <b>équipements protégés</b> (chiffrement du disque, antivirus à jour, pare-feu actif) ;</li>
+  <li>disposer d'une <b>authentification forte (MFA)</b> pour l'accès aux ressources partagées ;</li>
+  <li>ne pas stocker de données sensibles sur des équipements personnels non sécurisés ;</li>
+  <li>signaler toute violation de données dans les meilleurs délais, et en tout état de cause dans un délai compatible avec l'obligation de <b>notification CNIL sous 72 heures</b>.</li>
+</ul>
+
+<table class="sec"><tr><td class="n">7</td><td class="t">Engagement environnemental et numérique responsable</td></tr></table>
+<p class="p">Consciente de l'impact environnemental du secteur numérique, la Société encourage ses partenaires à adopter des pratiques plus responsables, à leur échelle. Les partenaires sont invités à :</p>
+<ul class="li">
+  <li>limiter les <b>déplacements non nécessaires</b> ;</li>
+  <li>privilégier les <b>outils de collaboration à distance</b> lorsque cela est possible ;</li>
+  <li>adopter des <b>usages numériques sobres</b> et responsables ;</li>
+  <li>favoriser la <b>prolongation de la durée de vie des équipements</b> ;</li>
+  <li>limiter le gaspillage des ressources.</li>
+</ul>
+<p class="p">Ces engagements s'inscrivent dans une logique de progrès continu et proportionnée aux activités des partenaires.</p>
+
+<table class="sec"><tr><td class="n">8</td><td class="t">Amélioration continue et dialogue</td></tr></table>
+<p class="p">La Société privilégie une approche fondée sur le dialogue, la coopération et l'amélioration continue. Les partenaires sont encouragés à :</p>
+<ul class="li">
+  <li>partager leurs <b>bonnes pratiques</b> ;</li>
+  <li>signaler toute difficulté ou situation à risque rencontrée dans le cadre des prestations ;</li>
+  <li>échanger avec la Société sur les axes de progrès possibles.</li>
+</ul>
+<p class="p">Cette démarche vise à construire des relations durables, responsables et créatrices de valeur pour l'ensemble des parties prenantes.</p>
+
+<table class="sec"><tr><td class="n">9</td><td class="t">Signalement et échanges</td></tr></table>
+<p class="p">Tout partenaire peut signaler, en toute bonne foi, une situation susceptible de constituer un manquement aux principes de la présente charte ou du Code de conduite de la Société. Les signalements peuvent être adressés :</p>
+<ul class="li">
+  <li>à l'<b>interlocuteur habituel</b> chez {{ issuer_company_name }} ;</li>
+  {% if ethics_alert_email %}<li>ou à l'adresse : <span class="mail">{{ ethics_alert_email }}</span>.</li>{% endif %}
+</ul>
+<div class="callout">La Société s'engage à traiter ces signalements avec <b>sérieux et confidentialité</b>, et à protéger de bonne foi l'auteur du signalement contre toute mesure de rétorsion.</div>
+
+<table class="sec"><tr><td class="n">10</td><td class="t">Entrée en vigueur et évolution</td></tr></table>
+<p class="p">La présente charte entre en vigueur à compter du <b>{{ charter_effective_date | default('1ᵉʳ janvier 2026') }}</b>. Elle pourra être mise à jour afin de tenir compte de l'évolution des activités de la Société, du cadre réglementaire ou de sa démarche RSE.</p>
+{% endblock %}
