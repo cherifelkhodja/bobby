@@ -36,7 +36,7 @@
 | Audit Logging | ✅ Done | Structuré |
 | Contractualisation | ✅ Done | Workflow BoondManager → validation → contrat PDF (HTML+WeasyPrint) → signature YouSign → push Boond |
 | Contrats cadres & BDC | ✅ Done | Workflows séparés : ContractRequest (simplifié, sans CONFIGURING_CONTRACT) + PurchaseOrderRequest (7 statuts). Webhooks candidat/ressource, re-contractualisation, UI progressive |
-| Vigilance documentaire | ✅ Done | Cycle de vie docs légaux tiers (request → upload → validate/reject → expiration) |
+| Vigilance documentaire | ✅ Done | Cycle de vie docs légaux tiers (request → upload → validate/reject → expiration) ; dépôt sautable en saisie en personne (`documents_skipped`) |
 | Portail tiers (magic link) | ✅ Done | Upload documents + review contrat via lien sécurisé |
 | CRON jobs (APScheduler) | ✅ Done | Expirations documents, relances, purge magic links |
 
@@ -205,6 +205,32 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-08-21 (feat: saisie en personne — possibilité de zapper le dépôt des documents)
+
+**Besoin** : lors de la saisie d'un contrat **en personne** (sans passer par le fournisseur/prestataire), pouvoir **ignorer complètement le dépôt des documents de vigilance**. Jusqu'ici la saisie manuelle imposait quand même la collecte : créer les emplacements de documents, les déposer un par un ou bloquer la conformité pour la forcer, puis démarrer la revue.
+
+**Décision** : le saut est modélisé comme une **dérogation de conformité tracée** (mécanisme existant) doublée d'un **nouveau drapeau persistant `documents_skipped`**, qui distingue « conformité forcée malgré des documents manquants » de « aucun document n'est attendu pour ce dossier ».
+
+**Backend** :
+- **Migration 078** : colonne `documents_skipped` (BOOLEAN NOT NULL DEFAULT FALSE) sur `cm_contract_requests`.
+- **Entité** `ContractRequest` : `documents_skipped`, `skip_document_collection(reason)` (drapeau + `override_compliance` + `COLLECTING_DOCUMENTS → REVIEWING_COMPLIANCE`) et `restore_document_collection()` (annule la dérogation, retour en `COLLECTING_DOCUMENTS`).
+- **Use case** `SkipDocumentCollectionUseCase` : autorisé en `collecting_documents` / `reviewing_compliance` / `compliance_blocked`. Au saut, **purge les emplacements jamais alimentés** (statut `requested` sans fichier) pour ne pas laisser de collecte fantôme ; tout document réellement déposé est conservé. `restore=True` recrée les emplacements depuis `entity_category` du tiers.
+- **Endpoint** `POST /contract-requests/{id}/skip-documents` (ADV/admin) — corps `{reason?, restore?}`.
+- **`validate-commercial`** accepte `skip_documents` (défaut `False`) : le saut peut être décidé dès la validation. Le schéma **refuse `skip_documents=true` avec `notify_third_party=true`** (sauter la collecte tout en sollicitant le fournisseur serait incohérent). L'email au commercial est adapté (« Dossier saisi en interne »). Le type `salarié` part en PayFit et n'est jamais concerné.
+- **`third-party-info`** ne crée plus les emplacements de documents quand `documents_skipped` — sinon la saisie du tiers recréerait la collecte qu'on vient d'ignorer.
+- **`resend-collection-email`** refuse (400) sur un dossier sans dépôt : il faut rétablir la collecte avant de solliciter le tiers.
+- La réponse `ContractRequestResponse` expose `documents_skipped` et `compliance_override_reason`.
+
+**Frontend** :
+- Validation commerciale : sous-case **« Sans dépôt des documents de vigilance »**, imbriquée sous « Je saisis les informations moi-même » (et réinitialisée si on décoche celle-ci). Le bouton devient « Valider sans collecte documentaire ».
+- Fiche contrat en `collecting_documents` : bouton **« Passer le dépôt »** à côté de « Démarrer la revue », avec panneau de confirmation + justification optionnelle.
+- Carte **« Documents de vigilance — Dépôt ignoré »** remplaçant la liste : badge « Non collectés », justification tracée, bouton **« Rétablir le dépôt »**, et alerte si l'identité du tiers n'est pas encore renseignée (le brouillon sortirait sans les mentions légales du tiers).
+- « Relancer le tiers » est masqué sur un dossier sans dépôt.
+
+**Effet** : parcours 100 % interne en 3 étapes — créer le dossier → valider sans collecte → saisir les informations société → générer le brouillon, sans qu'aucun document ne soit demandé ni attendu.
+
+**Tests** : `backend/tests/unit/contract_management/test_skip_document_collection.py` (16 cas : transitions, justification par défaut, purge sélective des emplacements, refus après génération du brouillon, rétablissement, validation commerciale avec/sans saut, PayFit épargné, garde du schéma). 574 tests unitaires verts, 876 tests backend verts (PostgreSQL + Redis), migration 078 appliquée et rejouée (upgrade/downgrade). Front `tsc` / `eslint` / `build` OK, 282 tests verts.
 
 ### 2026-08-21 (fix: saisie manuelle des infos du tiers — « value is not a valid email address »)
 
