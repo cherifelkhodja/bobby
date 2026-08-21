@@ -144,6 +144,22 @@
   - le socle commun (polices, palette, filtres, environnement Jinja2) vit dans `pdf_rendering.py` + `_marque.css.html` : tout nouveau document de la charte s'appuie dessus plutôt que de recopier le CSS. Les gabarits de base `_charte_base.html` (multipage, unilatéral) et `_formulaire_base.html` (une page, signé) couvrent les deux familles existantes
 
 
+### ADR-012 : Workflow fournisseur / mission piloté par Bobby (réintroduction du BDC)
+- **Date** : 2026-08
+- **Décision** : Reprendre le workflow de contractualisation autour de deux objets créés **manuellement dans Bobby**, sans aucun déclencheur BoondManager : le **fournisseur** (contrat cadre, inchangé) et la **mission** (nouveau bon de commande, `cm_purchase_orders`). Les deux sont signés séparément par le fournisseur.
+- **Raison** : Les webhooks Boond imposaient le rythme de la contractualisation et mélangeaient relation fournisseur et mission. La suppression du module BDC (2026-07-10) a laissé le contrat cadre renvoyer contractuellement à des bons de commande que l'application ne produisait plus.
+- **Documentation complète** : `docs/contracts/workflow-fournisseur-mission-bdc.md`
+- **Points structurants** :
+  - Le contrat cadre n'est pas modifié : le cadre **est** la `ContractRequest` signée (`signed`/`active`), pas de table `framework_contracts`
+  - Le BDC porte la mission : client, TJM vente (interne), CJM achat, jours vendus, jours de gratuité, dates ; montant = `(jours vendus - gratuité) x CJM`
+  - **Le TJM de vente n'apparaît jamais** sur le PDF fournisseur ni dans les données exposées au portail
+  - Le premier BDC part d'un positionnement Boond existant dont l'état est **contrôlé à la saisie** (lecture, pas de webhook) ; les reconductions sont pilotées depuis Bobby
+  - Pas de tacite reconduction : une reconduction est un nouveau BDC lié par `parent_purchase_order_id`
+  - Envoi du BDC en signature bloqué tant que le contrat cadre n'est pas signé
+  - Mode « saisie en personne » choisi **dès la création** du fournisseur, portail magic link sinon
+  - Historique conservé : aucune donnée existante supprimée ni reprise automatiquement
+
+
 ## Problèmes connus
 
 | Problème | Impact | Workaround | Priorité |
@@ -217,6 +233,17 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-08-21 (spec: workflow cible fournisseur + mission/BDC — ADR-012)
+
+Cadrage complet de la reprise du workflow de contractualisation, écrit avant implémentation dans `docs/contracts/workflow-fournisseur-mission-bdc.md`. Remplace la partie BDC de `refonte-contrat-cadre-bdc.md`, obsolète depuis la suppression du module le 2026-07-10.
+
+- **Deux objets créés à la main dans Bobby**, sans déclencheur Boond : le fournisseur (contrat cadre, workflow actuel inchangé) et la mission (nouveau BDC). Signatures séparées.
+- **Nouvelle table `cm_purchase_orders`** : fournisseur, contrat cadre de rattachement, consultant (ID candidat/ressource), positionnement et besoin Boond, mission, TJM vente / CJM achat, jours vendus, jours de gratuité, dates, documents, IDs Boond, `parent_purchase_order_id` pour les reconductions.
+- **Machine à états BDC** : `draft → generated → sent_for_signature → signed → active → closed`, `cancelled` avant signature. Envoi en signature refusé tant que le contrat cadre n'est pas `signed`/`active`.
+- **Confidentialité des marges** : le TJM de vente reste interne, seul le CJM figure sur le document du fournisseur. Montant du BDC = `(jours vendus - gratuité) x CJM` — lève le `NEEDS-CONFIRMATION` sur `amountExcludingTax` du bon de commande Boond.
+- **Push Boond à la signature du BDC** : conversion candidat → ressource, rattachement fournisseur, `POST /contracts` (CJM + dates), `POST /purchase-orders` (positionnement + montant achat). La création de la société fournisseur et des chartes partenaire reste à la signature du cadre.
+- **Défauts retenus, à confirmer en revue** : état de positionnement attendu = 7 « Gagné attente contrat » (configurable via `app_settings`) ; reconduction Boond = nouveau bon de commande sur le positionnement d'origine + mise à jour des dates du contrat ; suppression des trois webhooks de création (positionnement, candidat, ressource), le webhook YouSign étant conservé.
 
 ### 2026-08-21 (feat: chartes, accusés de réception et engagement — charte « Éditorial »)
 
