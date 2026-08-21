@@ -3,459 +3,266 @@
 <head>
 <meta charset="UTF-8">
 <style>
-  /* ===== PAGE SETUP ===== */
+  /* ==========================================================================
+     Contrat cadre de sous-traitance — charte « Éditorial »
+     Space Grotesk (titres) + Hanken Grotesk (corps).
+
+     Porté depuis la maquette Claude Design « Contrat de sous-traitance.dc.html ».
+     La maquette s'appuie sur le composant <doc-page> (JavaScript) ; WeasyPrint
+     n'exécute pas de JS, la pagination est donc reprise ici en CSS paged media
+     (@page + running elements). Les mises en colonnes utilisent des <table>
+     plutôt que grid/flex : le support de CSS Grid par WeasyPrint est partiel.
+     ========================================================================== */
+
+  /* ===== POLICES EMBARQUÉES ===== */
+  /* Chemins résolus via base_url = backend/templates (cf. html_pdf_contract_generator). */
+  @font-face { font-family: 'Space Grotesk'; font-weight: 400; font-style: normal; src: url(fonts/SpaceGrotesk-400.ttf) format('truetype'); }
+  @font-face { font-family: 'Space Grotesk'; font-weight: 500; font-style: normal; src: url(fonts/SpaceGrotesk-500.ttf) format('truetype'); }
+  @font-face { font-family: 'Space Grotesk'; font-weight: 600; font-style: normal; src: url(fonts/SpaceGrotesk-600.ttf) format('truetype'); }
+  @font-face { font-family: 'Space Grotesk'; font-weight: 700; font-style: normal; src: url(fonts/SpaceGrotesk-700.ttf) format('truetype'); }
+  @font-face { font-family: 'Hanken Grotesk'; font-weight: 400; font-style: normal; src: url(fonts/HankenGrotesk-400.ttf) format('truetype'); }
+  @font-face { font-family: 'Hanken Grotesk'; font-weight: 500; font-style: normal; src: url(fonts/HankenGrotesk-500.ttf) format('truetype'); }
+  @font-face { font-family: 'Hanken Grotesk'; font-weight: 600; font-style: normal; src: url(fonts/HankenGrotesk-600.ttf) format('truetype'); }
+  @font-face { font-family: 'Hanken Grotesk'; font-weight: 700; font-style: normal; src: url(fonts/HankenGrotesk-700.ttf) format('truetype'); }
+
+  /* ===== PAGE ===== */
   @page {
     size: A4;
-    margin: 2.5cm 2.2cm 2.3cm 2.2cm;
-
-    /* Footer gauche : société | ref */
-    @bottom-left {
-      content: element(page-running-footer-left);
-      font-family: Calibri, Carlito, Arial, sans-serif;
-      vertical-align: top;
-      padding-top: 0.3cm;
-    }
-
-    /* Footer centre : Confidentiel */
-    @bottom-center {
-      content: "Confidentiel";
-      font-family: Calibri, Carlito, Arial, sans-serif;
-      font-size: 9pt;
-      font-style: italic;
-      color: #555;
-      vertical-align: top;
-      padding-top: 0.3cm;
-    }
-
-    /* Footer droite : numéro de page */
-    @bottom-right {
-      content: counter(page);
-      font-family: Calibri, Carlito, Arial, sans-serif;
-      font-size: 9pt;
-      color: #333;
-      vertical-align: top;
-      padding-top: 0.3cm;
-    }
-
-    /* Header droite : logo */
-    @top-right {
-      content: element(page-running-header-right);
-    }
+    margin: 16mm 18mm 20mm 18mm;
+    @bottom-center { content: element(rfoot); vertical-align: bottom; }
   }
-
-  /* Première page : footer personnalisé via running element, même hauteur que les autres pages */
+  /* Couverture : pas de pied de page courant, le bloc légal est dans le flux. */
   @page :first {
-    margin-top: 0;
-    margin-bottom: 2.3cm;
-    @top-right { content: none; }
-    @bottom-left { content: none; }
-    @bottom-center {
-      content: element(cover-bottom-content);
-      vertical-align: top;
-      padding-top: 0.3cm;
-    }
-    @bottom-right { content: none; }
+    margin-bottom: 16mm;
+    @bottom-center { content: none; }
   }
 
-  /* ===== BASE ===== */
   * { margin: 0; padding: 0; box-sizing: border-box; }
+
   body {
-    font-family: Calibri, Carlito, Arial, sans-serif;
-    font-size: 11pt;
-    color: #000;
-    line-height: 1.5;
+    font-family: 'Hanken Grotesk', 'Carlito', 'Calibri', sans-serif;
+    color: #201f1e;
+    font-size: 12px;
+    line-height: 1.58;
   }
 
-  /* Running footer gauche (pages 2+) */
-  .page-running-footer-left {
-    position: running(page-running-footer-left);
-    font-size: 9pt;
-    white-space: nowrap;
+  /* ===== PIED DE PAGE COURANT (pages 2+) ===== */
+  .rfoot {
+    position: running(rfoot);
+    width: 174mm;                       /* 210mm - 18mm - 18mm */
+    padding-top: 9px;
+    border-top: 1px solid #e5e3df;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 10px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: #a09f9a;
   }
-  .page-running-footer-left .company-name {
-    font-weight: bold;
-    color: {{ issuer_color_code }};
-  }
+  .rfoot table { width: 100%; border-collapse: collapse; }
+  .rfoot td { padding: 0; vertical-align: middle; }
+  .rfoot .nm { font-weight: 700; color: {{ brand_strong | default('#c1301c') }}; }
+  .rfoot .ref { color: #a09f9a; }
+  .rfoot .c { color: {{ brand_strong | default('#c1301c') }}; text-align: right; }
 
-  /* Running cover bottom (page 1 margin box) — footer société uniquement */
-  .cover-bottom-content {
-    position: running(cover-bottom-content);
-    text-align: center;
-    font-family: Calibri, Carlito, Arial, sans-serif;
-    font-size: 9pt;
-    color: #333;
-    line-height: 1.4;
-    margin: 0;
-    padding: 0;
-  }
-  .cover-bottom-content .company-color {
-    font-weight: bold;
-    color: {{ issuer_color_code }};
-  }
-
-  /* Mention de confidentialité dans le flow de la couverture */
-  .cover-confidential {
-    font-style: italic;
-    font-size: 10pt;
-    color: #333;
-    text-align: center;
-    margin-top: 3cm;
-  }
-
-  /* ===== COVER PAGE ===== */
-  .cover-page {
+  /* ===== COUVERTURE ===== */
+  /* La maquette répartit la couverture en flex (héros centré, bloc légal collé
+     en bas). WeasyPrint n'étire pas un tableau à une hauteur imposée : on fixe
+     donc la hauteur de la page et on cale le bas en positionnement absolu, le
+     héros occupant la bande restante via un table-cell centré verticalement. */
+  .cover-flow {
+    position: relative;
+    height: 264mm;                      /* 297mm - 16mm - 16mm, arrondi bas */
     page-break-after: always;
-    text-align: center;
-    padding-top: 2.5cm;
   }
-  .cover-logo-wrapper {
-    margin-bottom: 2.5cm;
+  /* Centrage vertical du héros dans la bande libre entre l'en-tête et le bloc
+     bas. WeasyPrint n'étire ni un tableau ni une cellule à une hauteur imposée
+     (vertical-align:middle porterait sur la seule hauteur du contenu) : on
+     centre donc par translation, seule méthode fiable ici.
+     712px = 264mm (997.8px) - 76px d'en-tête - 210px réservés au bloc bas. */
+  .cover-hero-band { position: absolute; top: 76px; height: 712px; left: 0; right: 0; }
+  .cover-hero-cell {
+    position: absolute; top: 50%; left: 0; right: 0;
+    transform: translateY(-50%);
   }
-  .cover-logo {
-    display: block;
-    max-height: 5cm;
-    max-width: 14cm;
-    margin: 0 auto;
+  .cov-foot { position: absolute; bottom: 0; left: 0; right: 0; }
+
+  .cov-logo { height: 48px; width: auto; max-width: 330px; }
+  .cov-key { height: 6px; background: {{ brand_grad | default('linear-gradient(118deg,#ff8702,#e7521c 52%,#c50b2a)') }}; margin-top: 22px; border-radius: 3px; }
+
+  .cov-hero { padding: 22px 0; }
+  .cov-eyebrow {
+    font-family: 'Space Grotesk', sans-serif; font-size: 12.5px; letter-spacing: .15em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; font-weight: 600; margin-bottom: 18px;
   }
-  .cover-title {
-    font-size: 18pt;
-    font-weight: bold;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.6cm;
-    font-variant: small-caps;
+  .cov-title {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 54px; line-height: 1.0;
+    letter-spacing: -.03em; color: #201f1e; margin: 0; max-width: 600px;
   }
-  .cover-separator {
-    border: none;
-    border-top: 2px solid {{ issuer_color_code }};
-    width: 100%;
-    display: block;
-  }
-  .cover-subtitle {
-    font-size: 13pt;
-    font-weight: bold;
-    padding: 0.4cm 0;
-  }
-  .cover-subtitle .company-color {
-    color: {{ issuer_color_code }};
-  }
-  .cover-info {
-    margin-top: 1.5cm;
-    display: inline-block;
-    text-align: left;
-  }
-  .cover-info-row {
-    margin-bottom: 0.15cm;
-  }
-  .cover-info-label {
-    display: inline-block;
-    width: 3.5cm;
-    text-align: right;
-    padding-right: 0.5cm;
-    font-size: 11pt;
-  }
-  .cover-info-value {
-    font-weight: bold;
-    font-size: 11pt;
+  .cov-sub { font-size: 18px; color: #5c5b58; margin-top: 22px; max-width: 500px; line-height: 1.45; }
+  .cov-tag {
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px; letter-spacing: .08em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; margin-top: 26px; font-weight: 500;
   }
 
-  /* ===== RUNNING HEADER (logo pages 2+) ===== */
-  .page-running-header-right {
-    position: running(page-running-header-right);
-    text-align: right;
+  .cov-rule { height: 3px; background: {{ brand_grad | default('linear-gradient(118deg,#ff8702,#e7521c 52%,#c50b2a)') }}; border-radius: 2px; margin-bottom: 22px; }
+  .cov-meta { width: 100%; border-collapse: separate; border-spacing: 13px 0; margin: 0 -13px; }
+  .cov-meta td { width: 33.33%; padding: 0; vertical-align: top; }
+  .cov-meta .k {
+    font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: .08em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; font-weight: 600;
   }
-  .page-running-header-right img {
-    height: 1.2cm;
+  /* Puce dégradée du libellé : inline-block plutôt que ::before + flex. */
+  .cov-meta .k .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 2px;
+    background: {{ brand_grad | default('linear-gradient(118deg,#ff8702,#e7521c 52%,#c50b2a)') }}; margin-right: 7px;
+  }
+  .cov-meta .v {
+    font-size: 14px; color: #201f1e; font-weight: 500; margin-top: 9px;
+    padding-bottom: 8px; border-bottom: 1px solid #e5e3df; line-height: 1.3;
+  }
+  .cov-legal { margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e3df; text-align: center; }
+  .cov-legal .nm {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px;
+    color: {{ brand_strong | default('#c1301c') }}; letter-spacing: .01em;
+  }
+  .cov-legal .det { font-size: 11px; color: #8a8984; line-height: 1.55; margin-top: 5px; }
+
+  /* ===== TITRES ===== */
+  .h2 {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: .02em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; margin: 24px 0 12px;
+    page-break-after: avoid;
+  }
+  /* En-tête d'article : n° + intitulé, filet bas. */
+  .sec {
+    width: 100%; border-collapse: collapse; border-bottom: 1px solid #e5e3df;
+    margin: 18px 0 11px; page-break-after: avoid;
+  }
+  .sec td { padding: 0 0 9px; vertical-align: baseline; }
+  .sec .n {
+    width: 40px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 19px;
+    color: {{ brand | default('#e24a1a') }}; line-height: .9;
+  }
+  .sec .t {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px;
+    letter-spacing: -.01em; color: #201f1e; text-transform: uppercase;
   }
 
-  /* ===== CONTRACT BODY ===== */
-  .section-header {
-    text-align: center;
-    font-size: 16pt;
-    font-weight: bold;
-    font-variant: small-caps;
-    margin-top: 0.3cm;
-    margin-bottom: 0.8cm;
+  /* ===== CORPS ===== */
+  .p { font-size: 12px; line-height: 1.58; color: #33322f; margin: 0 0 9px; orphans: 3; widows: 3; }
+  .p b, .p strong { font-weight: 600; color: #201f1e; }
+  .subh {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px;
+    color: {{ brand_strong | default('#c1301c') }}; margin: 12px 0 5px; page-break-after: avoid;
+  }
+  .li { list-style: none; margin: 0 0 10px; padding: 0; }
+  .li li {
+    position: relative; padding-left: 18px; font-size: 12px; line-height: 1.5;
+    color: #33322f; margin-bottom: 5px; page-break-inside: avoid;
+  }
+  .li li::before {
+    content: ""; position: absolute; left: 2px; top: 7px; width: 5px; height: 5px;
+    background: {{ brand | default('#e24a1a') }}; border-radius: 2px;
+  }
+  .li li b, .li li strong { font-family: 'Space Grotesk', sans-serif; font-weight: 600; color: #201f1e; }
+
+  .callout {
+    border-left: 3px solid {{ brand | default('#e24a1a') }}; background: {{ brand_tint | default('#fbede6') }};
+    padding: 11px 15px; font-size: 11.5px; line-height: 1.55; color: #3f3e3b;
+    margin: 2px 0 11px; border-radius: 0 8px 8px 0; page-break-inside: avoid;
   }
 
-  /* Parties block */
-  .parties-block {
-    margin-bottom: 0.2cm;
-    line-height: 1.6;
+  /* Tableaux markdown dans le contenu des articles. */
+  .content-table { width: 100%; border-collapse: collapse; margin: 4px 0 11px; font-size: 11.5px; page-break-inside: avoid; }
+  .content-table th {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 10.5px; letter-spacing: .04em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; text-align: left;
+    padding: 7px 10px; border-bottom: 1px solid #e5e3df;
   }
-  .party-intro {
-    margin-bottom: 0.3cm;
+  .content-table td { padding: 7px 10px; border-bottom: 1px solid #f0eeea; color: #33322f; vertical-align: top; }
+
+  /* ===== PARTIES ===== */
+  .party {
+    border: 1px solid #e5e3df; border-radius: 12px; padding: 15px 18px;
+    margin-bottom: 10px; page-break-inside: avoid;
   }
-  .party-intro .company-color {
-    color: {{ issuer_color_code }};
-    font-weight: bold;
+  .party .pr {
+    font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: .08em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; font-weight: 700; margin-bottom: 7px;
   }
-  .party-detail {
-    margin-bottom: 0.1cm;
-    line-height: 1.6;
+  .party .lines { font-size: 12px; line-height: 1.55; color: #33322f; }
+  .party .lines b { font-weight: 600; color: #201f1e; }
+  .desig-l { display: block; text-align: left; margin-top: 6px; }
+  .desig { display: block; text-align: right; }
+  .vs {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: #9a9994;
+    letter-spacing: .1em; font-size: 11px; margin: 4px 0 10px;
   }
 
-  .denomination {
-    text-align: right;
-    font-style: italic;
-    margin-top: 0.3cm;
-    margin-bottom: 0.3cm;
-  }
-  .denomination strong {
-    font-weight: bold;
+  /* ===== ANNEXES ===== */
+  .annexe {
+    page-break-before: always; font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+    font-size: 22px; letter-spacing: -.01em; color: #201f1e;
+    border-bottom: 2px solid #201f1e; padding-bottom: 11px; margin: 0 0 14px;
+    page-break-after: avoid;
   }
 
-  .part-separator {
-    text-align: center;
-    font-style: italic;
-    margin-top: 0.4cm;
-    margin-bottom: 0.6cm;
+  /* ===== SIGNATURES ===== */
+  .sigblock { page-break-inside: avoid; margin-top: 20px; }
+  .sigblock-hd {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px;
+    letter-spacing: -.01em; color: #201f1e; margin: 0 0 6px;
   }
-
-  .decision-header {
-    text-align: center;
-    font-size: 16pt;
-    font-weight: bold;
-    font-variant: small-caps;
-    margin-top: 0.8cm;
-    margin-bottom: 0.8cm;
+  .sig-lead { font-size: 12px; line-height: 1.55; color: #5c5b58; margin: 0 0 14px; max-width: 560px; }
+  .sigrow { width: 100%; border-collapse: separate; border-spacing: 9px 0; margin: 0 -9px; }
+  /* Le cadre est porté par la cellule, pas par un div interne : les cellules
+     d'une même ligne partagent leur hauteur, les deux cartes restent donc
+     alignées comme en flex dans la maquette. */
+  .sigcard {
+    width: 50%; vertical-align: top;
+    border: 1px solid #e5e3df; border-radius: 14px; padding: 18px 20px;
+    background: #fdfcfb; page-break-inside: avoid;
   }
-
-  /* ===== ARTICLES ===== */
-  .article {
-    margin-bottom: 0.7cm;
-    page-break-inside: avoid;
+  .sigcard-role {
+    font-family: 'Space Grotesk', sans-serif; font-size: 11px; letter-spacing: .1em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; font-weight: 700;
   }
-  .article-title {
-    font-size: 11pt;
-    font-weight: bold;
-    margin-bottom: 0.15cm;
+  .sigcard-id { font-size: 12px; line-height: 1.5; color: #33322f; margin-top: 7px; min-height: 78px; }
+  .sigcard-id table { width: 100%; border-collapse: collapse; }
+  .sigcard-id b { font-family: 'Space Grotesk', sans-serif; font-weight: 600; }
+  .sl .k {
+    width: 112px; font-family: 'Space Grotesk', sans-serif; font-size: 9.5px; letter-spacing: .04em;
+    text-transform: uppercase; color: #8a8984; font-weight: 600;
+    padding: 2.5px 10px 2.5px 0; vertical-align: top;
   }
-  .article-separator {
-    border: none;
-    border-top: 1.5px solid {{ issuer_color_code }};
-    margin-bottom: 0.3cm;
+  .sl .v { padding: 2.5px 0; vertical-align: top; font-size: 12px; line-height: 1.45; }
+  .sigzone {
+    margin-top: 14px; height: 90px; border: 1.6px dashed {{ brand | default('#e24a1a') }};
+    border-radius: 10px; background: {{ brand_tint | default('#fbede6') }};
   }
-  .article-body p {
-    text-align: justify;
-    margin-bottom: 0.3cm;
-  }
-  .article-body p:last-child {
-    margin-bottom: 0;
-  }
-  .article-body ul {
-    margin-left: 1cm;
-    margin-top: 0.2cm;
-    margin-bottom: 0.2cm;
-  }
-  .article-body ul li {
-    text-align: justify;
-    margin-bottom: 0.15cm;
-    list-style-type: "- ";
-  }
-  .sub-section-title {
-    font-weight: bold;
-    font-size: 10.5pt;
-    margin-top: 0.35cm;
-    margin-bottom: 0.15cm;
-  }
-
-  /* ===== SIGNATURE BLOCK ===== */
-  .signature-section {
-    margin-top: 1cm;
-    page-break-inside: avoid;
-  }
-  .signature-location {
-    margin-bottom: 0.8cm;
-  }
-  .signature-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-  .signature-col {
-    width: 50%;
-    vertical-align: top;
-    padding-right: 0.5cm;
-  }
-  .signature-col:last-child {
-    padding-right: 0;
-  }
-  .signer-company {
-    font-weight: bold;
-    margin-bottom: 0.1cm;
-  }
-  .signer-name {
-    font-weight: bold;
-  }
-
-  /* ===== ANNEXE ===== */
-  .annexe-page {
-    page-break-before: always;
-  }
-  .annexe-title {
-    font-size: 13pt;
-    font-weight: bold;
-    text-align: center;
-    margin-bottom: 1.5cm;
-  }
-  .annexe-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 1.5cm;
-  }
-  .annexe-label {
-    font-weight: bold;
-    vertical-align: top;
-    padding: 0.35cm 1cm 0.35cm 0;
-    width: 42%;
-  }
-  .annexe-value {
-    vertical-align: top;
-    padding: 0.35cm 0;
-  }
-  .annexe-value-sub {
-    margin-top: 0.1cm;
-    font-style: italic;
-  }
+  .sigmeta { margin-top: 12px; font-size: 11.5px; color: #5c5b58; }
+  .sigmeta b { color: #201f1e; font-weight: 600; }
+  .fillin { display: inline-block; min-width: 100px; border-bottom: 1px dashed #cbc9c4; }
 </style>
 </head>
 <body>
 
-<!-- Running header droite (logo) — pages 2+ -->
-<div class="page-running-header-right">
-  {% if logo_b64 %}
-    <img src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="Logo">
-  {% endif %}
-</div>
-
-<!-- Running footer gauche (société | ref) — pages 2+ -->
-<div class="page-running-footer-left">
-  <span class="company-name">{{ issuer_company_name }}</span>&nbsp;|&nbsp;<strong>{{ reference }}</strong>
-</div>
-
-<!-- Running cover footer (page 1 margin box) -->
-<div class="cover-bottom-content">
-  <span class="company-color">{{ issuer_company_name | upper }}</span><br>
-  {{ issuer_head_office }}<br>
-  {{ issuer_legal_form }} au Capital de {{ issuer_capital | capital }} - {{ issuer_rcs_number | siren }} R.C.S. {{ issuer_rcs_city }}{% if issuer_tva_number %} - {{ issuer_tva_number }}{% endif %}
-</div>
-
-<!-- ===== PAGE 1: COVER ===== -->
-<div class="cover-page">
-  <!-- Logo -->
-  <div class="cover-logo-wrapper">
-    {% if logo_b64 %}
-      <img class="cover-logo" src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="Logo société">
-    {% elif logo_filename %}
-      <img class="cover-logo" src="{{ logo_filename }}" alt="Logo société">
-    {% endif %}
-  </div>
-
-  <!-- Titre -->
-  <div class="cover-title">CONTRAT CADRE DE SOUS-TRAITANCE</div>
-
-  <!-- Sous-titre entre deux lignes -->
-  <hr class="cover-separator">
-  <div class="cover-subtitle">
-    <span class="company-color">{{ issuer_company_name | upper }}</span> - {{ reference }}
-  </div>
-  <hr class="cover-separator">
-
-  <!-- Informations -->
-  <div class="cover-info">
-    <div class="cover-info-row">
-      <span class="cover-info-label">Partenaire :</span>
-      <span class="cover-info-value">{{ partner_company_name | default('') }}</span>
-    </div>
-    <div class="cover-info-row">
-      <span class="cover-info-label">Référence :</span>
-      <span class="cover-info-value">{{ reference }}</span>
-    </div>
-    <div class="cover-info-row">
-      <span class="cover-info-label">Date :</span>
-      <span class="cover-info-value">{{ contract_date }}</span>
-    </div>
-    <div class="cover-info-row">
-      <span class="cover-info-label">Classification :</span>
-      <span class="cover-info-value">Confidentiel</span>
-    </div>
-  </div>
-
-  <!-- Mention de confidentialité -->
-  <div class="cover-confidential">
-    Ce document est la propriété de {{ issuer_company_name | upper }}. Toute reproduction ou diffusion,<br>
-    même partielle, est interdite sans autorisation écrite préalable.
-  </div>
-</div>
-
-<!-- ===== PAGE 2+: CONTRACT BODY ===== -->
-<p class="section-header">Entre les soussignés</p>
-
-<!-- Émetteur -->
-<div class="parties-block">
-  <p class="party-intro">La société <span class="company-color">{{ issuer_company_name }}</span></p>
-  <p class="party-detail">
-    <strong>{{ issuer_legal_form }}</strong> au capital de <strong>{{ issuer_capital | capital }}</strong>,<br>
-    Dont le siège social est situé <strong>{{ issuer_head_office }}</strong>,<br>
-    Inscrite au <strong>RCS de {{ issuer_rcs_city }}</strong> sous le n° <strong>{{ issuer_rcs_number | siren }}</strong>,<br>
-    {% if issuer_representative_is_entity %}
-    Représentée par la société <strong>{{ issuer_representative_name }}</strong>,<br>
-    Agissant en qualité de <strong>{{ issuer_representative_quality }}</strong>,<br>
-    Représentée par <strong>{{ issuer_representative_sub_name | expand_civility }}</strong>{% if issuer_representative_sub_quality %}, {{ issuer_representative_sub_quality }}{% endif %}, Dûment habilité aux fins des présentes.
-    {% else %}
-    Représentée par <strong>{{ issuer_representative_name | expand_civility }}</strong>,<br>
-    Agissant en qualité de <strong>{{ issuer_representative_quality }}</strong>, Dûment habilité aux fins des présentes.
-    {% endif %}
-  </p>
-  <p class="denomination"><em>Ci-après dénommée</em>&nbsp; <strong>« {{ issuer_company_name }} »</strong></p>
-</div>
-
-<p class="part-separator">D'une part</p>
-
-<!-- Partenaire -->
-<div class="parties-block">
-  {% set plf = partner_legal_form | default('') | upper %}
-  {% if plf == 'EI' or plf == 'ENTREPRISE INDIVIDUELLE' %}
-  <p class="party-intro">Et l'Entreprise Individuelle <span class="company-color">{{ partner_company_name }}</span></p>
-  <p class="party-detail">
-    Dont le siège social est situé <strong>{{ partner_head_office }}</strong>,<br>
-    Inscrite sous le n° <strong>{{ partner_rcs_number | siren }}</strong>,<br>
-    Représentée par <strong>{% if partner_representative_civility %}{{ partner_representative_civility | civility }} {% endif %}{{ partner_representative_name }}</strong>,<br>
-    Agissant en qualité de <strong>{{ partner_representative_title }}</strong>, Dûment habilité aux fins des présentes.
-  </p>
-  {% else %}
-  <p class="party-intro">Et la société <span class="company-color">{{ partner_company_name }}</span></p>
-  <p class="party-detail">
-    <strong>{{ partner_legal_form }}</strong> au capital de <strong>{{ partner_capital | capital }}</strong>,<br>
-    Dont le siège social est situé <strong>{{ partner_head_office }}</strong>,<br>
-    Inscrite au <strong>RCS de {{ partner_rcs_city }}</strong> sous le n° <strong>{{ partner_rcs_number | siren }}</strong>,<br>
-    Représentée par <strong>{% if partner_representative_civility %}{{ partner_representative_civility | civility }} {% endif %}{{ partner_representative_name }}</strong>,<br>
-    Agissant en qualité de <strong>{{ partner_representative_title }}</strong>, Dûment habilité aux fins des présentes.
-  </p>
-  {% endif %}
-  <p class="denomination"><em>Ci-après dénommé(e)</em>&nbsp; <strong>« le Partenaire »</strong></p>
-</div>
-
-<p class="part-separator">D'autre part</p>
-
-<p class="decision-header">Il a été décidé ce qui suit :</p>
-
-<!-- ===== ARTICLES ===== -->
+{# ===== Macro de rendu du contenu markdown des articles / annexes ===== #}
 {% macro render_paragraphs(content, article_num=0) %}
   {% set sub_ns = namespace(sub_counter=0) %}
   {% for paragraph in content.split('\n\n') %}
     {% set stripped = paragraph.strip() %}
     {% if stripped %}
       {% if stripped.startswith('## ') %}
-        {# Sub-section heading: auto-numbered as N.X when article_num > 0 #}
+        {# Sous-titre : auto-numéroté N.X quand on est dans un article numéroté #}
         {% set sub_ns.sub_counter = sub_ns.sub_counter + 1 %}
         {% if article_num > 0 %}
-          <div class="sub-section-title">{{ article_num }}.{{ sub_ns.sub_counter }} — {{ stripped[3:].strip() | md | safe }}</div>
+          <div class="subh">{{ article_num }}.{{ sub_ns.sub_counter }} — {{ stripped[3:].strip() | md | safe }}</div>
         {% else %}
-          <div class="sub-section-title">{{ stripped[3:].strip() | md | safe }}</div>
+          <div class="subh">{{ stripped[3:].strip() | md | safe }}</div>
         {% endif %}
       {% elif stripped.startswith('- ') %}
-        {# Dash-prefixed lines → <ul> #}
-        <ul>
+        <ul class="li">
           {% for line in stripped.split('\n') %}
             {% set l = line.strip() %}
             {% if l.startswith('- ') %}
@@ -466,7 +273,6 @@
           {% endfor %}
         </ul>
       {% elif stripped.startswith('|') %}
-        {# Markdown table → <table> #}
         <table class="content-table">
           {% for row in stripped.split('\n') %}
             {% set r = row.strip() %}
@@ -483,59 +289,152 @@
           </tbody>
         </table>
       {% else %}
-        <p>{{ stripped | md | replace('\n', '<br>') | safe }}</p>
+        <p class="p">{{ stripped | md | replace('\n', '<br>') | safe }}</p>
       {% endif %}
     {% endif %}
   {% endfor %}
 {% endmacro %}
 
+<!-- ===== PIED DE PAGE COURANT (pages 2+) ===== -->
+<div class="rfoot">
+  <table><tr>
+    <td><span class="nm">{{ issuer_company_name | upper }}</span> · Contrat cadre de sous-traitance <span class="ref">{{ reference }}</span></td>
+    <td class="c">Confidentiel</td>
+  </tr></table>
+</div>
+
+<!-- ===== COUVERTURE ===== -->
+<div class="cover-flow">
+  {% if logo_b64 %}
+    <img class="cov-logo" src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="{{ issuer_company_name }}">
+  {% elif logo_filename %}
+    <img class="cov-logo" src="{{ logo_filename }}" alt="{{ issuer_company_name }}">
+  {% endif %}
+  <div class="cov-key"></div>
+
+  <div class="cover-hero-band"><div class="cover-hero-cell">
+    <div class="cov-hero">
+      <div class="cov-eyebrow">Document contractuel</div>
+      <h1 class="cov-title">Contrat cadre de sous-traitance</h1>
+      <div class="cov-sub">Prestations d'assistance technique — mise à disposition de collaborateurs.</div>
+      <div class="cov-tag">Confidentiel — Propriété de la Société</div>
+    </div>
+  </div></div>
+
+  <div class="cov-foot">
+    <div class="cov-rule"></div>
+    <table class="cov-meta">
+      <tr>
+        <td><div class="k"><span class="dot"></span>Partenaire</div><div class="v">{{ partner_company_name | default('') }}</div></td>
+        <td><div class="k"><span class="dot"></span>Référence</div><div class="v">{{ reference }}</div></td>
+        <td><div class="k"><span class="dot"></span>Date</div><div class="v">{{ contract_date }}</div></td>
+      </tr>
+    </table>
+    <div class="cov-legal">
+      <div class="nm">{{ issuer_company_name | upper }}</div>
+      <div class="det">
+        {{ issuer_head_office }}<br>
+        {{ issuer_legal_form }} au capital de {{ issuer_capital | capital }} · R.C.S. {{ issuer_rcs_city }} {{ issuer_rcs_number | siren }}{% if issuer_tva_number %} · TVA {{ issuer_tva_number }}{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PARTIES ===== -->
+<div class="h2">Entre les soussignés</div>
+
+<div class="party">
+  <div class="pr">La Société</div>
+  <div class="lines">
+    La société <b>{{ issuer_company_name }}</b>, {{ issuer_legal_form }} au capital de <b>{{ issuer_capital | capital }}</b>,
+    dont le siège social est situé <b>{{ issuer_head_office }}</b>,
+    inscrite au RCS de {{ issuer_rcs_city }} sous le n° <b>{{ issuer_rcs_number | siren }}</b>,
+    {%- if issuer_representative_is_entity %}
+      représentée par la société <b>{{ issuer_representative_name }}</b>, agissant en qualité de {{ issuer_representative_quality }}, elle-même représentée par <b>{{ issuer_representative_sub_name | expand_civility }}</b>{% if issuer_representative_sub_quality %}, {{ issuer_representative_sub_quality }}{% endif %}, dûment habilitée.
+    {%- else %}
+      représentée par <b>{{ issuer_representative_name | expand_civility }}</b>, agissant en qualité de {{ issuer_representative_quality }}, dûment habilité.
+    {%- endif %}
+    <span class="desig-l">Ci-après dénommée « la Société »,</span>
+    <span class="desig">d'une part.</span>
+  </div>
+</div>
+
+<div class="vs">ET</div>
+
+<div class="party">
+  <div class="pr">Le Partenaire</div>
+  <div class="lines">
+    {%- set plf = partner_legal_form | default('') | upper %}
+    {%- if plf == 'EI' or plf == 'ENTREPRISE INDIVIDUELLE' %}
+      L'entreprise individuelle <b>{{ partner_company_name }}</b>,
+      dont le siège social est situé <b>{{ partner_head_office }}</b>,
+      inscrite sous le n° <b>{{ partner_rcs_number | siren }}</b>,
+      représentée par <b>{% if partner_representative_civility %}{{ partner_representative_civility | civility }} {% endif %}{{ partner_representative_name }}</b>, en qualité de {{ partner_representative_title }}, dûment habilité.
+    {%- else %}
+      La société <b>{{ partner_company_name }}</b>, {{ partner_legal_form }} au capital de <b>{{ partner_capital | capital }}</b>,
+      dont le siège social est situé <b>{{ partner_head_office }}</b>,
+      inscrite au RCS de {{ partner_rcs_city }} sous le n° <b>{{ partner_rcs_number | siren }}</b>,
+      représentée par <b>{% if partner_representative_civility %}{{ partner_representative_civility | civility }} {% endif %}{{ partner_representative_name }}</b>, en qualité de {{ partner_representative_title }}, dûment habilité.
+    {%- endif %}
+    <span class="desig-l">Ci-après dénommée « le Partenaire »,</span>
+    <span class="desig">d'autre part.</span>
+  </div>
+</div>
+
+<!-- ===== ARTICLES ===== -->
 {% set ns = namespace(counter=0) %}
 {% for article in articles %}
   {% if article.article_key == 'preambule' %}
-<div class="article preambule">
-  <div class="article-title">{{ article.title }}</div>
-  <hr class="article-separator">
-  <div class="article-body">
-    {{ render_paragraphs(article.content) }}
-  </div>
-</div>
+<div class="h2">{{ article.title }}</div>
+{{ render_paragraphs(article.content) }}
   {% else %}
     {% set ns.counter = ns.counter + 1 %}
-<div class="article">
-  <div class="article-title">{{ ns.counter }} – {{ article.title }}</div>
-  <hr class="article-separator">
-  <div class="article-body">
-    {{ render_paragraphs(article.content, ns.counter) }}
-  </div>
-</div>
+<table class="sec"><tr>
+  <td class="n">{{ ns.counter }}</td>
+  <td class="t">{{ article.title }}</td>
+</tr></table>
+{{ render_paragraphs(article.content, ns.counter) }}
   {% endif %}
 {% endfor %}
 
-<!-- ===== SIGNATURE ===== -->
-<div class="signature-section">
-  <p class="signature-location">Fait à Paris,<br>le</p>
-  <table class="signature-table">
-    <tr>
-      <td class="signature-col">
-        <p class="signer-company">{{ issuer_legal_form }} {{ issuer_company_name }}</p>
-        <p class="signer-name">{{ issuer_signatory_name | expand_civility }}</p>
-      </td>
-      <td class="signature-col">
-        <p class="signer-company">{{ partner_legal_form }} {{ partner_company_name }}</p>
-        <p class="signer-name">{% if partner_representative_civility %}{{ partner_representative_civility | civility }} {% endif %}{{ partner_representative_name }}</p>
-      </td>
-    </tr>
-  </table>
+<!-- ===== SIGNATURES ===== -->
+<div class="sigblock">
+  <div class="sigblock-hd">Signatures</div>
+  <p class="sig-lead">Fait à {{ signature_city | default('Paris') }}. Document signé électroniquement via Yousign ; l'horodatage de la plateforme fait foi de la date de signature.</p>
+  <table class="sigrow"><tr>
+    <td class="sigcard">
+        <div class="sigcard-role">Pour la Société</div>
+        <div class="sigcard-id"><table>
+          <tr class="sl"><td class="k">Société</td><td class="v"><b>{{ issuer_company_name | upper }}</b></td></tr>
+          <tr class="sl"><td class="k">Représentée par</td><td class="v">
+            {%- if issuer_representative_is_entity -%}
+              {{ issuer_representative_name }}, elle-même représentée par <b>{{ issuer_signatory_name | expand_civility }}</b>
+            {%- else -%}
+              <b>{{ issuer_signatory_name | expand_civility }}</b>
+            {%- endif -%}
+          </td></tr>
+          <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ issuer_representative_sub_quality | default(issuer_representative_quality, true) }}</b></td></tr>
+        </table></div>
+        <div class="sigzone"></div>
+        <div class="sigmeta">Le <span class="fillin"></span></div>
+    </td>
+    <td class="sigcard">
+        <div class="sigcard-role">Pour le Partenaire</div>
+        <div class="sigcard-id"><table>
+          <tr class="sl"><td class="k">Société</td><td class="v"><b>{{ partner_company_name | upper }}</b></td></tr>
+          <tr class="sl"><td class="k">Représentée par</td><td class="v"><b>{% if partner_representative_civility %}{{ partner_representative_civility | civility }} {% endif %}{{ partner_representative_name }}</b></td></tr>
+          <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ partner_representative_title }}</b></td></tr>
+        </table></div>
+        <div class="sigzone"></div>
+        <div class="sigmeta">Le <span class="fillin"></span></div>
+    </td>
+  </tr></table>
 </div>
 
 <!-- ===== ANNEXES ===== -->
 {% for annexe in annexes %}
-<div class="annexe-page">
-  <div class="annexe-title">ANNEXE N° {{ loop.index }} — {{ annexe.title }}</div>
-  <div class="article-body">
-    {{ render_paragraphs(annexe.content) }}
-  </div>
-</div>
+<div class="annexe">Annexe {{ loop.index }} — {{ annexe.title }}</div>
+{{ render_paragraphs(annexe.content) }}
 {% endfor %}
 
 </body>

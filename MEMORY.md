@@ -132,6 +132,18 @@
   - `CONTRACT_STATUS_CONFIG` porte désormais `stage` (1-6) pour le stepper et les segments de progression du pipeline
   - Typo : Inter + JetBrains Mono (refs/compteurs)
 
+### ADR-011 : Gabarit de contrat porté en CSS paged media (pas de moteur JS)
+- **Date** : 2026-08
+- **Décision** : Porter les maquettes de contrat Claude Design vers un gabarit Jinja2 rendu par WeasyPrint, en réécrivant la mise en page en CSS paged media, plutôt que de rendre le `.dc.html` tel quel via un navigateur headless
+- **Raison** : Les `.dc.html` dépendent de `doc-page.js` et du runtime `x-dc` (React) pour paginer ; les exécuter imposerait Chromium/Playwright en production alors que la chaîne WeasyPrint est déjà en place, plus légère et déjà branchée sur S3/YouSign
+- **Conséquences** :
+  - la maquette reste la source de vérité **visuelle**, le gabarit la source de vérité **technique** — tout écart de rendu se corrige côté gabarit
+  - les fonctionnalités CSS non supportées (grid, étirement de tableau à hauteur imposée, `height: 100%` contre un bloc absolu) sont contournées par tables + positionnement absolu, et **commentées sur place** pour éviter qu'un futur portage les réintroduise
+  - les polices de la charte doivent être versionnées dans `backend/templates/fonts/` : l'image Docker ne les embarque pas et la substitution est silencieuse
+  - le contenu juridique reste en base (articles/annexes éditables par l'ADV) ; le gabarit ne porte que la forme
+  - le socle commun (polices, palette, filtres, environnement Jinja2) vit dans `pdf_rendering.py` + `_marque.css.html` : tout nouveau document de la charte s'appuie dessus plutôt que de recopier le CSS. Les gabarits de base `_charte_base.html` (multipage, unilatéral) et `_formulaire_base.html` (une page, signé) couvrent les deux familles existantes
+
+
 ## Problèmes connus
 
 | Problème | Impact | Workaround | Priorité |
@@ -205,6 +217,35 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-08-21 (feat: chartes, accusés de réception et engagement — charte « Éditorial »)
+
+Portage des cinq maquettes Claude Design restantes du projet *Refonte templates Craftmania et Leonum* : **Charte informatique**, **Charte des achats responsables et des partenaires**, leurs deux **accusés de réception** et l'**Engagement de confidentialité**. Suite directe de la refonte du contrat de sous-traitance, même charte graphique.
+
+- **Deux familles de documents**, chacune avec son gabarit de base :
+  - `_charte_base.html` — chartes multipages (couverture pleine page, pied de page courant, sections numérotées). Documents **unilatéraux** : bloc « Pour la Direction » seul, **aucune mention de signature électronique**, conformément à la règle de la charte documentaire.
+  - `_formulaire_base.html` — formulaires d'une page (AR, engagement), pleine page `@page { margin: 0 }`. Ces documents sont **signés par leur destinataire** : la mention Yousign y est donc attendue.
+  - `_marque.css.html` — socle commun aux deux (polices embarquées, palette, encarts, listes à puce, cartes de signature).
+- **Nouveau module partagé** `pdf_rendering.py` : filtres Jinja2, palette de marque et fabrique d'environnement, désormais utilisés par le contrat **et** les chartes. `html_pdf_contract_generator.py` passe de 168 à 68 lignes. Corrige au passage deux défauts du chemin chartes : le `base_url` manquant (les polices embarquées n'étaient pas résolues, WeasyPrint substituait silencieusement) et l'absence de loader Jinja2 (`Template(f.read())`), qui interdisait `{% extends %}` / `{% include %}`.
+- **Contraintes WeasyPrint** identiques à la refonte du contrat, contournées et commentées sur place : grid → tables, cartes de signature portées par le `<td>`, couverture à hauteur fixe avec héros centré par translation. ⚠️ La bande héros **exige une hauteur explicite** : sans elle `top: 50%` vaut 0 et la translation remonte le titre par-dessus le logo. `max-width` est par ailleurs sans effet sur une cellule de tableau — la largeur des cartes de signature est portée par la table.
+- **`GenerateCharterDocumentsUseCase` réécrit** autour d'un registre `CHARTER_DOCUMENTS` (clé, gabarit, destinataire, nom de fichier, clé de résultat). `execute(target=...)` génère le jeu consultant (charte informatique + AR + engagement) ou partenaire (charte achats responsables + AR). Les clés `ar_s3_key` / `engagement_s3_key` déjà exposées par l'API sont conservées ; le jeu consultant inclut désormais **la charte elle-même**, que le système ne générait pas alors que son AR y fait référence.
+- **Nouvelle route** `POST /contract-requests/{id}/generate-partner-charters` (ADV/admin), pendant de `send-charters` pour les documents partenaire.
+- **Tests** : `test_charter_template_rendering.py` (18 cas — registre, rendu des dix sections de chaque charte, unilatéralité vérifiée sur le PDF, formulaires tenant sur une page, absence de « None » avec un contexte minimal). 140 tests unitaires `contract_management` verts, ruff OK.
+
+### 2026-08-21 (feat: refonte graphique du contrat de sous-traitance — charte « Éditorial »)
+
+Portage de la maquette Claude Design **« Contrat de sous-traitance.dc.html »** (projet *Refonte templates Craftmania et Leonum*) dans le gabarit PDF `backend/templates/contrat_at.html`. Le rendu passe d'un document Calibri centré à la charte éditoriale : couverture pleine page, en-têtes d'article numérotés, cartes de parties et de signature, annexes en pages dédiées.
+
+- **Traduction maquette → WeasyPrint** : la maquette s'appuie sur le composant JS `<doc-page>` et sur `x-dc` (React), que WeasyPrint n'exécute pas. La pagination est reprise en CSS paged media (`@page` + `position: running()` pour le pied de page courant, `@page :first` pour la couverture sans pied).
+- **Contraintes moteur** contournées et documentées dans le gabarit :
+  - CSS Grid et Flexbox → `<table>` (support partiel/absent de grid dans WeasyPrint) ;
+  - WeasyPrint n'étire ni un tableau ni une cellule à une hauteur imposée : la couverture fixe sa hauteur (264 mm), cale son bloc légal en `position: absolute; bottom: 0` et centre le héros par `translateY(-50%)` ;
+  - cartes de signature : le cadre est porté par le `<td>` (les cellules d'une ligne partagent leur hauteur) et non par un `<div>` interne.
+- **Polices embarquées** : `backend/templates/fonts/` (Space Grotesk + Hanken Grotesk, graisses 400/500/600/700, SIL OFL 1.1). L'image Docker n'installe que Liberation/DejaVu/Carlito — sans ces fichiers WeasyPrint substituait silencieusement une autre police.
+- **Palette par société** : `_resolve_brand_theme()` (`html_pdf_contract_generator.py`) injecte `brand` / `brand_strong` / `brand_tint` / `brand_grad`. Craftmania, Leonum et Wohm gardent les couleurs de la maquette ; toute autre société obtient une palette dérivée de son `color_code` (`cm_contract_companies`), donc une société créée en base reste correctement brandée.
+- **Contenu inchangé** : les articles et annexes restent pilotés par la base (`cm_contract_article_templates` / `cm_contract_annex_templates`), avec la renumérotation hors préambule, les sous-titres auto-numérotés `N.X`, les listes et les tableaux markdown.
+- **Dépendances** : `weasyprint` et `jinja2` ajoutés à `backend/pyproject.toml`. Ils étaient importés à l'exécution mais déclarés uniquement dans le `Dockerfile` — un `pip install -e .` donnait une app qui plantait à la génération du brouillon.
+- **Tests** : `backend/tests/unit/contract_management/test_contract_template_rendering.py` (24 cas — palette de marque, présence et déclaration des polices, rendu PDF multi-pages vérifié par extraction de texte). Le rendu est `importorskip` sur WeasyPrint/pymupdf pour ne pas casser une CI sans les libs système. 122 tests unitaires `contract_management` verts, ruff OK.
 
 ### 2026-08-21 (feat: saisie en personne — possibilité de zapper le dépôt des documents)
 
