@@ -1,0 +1,41 @@
+{# Accusé de réception — Charte des achats responsables et des partenaires.
+   Porté depuis « Accusé de réception - Charte des achats responsables.dc.html ». #}
+{% extends "_formulaire_base.html" %}
+{% set doc_titre = "Charte des achats responsables et des partenaires — Version " ~ (charter_version | default('2026.1')) %}
+
+{% block kick %}Accusé de réception<br>Version {{ charter_version | default('2026.1') }}{% endblock %}
+{% block title %}Accusé de réception{% endblock %}
+{% block sub %}{{ doc_titre }}{% endblock %}
+
+{% block ident_label %}Identification du partenaire{% endblock %}
+{% block id_rows %}
+  <tr class="idrow">
+    <td class="k">Prénom et nom</td>
+    <td class="v">{% if partner_representative_civility %}{{ partner_representative_civility | civility }} {% endif %}{{ partner_representative_name | default('') }}</td>
+  </tr>
+  <tr class="idrow">
+    <td class="k">Fonction</td>
+    <td class="v">{{ partner_representative_title | default('') }}</td>
+  </tr>
+  <tr class="idrow last">
+    <td class="k">Société</td>
+    <td class="v">{{ partner_company_name | default('') }}</td>
+  </tr>
+{% endblock %}
+
+{% block objet %}
+<p class="p">
+  Par la présente, je soussigné(e) reconnais avoir reçu de la Direction de {{ issuer_company_name }} le document intitulé :<br>
+  <span class="q">« {{ doc_titre }} »</span>.
+</p>
+{% endblock %}
+
+{% block engagement_list %}
+  <li>Avoir reçu et pris connaissance de l'intégralité du document susvisé ;</li>
+  <li>M'engage à en respecter l'ensemble des dispositions.</li>
+{% endblock %}
+
+{% block callout %}Le présent accusé de réception est signé électroniquement via Yousign et conservé par la Société ; l'horodatage vaut preuve de la date de remise.{% endblock %}
+
+{% block sig_role %}Le partenaire{% endblock %}
+{% block sig_id %}<b>{% if partner_representative_civility %}{{ partner_representative_civility | civility }} {% endif %}{{ partner_representative_name | default('') }}</b>{% endblock %}

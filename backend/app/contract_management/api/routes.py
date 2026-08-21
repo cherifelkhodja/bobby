@@ -3219,3 +3219,50 @@ async def send_consultant_charters(
         "charter_status": "sent",
         "documents": result_keys,
     }
+
+
+@router.post(
+    "/{contract_request_id}/generate-partner-charters",
+    summary="Generate the partner charter documents for a contract request",
+)
+async def generate_partner_charters(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate the charte des achats responsables and its AR. ADV/admin only.
+
+    Companion of `send-charters`, which covers the consultant documents.
+    """
+    from app.contract_management.application.use_cases.generate_charter_documents import (
+        GenerateCharterDocumentsUseCase,
+    )
+    from app.infrastructure.storage.s3_client import S3StorageClient
+
+    settings = get_settings()
+
+    use_case = GenerateCharterDocumentsUseCase(
+        contract_request_repository=ContractRequestRepository(db),
+        s3_service=S3StorageClient(settings),
+        db=db,
+        third_party_repository=ThirdPartyRepository(db),
+    )
+
+    try:
+        result_keys = await use_case.execute(
+            contract_request_id=contract_request_id,
+            target="partner",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error(
+            "generate_partner_charters_failed",
+            error=str(exc),
+            cr_id=str(contract_request_id),
+        )
+        raise HTTPException(
+            status_code=400, detail="La génération des chartes partenaire a échoué."
+        ) from exc
+
+    return {"status": "ok", "documents": result_keys}

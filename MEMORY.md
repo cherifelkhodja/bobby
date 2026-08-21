@@ -141,6 +141,7 @@
   - les fonctionnalités CSS non supportées (grid, étirement de tableau à hauteur imposée, `height: 100%` contre un bloc absolu) sont contournées par tables + positionnement absolu, et **commentées sur place** pour éviter qu'un futur portage les réintroduise
   - les polices de la charte doivent être versionnées dans `backend/templates/fonts/` : l'image Docker ne les embarque pas et la substitution est silencieuse
   - le contenu juridique reste en base (articles/annexes éditables par l'ADV) ; le gabarit ne porte que la forme
+  - le socle commun (polices, palette, filtres, environnement Jinja2) vit dans `pdf_rendering.py` + `_marque.css.html` : tout nouveau document de la charte s'appuie dessus plutôt que de recopier le CSS. Les gabarits de base `_charte_base.html` (multipage, unilatéral) et `_formulaire_base.html` (une page, signé) couvrent les deux familles existantes
 
 
 ## Problèmes connus
@@ -216,6 +217,20 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-08-21 (feat: chartes, accusés de réception et engagement — charte « Éditorial »)
+
+Portage des cinq maquettes Claude Design restantes du projet *Refonte templates Craftmania et Leonum* : **Charte informatique**, **Charte des achats responsables et des partenaires**, leurs deux **accusés de réception** et l'**Engagement de confidentialité**. Suite directe de la refonte du contrat de sous-traitance, même charte graphique.
+
+- **Deux familles de documents**, chacune avec son gabarit de base :
+  - `_charte_base.html` — chartes multipages (couverture pleine page, pied de page courant, sections numérotées). Documents **unilatéraux** : bloc « Pour la Direction » seul, **aucune mention de signature électronique**, conformément à la règle de la charte documentaire.
+  - `_formulaire_base.html` — formulaires d'une page (AR, engagement), pleine page `@page { margin: 0 }`. Ces documents sont **signés par leur destinataire** : la mention Yousign y est donc attendue.
+  - `_marque.css.html` — socle commun aux deux (polices embarquées, palette, encarts, listes à puce, cartes de signature).
+- **Nouveau module partagé** `pdf_rendering.py` : filtres Jinja2, palette de marque et fabrique d'environnement, désormais utilisés par le contrat **et** les chartes. `html_pdf_contract_generator.py` passe de 168 à 68 lignes. Corrige au passage deux défauts du chemin chartes : le `base_url` manquant (les polices embarquées n'étaient pas résolues, WeasyPrint substituait silencieusement) et l'absence de loader Jinja2 (`Template(f.read())`), qui interdisait `{% extends %}` / `{% include %}`.
+- **Contraintes WeasyPrint** identiques à la refonte du contrat, contournées et commentées sur place : grid → tables, cartes de signature portées par le `<td>`, couverture à hauteur fixe avec héros centré par translation. ⚠️ La bande héros **exige une hauteur explicite** : sans elle `top: 50%` vaut 0 et la translation remonte le titre par-dessus le logo. `max-width` est par ailleurs sans effet sur une cellule de tableau — la largeur des cartes de signature est portée par la table.
+- **`GenerateCharterDocumentsUseCase` réécrit** autour d'un registre `CHARTER_DOCUMENTS` (clé, gabarit, destinataire, nom de fichier, clé de résultat). `execute(target=...)` génère le jeu consultant (charte informatique + AR + engagement) ou partenaire (charte achats responsables + AR). Les clés `ar_s3_key` / `engagement_s3_key` déjà exposées par l'API sont conservées ; le jeu consultant inclut désormais **la charte elle-même**, que le système ne générait pas alors que son AR y fait référence.
+- **Nouvelle route** `POST /contract-requests/{id}/generate-partner-charters` (ADV/admin), pendant de `send-charters` pour les documents partenaire.
+- **Tests** : `test_charter_template_rendering.py` (18 cas — registre, rendu des dix sections de chaque charte, unilatéralité vérifiée sur le PDF, formulaires tenant sur une page, absence de « None » avec un contexte minimal). 140 tests unitaires `contract_management` verts, ruff OK.
 
 ### 2026-08-21 (feat: refonte graphique du contrat de sous-traitance — charte « Éditorial »)
 

@@ -5,12 +5,14 @@ from pathlib import Path
 import pytest
 
 from app.contract_management.infrastructure.adapters.html_pdf_contract_generator import (
-    TEMPLATE_DIR,
     TEMPLATE_NAME,
     HtmlPdfContractGenerator,
+)
+from app.contract_management.infrastructure.adapters.pdf_rendering import (
+    TEMPLATE_DIR,
     _parse_hex,
-    _resolve_brand_theme,
     _shade,
+    resolve_brand_theme,
 )
 
 # Graisses embarquées : le gabarit les déclare toutes en @font-face et l'image
@@ -116,12 +118,12 @@ def test_shade_blends_toward_black_and_white():
 )
 def test_known_brands_use_the_design_palette(company, expected_brand):
     """Les marques de la maquette gardent leurs couleurs, quel que soit color_code."""
-    theme = _resolve_brand_theme(company, "#000000")
+    theme = resolve_brand_theme(company, "#000000")
     assert theme["brand"] == expected_brand
 
 
 def test_unknown_company_derives_a_palette_from_its_color_code():
-    theme = _resolve_brand_theme("GEMINI CONSULTING", "#4BBEA8")
+    theme = resolve_brand_theme("GEMINI CONSULTING", "#4BBEA8")
     assert theme["brand"] == "#4bbea8"
     # Teinte assombrie pour les aplats de texte, très claire pour les fonds.
     assert theme["brand_strong"] != theme["brand"]
@@ -130,7 +132,7 @@ def test_unknown_company_derives_a_palette_from_its_color_code():
 
 
 def test_unusable_color_code_falls_back_to_a_valid_palette():
-    theme = _resolve_brand_theme("Société Inconnue", "pas-une-couleur")
+    theme = resolve_brand_theme("Société Inconnue", "pas-une-couleur")
     assert set(theme) == {"brand", "brand_strong", "brand_tint", "brand_grad"}
     assert theme["brand"].startswith("#")
 
