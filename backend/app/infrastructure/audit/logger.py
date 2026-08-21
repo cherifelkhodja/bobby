@@ -69,6 +69,7 @@ class AuditAction(str, Enum):
     DOCUMENT_COLLECTION_INITIATED = "document_collection_initiated"
     DRAFT_GENERATED = "draft_generated"
     CONTRACT_SIGNED = "contract_signed"
+    CONTRACT_PUSHED_TO_CRM = "contract_pushed_to_crm"
     CONTRACT_REQUEST_CANCELLED = "contract_request_cancelled"
 
     # Admin data management

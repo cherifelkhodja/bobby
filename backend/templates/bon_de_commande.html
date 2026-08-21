@@ -1,0 +1,273 @@
+{#
+  Bon de commande — charte « Éditorial ».
+
+  Document d'une à deux pages, signé par les deux Parties, qui matérialise une
+  mission sous le contrat cadre du fournisseur. Même socle de marque que le
+  contrat et les chartes (`_marque.css.html`), mise en page propre : ce n'est
+  ni une charte multipage ni un formulaire unilatéral.
+
+  Contrainte tenue par ce gabarit : **seul le CJM d'achat figure ici**. Le TJM
+  de vente au client est une donnée interne et ne doit jamais être injectée
+  dans ce contexte.
+
+  Comme les autres gabarits : tables plutôt que grid/flex (support partiel dans
+  WeasyPrint), et polices résolues via `base_url` = backend/templates.
+#}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<style>
+{% include "_marque.css.html" %}
+
+  /* ===== PAGE ===== */
+  @page {
+    size: A4;
+    margin: 16mm 18mm 18mm 18mm;
+    @bottom-center { content: element(rfoot); vertical-align: bottom; }
+  }
+
+  body { font-size: 12px; line-height: 1.55; }
+
+  /* ===== PIED DE PAGE COURANT ===== */
+  .rfoot {
+    position: running(rfoot);
+    width: 174mm;                       /* 210mm - 18mm - 18mm */
+    padding-top: 8px;
+    border-top: 1px solid #e5e3df;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 9.5px; letter-spacing: .07em; text-transform: uppercase; color: #a09f9a;
+  }
+  .rfoot table { width: 100%; border-collapse: collapse; }
+  .rfoot td { padding: 0; vertical-align: middle; }
+  .rfoot .nm { font-weight: 700; color: {{ brand_strong | default('#c1301c') }}; }
+  .rfoot .c { text-align: right; color: {{ brand_strong | default('#c1301c') }}; }
+
+  /* ===== EN-TÊTE ===== */
+  .hd { width: 100%; border-collapse: collapse; }
+  .hd td { padding: 0; vertical-align: top; }
+  .hd-kick {
+    font-family: 'Space Grotesk', sans-serif; font-size: 11.5px; letter-spacing: .11em;
+    text-transform: uppercase; text-align: right; font-weight: 600;
+    color: {{ brand_strong | default('#c1301c') }}; line-height: 1.6;
+  }
+  .hd-ref { font-size: 15px; letter-spacing: -.01em; color: #201f1e; font-weight: 700; }
+  .doc-title {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 30px;
+    letter-spacing: -.02em; color: #201f1e; margin: 16px 0 0; line-height: 1.05;
+  }
+  .doc-sub { font-size: 13px; color: #5c5b58; margin: 6px 0 16px; }
+
+  /* ===== SECTIONS ===== */
+  .lblh {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 11px; letter-spacing: .09em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }};
+    margin: 14px 0 7px; padding-bottom: 6px; border-bottom: 1px solid #e5e3df;
+  }
+
+  /* Deux colonnes de parties : table, car flex n'égalise pas les hauteurs ici. */
+  .parties { width: 100%; border-collapse: separate; border-spacing: 10px 0; margin: 0 -10px; }
+  .parties td {
+    width: 50%; vertical-align: top; border: 1px solid #e5e3df; border-radius: 12px;
+    padding: 12px 15px; background: #fdfcfb;
+  }
+  .party-role {
+    font-family: 'Space Grotesk', sans-serif; font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase; color: #8a8984; font-weight: 700; margin-bottom: 6px;
+  }
+  .party-name { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; }
+  .party-tx { font-size: 11.5px; line-height: 1.55; color: #4a4946; margin-top: 4px; }
+
+  /* Tableau clé/valeur, utilisé pour le consultant et la mission. */
+  .kv { width: 100%; border-collapse: collapse; }
+  .kv td { padding: 5px 0; border-bottom: 1px solid #eeece8; vertical-align: top; }
+  .kv tr:last-child td { border-bottom: 0; }
+  .kv .k {
+    width: 165px; font-family: 'Space Grotesk', sans-serif; font-size: 10px; letter-spacing: .04em;
+    text-transform: uppercase; color: #8a8984; font-weight: 600; padding-right: 12px;
+  }
+  .kv .v { font-size: 12px; color: #201f1e; }
+  .kv .v b { font-weight: 600; }
+
+  /* ===== CONDITIONS FINANCIÈRES ===== */
+  .money { width: 100%; border-collapse: collapse; margin-top: 2px; }
+  .money th {
+    font-family: 'Space Grotesk', sans-serif; font-size: 9.5px; letter-spacing: .06em;
+    text-transform: uppercase; color: #8a8984; font-weight: 600; text-align: right;
+    padding: 0 10px 6px; border-bottom: 1px solid #e5e3df;
+  }
+  .money th.lbl, .money td.lbl { text-align: left; padding-left: 0; }
+  .money td { font-size: 12.5px; text-align: right; padding: 8px 10px; border-bottom: 1px solid #eeece8; }
+  .money tr.total td {
+    border-bottom: 0; border-top: 1.5px solid {{ brand | default('#e24a1a') }};
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; color: #201f1e;
+    padding-top: 10px;
+  }
+  .money .unit { color: #8a8984; font-size: 10.5px; }
+
+  /* ===== SIGNATURES ===== */
+  .sigblock { margin-top: 14px; }
+  .sigcard { padding: 14px 16px; width: 50%; }
+  .sigcard-id { margin-top: 8px; min-height: 30px; }
+  .sigzone { margin-top: 10px; height: 52px; }
+  .sigmeta { margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<!-- Pied de page courant (pages 2+) -->
+<div class="rfoot">
+  <table><tr>
+    <td><span class="nm">{{ issuer_company_name }}</span> · Bon de commande {{ reference }}</td>
+    <td class="c">{{ partner_company_name }}</td>
+  </tr></table>
+</div>
+
+<table class="hd"><tr>
+  <td>
+    {% if logo_b64 %}
+      <img class="cov-logo" src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="{{ issuer_company_name }}">
+    {% elif logo_filename %}
+      <img class="cov-logo" src="{{ logo_filename }}" alt="{{ issuer_company_name }}">
+    {% endif %}
+  </td>
+  <td class="hd-kick">
+    Bon de commande<br>
+    <span class="hd-ref">{{ reference }}</span><br>
+    {{ order_date }}
+  </td>
+</tr></table>
+<div class="cov-key"></div>
+
+<h1 class="doc-title">{{ mission_title | default('Mission de prestation') }}</h1>
+<div class="doc-sub">
+  {% if consultant_name %}{{ consultant_name }}{% endif %}
+  {%- if consultant_name and client_name %} · {% endif -%}
+  {% if client_name %}Client : {{ client_name }}{% endif %}
+</div>
+
+<div class="ident">
+  <div class="ident-pr">Bon de commande établi par</div>
+  <div class="ident-tx">
+    La société <b>{{ issuer_company_name }}</b>, {{ issuer_legal_form }} au capital de <b>{{ issuer_capital | capital }}</b>,
+    siège social <b>{{ issuer_head_office }}</b> — R.C.S. {{ issuer_rcs_city }} <b>{{ issuer_rcs_number | siren }}</b>{% if issuer_tva_number %} · TVA <b>{{ issuer_tva_number }}</b>{% endif %}.
+  </div>
+</div>
+
+<div class="callout">
+  Le présent bon de commande est régi par le contrat cadre de sous-traitance
+  {% if framework_reference %}<b>{{ framework_reference }}</b>{% endif %}
+  {%- if framework_signed_date %} signé le <b>{{ framework_signed_date }}</b>{% endif %}, conclu entre les Parties.
+  Il en constitue les Conditions Particulières et ne vaut que pour la mission décrite ci-dessous.
+</div>
+
+<div class="lblh">Parties</div>
+<table class="parties"><tr>
+  <td>
+    <div class="party-role">Le client</div>
+    <div class="party-name">{{ issuer_company_name }}</div>
+    <div class="party-tx">
+      {{ issuer_head_office }}<br>
+      Représentée par {{ issuer_representative_name | expand_civility }}{% if issuer_representative_quality %}, {{ issuer_representative_quality }}{% endif %}
+    </div>
+  </td>
+  <td>
+    <div class="party-role">Le partenaire</div>
+    <div class="party-name">{{ partner_company_name }}</div>
+    <div class="party-tx">
+      {{ partner_head_office }}<br>
+      {% if partner_siren %}SIREN {{ partner_siren | siren }}{% endif %}
+      {%- if partner_representative_name %}<br>Représentée par {{ partner_representative_civility | civility }} {{ partner_representative_name }}{% if partner_representative_title %}, {{ partner_representative_title }}{% endif %}{% endif %}
+    </div>
+  </td>
+</tr></table>
+
+<div class="lblh">Collaborateur affecté</div>
+<table class="kv">
+  <tr>
+    <td class="k">Consultant</td>
+    <td class="v"><b>{{ consultant_civility | civility }} {{ consultant_name }}</b></td>
+  </tr>
+  {% if consultant_email or consultant_phone %}
+  <tr>
+    <td class="k">Coordonnées</td>
+    <td class="v">{{ consultant_email }}{% if consultant_email and consultant_phone %} · {% endif %}{{ consultant_phone }}</td>
+  </tr>
+  {% endif %}
+</table>
+
+<div class="lblh">Mission</div>
+<table class="kv">
+  {% if client_name %}
+  <tr><td class="k">Client final</td><td class="v"><b>{{ client_name }}</b></td></tr>
+  {% endif %}
+  <tr><td class="k">Objet</td><td class="v">{{ mission_title }}</td></tr>
+  {% if mission_description %}
+  <tr><td class="k">Description</td><td class="v">{{ mission_description }}</td></tr>
+  {% endif %}
+  {% if mission_place %}
+  <tr><td class="k">Lieu d'exécution</td><td class="v">{{ mission_place }}</td></tr>
+  {% endif %}
+  <tr><td class="k">Période</td><td class="v">Du <b>{{ start_date }}</b> au <b>{{ end_date }}</b></td></tr>
+</table>
+
+<div class="lblh">Conditions financières</div>
+<table class="money">
+  <tr>
+    <th class="lbl">Désignation</th>
+    <th>Quantité</th>
+    <th>Prix unitaire HT</th>
+    <th>Montant HT</th>
+  </tr>
+  <tr>
+    <td class="lbl">Prestation d'assistance technique</td>
+    <td>{{ billable_days }} <span class="unit">j</span></td>
+    <td>{{ purchase_daily_rate }} <span class="unit">€ / j</span></td>
+    <td>{{ total_amount }} <span class="unit">€</span></td>
+  </tr>
+  {% if free_days and free_days != '0' %}
+  <tr>
+    <td class="lbl">Jours de gratuité <span class="unit">(non facturés)</span></td>
+    <td>{{ free_days }} <span class="unit">j</span></td>
+    <td>—</td>
+    <td>0 <span class="unit">€</span></td>
+  </tr>
+  {% endif %}
+  <tr class="total">
+    <td class="lbl">Total HT</td>
+    <td>{{ days_sold }} <span class="unit">j vendus</span></td>
+    <td></td>
+    <td>{{ total_amount }} <span class="unit">€</span></td>
+  </tr>
+</table>
+<div class="callout">
+  {% if free_days and free_days != '0' %}
+  Sur les <b>{{ days_sold }}</b> jours vendus, <b>{{ free_days }}</b> sont accordés à titre gracieux :
+  <b>{{ billable_days }}</b> jours sont facturables.
+  {% endif %}
+  Facturation mensuelle à terme échu sur la base des jours réellement réalisés{% if payment_terms_label %}, paiement {{ payment_terms_label }}{% endif %}.
+  {% if invoices_company_mail %}Factures à adresser à <span class="mail">{{ invoices_company_mail }}</span>.{% endif %}
+</div>
+
+<div class="lblh">Signatures</div>
+<div class="sigblock">
+  <table class="sigrow" style="width: 100%"><tr>
+    <td class="sigcard">
+      <div class="sigcard-role">Pour {{ issuer_company_name }}</div>
+      <div class="sigcard-id"><b>{{ issuer_signatory_name }}</b></div>
+      <div class="sigzone"></div>
+      <div class="sigmeta">Le <span class="fillin"></span></div>
+    </td>
+    <td class="sigcard">
+      <div class="sigcard-role">Pour {{ partner_company_name }}</div>
+      <div class="sigcard-id">
+        <b>{% if partner_signatory_name %}{{ partner_signatory_name }}{% else %}{{ partner_representative_name }}{% endif %}</b>
+      </div>
+      <div class="sigzone"></div>
+      <div class="sigmeta">Le <span class="fillin"></span>, précédé de la mention « Bon pour accord »</div>
+    </td>
+  </tr></table>
+</div>
+
+</body>
+</html>

@@ -113,3 +113,13 @@ class PurchaseOrderNotEditableError(DomainError):
 
     def __init__(self, reference: str, status: str) -> None:
         super().__init__(f"Le bon de commande {reference} n'est plus modifiable (état : {status}).")
+
+
+class PurchaseOrderBoondSyncError(DomainError):
+    """Raised when pushing a signed purchase order to BoondManager fails."""
+
+    def __init__(self, reference: str, reason: str) -> None:
+        self.reason = reason
+        super().__init__(
+            f"Synchronisation BoondManager du bon de commande {reference} impossible : {reason}"
+        )

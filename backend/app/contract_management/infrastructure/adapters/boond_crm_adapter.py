@@ -366,7 +366,7 @@ class BoondCrmAdapter:
             provider_id: Boond provider ID.
             positioning_id: Boond positioning ID.
             reference: Contract reference.
-            amount: Order amount (voir NEEDS-CONFIRMATION ci-dessous).
+            amount: Montant d'achat HT total de la mission.
 
         Returns:
             Boond purchase order ID.
@@ -376,13 +376,10 @@ class BoondCrmAdapter:
                 "type": "purchaseorder",
                 "attributes": {
                     "reference": reference,
-                    # NEEDS-CONFIRMATION: `amount` reçu = TJM (prix unitaire) des
-                    # appelants. Dans le schéma Boond des devis, `amountExcludingTax`
-                    # est le prix UNITAIRE (cf. quotation_line.to_boond_record), le
-                    # total étant `turnoverExcludingTax` = TJM × quantité. Ce BDC
-                    # n'envoie ni quantité ni total : à confirmer si Boond attend ici
-                    # un TOTAL (TJM × quantity_sold) ou le TJM seul. Maths d'argent
-                    # laissées inchangées faute de certitude.
+                    # Montant d'achat total de la mission, soit
+                    # (jours vendus - jours de gratuité) x CJM. Le bon de commande
+                    # Boond matérialise un engagement d'achat sur une période :
+                    # c'est bien un total, pas un prix unitaire.
                     "amountExcludingTax": amount,
                 },
                 "relationships": {
