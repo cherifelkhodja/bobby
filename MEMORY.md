@@ -206,6 +206,15 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-21 (fix: saisie manuelle des infos du tiers — « value is not a valid email address »)
+
+L'enregistrement du formulaire ADV « Informations du tiers » (`POST /contract-requests/{id}/third-party-info`) échouait en 422 `value is not a valid email address: An email address must have an @-sign.` dès qu'un contact était coché « Identique au représentant légal » : le front poste tous ses champs, donc `signatory_email` / `adv_contact_email` / `billing_contact_email` arrivaient en `""` et cassaient la validation `EmailStr | None`.
+
+- **Fix** : nouveau `BlankToNoneModel` (`backend/app/third_party/api/schemas.py`) — un `model_validator(mode="before")` convertit les chaînes vides/blanches en `None` **pour les champs optionnels uniquement** (annotation acceptant `None`). Appliqué à `CompanyInfoRequest` et `CompanyInfoDraftRequest`, donc au portail tiers **et** à la saisie manuelle ADV.
+- Les champs requis (ex. `representative_email`) continuent de remonter une vraie erreur de validation, et un email optionnel mal formé reste rejeté.
+- Effet de bord corrigé : les téléphones/prénoms/noms/civilités optionnels vides ne sont plus stockés en chaîne vide mais en `NULL` — le mapper `apply_company_info` recopie bien les infos du représentant pour les contacts « identiques ».
+- **Tests** : `backend/tests/unit/third_party/test_company_info_schema.py` (5 cas : blancs → None, requis toujours rejeté, email optionnel invalide rejeté, brouillon). 558 tests unitaires verts, ruff OK.
+
 ### 2026-07-11 (feat: UI v2 — implémentation du prototype « Bobby v2 »)
 
 Refonte visuelle complète du frontend selon le prototype Claude Design « Bobby v2 - Prototype » (~40 fichiers, logique métier intacte).

@@ -1,9 +1,38 @@
 """Pydantic schemas for third party portal API."""
 
 from datetime import date, datetime
+from typing import Any, get_args
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
+
+
+class BlankToNoneModel(BaseModel):
+    """Base model turning blank strings into ``None`` on optional fields.
+
+    A form posts every input it renders, so an optional field the user left
+    untouched arrives as ``""`` — which fails ``EmailStr`` or pattern validation
+    ("value is not a valid email address") instead of being read as "not filled
+    in". Normalising here keeps both the tiers portal and the ADV manual-entry
+    form working without each of them having to strip empty values client-side.
+
+    Required fields are left alone so they still report a proper error.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _blank_strings_to_none(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        cleaned = dict(data)
+        for key, value in data.items():
+            if not isinstance(value, str) or value.strip():
+                continue
+            field = cls.model_fields.get(key)
+            if field is not None and type(None) in get_args(field.annotation):
+                cleaned[key] = None
+        return cleaned
+
 
 # ── Portal Responses ──────────────────────────────────────────────
 
@@ -244,7 +273,7 @@ class SiretLookupResponse(BaseModel):
     ape_code: str | None = None  # From INSEE (activité principale)
 
 
-class CompanyInfoRequest(BaseModel):
+class CompanyInfoRequest(BlankToNoneModel):
     """Request from tiers to submit company identity via portal."""
 
     entity_category: str = Field(..., pattern=r"^(ei|societe|portage_salarial)$")
@@ -291,7 +320,7 @@ class CompanyInfoRequest(BaseModel):
     billing_contact_phone: str | None = Field(None, max_length=50)
 
 
-class CompanyInfoDraftRequest(BaseModel):
+class CompanyInfoDraftRequest(BlankToNoneModel):
     """Partial/draft save of company info — all fields optional, no validation constraints."""
 
     entity_category: str | None = Field(None, pattern=r"^(ei|societe|portage_salarial)$")
