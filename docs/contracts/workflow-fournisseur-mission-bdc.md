@@ -1,7 +1,7 @@
 # Workflow cible : Fournisseur (contrat cadre) + Mission (BDC)
 
 > **Date** : 2026-08-21
-> **Statut** : Spécifié, implémentation à venir
+> **Statut** : Implémenté le 2026-08-21
 > **Remplace** : `refonte-contrat-cadre-bdc.md` (ADR-009, partiellement obsolète depuis la suppression du module BDC le 2026-07-10)
 
 ---
@@ -227,3 +227,13 @@ automatique des missions passées vers `cm_purchase_orders`.
    ressource Boond (`providerCompany`) a été retirée du code en juillet. Si elle est
    réintroduite, un BDC créé par webhook pour un consultant déjà rattaché peut
    présélectionner son fournisseur ; sinon l'ADV le choisit systématiquement.
+
+---
+
+## Écarts entre la spec et l'implémentation
+
+| Point | Décision retenue |
+|---|---|
+| Reconduction côté Boond | `POST /deliveries/{id}/renew` (renouvellement natif de la prestation, crée l'achat et la commande client) est la voie visée. Le corps de requête n'étant pas confirmé, la synchronisation d'une reconduction crée aujourd'hui son bon de commande Boond mais **ne crée pas** de second contrat : le consultant reste sous le contrat existant, dont l'échéance est à reculer. `boond_delivery_id` est capté sur le positionnement, prêt pour le branchement. |
+| Signature du BDC | Circuit manuel, comme le contrat cadre : téléchargement du document, envoi hors Bobby, dépôt du signé. YouSign reste à brancher. |
+| Archivage du contrat cadre | Le CRON épargne les cadres portant encore des missions vivantes — sans cela un cadre paraîtrait inactif alors que ses bons de commande tournent. |

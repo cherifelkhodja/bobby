@@ -35,7 +35,7 @@
 | Row Level Security | ✅ Done | PostgreSQL RLS |
 | Audit Logging | ✅ Done | Structuré |
 | Contractualisation | ✅ Done | Workflow BoondManager → validation → contrat PDF (HTML+WeasyPrint) → signature YouSign → push Boond |
-| Contrats cadres & BDC | ✅ Done | Workflows séparés : ContractRequest (simplifié, sans CONFIGURING_CONTRACT) + PurchaseOrderRequest (7 statuts). Webhooks candidat/ressource, re-contractualisation, UI progressive |
+| Contrats cadres & BDC | ✅ Done | Deux objets : fournisseur (ContractRequest, ouvert à la main) et mission (PurchaseOrder, `cm_purchase_orders`). Webhook positionnement → premier BDC, TJM vente interne / CJM achat imprimé, signature séparée, report Boond, reconduction |
 | Vigilance documentaire | ✅ Done | Cycle de vie docs légaux tiers (request → upload → validate/reject → expiration) ; dépôt sautable en saisie en personne (`documents_skipped`) |
 | Portail tiers (magic link) | ✅ Done | Upload documents + review contrat via lien sécurisé |
 | CRON jobs (APScheduler) | ✅ Done | Expirations documents, relances, purge magic links |
@@ -146,7 +146,8 @@
 
 ### ADR-012 : Workflow fournisseur / mission piloté par Bobby (réintroduction du BDC)
 - **Date** : 2026-08
-- **Décision** : Reprendre le workflow de contractualisation autour de deux objets créés **manuellement dans Bobby**, sans aucun déclencheur BoondManager : le **fournisseur** (contrat cadre, inchangé) et la **mission** (nouveau bon de commande, `cm_purchase_orders`). Les deux sont signés séparément par le fournisseur.
+- **Décision** : Reprendre le workflow de contractualisation autour de deux objets : le **fournisseur** (contrat cadre, inchangé, ouvert à la main dans Bobby) et la **mission** (nouveau bon de commande, `cm_purchase_orders`). Les deux sont signés séparément par le fournisseur. Seul le webhook positionnement subsiste, redirigé vers la création du premier bon de commande d'une mission.
+- **Statut** : Implémenté le 2026-08-21 (cf. changelog).
 - **Raison** : Les webhooks Boond imposaient le rythme de la contractualisation et mélangeaient relation fournisseur et mission. La suppression du module BDC (2026-07-10) a laissé le contrat cadre renvoyer contractuellement à des bons de commande que l'application ne produisait plus.
 - **Documentation complète** : `docs/contracts/workflow-fournisseur-mission-bdc.md`
 - **Points structurants** :
@@ -180,7 +181,8 @@
 | Signature YouSign auto | `create_procedure` non branché (flux manuel `mark-as-signed` seul) ; webhook rendu idempotent mais inerte tant qu'aucun `yousign_procedure_id` n'est associé | Medium |
 | Format références contrat | Code en `:03d` (3 chiffres) vs docstrings `NNNN` (4 chiffres) — trancher avant d'atteindre 1000 réf/an/société | Medium |
 | Colonnes DateTime naïves | `TIMESTAMP WITHOUT TIME ZONE` → `datetime.utcnow()` conservé (asyncpg refuse tz-aware) ; migrer en `timezone=True` pour passer à `datetime.now(UTC)` | Low |
-| Montant PO Boond | `amountExcludingTax` = TJM unitaire (ni `quantity` ni `turnoverExcludingTax` envoyés) — confirmer la sémantique attendue par `/purchase-orders` | Medium |
+| Renouvellement de prestation Boond | `POST /deliveries/{id}/renew` (crée achat + commande client) identifié comme la voie native pour reculer l'échéance du contrat à la reconduction ; corps de requête à confirmer avant branchement. `boond_delivery_id` est déjà capté sur le positionnement | Medium |
+| Signature BDC | Circuit manuel (téléchargement, envoi, dépôt du signé), comme le contrat cadre — YouSign non branché | Medium |
 | Repo sans `get_latest_by_candidate_id` | Garde anti double-CR best-effort côté candidat_11 pur (dédup pleine côté ressource) | Low |
 | RLS décorative | `set_rls_context` jamais appelé + policy `app.user_email` non définie + tables `cm_*` récentes sans policy — isolation reposant sur le filtre applicatif | Medium |
 | Webhook Boond `X-Webhook-Token` | Auth ajoutée (secret vide = rétrocompat) ; configurer Boond pour envoyer le header avant de renseigner le secret | Medium |
@@ -189,13 +191,9 @@
 
 ## Prochaines étapes
 
-- [ ] **Refonte contrat cadre/BDC** (ADR-009) — voir `docs/contracts/refonte-contrat-cadre-bdc.md`
-  - [ ] Webhooks candidat state 11 + ressource states 4/5
-  - [ ] Simplification saisie commerciale
-  - [ ] Simplification statuts contrat cadre
-  - [ ] UI progressive (sections masquées)
-  - [ ] Conformité intégrée dans page contrat
-  - [ ] Pages BDC séparées
+- [x] **Reprise du workflow fournisseur + mission** (ADR-012) — voir `docs/contracts/workflow-fournisseur-mission-bdc.md`
+- [ ] Brancher `POST /deliveries/{id}/renew` pour la reconduction côté Boond (corps de requête à confirmer)
+- [ ] Signature électronique du BDC (YouSign), aujourd'hui manuelle
 - [ ] Améliorer couverture tests E2E
 - [ ] Dashboard analytics cooptations
 - [ ] Notifications push
@@ -233,6 +231,31 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-08-21 (feat: reprise du workflow fournisseur + mission — implémentation ADR-012)
+
+Mise en œuvre complète de la spec `docs/contracts/workflow-fournisseur-mission-bdc.md`. Deux objets, deux cycles de vie : le **fournisseur** (contrat cadre, ouvert à la main) et la **mission** (bon de commande).
+
+**Socle** :
+- **Migration 079** : `cm_purchase_orders`. `third_party_id` et `contract_request_id` nullables — un BDC créé par webhook naît « à rattacher ». Index unique partiel sur `boond_positioning_id`, restreint aux BDC d'origine non annulés, qui rend le webhook idempotent sans gêner les reconductions.
+- `PurchaseOrderStatus` : `draft → generated → sent_for_signature → signed → active → closed`, annulable avant signature, avec retours arrière pour corriger un document généré ou envoyé.
+- Entité `PurchaseOrder` : **TJM de vente interne, CJM d'achat imprimé** ; montant = `(jours vendus - gratuité) x CJM` ; marge indicative réservée à l'affichage ; complétude vérifiée avant génération ; envoi en signature refusé tant que le contrat cadre n'est pas signé.
+- Références `XXX-BC-NNN` par société émettrice, même mécanique d'advisory lock que les contrats cadres.
+
+**Points d'entrée** :
+- `POST /contract-requests/suppliers` : dossier fournisseur **sans consultant**, avec déduplication par SIREN (`/suppliers/lookup` renseigne l'ADV avant création) et choix du mode de collecte dès la création.
+- Webhook `positioning-update` redirigé : il crée le **premier BDC** d'une mission, plus jamais de demande de contrat cadre. État déclencheur configurable (`app_settings` → `bdc_trigger_positioning_state`, 7 par défaut). Webhooks candidat et ressource supprimés, ainsi que les deux use cases devenus inatteignables.
+- `POST /purchase-orders` : même chemin, déclenché à la main (rattrapage).
+
+**Cycle du BDC** : complétion (fournisseur, mission, conditions) → génération du PDF (`bon_de_commande.html`, charte « Éditorial », **sans le TJM**) → envoi en signature → dépôt du signé → report Boond (conversion candidat, rattachement fournisseur, contrat au CJM, bon de commande au montant d'achat), chaque écriture idempotente et l'erreur conservée pour relance.
+
+**Reconduction** : nouveau BDC relié par `parent_purchase_order_id`, positionnement Boond conservé, pas de second contrat Boond. Le CRON d'archivage épargne désormais les contrats cadres portant des missions vivantes.
+
+**Décidé au passage** : le montant du bon de commande Boond est le **total d'achat**, ce qui lève le `NEEDS-CONFIRMATION` sur `amountExcludingTax` posé en mars.
+
+**Front** : pages `/contracts/bdc` et `/contracts/bdc/:id`, modale « Nouveau fournisseur » avec recherche SIRET, carte « Bons de commande » sur la fiche cadre, entrée de navigation avec compteur.
+
+**Tests** : 90 nouveaux tests unitaires (entité, statuts, création depuis positionnement, complétion, génération et confidentialité du TJM, synchronisation Boond, reconduction, lecture des webhooks). 268 tests `contract_management` verts, ruff/mypy propres, front `tsc`/`eslint`/`vitest` (282) et build Vite OK.
 
 ### 2026-08-21 (spec: workflow cible fournisseur + mission/BDC — ADR-012)
 

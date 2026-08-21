@@ -462,6 +462,8 @@ nouveau → en_cours → entretien → accepté
 - `GET /companies` - List contract companies (active)
 - `GET /` - List contract requests (commercial: own, adv/admin: all)
 - `POST /manual` - Create a contract request from scratch, entering the Boond consultant ID + type candidate/resource (ADV/admin, no webhook)
+- `POST /suppliers` - Open a supplier dossier with no consultant: type, contact, issuing company and collection mode entered up front (ADV/admin)
+- `GET /suppliers/lookup?siret=` - Find an existing supplier by SIRET before creating a duplicate (ADV/admin)
 - `GET /next-reference` - Get next contract request reference
 - `GET /siret-lookup/{siret}` - SIRET auto-fill INSEE+INPI for ADV manual entry (ADV/admin)
 - `GET /{id}` - Get contract request detail
@@ -491,8 +493,21 @@ nouveau → en_cours → entretien → accepté
 - `GET /{id}/contracts/{contract_id}/download` - Get presigned download URL
 - `POST /{id}/rollback` - Rollback contract request status (ADV/admin)
 
+### Purchase Orders — Bons de commande (`/api/v1/purchase-orders`)
+- `GET /` - List purchase orders (filters: status, third_party_id, search)
+- `POST /` - Create from a Boond positioning (ADV/admin)
+- `GET /{id}` - Get purchase order detail
+- `PATCH /{id}` - Complete or correct the mission (ADV/admin)
+- `POST /{id}/generate` - Generate the purchase order PDF (ADV/admin)
+- `GET /{id}/document` - Presigned download URL (`?signed=true` for the signed copy)
+- `POST /{id}/send-for-signature` - Send to the supplier (refused until the framework contract is signed)
+- `POST /{id}/mark-as-signed` - Upload the signed document (ADV/admin)
+- `POST /{id}/push-to-boond` - Push resource, contract and purchase order to Boond (ADV/admin)
+- `POST /{id}/renew` - Renew the mission with a new purchase order (ADV/admin)
+- `POST /{id}/cancel` - Cancel before signature (ADV/admin)
+
 ### Webhooks (`/api/v1/webhooks`)
-- `POST /boondmanager/positioning-update` - Boond positioning webhook (always 200 OK)
+- `POST /boondmanager/positioning-update` - Creates the first purchase order of a mission (always 200 OK)
 - `POST /yousign/signature-completed` - YouSign signature webhook
 
 ### Vigilance (`/api/v1`)
@@ -680,6 +695,37 @@ created_at: datetime
 updated_at: datetime
 ```
 
+### cm_purchase_orders (bons de commande)
+```python
+id: UUID (PK)
+reference: str (unique)            # XXX-BC-NNN, séquence par société émettrice
+status: str                        # draft, generated, sent_for_signature, signed, active, closed, cancelled
+company_id: UUID (FK cm_contract_companies.id) | None
+third_party_id: UUID (FK tp_third_parties.id) | None   # None = « à rattacher »
+contract_request_id: UUID (FK cm_contract_requests.id) | None  # contrat cadre
+parent_purchase_order_id: UUID (FK self) | None        # reconduction
+boond_consultant_id: int | None
+boond_consultant_type: str | None  # candidate | resource
+boond_positioning_id: int | None
+boond_need_id: int | None
+boond_delivery_id: int | None      # prestation Boond (renouvellement natif)
+client_name / mission_title / mission_description: str | None
+mission_site_name / mission_address / mission_postal_code / mission_city: str | None
+sale_daily_rate: Decimal | None    # TJM vente — INTERNE, jamais imprimé
+purchase_daily_rate: Decimal | None  # CJM achat — seul taux du document
+days_sold: Decimal | None
+free_days: Decimal                 # jours travaillés non facturés
+start_date / end_date: date | None
+s3_key_draft / s3_key_signed: str | None
+boond_contract_id / boond_purchase_order_id: int | None
+boond_sync_error: str | None
+status_history: JSON
+created_by: UUID (FK users.id) | None
+created_at / updated_at: datetime
+```
+
+**Montant** : `(days_sold - free_days) x purchase_daily_rate`.
+
 ### cv_templates
 ```python
 id: UUID (PK)
@@ -762,6 +808,7 @@ updated_at: datetime
 | 027_add_end_date_mission_title_to_contract_requests.py | end_date, mission_title on cm_contract_requests |
 | 028_add_consultant_and_address_fields.py | consultant/address fields, drop mission_location |
 | 078_add_documents_skipped_to_contract_requests.py | documents_skipped on cm_contract_requests (saisie en personne sans dépôt) |
+| 079_add_purchase_orders.py | cm_purchase_orders (bons de commande) + index unique partiel sur boond_positioning_id |
 
 ## Environment Variables
 
@@ -916,6 +963,8 @@ audit_logger.log(
 
 ### ADV/Commercial/Admin Routes
 - `/contracts` - Contract requests list (commercial: own, adv/admin: all)
+- `/contracts/bdc` - Purchase orders list (missions)
+- `/contracts/bdc/:id` - Purchase order detail (mission, conditions, signature, Boond)
 - `/contracts/:id` - Contract request detail + validation form
 - `/compliance` - Compliance dashboard (ADV/admin)
 
