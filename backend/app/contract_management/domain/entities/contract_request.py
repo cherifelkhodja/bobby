@@ -72,6 +72,11 @@ class ContractRequest:
     #   - True  -> `compliance_override_reason` = justification de l'override
     #   - False -> `compliance_override_reason` = motif de blocage (COMPLIANCE_BLOCKED)
     compliance_override_reason: str | None = None
+    # Dépôt des documents de vigilance volontairement ignoré (saisie manuelle
+    # « en personne » : l'ADV renseigne tout sans solliciter le fournisseur).
+    # Aucun emplacement de document n'est créé et la conformité est levée par
+    # dérogation tracée (cf. `skip_document_collection`).
+    documents_skipped: bool = False
     status_history: list[dict[str, Any]] = field(default_factory=list)
     # NEEDS-CONFIRMATION: `datetime.utcnow()` est déprécié mais conservé
     # volontairement. Les colonnes DB correspondantes sont de type
@@ -193,6 +198,43 @@ class ContractRequest:
         """
         self.compliance_override = True
         self.compliance_override_reason = reason
+        self.updated_at = datetime.utcnow()
+
+    def skip_document_collection(self, reason: str) -> None:
+        """Ignorer le dépôt des documents de vigilance (saisie manuelle ADV).
+
+        Utilisé quand le contrat est saisi « en personne », sans passer par le
+        portail fournisseur : l'ADV atteste que la vigilance est traitée hors
+        Bobby et ne veut pas de collecte documentaire.
+
+        Marque la demande comme sans collecte, trace la justification via la
+        dérogation de conformité existante (ce qui débloque la génération du
+        brouillon) et, si la collecte est en cours, avance jusqu'à la revue de
+        conformité pour que le brouillon soit générable immédiatement.
+
+        Args:
+            reason: Justification, tracée dans `compliance_override_reason`.
+        """
+        self.documents_skipped = True
+        self.override_compliance(reason)
+        if self.status == ContractRequestStatus.COLLECTING_DOCUMENTS:
+            self.transition_to(ContractRequestStatus.REVIEWING_COMPLIANCE)
+
+    def restore_document_collection(self) -> None:
+        """Rétablir le dépôt des documents après un `skip_document_collection`.
+
+        Annule la dérogation posée par le saut et ramène la demande en collecte
+        si elle n'a pas encore dépassé la revue de conformité — l'ADV peut alors
+        déposer les documents normalement.
+        """
+        self.documents_skipped = False
+        self.compliance_override = False
+        self.compliance_override_reason = None
+        if self.status in (
+            ContractRequestStatus.REVIEWING_COMPLIANCE,
+            ContractRequestStatus.COMPLIANCE_BLOCKED,
+        ):
+            self.transition_to(ContractRequestStatus.COLLECTING_DOCUMENTS)
         self.updated_at = datetime.utcnow()
 
     def rollback_to_previous_status(self) -> None:

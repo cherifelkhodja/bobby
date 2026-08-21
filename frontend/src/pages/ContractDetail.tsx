@@ -25,6 +25,7 @@ import {
   X,
   Eye,
   Upload,
+  SkipForward,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -180,6 +181,10 @@ export default function ContractDetail() {
   const [formInitialized, setFormInitialized] = useState(false);
   // Manual entry: ADV enters the tiers info themselves without soliciting the fournisseur.
   const [manualEntry, setManualEntry] = useState(false);
+  // Sub-option of manual entry: no vigilance document is collected at all.
+  const [skipDocuments, setSkipDocuments] = useState(false);
+  const [showSkipDocs, setShowSkipDocs] = useState(false);
+  const [skipDocsReason, setSkipDocsReason] = useState('');
   const [showTpForm, setShowTpForm] = useState(false);
 
   // Contract configuration form state
@@ -548,6 +553,8 @@ export default function ContractDetail() {
         consultant_phone: validationForm.consultant_phone || undefined,
         // When the ADV opts for manual entry, do not email the fournisseur.
         notify_third_party: !manualEntry,
+        // Sub-option: skip the vigilance document deposit entirely.
+        skip_documents: manualEntry && skipDocuments,
       }),
     onSuccess: () => {
       toast.success('Validation commerciale effectuée.');
@@ -570,6 +577,31 @@ export default function ContractDetail() {
     },
     onError: (error) => toast.error(getErrorMessage(error)),
     onSettled: () => setUploadingDocId(null),
+  });
+
+  // Saisie « en personne » : ignorer le dépôt des documents de vigilance.
+  const skipDocumentsMutation = useMutation({
+    mutationFn: () => contractsApi.skipDocuments(id!, skipDocsReason.trim() || undefined),
+    onSuccess: () => {
+      toast.success('Dépôt des documents ignoré.');
+      setShowSkipDocs(false);
+      setSkipDocsReason('');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['compliance-docs', cr?.third_party_id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const restoreDocumentsMutation = useMutation({
+    mutationFn: () => contractsApi.restoreDocuments(id!),
+    onSuccess: () => {
+      toast.success('Collecte des documents rétablie.');
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
+      queryClient.invalidateQueries({ queryKey: ['compliance-docs', cr?.third_party_id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
   });
 
   // Advance collecting_documents → reviewing_compliance (manual/ADV path).
@@ -651,8 +683,20 @@ export default function ContractDetail() {
     cr.status === 'compliance_blocked' ||
     vigDocs.some((d) => d.status === 'rejected' || d.status === 'expired');
 
+  // Saisie « en personne » : le dépôt des documents a été volontairement ignoré.
+  const documentsSkipped = cr.documents_skipped;
   const showVigilanceCard =
-    isAdv && vigDocs.length > 0 && hasReachedStatus(cr.status, 'collecting_documents');
+    isAdv &&
+    !documentsSkipped &&
+    vigDocs.length > 0 &&
+    hasReachedStatus(cr.status, 'collecting_documents');
+  const showSkippedDocsCard =
+    isAdv && documentsSkipped && hasReachedStatus(cr.status, 'collecting_documents');
+  // Le rétablissement n'a de sens que tant que la conformité est encore en jeu.
+  const canRestoreDocuments =
+    cr.status === 'collecting_documents' ||
+    cr.status === 'reviewing_compliance' ||
+    cr.status === 'compliance_blocked';
   const showTpInfoCard =
     isAdv && !!complianceDocs && hasReachedStatus(cr.status, 'collecting_documents');
   const showConfigLocked = isAdv && cr.status === 'collecting_documents';
@@ -666,6 +710,7 @@ export default function ContractDetail() {
 
   const hasLeftColumn =
     showVigilanceCard ||
+    showSkippedDocsCard ||
     showConfigForm ||
     showConfigLocked ||
     showTpInfoCard ||
@@ -742,17 +787,19 @@ export default function ContractDetail() {
               {linkCopied ? 'Copié !' : 'Copier le lien magique'}
             </Button>
           )}
-          {isAdv && (cr.status === 'collecting_documents' || cr.status === 'compliance_blocked') && (
-            <Button
-              variant="secondary"
-              onClick={() => resendCollectionEmailMutation.mutate()}
-              disabled={resendCollectionEmailMutation.isPending}
-              isLoading={resendCollectionEmailMutation.isPending}
-              leftIcon={<Mail className="h-3.5 w-3.5" />}
-            >
-              Relancer le tiers
-            </Button>
-          )}
+          {isAdv &&
+            !documentsSkipped &&
+            (cr.status === 'collecting_documents' || cr.status === 'compliance_blocked') && (
+              <Button
+                variant="secondary"
+                onClick={() => resendCollectionEmailMutation.mutate()}
+                disabled={resendCollectionEmailMutation.isPending}
+                isLoading={resendCollectionEmailMutation.isPending}
+                leftIcon={<Mail className="h-3.5 w-3.5" />}
+              >
+                Relancer le tiers
+              </Button>
+            )}
           {isAdv && cr.status === 'draft_sent_to_partner' && (
             <Button
               variant="secondary"
@@ -764,15 +811,24 @@ export default function ContractDetail() {
               Relancer le tiers
             </Button>
           )}
-          {isAdv && cr.status === 'collecting_documents' && (
-            <Button
-              onClick={() => startComplianceReviewMutation.mutate()}
-              disabled={startComplianceReviewMutation.isPending}
-              isLoading={startComplianceReviewMutation.isPending}
-              leftIcon={<CheckCircle className="h-3.5 w-3.5" />}
-            >
-              Démarrer la revue
-            </Button>
+          {isAdv && cr.status === 'collecting_documents' && !documentsSkipped && (
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setShowSkipDocs(true)}
+                leftIcon={<SkipForward className="h-3.5 w-3.5" />}
+              >
+                Passer le dépôt
+              </Button>
+              <Button
+                onClick={() => startComplianceReviewMutation.mutate()}
+                disabled={startComplianceReviewMutation.isPending}
+                isLoading={startComplianceReviewMutation.isPending}
+                leftIcon={<CheckCircle className="h-3.5 w-3.5" />}
+              >
+                Démarrer la revue
+              </Button>
+            </>
           )}
           {latestContract?.signed_at && latestContract?.s3_key_signed && (
             <Button
@@ -840,6 +896,49 @@ export default function ContractDetail() {
           )}
         </div>
       </div>
+
+      {/* Passer le dépôt des documents — confirmation + justification tracée */}
+      {isAdv && showSkipDocs && (
+        <div className="card mt-3">
+          <h3 className="ct">Passer le dépôt des documents</h3>
+          <p className="cs">
+            Les documents de vigilance ne seront ni demandés ni attendus, et les emplacements
+            encore vides seront retirés du dossier. La demande passe en revue de conformité avec
+            une dérogation tracée dans l'activité.
+          </p>
+          <label className="f-lab mt-3.5" htmlFor="skip-docs-reason">
+            Justification (optionnelle)
+          </label>
+          <textarea
+            id="skip-docs-reason"
+            value={skipDocsReason}
+            onChange={(e) => setSkipDocsReason(e.target.value)}
+            placeholder="Ex. : documents reçus et vérifiés hors Bobby…"
+            className="f-ta"
+            rows={2}
+          />
+          <div className="flex gap-2 mt-3">
+            <Button
+              size="sm"
+              onClick={() => skipDocumentsMutation.mutate()}
+              disabled={skipDocumentsMutation.isPending}
+              isLoading={skipDocumentsMutation.isPending}
+            >
+              Confirmer
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setShowSkipDocs(false);
+                setSkipDocsReason('');
+              }}
+            >
+              Annuler
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Conformité bloquée — alerte + dérogation tracée */}
       {isAdv && cr.status === 'compliance_blocked' && (
@@ -1121,7 +1220,10 @@ export default function ContractDetail() {
                 <input
                   type="checkbox"
                   checked={manualEntry}
-                  onChange={(e) => setManualEntry(e.target.checked)}
+                  onChange={(e) => {
+                    setManualEntry(e.target.checked);
+                    if (!e.target.checked) setSkipDocuments(false);
+                  }}
                   className="mt-0.5 rounded border-lin text-pri focus:ring-pri"
                 />
                 <span className="text-[12.5px] text-mut leading-relaxed">
@@ -1133,6 +1235,25 @@ export default function ContractDetail() {
                 </span>
               </label>
 
+              {/* Sous-option : saisie en personne sans aucune collecte documentaire */}
+              {manualEntry && (
+                <label className="flex items-start gap-2.5 mt-2 ml-6 p-3 rounded-[10px] bg-srf2 border border-lin2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={skipDocuments}
+                    onChange={(e) => setSkipDocuments(e.target.checked)}
+                    className="mt-0.5 rounded border-lin text-pri focus:ring-pri"
+                  />
+                  <span className="text-[12.5px] text-mut leading-relaxed">
+                    <span className="font-semibold text-ink block">
+                      Sans dépôt des documents de vigilance
+                    </span>
+                    Aucun document ne sera demandé ni attendu. La demande passe directement en
+                    revue de conformité avec une dérogation tracée dans l'activité.
+                  </span>
+                </label>
+              )}
+
               <div className="flex items-center justify-between gap-2 mt-5">
                 <span className="cs !mt-0">* champs requis</span>
                 <Button
@@ -1141,7 +1262,11 @@ export default function ContractDetail() {
                   isLoading={validateCommercialMutation.isPending}
                   leftIcon={<CheckCircle className="h-3.5 w-3.5" />}
                 >
-                  {manualEntry ? 'Valider et saisir les informations' : 'Valider'}
+                  {manualEntry
+                    ? skipDocuments
+                      ? 'Valider sans collecte documentaire'
+                      : 'Valider et saisir les informations'
+                    : 'Valider'}
                 </Button>
               </div>
             </div>
@@ -1184,6 +1309,58 @@ export default function ContractDetail() {
         <div className={hasLeftColumn ? 'cols' : 'mt-4'}>
           {hasLeftColumn && (
             <div className="space-y-4">
+              {/* Dépôt des documents ignoré (saisie en personne) */}
+              {showSkippedDocsCard && (
+                <div className="card">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="ct">Documents de vigilance</h3>
+                      <p className="cs">Dépôt ignoré — saisie en personne</p>
+                    </div>
+                    <span className="st st-amb shrink-0">
+                      <span className="dot" />
+                      Non collectés
+                    </span>
+                  </div>
+                  <div className="lock mt-3">
+                    <SkipForward className="h-4 w-4 shrink-0 mt-px" />
+                    <span>
+                      Aucun document n'est demandé au tiers pour cette demande. La conformité est
+                      levée par dérogation — la justification est tracée dans l'activité.
+                    </span>
+                  </div>
+                  {cr.compliance_override_reason && (
+                    <div className="quote mt-3 whitespace-pre-wrap">
+                      {cr.compliance_override_reason}
+                    </div>
+                  )}
+                  {complianceDocs && !complianceDocs.company_info_submitted && (
+                    <div className="alert !mt-3 !py-2.5 !text-[12.5px]">
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      <span>
+                        L'identité du tiers n'est pas encore renseignée — complétez « Informations
+                        société » avant de générer le brouillon, sinon le contrat sortira sans les
+                        mentions légales du tiers.
+                      </span>
+                    </div>
+                  )}
+                  {canRestoreDocuments && (
+                    <div className="flex gap-2 mt-3.5">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => restoreDocumentsMutation.mutate()}
+                        disabled={restoreDocumentsMutation.isPending}
+                        isLoading={restoreDocumentsMutation.isPending}
+                        leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
+                      >
+                        Rétablir le dépôt
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Documents de vigilance */}
               {showVigilanceCard && (
                 <div className="card">

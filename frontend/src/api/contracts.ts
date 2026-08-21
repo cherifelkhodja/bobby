@@ -66,6 +66,7 @@ export const contractsApi = {
       consultant_email?: string;
       consultant_phone?: string;
       notify_third_party?: boolean;
+      skip_documents?: boolean;
     },
   ): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
@@ -305,6 +306,27 @@ export const contractsApi = {
   resendCollectionEmail: async (id: string): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
       `/contract-requests/${id}/resend-collection-email`,
+    );
+    return response.data;
+  },
+
+  // Saisie « en personne » : ignorer le dépôt des documents de vigilance
+  // (dérogation tracée), ou rétablir la collecte.
+  skipDocuments: async (
+    id: string,
+    reason?: string,
+  ): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      `/contract-requests/${id}/skip-documents`,
+      { reason },
+    );
+    return response.data;
+  },
+
+  restoreDocuments: async (id: string): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      `/contract-requests/${id}/skip-documents`,
+      { restore: true },
     );
     return response.data;
   },

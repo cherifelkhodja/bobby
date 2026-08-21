@@ -466,12 +466,13 @@ nouveau → en_cours → entretien → accepté
 - `GET /siret-lookup/{siret}` - SIRET auto-fill INSEE+INPI for ADV manual entry (ADV/admin)
 - `GET /{id}` - Get contract request detail
 - `POST /{id}/sync-from-boond` - Re-sync data from Boond (ADV/admin)
-- `POST /{id}/validate-commercial` - Commercial validation (type tiers, contact, consultant; `notify_third_party` to skip the fournisseur email for manual entry)
+- `POST /{id}/validate-commercial` - Commercial validation (type tiers, contact, consultant; `notify_third_party` to skip the fournisseur email for manual entry, `skip_documents` to also skip the vigilance deposit)
 - `POST /{id}/third-party-info` - Manually enter third-party identity + contacts, no email (ADV/admin)
 - `POST /{id}/resend-collection-email` - Resend document collection email
 - `POST /{id}/configure` - Configure contract (ADV/admin)
 - `PATCH /{id}/article-overrides` - Override contract articles (ADV/admin)
 - `POST /{id}/compliance-override` - Override compliance check (ADV/admin)
+- `POST /{id}/skip-documents` - Skip the vigilance document deposit for an in-person entry, or restore it with `restore: true` (ADV/admin)
 - `POST /{id}/start-compliance-review` - Start compliance review (ADV/admin)
 - `POST /{id}/block-compliance` - Block for compliance issue (ADV/admin)
 - `DELETE /{id}` - Cancel contract request (ADV/admin)
@@ -760,6 +761,7 @@ updated_at: datetime
 | 026_allow_duplicate_positioning_after_cancel.py | Partial unique index on boond_positioning_id (WHERE status != cancelled) |
 | 027_add_end_date_mission_title_to_contract_requests.py | end_date, mission_title on cm_contract_requests |
 | 028_add_consultant_and_address_fields.py | consultant/address fields, drop mission_location |
+| 078_add_documents_skipped_to_contract_requests.py | documents_skipped on cm_contract_requests (saisie en personne sans dépôt) |
 
 ## Environment Variables
 
