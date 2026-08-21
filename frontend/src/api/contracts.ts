@@ -22,6 +22,7 @@ import type {
   ContractRequestListResponse,
   ContractRequestStatus,
   Contract,
+  SupplierLookupResult,
 } from '../types';
 
 export const contractsApi = {
@@ -49,6 +50,32 @@ export const contractsApi = {
   createManual: async (data: ManualContractInput): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
       '/contract-requests/manual',
+      data,
+    );
+    return response.data;
+  },
+
+  /** Recherche un fournisseur par SIRET avant d'ouvrir un dossier. */
+  lookupSupplier: async (siret: string): Promise<SupplierLookupResult> => {
+    const response = await apiClient.get<SupplierLookupResult>(
+      '/contract-requests/suppliers/lookup',
+      { params: { siret } },
+    );
+    return response.data;
+  },
+
+  /** Ouvre un dossier de contractualisation fournisseur (sans consultant). */
+  createSupplierDossier: async (data: {
+    third_party_type: string;
+    contact_email: string;
+    company_id?: string | null;
+    siret?: string | null;
+    reuse_third_party_id?: string | null;
+    notify_third_party: boolean;
+    skip_documents: boolean;
+  }): Promise<ContractRequest> => {
+    const response = await apiClient.post<ContractRequest>(
+      '/contract-requests/suppliers',
       data,
     );
     return response.data;

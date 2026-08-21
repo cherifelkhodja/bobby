@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FileSignature, X, Trash2, Plus, ChevronRight } from 'lucide-react';
+import { FileSignature, X, Trash2, Plus, ChevronRight, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { contractsApi, contractCompaniesApi } from '../api/contracts';
@@ -10,7 +10,7 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
 import { getErrorMessage } from '../api/client';
-import type { ContractRequest, ContractRequestStatus } from '../types';
+import type { ContractRequest, ContractRequestStatus, SupplierLookupResult } from '../types';
 import { CONTRACT_STATUS_CONFIG } from '../types';
 
 const THIRD_PARTY_TYPE_LABELS: Record<string, string> = {
@@ -75,6 +75,17 @@ export function ContractManagement() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [cancelTarget, setCancelTarget] = useState<{ id: string; reference: string } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showSupplier, setShowSupplier] = useState(false);
+  const [supplierForm, setSupplierForm] = useState({
+    siret: '',
+    third_party_type: 'sous_traitant',
+    contact_email: '',
+    company_id: '',
+    collection: 'portal' as 'portal' | 'in_person',
+    skip_documents: false,
+    reuse_third_party_id: '' as string,
+  });
+  const [supplierLookup, setSupplierLookup] = useState<SupplierLookupResult | null>(null);
   const [createForm, setCreateForm] = useState<{
     boond_consultant_id: string;
     consultant_type: 'candidate' | 'resource';
@@ -105,6 +116,38 @@ export function ContractManagement() {
         limit: FETCH_LIMIT,
         ...(statusFilter ? { status_filter: statusFilter as ContractRequestStatus } : {}),
       }),
+  });
+
+  const lookupSupplierMutation = useMutation({
+    mutationFn: (siret: string) => contractsApi.lookupSupplier(siret),
+    onSuccess: (result) => {
+      setSupplierLookup(result);
+      if (result.exists && result.third_party_id) {
+        setSupplierForm((f) => ({ ...f, reuse_third_party_id: result.third_party_id ?? '' }));
+      }
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const createSupplierMutation = useMutation({
+    mutationFn: () =>
+      contractsApi.createSupplierDossier({
+        third_party_type: supplierForm.third_party_type,
+        contact_email: supplierForm.contact_email.trim(),
+        company_id: supplierForm.company_id || null,
+        siret: supplierForm.siret.trim() || null,
+        reuse_third_party_id: supplierForm.reuse_third_party_id || null,
+        notify_third_party: supplierForm.collection === 'portal',
+        skip_documents: supplierForm.collection === 'in_person' && supplierForm.skip_documents,
+      }),
+    onSuccess: (cr) => {
+      toast.success(`Dossier ${cr.display_reference} ouvert.`);
+      setShowSupplier(false);
+      setSupplierLookup(null);
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+      navigate(`/contracts/${cr.id}`);
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
   });
 
   const cancelCrMutation = useMutation({
@@ -214,9 +257,21 @@ export function ContractManagement() {
             ))}
           </select>
           {isAdv && (
-            <Button onClick={() => setShowCreate(true)} leftIcon={<Plus className="h-3.5 w-3.5" />}>
-              Nouveau contrat
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setShowCreate(true)}
+                leftIcon={<Plus className="h-3.5 w-3.5" />}
+              >
+                Depuis un consultant
+              </Button>
+              <Button
+                onClick={() => setShowSupplier(true)}
+                leftIcon={<Building2 className="h-3.5 w-3.5" />}
+              >
+                Nouveau fournisseur
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -511,6 +566,190 @@ export function ContractManagement() {
               isLoading={createManualMutation.isPending}
             >
               Créer le dossier
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Ouverture d'un dossier fournisseur : ni consultant, ni positionnement */}
+      <Modal
+        isOpen={showSupplier}
+        onClose={() => setShowSupplier(false)}
+        title="Nouveau fournisseur"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <p className="notec">
+            Ouvre un contrat cadre pour une société, indépendamment de toute mission. Les missions
+            se rattachent ensuite via des bons de commande.
+          </p>
+
+          <div>
+            <label className="f-lab">SIRET du fournisseur</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={supplierForm.siret}
+                onChange={(e) => {
+                  setSupplierForm((f) => ({ ...f, siret: e.target.value, reuse_third_party_id: '' }));
+                  setSupplierLookup(null);
+                }}
+                placeholder="Ex : 894 213 669 00017"
+                className="f-in"
+                autoFocus
+              />
+              <Button
+                variant="secondary"
+                onClick={() => lookupSupplierMutation.mutate(supplierForm.siret.trim())}
+                disabled={
+                  supplierForm.siret.replace(/\D/g, '').length < 9 ||
+                  lookupSupplierMutation.isPending
+                }
+                isLoading={lookupSupplierMutation.isPending}
+              >
+                Rechercher
+              </Button>
+            </div>
+            <p className="f-hint">
+              Recherche la société dans le panel pour éviter d'ouvrir une seconde fiche.
+            </p>
+          </div>
+
+          {supplierLookup && (
+            <div className={`alert ${supplierLookup.has_framework_contract ? '' : ''}`}>
+              {supplierLookup.exists ? (
+                <span>
+                  <b>{supplierLookup.company_name ?? 'Fournisseur connu'}</b> est déjà au panel
+                  {supplierLookup.has_framework_contract
+                    ? ` avec un contrat cadre signé (${supplierLookup.framework_contract_reference}).`
+                    : '.'}
+                  {supplierLookup.open_contract_request_id
+                    ? ' Un dossier est déjà en cours pour cette société.'
+                    : ''}{' '}
+                  Ses documents de vigilance encore valides seront réutilisés.
+                </span>
+              ) : (
+                <span>Aucune société connue avec ce SIRET : une nouvelle fiche sera créée.</span>
+              )}
+            </div>
+          )}
+
+          <div>
+            <label className="f-lab">Type de tiers *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { key: 'sous_traitant', label: 'Sous-traitant', hint: 'Société de prestation' },
+                  { key: 'freelance', label: 'Freelance', hint: 'Indépendant, EI ou société' },
+                  { key: 'portage_salarial', label: 'Portage salarial', hint: 'Société de portage' },
+                  { key: 'salarie', label: 'Salarié', hint: 'Redirigé vers PayFit' },
+                ] as const
+              ).map(({ key, label, hint }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSupplierForm((f) => ({ ...f, third_party_type: key }))}
+                  className={`tcard text-left ${supplierForm.third_party_type === key ? 'on' : ''}`}
+                >
+                  <span className="tt">{label}</span>
+                  <span className="td2 block">{hint}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="f-lab">Email de contact contractualisation *</label>
+            <input
+              type="email"
+              value={supplierForm.contact_email}
+              onChange={(e) => setSupplierForm((f) => ({ ...f, contact_email: e.target.value }))}
+              placeholder="contact@fournisseur.fr"
+              className="f-in"
+            />
+          </div>
+
+          <div>
+            <label className="f-lab">Société émettrice</label>
+            <select
+              value={supplierForm.company_id}
+              onChange={(e) => setSupplierForm((f) => ({ ...f, company_id: e.target.value }))}
+              className="f-in !px-2.5"
+            >
+              <option value="">Sélectionner (optionnel)…</option>
+              {companies
+                .filter((c) => c.is_active)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.code})
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="f-lab">Collecte des documents *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  {
+                    key: 'portal' as const,
+                    label: 'Portail fournisseur',
+                    hint: 'Lien sécurisé envoyé au contact',
+                  },
+                  {
+                    key: 'in_person' as const,
+                    label: 'Je saisis en personne',
+                    hint: 'Aucun email au fournisseur',
+                  },
+                ]
+              ).map(({ key, label, hint }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() =>
+                    setSupplierForm((f) => ({
+                      ...f,
+                      collection: key,
+                      skip_documents: key === 'portal' ? false : f.skip_documents,
+                    }))
+                  }
+                  className={`tcard text-left ${supplierForm.collection === key ? 'on' : ''}`}
+                >
+                  <span className="tt">{label}</span>
+                  <span className="td2 block">{hint}</span>
+                </button>
+              ))}
+            </div>
+            {supplierForm.collection === 'in_person' && (
+              <label className="flex items-center gap-2 mt-3 ds">
+                <input
+                  type="checkbox"
+                  checked={supplierForm.skip_documents}
+                  onChange={(e) =>
+                    setSupplierForm((f) => ({ ...f, skip_documents: e.target.checked }))
+                  }
+                />
+                Vigilance documentaire traitée hors Bobby (dérogation tracée)
+              </label>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="secondary"
+              onClick={() => setShowSupplier(false)}
+              disabled={createSupplierMutation.isPending}
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={() => createSupplierMutation.mutate()}
+              disabled={!supplierForm.contact_email.includes('@') || createSupplierMutation.isPending}
+              isLoading={createSupplierMutation.isPending}
+            >
+              Ouvrir le dossier
             </Button>
           </div>
         </div>

@@ -9,6 +9,7 @@ import {
   UserCheck,
   Sparkles,
   FileSignature,
+  ClipboardList,
   ShieldCheck,
   Inbox,
   Shield,
@@ -17,6 +18,7 @@ import type { LucideIcon } from 'lucide-react';
 
 import { useAuthStore } from '../../stores/authStore';
 import { contractsApi } from '../../api/contracts';
+import { purchaseOrdersApi } from '../../api/purchaseOrders';
 import { vigilanceApi } from '../../api/vigilance';
 
 interface NavItemProps {
@@ -61,6 +63,12 @@ export function Sidebar() {
     refetchInterval: 120_000,
   });
 
+  const { data: purchaseOrdersData } = useQuery({
+    queryKey: ['purchase-orders', 'nav-count'],
+    queryFn: () => purchaseOrdersApi.list({ limit: 1 }),
+    enabled: canAccessContracts,
+  });
+
   const { data: complianceData } = useQuery({
     queryKey: ['compliance', 'nav-count'],
     queryFn: () => vigilanceApi.getDashboard(),
@@ -95,6 +103,12 @@ export function Sidebar() {
               label="Demandes"
               count={contractsData?.total}
               hot
+            />
+            <NavItem
+              to="/contracts/bdc"
+              icon={ClipboardList}
+              label="Bons de commande"
+              count={purchaseOrdersData?.total}
             />
             {isAdvOrAdmin && (
               <>

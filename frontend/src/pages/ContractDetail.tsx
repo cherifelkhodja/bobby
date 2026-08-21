@@ -31,6 +31,7 @@ import { toast } from 'sonner';
 
 import { contractsApi, contractCompaniesApi, contractArticlesApi, contractAnnexesApi, contractConsultantsApi } from '../api/contracts';
 import { vigilanceApi } from '../api/vigilance';
+import { purchaseOrdersApi } from '../api/purchaseOrders';
 import { useAuthStore } from '../stores/authStore';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
@@ -38,7 +39,11 @@ import { PageSpinner } from '../components/ui/Spinner';
 import { DocumentViewerModal } from '../components/vigilance/DocumentViewerModal';
 import { ThirdPartyInfoForm } from '../components/contracts/ThirdPartyInfoForm';
 import { getErrorMessage } from '../api/client';
-import { CONTRACT_STATUS_CONFIG, getDocumentBadgeConfig } from '../types';
+import {
+  CONTRACT_STATUS_CONFIG,
+  PURCHASE_ORDER_STATUS_CONFIG,
+  getDocumentBadgeConfig,
+} from '../types';
 import type { ContractRequestStatus, ContractRequest, VigilanceDocument } from '../types';
 
 // Progressive UI: status ordering for determining which sections to show
@@ -2112,6 +2117,11 @@ export default function ContractDetail() {
               {showConsultantsSection && (
                 <ConsultantsSection contractRequestId={cr.id} cr={cr} />
               )}
+
+              {/* Missions rattachées à ce fournisseur */}
+              {cr.third_party_id && (
+                <PurchaseOrdersSection thirdPartyId={cr.third_party_id} />
+              )}
             </div>
           )}
 
@@ -3210,6 +3220,67 @@ function ConsultantsSection({ contractRequestId, cr }: { contractRequestId: stri
         <p className="notec text-center py-4">
           Aucun consultant. Ajoutez un consultant pour envoyer les chartes.
         </p>
+      )}
+    </div>
+  );
+}
+
+
+/**
+ * Bons de commande du fournisseur.
+ *
+ * Un contrat cadre porte N missions dans le temps : cette carte les liste et
+ * signale celles qui attendent encore d'être complétées.
+ */
+function PurchaseOrdersSection({ thirdPartyId }: { thirdPartyId: string }) {
+  const navigate = useNavigate();
+
+  const { data } = useQuery({
+    queryKey: ['purchase-orders', 'by-third-party', thirdPartyId],
+    queryFn: () => purchaseOrdersApi.list({ third_party_id: thirdPartyId, limit: 100 }),
+  });
+
+  const orders = data?.items ?? [];
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-3.5">
+        <h3 className="ct">Bons de commande</h3>
+        <button type="button" className="alink" onClick={() => navigate('/contracts/bdc')}>
+          Tout voir →
+        </button>
+      </div>
+
+      {orders.length === 0 ? (
+        <p className="notec text-center py-4">
+          Aucune mission sous ce contrat cadre pour le moment.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {orders.map((po) => (
+            <button
+              key={po.id}
+              type="button"
+              onClick={() => navigate(`/contracts/bdc/${po.id}`)}
+              className="w-full text-left flex items-center justify-between gap-3 p-2.5 rounded-lg border border-lin hover:bg-srf2 transition-colors"
+            >
+              <div className="min-w-0">
+                <p className="nm truncate">
+                  <span className="ref mr-2">{po.reference}</span>
+                  {po.mission_title || 'Mission à préciser'}
+                </p>
+                <p className="ns truncate">
+                  {po.consultant_name || 'Consultant à identifier'}
+                  {po.client_name ? ` · ${po.client_name}` : ''}
+                </p>
+              </div>
+              <span className={`st ${PURCHASE_ORDER_STATUS_CONFIG[po.status].color} shrink-0`}>
+                <span className="dot" />
+                {PURCHASE_ORDER_STATUS_CONFIG[po.status].label}
+              </span>
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
