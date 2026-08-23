@@ -84,6 +84,15 @@ body {
   vertical-align: top; border: 1px solid #e5e3df; border-radius: 14px;
   background: #fdfcfb; page-break-inside: avoid;
 }
+/* Deux signataires : les identités n'ont pas le même nombre de lignes (« SC
+   HOLDING, elle-même représentée par… » en tient trois), et une hauteur fixe
+   déborderait. La carte est donc coupée en deux cellules d'une même colonne :
+   la ligne du haut porte les identités — les cellules d'une ligne partagent
+   leur hauteur —, celle du bas les zones de signature, qui commencent dès lors
+   à la même hauteur des deux côtés. Les deux moitiés se referment l'une sur
+   l'autre : bordure ouverte au raccord, `border-spacing` vertical nul. */
+.sigcard.hd { border-bottom: none; border-radius: 14px 14px 0 0; }
+.sigcard.ft { border-top: none; border-radius: 0 0 14px 14px; }
 .sigcard-role {
   font-family: 'Space Grotesk', sans-serif; font-size: 11px; letter-spacing: .1em;
   text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; font-weight: 700;

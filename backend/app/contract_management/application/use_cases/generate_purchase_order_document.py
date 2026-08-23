@@ -138,9 +138,16 @@ class GeneratePurchaseOrderDocumentUseCase:
         if framework and framework.contract_config:
             payment_terms = framework.contract_config.get("payment_terms")
 
-        # La TVA n'est pas une donnée du bon de commande : elle est calculée au
-        # taux normal, seul applicable à une prestation de services intérieure.
-        vat_amount = (po.total_amount * VAT_RATE / Decimal("100")).quantize(Decimal("0.01"))
+        # Tous les fournisseurs ne facturent pas la TVA : franchise en base,
+        # autoliquidation. Le tiers porte cet assujettissement ; le taux, lui,
+        # n'est pas une donnée du bon de commande — c'est le taux normal, seul
+        # applicable à une prestation de services intérieure.
+        vat_liable = getattr(third_party, "vat_liable", True) if third_party else True
+        vat_amount = (
+            (po.total_amount * VAT_RATE / Decimal("100")).quantize(Decimal("0.01"))
+            if vat_liable
+            else Decimal("0")
+        )
 
         context: dict = {
             "reference": po.display_reference,
@@ -165,6 +172,7 @@ class GeneratePurchaseOrderDocumentUseCase:
             "free_days": _fmt_quantity(po.free_days),
             "billable_days": _fmt_quantity(po.billable_days),
             "total_amount": _fmt_amount(po.total_amount),
+            "vat_liable": vat_liable,
             "vat_rate": _fmt_quantity(VAT_RATE),
             "vat_amount": _fmt_amount(vat_amount),
             "total_amount_ttc": _fmt_amount(po.total_amount + vat_amount),

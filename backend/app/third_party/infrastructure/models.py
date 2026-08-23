@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -57,6 +57,13 @@ class ThirdPartyModel(Base):
     billing_contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     billing_contact_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     vat_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    vat_liable: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
+        comment="Le tiers facture-t-il la TVA ? Faux en franchise en base ou autoliquidation.",
+    )
     ape_code: Mapped[str | None] = mapped_column(String(10), nullable=True)
     entity_category: Mapped[str | None] = mapped_column(String(20), nullable=True)
     company_info_submitted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

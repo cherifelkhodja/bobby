@@ -56,6 +56,9 @@ class ThirdParty:
     billing_contact_email: str | None = None
     billing_contact_phone: str | None = None
     vat_number: str | None = None
+    # Assujettissement à la TVA : faux en franchise en base ou en autoliquidation.
+    # Le numéro de TVA ne le dit pas — il est calculable depuis le SIREN.
+    vat_liable: bool = True
     ape_code: str | None = None
     id: UUID = field(default_factory=uuid4)
     boond_provider_id: int | None = None

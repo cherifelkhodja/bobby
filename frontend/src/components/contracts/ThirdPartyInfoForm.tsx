@@ -28,6 +28,7 @@ function buildInitialForm(tp: ThirdPartyWithDocuments): ThirdPartyInfoInput {
     capital: tp.capital ?? '',
     siret: tp.siret ?? '',
     vat_number: tp.vat_number ?? '',
+    vat_liable: tp.vat_liable ?? true,
     ape_code: tp.ape_code ?? '',
     head_office_street: tp.head_office_street ?? '',
     head_office_postal_code: tp.head_office_postal_code ?? '',
@@ -208,9 +209,19 @@ export function ThirdPartyInfoForm({ contractRequestId, initial, onSaved, onCanc
             type="text"
             value={form.vat_number ?? ''}
             onChange={(e) => set('vat_number', e.target.value)}
-            placeholder="Calculé depuis le SIREN si vide"
+            placeholder={form.vat_liable === false ? 'Sans objet' : 'Calculé depuis le SIREN si vide'}
+            disabled={form.vat_liable === false}
             className={INPUT_CLS}
           />
+          <label className="ds flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.vat_liable !== false}
+              onChange={(e) => set('vat_liable', e.target.checked)}
+            />
+            Assujetti à la TVA — décochez en franchise en base ou en autoliquidation, les bons
+            de commande sont alors établis sans TVA.
+          </label>
         </div>
         <div>
           <label className={LABEL_CLS}>Code APE/NAF</label>

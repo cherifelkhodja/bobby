@@ -217,17 +217,23 @@
   .sigrow { width: 100%; border-collapse: separate; border-spacing: 9px 0; margin: 0 -9px; }
   /* Le cadre est porté par la cellule, pas par un div interne : les cellules
      d'une même ligne partagent leur hauteur, les deux cartes restent donc
-     alignées comme en flex dans la maquette. */
+     alignées comme en flex dans la maquette. La carte est coupée en deux
+     cellules d'une même colonne (voir `_marque.css.html`) pour que les zones
+     de signature partent à la même hauteur des deux côtés. */
   .sigcard {
     width: 50%; vertical-align: top;
-    border: 1px solid #e5e3df; border-radius: 14px; padding: 18px 20px;
+    border: 1px solid #e5e3df; border-radius: 14px;
     background: #fdfcfb; page-break-inside: avoid;
   }
+  /* Bordure ouverte au raccord : les deux moitiés se referment l'une sur
+     l'autre et ne forment qu'une carte. */
+  .sigcard.hd { padding: 18px 20px 0; border-bottom: none; border-radius: 14px 14px 0 0; }
+  .sigcard.ft { padding: 0 20px 18px; border-top: none; border-radius: 0 0 14px 14px; }
   .sigcard-role {
     font-family: 'Space Grotesk', sans-serif; font-size: 11px; letter-spacing: .1em;
     text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; font-weight: 700;
   }
-  .sigcard-id { font-size: 12px; line-height: 1.5; color: #33322f; margin-top: 7px; min-height: 78px; }
+  .sigcard-id { font-size: 12px; line-height: 1.5; color: #33322f; margin-top: 7px; }
   .sigcard-id table { width: 100%; border-collapse: collapse; }
   .sigcard-id b { font-family: 'Space Grotesk', sans-serif; font-weight: 600; }
   .sl .k {
@@ -401,8 +407,9 @@
 <div class="sigblock">
   <div class="sigblock-hd">Signatures</div>
   <p class="sig-lead">Fait à {{ signature_city | default('Paris') }}. Document signé électroniquement via Yousign ; l'horodatage de la plateforme fait foi de la date de signature.</p>
-  <table class="sigrow"><tr>
-    <td class="sigcard">
+  <table class="sigrow">
+    <tr>
+      <td class="sigcard hd">
         <div class="sigcard-role">Pour la Société</div>
         <div class="sigcard-id"><table>
           <tr class="sl"><td class="k">Société</td><td class="v"><b>{{ issuer_company_name | upper }}</b></td></tr>
@@ -415,20 +422,27 @@
           </td></tr>
           <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ issuer_representative_sub_quality | default(issuer_representative_quality, true) }}</b></td></tr>
         </table></div>
-        <div class="sigzone"></div>
-        <div class="sigmeta">Le <span class="fillin"></span></div>
-    </td>
-    <td class="sigcard">
+      </td>
+      <td class="sigcard hd">
         <div class="sigcard-role">Pour le Partenaire</div>
         <div class="sigcard-id"><table>
           <tr class="sl"><td class="k">Société</td><td class="v"><b>{{ partner_company_name | upper }}</b></td></tr>
           <tr class="sl"><td class="k">Représentée par</td><td class="v"><b>{% if partner_representative_civility %}{{ partner_representative_civility | civility }} {% endif %}{{ partner_representative_name }}</b></td></tr>
           <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ partner_representative_title }}</b></td></tr>
         </table></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="sigcard ft">
         <div class="sigzone"></div>
         <div class="sigmeta">Le <span class="fillin"></span></div>
-    </td>
-  </tr></table>
+      </td>
+      <td class="sigcard ft">
+        <div class="sigzone"></div>
+        <div class="sigmeta">Le <span class="fillin"></span></div>
+      </td>
+    </tr>
+  </table>
 </div>
 
 <!-- ===== ANNEXES ===== -->

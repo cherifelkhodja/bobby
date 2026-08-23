@@ -233,6 +233,18 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-23 (feat: TVA optionnelle, signatures alignées, mission sans description)
+
+Trois retouches des documents contractuels, après relecture du nouveau bon de commande.
+
+**Fournisseurs non assujettis à la TVA** (migration 081). Le taux normal était appliqué à tout le monde, alors qu'un fournisseur peut être en franchise en base ou en autoliquidation. Le numéro de TVA ne dit rien de cet assujettissement — le portail le calcule d'office depuis le SIREN quand le tiers ne le renseigne pas —, d'où un drapeau explicite `vat_liable` sur `tp_third_parties`, vrai par défaut. Il se saisit dans le portail fournisseur comme dans la saisie ADV (une case, un seul formulaire pour les deux). Non assujetti : le bon de commande n'affiche ni taux ni TTC, mais « TVA non applicable », un « Total à régler » égal au total HT et la mention explicative ; le numéro de TVA n'est plus calculé d'office.
+
+**Blocs de signature alignés**, sur le bon de commande comme sur le contrat de sous-traitance. Les deux signataires n'ont pas la même identité — « SC HOLDING, elle-même représentée par Madame Selma HIZEM » tient trois lignes là où le partenaire en tient une — et la zone de signature de gauche descendait plus bas que celle de droite. La carte est désormais coupée en deux cellules d'une même colonne : la ligne du haut porte les identités, dont les cellules partagent leur hauteur, celle du bas les zones de signature, qui partent donc à la même hauteur. Les deux moitiés se referment l'une sur l'autre (bordure ouverte au raccord) et ne forment qu'une carte. Une hauteur fixe aurait débordé dès qu'une raison sociale passe à la ligne ; deux tests mesurent les boîtes réellement produites plutôt que la présence de classes.
+
+**Description de mission retirée du bon de commande** : elle reste en base et à l'écran, mais ne s'imprime plus. Le document décrit la mission par son intitulé, le consultant, le client final et le lieu.
+
+357 tests `contract_management` verts, 627 tests backend, front `tsc`/`eslint`/282 tests OK.
+
 ### 2026-08-23 (feat: bon de commande refait d'après la maquette Claude Design)
 
 Le PDF du bon de commande suit désormais la maquette `Bon de commande.dc.html`

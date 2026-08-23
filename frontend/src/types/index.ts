@@ -882,6 +882,8 @@ export interface ThirdPartyWithDocuments {
   siren: string;
   siret: string | null;
   vat_number: string | null;
+  /** Le tiers facture-t-il la TVA ? Faux en franchise en base ou autoliquidation. */
+  vat_liable: boolean;
   ape_code: string | null;
   rcs_city: string | null;
   rcs_number: string | null;
@@ -973,6 +975,7 @@ export interface PortalInfo {
     capital: string | null;
     siret: string | null;
     vat_number: string | null;
+    vat_liable: boolean;
     ape_code: string | null;
     rcs_city: string | null;
     head_office_street: string | null;

@@ -271,6 +271,28 @@ class TestTemplateRendering:
         assert "L.441-9" in html
         assert "indemnité forfaitaire de 40" in html
 
+    def test_a_supplier_exempt_from_vat_gets_no_vat_line(self):
+        """Franchise en base ou autoliquidation : ni TVA ni total TTC."""
+        third_party = _third_party()
+        third_party.vat_liable = False
+        use_case, _ = _make_use_case(_purchase_order(), third_party=third_party)
+        context = use_case._build_context(
+            _purchase_order(), third_party, _framework(), _company()
+        )
+        apply_brand_theme(context)
+        html = build_environment().get_template("bon_de_commande.html").render(**context)
+
+        assert "non applicable" in html
+        assert "Total à régler" in html
+        assert "Total TTC" not in html
+        assert "Fournisseur non assujetti à la TVA" in html
+
+    def test_the_mission_description_stays_internal(self):
+        """La description de mission ne s'imprime pas sur le bon de commande."""
+        html = self._html()
+
+        assert "Reprise du socle de facturation" not in html
+
     def test_the_totals_carry_the_vat(self):
         """Total HT, TVA au taux normal et total TTC."""
         html = self._html()

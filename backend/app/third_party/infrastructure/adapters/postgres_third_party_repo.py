@@ -85,6 +85,7 @@ class ThirdPartyRepository:
             model.billing_contact_email = third_party.billing_contact_email
             model.billing_contact_phone = third_party.billing_contact_phone
             model.vat_number = third_party.vat_number
+            model.vat_liable = third_party.vat_liable
             model.ape_code = third_party.ape_code
             model.entity_category = third_party.entity_category
             model.company_info_submitted = third_party.company_info_submitted
@@ -220,6 +221,7 @@ class ThirdPartyRepository:
             billing_contact_email=model.billing_contact_email,
             billing_contact_phone=model.billing_contact_phone,
             vat_number=model.vat_number,
+            vat_liable=model.vat_liable,
             ape_code=model.ape_code,
             entity_category=model.entity_category,
             company_info_submitted=model.company_info_submitted,
@@ -275,6 +277,7 @@ class ThirdPartyRepository:
             billing_contact_email=entity.billing_contact_email,
             billing_contact_phone=entity.billing_contact_phone,
             vat_number=entity.vat_number,
+            vat_liable=entity.vat_liable,
             ape_code=entity.ape_code,
             entity_category=entity.entity_category,
             company_info_submitted=entity.company_info_submitted,

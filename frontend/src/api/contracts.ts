@@ -398,6 +398,8 @@ export interface ThirdPartyInfoInput {
   capital?: string | null;
   siret: string;
   vat_number?: string | null;
+  /** Faux en franchise en base ou en autoliquidation : le BDC n'imprime alors pas de TVA. */
+  vat_liable?: boolean;
   ape_code?: string | null;
   head_office_street: string;
   head_office_postal_code: string;

@@ -62,6 +62,7 @@ class ThirdPartyWithDocumentsResponse(BaseModel):
     siren: str | None = None
     siret: str | None = None
     vat_number: str | None = None
+    vat_liable: bool = True
     ape_code: str | None = None
     rcs_city: str | None = None
     rcs_number: str | None = None

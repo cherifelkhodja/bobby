@@ -76,6 +76,7 @@ export const portalApi = {
       capital?: string;
       siret: string;
       vat_number?: string;
+      vat_liable?: boolean;
       ape_code?: string;
       head_office_street: string;
       head_office_postal_code: string;
@@ -144,6 +145,7 @@ export const portalApi = {
       capital: string;
       siret: string;
       vat_number: string;
+      vat_liable: boolean;
       ape_code: string;
       head_office_street: string;
       head_office_postal_code: string;

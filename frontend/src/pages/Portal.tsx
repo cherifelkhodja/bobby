@@ -640,6 +640,7 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
     capital: initialData?.capital ?? '',
     siret: initialData?.siret ?? '',
     vat_number: initialData?.vat_number ?? '',
+    vat_liable: initialData?.vat_liable ?? true,
     ape_code: initialData?.ape_code ?? '',
     head_office_street: initialData?.head_office_street ?? '',
     head_office_postal_code: initialData?.head_office_postal_code ?? '',
@@ -687,7 +688,7 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
     const digits = value.replace(/\D/g, '').slice(0, 14);
     setForm((f) => {
       const updated = { ...f, siret: digits };
-      if (digits.length === 14) {
+      if (digits.length === 14 && f.vat_liable) {
         updated.vat_number = computeVatNumber(digits);
       }
       return updated;
@@ -744,6 +745,7 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
         ...(form.capital ? { capital: form.capital } : {}),
         ...(form.siret ? { siret: form.siret } : {}),
         ...(form.vat_number ? { vat_number: form.vat_number } : {}),
+        vat_liable: form.vat_liable,
         ...(form.ape_code ? { ape_code: form.ape_code } : {}),
         ...(form.head_office_street ? { head_office_street: form.head_office_street } : {}),
         ...(form.head_office_postal_code ? { head_office_postal_code: form.head_office_postal_code } : {}),
@@ -793,6 +795,7 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
         capital: form.capital || undefined,
         siret: form.siret,
         vat_number: form.vat_number || undefined,
+        vat_liable: form.vat_liable,
         ape_code: form.ape_code || undefined,
         head_office_street: form.head_office_street,
         head_office_postal_code: form.head_office_postal_code,
@@ -839,7 +842,13 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
     }
   };
 
-  const field = (key: keyof typeof form) => ({
+  // Champs texte du formulaire : `vat_liable` est un booléen et se pilote par
+  // sa propre case à cocher, pas par ce raccourci.
+  type TextFieldKey = {
+    [K in keyof typeof form]: (typeof form)[K] extends string ? K : never;
+  }[keyof typeof form];
+
+  const field = (key: TextFieldKey) => ({
     value: form[key],
     onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm((f) => ({ ...f, [key]: e.target.value })),
@@ -973,12 +982,31 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
           <label className="f-lab">N° TVA intracommunautaire</label>
           <input
             type="text"
-            value={form.vat_number}
+            value={form.vat_liable ? form.vat_number : ''}
             readOnly
             tabIndex={-1}
-            placeholder="Calculé automatiquement à partir du SIRET"
+            placeholder={
+              form.vat_liable
+                ? 'Calculé automatiquement à partir du SIRET'
+                : 'Sans objet — non assujetti'
+            }
             className={`${INPUT_CLS} !text-mut cursor-not-allowed`}
           />
+          <label className="ds flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.vat_liable}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  vat_liable: e.target.checked,
+                  vat_number:
+                    e.target.checked && f.siret.length === 14 ? computeVatNumber(f.siret) : '',
+                }))
+              }
+            />
+            Ma société est assujettie à la TVA
+          </label>
         </div>
         <div>
           <label className="f-lab">Code APE / NAF</label>

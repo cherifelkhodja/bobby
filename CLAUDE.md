@@ -814,6 +814,7 @@ updated_at: datetime
 | 078_add_documents_skipped_to_contract_requests.py | documents_skipped on cm_contract_requests (saisie en personne sans dépôt) |
 | 079_add_purchase_orders.py | cm_purchase_orders (bons de commande) + index unique partiel sur boond_positioning_id |
 | 080_purchase_order_provisional_reference.py | provisional_reference sur cm_purchase_orders, reference nullable (numéro définitif pris à la génération) |
+| 081_add_vat_liable_to_third_parties.py | vat_liable sur tp_third_parties (fournisseur non assujetti à la TVA) |
 
 ## Environment Variables
 

@@ -123,13 +123,17 @@
   .po-tot .ttc td { border-top: 2px solid #201f1e; padding-top: 7px; }
   .po-tot .ttc .l { color: {{ brand_strong | default('#c1301c') }}; font-weight: 700; }
   .po-tot .ttc .v { font-size: 16px; color: {{ brand_strong | default('#c1301c') }}; font-weight: 700; }
+  .po-tot .na { font-family: 'Hanken Grotesk', sans-serif; font-weight: 400; color: #5c5b58; font-size: 12px; }
+  .vat-note { margin-top: 8px; font-size: 11.5px; color: #5c5b58; text-align: right; }
 
   /* ===== SIGNATURES ===== */
   .sigblock { margin-top: 14px; }
   .sigblock-hd { font-size: 18px; margin-bottom: 6px; }
   .sig-lead { font-size: 11.5px; line-height: 1.5; color: #5c5b58; margin-bottom: 10px; }
-  .sigcard { padding: 14px 16px; width: 50%; }
-  .sigcard-id { margin-top: 7px; min-height: 44px; }
+  .sigcard { width: 50%; }
+  .sigcard.hd { padding: 14px 16px 0; }
+  .sigcard.ft { padding: 0 16px 14px; }
+  .sigcard-id { margin-top: 7px; }
   .sigzone { margin-top: 11px; height: 62px; }
   .sigmeta { margin-top: 10px; font-size: 11.5px; }
 
@@ -211,11 +215,6 @@
   </tr></table>
 </div>
 
-{% if mission_description %}
-<div class="h3">Objet de la mission</div>
-<p class="p">{{ mission_description }}</p>
-{% endif %}
-
 <!-- ===== DÉTAIL DE LA COMMANDE ===== -->
 <div class="h3">Détail de la commande</div>
 <table class="tbl">
@@ -238,7 +237,7 @@
       </td>
       <td class="r">{{ billable_days }} j</td>
       <td class="r">{{ purchase_daily_rate }} €</td>
-      <td class="r">{{ vat_rate }} %</td>
+      <td class="r">{% if vat_liable %}{{ vat_rate }} %{% else %}—{% endif %}</td>
       <td class="r">{{ total_amount }} €</td>
     </tr>
     {% if free_days and free_days != '0' %}
@@ -257,9 +256,18 @@
 </table>
 <table class="po-tot">
   <tr class="ht"><td class="l">Total HT</td><td class="v">{{ total_amount }} €</td></tr>
+  {% if vat_liable %}
   <tr><td class="l">TVA ({{ vat_rate }} %)</td><td class="v">{{ vat_amount }} €</td></tr>
   <tr class="ttc"><td class="l">Total TTC</td><td class="v">{{ total_amount_ttc }} €</td></tr>
+  {% else %}
+  {# Fournisseur non assujetti : pas de TVA à facturer, donc pas de TTC. #}
+  <tr><td class="l">TVA</td><td class="v na">non applicable</td></tr>
+  <tr class="ttc"><td class="l">Total à régler</td><td class="v">{{ total_amount }} €</td></tr>
+  {% endif %}
 </table>
+{% if not vat_liable %}
+<p class="p vat-note">Fournisseur non assujetti à la TVA : la facture est établie hors taxes, sans TVA.</p>
+{% endif %}
 
 <!-- ===== INTERLOCUTEURS ===== -->
 {% if commercial_email or invoices_company_mail or partner_contact_name or partner_contact_email %}
@@ -287,34 +295,42 @@
     Document signé électroniquement via Yousign ; l'horodatage de la plateforme
     vaut acceptation et fait foi de la date.
   </p>
-  <table class="sigrow" style="width: 100%"><tr>
-    <td class="sigcard">
-      <div class="sigcard-role">Pour {{ issuer_company_name | upper }}</div>
-      <div class="sigcard-id"><table>
-        <tr class="sl"><td class="k">Société</td><td class="v"><b>{{ issuer_company_name | upper }}</b></td></tr>
-        <tr class="sl"><td class="k">Représentée par</td><td class="v">
-          {%- if issuer_representative_is_entity -%}
-            {{ issuer_representative_name }}, elle-même représentée par <b>{{ issuer_signatory_name | expand_civility }}</b>
-          {%- else -%}
-            <b>{{ issuer_signatory_name | expand_civility }}</b>
-          {%- endif -%}
-        </td></tr>
-        <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ issuer_representative_sub_quality | default(issuer_representative_quality, true) }}</b></td></tr>
-      </table></div>
-      <div class="sigzone"></div>
-      <div class="sigmeta">Le <span class="fillin"></span></div>
-    </td>
-    <td class="sigcard">
-      <div class="sigcard-role">Pour le Fournisseur</div>
-      <div class="sigcard-id"><table>
-        <tr class="sl"><td class="k">Société</td><td class="v"><b>{{ partner_company_name | upper }}</b></td></tr>
-        <tr class="sl"><td class="k">Représentée par</td><td class="v"><b>{% if partner_signatory_name %}{{ partner_signatory_name | expand_civility }}{% else %}{{ partner_representative_civility | civility }} {{ partner_representative_name }}{% endif %}</b></td></tr>
-        <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ partner_representative_title }}</b></td></tr>
-      </table></div>
-      <div class="sigzone"></div>
-      <div class="sigmeta">Le <span class="fillin"></span></div>
-    </td>
-  </tr></table>
+  <table class="sigrow" style="width: 100%">
+    <tr>
+      <td class="sigcard hd">
+        <div class="sigcard-role">Pour {{ issuer_company_name | upper }}</div>
+        <div class="sigcard-id"><table>
+          <tr class="sl"><td class="k">Société</td><td class="v"><b>{{ issuer_company_name | upper }}</b></td></tr>
+          <tr class="sl"><td class="k">Représentée par</td><td class="v">
+            {%- if issuer_representative_is_entity -%}
+              {{ issuer_representative_name }}, elle-même représentée par <b>{{ issuer_signatory_name | expand_civility }}</b>
+            {%- else -%}
+              <b>{{ issuer_signatory_name | expand_civility }}</b>
+            {%- endif -%}
+          </td></tr>
+          <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ issuer_representative_sub_quality | default(issuer_representative_quality, true) }}</b></td></tr>
+        </table></div>
+      </td>
+      <td class="sigcard hd">
+        <div class="sigcard-role">Pour le Fournisseur</div>
+        <div class="sigcard-id"><table>
+          <tr class="sl"><td class="k">Société</td><td class="v"><b>{{ partner_company_name | upper }}</b></td></tr>
+          <tr class="sl"><td class="k">Représentée par</td><td class="v"><b>{% if partner_signatory_name %}{{ partner_signatory_name | expand_civility }}{% else %}{{ partner_representative_civility | civility }} {{ partner_representative_name }}{% endif %}</b></td></tr>
+          <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ partner_representative_title }}</b></td></tr>
+        </table></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="sigcard ft">
+        <div class="sigzone"></div>
+        <div class="sigmeta">Le <span class="fillin"></span></div>
+      </td>
+      <td class="sigcard ft">
+        <div class="sigzone"></div>
+        <div class="sigmeta">Le <span class="fillin"></span></div>
+      </td>
+    </tr>
+  </table>
 </div>
 
 <!-- ===== PAGE 2 — CONDITIONS DE FACTURATION ===== -->
