@@ -495,6 +495,7 @@ nouveau → en_cours → entretien → accepté
 
 ### Purchase Orders — Bons de commande (`/api/v1/purchase-orders`)
 - `GET /` - List purchase orders (filters: status, third_party_id, company_id, contract_request_id, search)
+- `GET /suppliers?company_id=` - Panel suppliers: those under framework contract (signed or in progress) with the issuing company, labelled by that contract's reference
 - `POST /` - Create from a Boond positioning (ADV/admin)
 - `GET /{id}` - Get purchase order detail
 - `PATCH /{id}` - Complete or correct the mission (ADV/admin)
@@ -698,7 +699,8 @@ updated_at: datetime
 ### cm_purchase_orders (bons de commande)
 ```python
 id: UUID (PK)
-reference: str (unique)            # XXX-BC-NNN, séquence par société émettrice
+provisional_reference: str (unique)  # PROV-BC-AAAA-NNN, assignée à la création
+reference: str | None (unique)     # XXX-BC-NNN, prise à la génération du document
 status: str                        # draft, generated, sent_for_signature, signed, active, closed, cancelled
 company_id: UUID (FK cm_contract_companies.id) | None
 third_party_id: UUID (FK tp_third_parties.id) | None   # None = « à rattacher »
@@ -725,6 +727,8 @@ created_at / updated_at: datetime
 ```
 
 **Montant** : `(days_sold - free_days) x purchase_daily_rate`.
+
+**Numérotation** : `provisional_reference` dès la création, `reference` définitive à la génération du document (séquence propre à la société émettrice) ; changer de société émettrice la libère. `display_reference` = définitive si elle existe, provisoire sinon.
 
 ### cv_templates
 ```python
@@ -809,6 +813,7 @@ updated_at: datetime
 | 028_add_consultant_and_address_fields.py | consultant/address fields, drop mission_location |
 | 078_add_documents_skipped_to_contract_requests.py | documents_skipped on cm_contract_requests (saisie en personne sans dépôt) |
 | 079_add_purchase_orders.py | cm_purchase_orders (bons de commande) + index unique partiel sur boond_positioning_id |
+| 080_purchase_order_provisional_reference.py | provisional_reference sur cm_purchase_orders, reference nullable (numéro définitif pris à la génération) |
 
 ## Environment Variables
 

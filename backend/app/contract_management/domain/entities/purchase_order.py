@@ -41,9 +41,19 @@ class PurchaseOrder:
     fournisseur (`contract_request_id`). Un fournisseur porte N bons de
     commande dans le temps, un par consultant et par mission.
 
-    Numérotation : ``XXX-BC-NNN``, séquence propre à chaque société émettrice,
-    assignée à la création. Elle matérialise la numérotation séquentielle
-    qu'exige l'article « Bon de Commande » du contrat cadre.
+    Numérotation, en deux temps :
+
+    - ``provisional_reference`` (``PROV-BC-YYYY-NNN``) est assignée à la
+      création et sert d'identifiant tant que le bon de commande est en
+      préparation ;
+    - ``reference`` (``XXX-BC-NNN``, séquence propre à chaque société
+      émettrice) n'est assignée qu'à la **génération du document**, moment où
+      le numéro s'imprime et devient définitif.
+
+    Un brouillon abandonné ne consomme donc aucun numéro : la séquence reste
+    continue, comme l'exige l'article « Bon de Commande » du contrat cadre.
+    ``display_reference`` donne la référence à afficher, définitive si elle
+    existe, provisoire sinon.
 
     Conditions financières — deux taux, deux publics :
     - ``sale_daily_rate`` (TJM) est le prix de vente au client. **Interne** :
@@ -52,8 +62,9 @@ class PurchaseOrder:
       C'est le seul taux imprimé sur le bon de commande.
     """
 
-    reference: str
+    provisional_reference: str
     id: UUID = field(default_factory=uuid4)
+    reference: str | None = None
     status: PurchaseOrderStatus = PurchaseOrderStatus.DRAFT
     company_id: UUID | None = None
     third_party_id: UUID | None = None
@@ -122,6 +133,29 @@ class PurchaseOrder:
                     "initial": True,
                 }
             )
+
+    @property
+    def display_reference(self) -> str:
+        """Référence à afficher : définitive si assignée, provisoire sinon."""
+        return self.reference or self.provisional_reference
+
+    def assign_reference(self, reference: str) -> None:
+        """Fixe la référence définitive, une seule fois.
+
+        Régénérer un document ne renumérote pas le bon de commande : le numéro
+        a pu être communiqué au fournisseur entre-temps.
+        """
+        if self.reference is None:
+            self.reference = reference
+
+    def release_reference(self) -> None:
+        """Libère la référence définitive : le bon de commande redevient provisoire.
+
+        Le numéro porte le code de la société émettrice et vit dans sa
+        séquence : changer de société avant l'envoi le périme. Un numéro de la
+        nouvelle séquence sera attribué à la prochaine génération.
+        """
+        self.reference = None
 
     # ── Consultant ────────────────────────────────────────────────────────
 
@@ -235,7 +269,7 @@ class PurchaseOrder:
             PurchaseOrderIncompleteError: If required mission fields are missing.
         """
         if not self.is_complete:
-            raise PurchaseOrderIncompleteError(self.reference, self.missing_fields)
+            raise PurchaseOrderIncompleteError(self.display_reference, self.missing_fields)
         self.s3_key_draft = s3_key_draft
         self.transition_to(PurchaseOrderStatus.GENERATED)
 
@@ -251,7 +285,7 @@ class PurchaseOrder:
             FrameworkContractNotSignedError: If the framework contract is not signed.
         """
         if not framework_contract_signed:
-            raise FrameworkContractNotSignedError(self.reference)
+            raise FrameworkContractNotSignedError(self.display_reference)
         self.transition_to(PurchaseOrderStatus.SENT_FOR_SIGNATURE)
         self.sent_for_signature_at = datetime.utcnow()
 

@@ -66,7 +66,7 @@ class SyncPurchaseOrderToBoondUseCase:
 
         if po.status not in (PurchaseOrderStatus.SIGNED, PurchaseOrderStatus.ACTIVE):
             raise PurchaseOrderBoondSyncError(
-                po.reference,
+                po.display_reference,
                 f"le bon de commande doit être signé (état actuel : {po.status.display_name})",
             )
 
@@ -75,13 +75,13 @@ class SyncPurchaseOrderToBoondUseCase:
         )
         if not third_party or not third_party.boond_provider_id:
             raise PurchaseOrderBoondSyncError(
-                po.reference,
+                po.display_reference,
                 "la société fournisseur n'existe pas encore dans BoondManager "
                 "(elle est créée à la signature du contrat cadre)",
             )
         if not po.boond_positioning_id:
             raise PurchaseOrderBoondSyncError(
-                po.reference, "aucun positionnement Boond n'est rattaché"
+                po.display_reference, "aucun positionnement Boond n'est rattaché"
             )
 
         warnings: list[str] = []
@@ -98,10 +98,10 @@ class SyncPurchaseOrderToBoondUseCase:
             logger.error(
                 "purchase_order_boond_sync_failed",
                 purchase_order_id=str(po.id),
-                reference=po.reference,
+                reference=po.display_reference,
                 error=po.boond_sync_error,
             )
-            raise PurchaseOrderBoondSyncError(po.reference, po.boond_sync_error)
+            raise PurchaseOrderBoondSyncError(po.display_reference, po.boond_sync_error)
 
         if po.status == PurchaseOrderStatus.SIGNED:
             po.mark_active()
@@ -118,7 +118,7 @@ class SyncPurchaseOrderToBoondUseCase:
         logger.info(
             "purchase_order_boond_sync_completed",
             purchase_order_id=str(saved.id),
-            reference=saved.reference,
+            reference=saved.display_reference,
             boond_contract_id=saved.boond_contract_id,
             boond_purchase_order_id=saved.boond_purchase_order_id,
         )
@@ -131,7 +131,7 @@ class SyncPurchaseOrderToBoondUseCase:
         commande : c'est ce document qui acte sa mission.
         """
         if not po.boond_consultant_id:
-            raise PurchaseOrderBoondSyncError(po.reference, "aucun consultant Boond rattaché")
+            raise PurchaseOrderBoondSyncError(po.display_reference, "aucun consultant Boond rattaché")
 
         if po.boond_consultant_type == "resource":
             return po.boond_consultant_id
@@ -152,7 +152,7 @@ class SyncPurchaseOrderToBoondUseCase:
         )
         if not resource_id:
             raise PurchaseOrderBoondSyncError(
-                po.reference, "la conversion du candidat en ressource a échoué"
+                po.display_reference, "la conversion du candidat en ressource a échoué"
             )
         logger.info(
             "purchase_order_candidate_converted",
@@ -202,7 +202,7 @@ class SyncPurchaseOrderToBoondUseCase:
             logger.info(
                 "purchase_order_renewal_keeps_existing_contract",
                 purchase_order_id=str(po.id),
-                reference=po.reference,
+                reference=po.display_reference,
                 delivery_id=po.boond_delivery_id,
             )
             return
@@ -239,7 +239,7 @@ class SyncPurchaseOrderToBoondUseCase:
         boond_po_id = await self._crm.create_purchase_order(
             provider_id=provider_id,
             positioning_id=po.boond_positioning_id,
-            reference=po.reference,
+            reference=po.display_reference,
             amount=float(po.total_amount),
         )
         po.boond_purchase_order_id = boond_po_id
@@ -253,7 +253,7 @@ class SyncPurchaseOrderToBoondUseCase:
         renewed = await self._crm.renew_delivery(po.boond_delivery_id)
         if not renewed or not renewed.get("id"):
             raise PurchaseOrderBoondSyncError(
-                po.reference, "le renouvellement de la prestation n'a rien retourné"
+                po.display_reference, "le renouvellement de la prestation n'a rien retourné"
             )
 
         source_delivery_id = po.boond_delivery_id

@@ -151,6 +151,7 @@ class PurchaseOrderRepository:
             query = query.where(
                 or_(
                     func.lower(PurchaseOrderModel.reference).like(pattern),
+                    func.lower(PurchaseOrderModel.provisional_reference).like(pattern),
                     func.lower(PurchaseOrderModel.consultant_last_name).like(pattern),
                     func.lower(PurchaseOrderModel.consultant_first_name).like(pattern),
                     func.lower(PurchaseOrderModel.client_name).like(pattern),
@@ -158,6 +159,29 @@ class PurchaseOrderRepository:
                 )
             )
         return query
+
+    async def get_next_provisional_reference(self) -> str:
+        """Generate the next provisional reference, format PROV-BC-YYYY-NNN.
+
+        Portée par le bon de commande tant qu'il n'est pas validé : un brouillon
+        abandonné ne consomme ainsi aucun numéro de la séquence définitive, que
+        le contrat cadre exige continue.
+        """
+        prefix = f"PROV-BC-{datetime.utcnow().year}-"
+
+        # Sérialise l'allocation pour cette famille de préfixe (anti-race
+        # condition). Le verrou tient jusqu'au commit, couvrant l'insert.
+        await self.session.execute(
+            text("SELECT pg_advisory_xact_lock(:k)"),
+            {"k": _reference_lock_key(prefix)},
+        )
+
+        result = await self.session.execute(
+            select(PurchaseOrderModel.provisional_reference).where(
+                PurchaseOrderModel.provisional_reference.like(f"{prefix}%")
+            )
+        )
+        return f"{prefix}{_next_reference_number(result.scalars().all()):03d}"
 
     async def get_next_reference(self, company_code: str | None = None) -> str:
         """Generate the next purchase order reference, format XXX-BC-NNN.
@@ -207,6 +231,7 @@ class PurchaseOrderRepository:
 
         if model:
             for attr in (
+                "provisional_reference",
                 "reference",
                 "company_id",
                 "third_party_id",
@@ -285,6 +310,7 @@ class PurchaseOrderRepository:
         """Convert SQLAlchemy model to domain entity."""
         return PurchaseOrder(
             id=model.id,
+            provisional_reference=model.provisional_reference,
             reference=model.reference,
             status=PurchaseOrderStatus(model.status),
             company_id=model.company_id,
@@ -333,6 +359,7 @@ class PurchaseOrderRepository:
         """Convert domain entity to SQLAlchemy model."""
         return PurchaseOrderModel(
             id=entity.id,
+            provisional_reference=entity.provisional_reference,
             reference=entity.reference,
             status=entity.status.value,
             company_id=entity.company_id,

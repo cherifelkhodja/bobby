@@ -23,6 +23,7 @@ from app.contract_management.domain.value_objects.purchase_order_status import (
 
 def _source(**overrides) -> PurchaseOrder:
     defaults = {
+        "provisional_reference": "PROV-BC-2026-001",
         "reference": "GEM-BC-001",
         "status": PurchaseOrderStatus.ACTIVE,
         "company_id": uuid4(),
@@ -54,6 +55,7 @@ def _make_use_case(source, next_reference="GEM-BC-002"):
     po_repo = AsyncMock()
     po_repo.get_by_id = AsyncMock(return_value=source)
     po_repo.save = AsyncMock(side_effect=lambda entity: entity)
+    po_repo.get_next_provisional_reference = AsyncMock(return_value="PROV-BC-2026-002")
     po_repo.get_next_reference = AsyncMock(return_value=next_reference)
 
     cr_repo = AsyncMock()
@@ -87,7 +89,8 @@ class TestRenewal:
         renewal = await use_case.execute(_command(source))
 
         assert renewal.id != source.id
-        assert renewal.reference == "GEM-BC-002"
+        assert renewal.provisional_reference == "PROV-BC-2026-002"
+        assert renewal.reference is None
         assert renewal.status == PurchaseOrderStatus.DRAFT
         assert renewal.parent_purchase_order_id == source.id
         assert source.status == PurchaseOrderStatus.ACTIVE

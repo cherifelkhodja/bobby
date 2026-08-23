@@ -355,11 +355,17 @@ class PurchaseOrderModel(Base):
     __tablename__ = "cm_purchase_orders"
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
-    reference: Mapped[str] = mapped_column(
+    provisional_reference: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
         unique=True,
-        comment="Référence séquentielle du bon de commande (XXX-BC-NNN)",
+        comment="Référence provisoire (PROV-BC-YYYY-NNN), assignée à la création",
+    )
+    reference: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        unique=True,
+        comment="Référence définitive (XXX-BC-NNN), assignée à la génération du document",
     )
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="draft")
     company_id: Mapped[UUID | None] = mapped_column(

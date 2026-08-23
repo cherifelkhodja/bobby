@@ -27,7 +27,9 @@ POSITIONING = {
     "consultant_type": "candidate",
     "need_id": 88,
     "daily_rate": "500",
+    "sale_daily_rate": "800",
     "quantity": "20",
+    "free_days": "1",
     "start_date": "2026-09-01",
     "end_date": "2027-02-28",
     "consultant_first_name": "Camille",
@@ -87,6 +89,7 @@ def _make_use_case(
     """Use case wired with fakes; returns it along with its repositories."""
     po_repo = AsyncMock()
     po_repo.get_by_positioning_id = AsyncMock(return_value=existing)
+    po_repo.get_next_provisional_reference = AsyncMock(return_value="PROV-BC-2026-001")
     po_repo.get_next_reference = AsyncMock(return_value="GEM-BC-001")
     po_repo.save = AsyncMock(side_effect=lambda po: po)
 
@@ -126,7 +129,10 @@ class TestTriggerState:
 
         po = await use_case.execute(41)
 
-        assert po.reference == "GEM-BC-001"
+        # Le numéro définitif n'arrive qu'à la génération du document.
+        assert po.provisional_reference == "PROV-BC-2026-001"
+        assert po.reference is None
+        assert po.display_reference == "PROV-BC-2026-001"
         assert po.status == PurchaseOrderStatus.DRAFT
 
     @pytest.mark.asyncio
@@ -176,7 +182,7 @@ class TestIdempotence:
     @pytest.mark.asyncio
     async def test_refuses_a_second_purchase_order(self):
         """Rejouer le webhook ne crée pas de doublon."""
-        existing = PurchaseOrder(reference="GEM-BC-001", boond_positioning_id=41)
+        existing = PurchaseOrder(provisional_reference="PROV-BC-2026-001", reference="GEM-BC-001", boond_positioning_id=41)
         use_case, po_repo, _, _ = _make_use_case(existing=existing)
 
         with pytest.raises(PurchaseOrderAlreadyExistsError) as exc:
@@ -190,14 +196,24 @@ class TestPrefill:
     """Préremplissage depuis le positionnement, le besoin et le consultant."""
 
     @pytest.mark.asyncio
-    async def test_the_boond_daily_cost_prefills_the_purchase_rate(self):
-        """averageDailyCost est un coût : il alimente le CJM, pas le TJM."""
+    async def test_both_daily_rates_come_from_the_positioning(self):
+        """averageDailyCost alimente le CJM, averageDailyPriceExcludingTax le TJM."""
         use_case, _, _, _ = _make_use_case()
 
         po = await use_case.execute(41)
 
         assert po.purchase_daily_rate == Decimal("500")
-        assert po.sale_daily_rate is None
+        assert po.sale_daily_rate == Decimal("800")
+
+    @pytest.mark.asyncio
+    async def test_the_positioning_free_days_are_kept(self):
+        """La gratuité saisie sur le positionnement suit dans le bon de commande."""
+        use_case, _, _, _ = _make_use_case()
+
+        po = await use_case.execute(41)
+
+        assert po.free_days == Decimal("1")
+        assert po.billable_days == Decimal("19")
 
     @pytest.mark.asyncio
     async def test_mission_and_dates_come_from_boond(self):
@@ -249,7 +265,8 @@ class TestPrefill:
 
         company_repo.get_company_by_boond_agency_id.assert_awaited_once_with(5)
         assert po.company_id == company_id
-        po_repo.get_next_reference.assert_awaited_once_with("GEM")
+        # La séquence de la société n'est pas entamée à ce stade.
+        po_repo.get_next_reference.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_commercial_prefers_the_bobby_account(self):
@@ -287,6 +304,18 @@ class TestDeliveryPrefill:
         assert po.free_days == Decimal("2")
         assert po.days_sold == Decimal("22")
         assert po.billable_days == Decimal("20")
+
+    @pytest.mark.asyncio
+    async def test_a_delivery_without_free_days_wins_over_the_positioning(self):
+        """Zéro jour de gratuité est une donnée : elle ne laisse pas la main au repli."""
+        use_case, _, _, _ = _make_use_case(
+            positioning={**POSITIONING, "delivery_id": 797},
+            delivery={**DELIVERY, "free_days": 0},
+        )
+
+        po = await use_case.execute(41)
+
+        assert po.free_days == Decimal("0")
 
     @pytest.mark.asyncio
     async def test_the_delivery_wins_over_the_positioning(self):
@@ -347,8 +376,9 @@ class TestDeliveryPrefill:
         po = await use_case.execute(41)
 
         assert po.purchase_daily_rate == Decimal("500")
+        assert po.sale_daily_rate == Decimal("800")
         assert po.days_sold == Decimal("20")
-        assert po.free_days == Decimal("0")
+        assert po.free_days == Decimal("1")
         assert po.boond_contract_id is None
 
     @pytest.mark.asyncio

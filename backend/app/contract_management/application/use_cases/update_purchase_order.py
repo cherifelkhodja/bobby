@@ -115,7 +115,7 @@ class UpdatePurchaseOrderUseCase:
             raise PurchaseOrderNotFoundError(str(command.purchase_order_id))
 
         if not po.status.is_editable:
-            raise PurchaseOrderNotEditableError(po.reference, po.status.display_name)
+            raise PurchaseOrderNotEditableError(po.display_reference, po.status.display_name)
 
         unknown = set(command.fields) - self.ALLOWED_FIELDS
         if unknown:
@@ -123,7 +123,6 @@ class UpdatePurchaseOrderUseCase:
                 f"Champs non modifiables : {', '.join(sorted(unknown))}."
             )
 
-        previous_company_id = po.company_id
         changed = self._apply(po, command.fields)
 
         # Le cadre dépend du couple fournisseur + société émettrice : changer
@@ -131,17 +130,12 @@ class UpdatePurchaseOrderUseCase:
         if changed & {"third_party_id", "company_id"}:
             await self._attach_framework_contract(po)
 
-        self._check_consistency(po)
+        # Le numéro définitif vit dans la séquence de la société émettrice :
+        # changer de société le périme. Le suivant sera pris à la génération.
+        if "company_id" in changed:
+            po.release_reference()
 
-        # La référence porte le code de la société émettrice : si celle-ci
-        # change avant génération, la référence doit suivre, sinon un
-        # GEM-BC-012 se retrouverait émis par une autre société.
-        if (
-            "company_id" in command.fields
-            and po.company_id != previous_company_id
-            and po.status == PurchaseOrderStatus.DRAFT
-        ):
-            await self._reallocate_reference(po)
+        self._check_consistency(po)
 
         # Un document déjà généré ne reflète plus la mission : retour en
         # brouillon pour forcer la régénération avant l'envoi.
@@ -153,7 +147,7 @@ class UpdatePurchaseOrderUseCase:
         logger.info(
             "purchase_order_updated",
             purchase_order_id=str(saved.id),
-            reference=saved.reference,
+            reference=saved.display_reference,
             changed=sorted(changed),
             missing_fields=saved.missing_fields,
         )
@@ -224,16 +218,3 @@ class UpdatePurchaseOrderUseCase:
                 "La date de fin ne peut pas précéder la date de début."
             )
 
-    async def _reallocate_reference(self, po: PurchaseOrder) -> None:
-        """Réalloue la référence sur la séquence de la nouvelle société."""
-        company_code = None
-        if po.company_id is not None:
-            company_code = await self._cr_repo.get_company_code(po.company_id)
-        new_reference = await self._po_repo.get_next_reference(company_code)
-        logger.info(
-            "purchase_order_reference_reallocated",
-            purchase_order_id=str(po.id),
-            old_reference=po.reference,
-            new_reference=new_reference,
-        )
-        po.reference = new_reference

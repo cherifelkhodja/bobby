@@ -31,6 +31,7 @@ SALE_RATE = Decimal("780")
 
 def _purchase_order(**overrides) -> PurchaseOrder:
     defaults = {
+        "provisional_reference": "PROV-BC-2026-001",
         "reference": "GEM-BC-001",
         "company_id": uuid4(),
         "third_party_id": uuid4(),
@@ -103,13 +104,23 @@ def _framework():
     return framework
 
 
-def _make_use_case(po, *, third_party=None, framework=None, company=None):
+def _make_use_case(  # noqa: PLR0913
+    po,
+    *,
+    third_party=None,
+    framework=None,
+    company=None,
+    next_reference="GEM-BC-009",
+    company_code="GEM",
+):
     po_repo = AsyncMock()
     po_repo.get_by_id = AsyncMock(return_value=po)
     po_repo.save = AsyncMock(side_effect=lambda entity: entity)
+    po_repo.get_next_reference = AsyncMock(return_value=next_reference)
 
     cr_repo = AsyncMock()
     cr_repo.get_by_id = AsyncMock(return_value=framework)
+    cr_repo.get_company_code = AsyncMock(return_value=company_code)
 
     tp_repo = AsyncMock()
     tp_repo.get_by_id = AsyncMock(return_value=third_party)
@@ -125,6 +136,13 @@ def _make_use_case(po, *, third_party=None, framework=None, company=None):
         db=None,
     )
     return use_case, s3
+
+
+def _stub_pdf(monkeypatch) -> None:
+    """Neutralise le rendu WeasyPrint : ces tests portent sur la numérotation."""
+    from app.contract_management.infrastructure.adapters import pdf_rendering
+
+    monkeypatch.setattr(pdf_rendering, "render_pdf", lambda *args, **kwargs: b"%PDF-stub")
 
 
 def _context(po=None) -> dict:
@@ -272,3 +290,53 @@ class TestGeneration:
         result = await use_case.execute(po.id)
 
         assert result.s3_key_draft.endswith("bon_de_commande_v2.pdf")
+
+
+class TestNumbering:
+    """Le numéro définitif est pris à la génération, une seule fois."""
+
+    @pytest.mark.asyncio
+    async def test_the_definitive_number_is_taken_at_generation(self, monkeypatch):
+        """Le brouillon provisoire prend son rang dans la séquence de sa société."""
+        po = _purchase_order(reference=None)
+        use_case, s3 = _make_use_case(
+            po,
+            third_party=_third_party(),
+            framework=_framework(),
+            next_reference="GEM-BC-007",
+        )
+        _stub_pdf(monkeypatch)
+
+        result = await use_case.execute(po.id)
+
+        assert result.reference == "GEM-BC-007"
+        assert result.s3_key_draft == "purchase-orders/GEM-BC-007/bon_de_commande_v1.pdf"
+        assert s3.upload_file.await_args.kwargs["key"].startswith("purchase-orders/GEM-BC-007/")
+
+    @pytest.mark.asyncio
+    async def test_a_numbered_order_is_never_renumbered(self, monkeypatch):
+        """Régénérer ne change pas le numéro : il a pu être communiqué."""
+        po = _purchase_order()
+        use_case, _ = _make_use_case(
+            po,
+            third_party=_third_party(),
+            framework=_framework(),
+            next_reference="GEM-BC-042",
+        )
+        _stub_pdf(monkeypatch)
+
+        result = await use_case.execute(po.id)
+
+        assert result.reference == "GEM-BC-001"
+
+    @pytest.mark.asyncio
+    async def test_an_incomplete_order_consumes_no_number(self):
+        """Un dossier incomplet ne troue pas la séquence de la société."""
+        po = _purchase_order(reference=None, third_party_id=None, purchase_daily_rate=None)
+        use_case, _ = _make_use_case(po)
+
+        with pytest.raises(PurchaseOrderIncompleteError):
+            await use_case.execute(po.id)
+
+        assert po.reference is None
+        assert po.display_reference == "PROV-BC-2026-001"

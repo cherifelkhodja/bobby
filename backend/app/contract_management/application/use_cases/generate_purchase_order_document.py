@@ -76,7 +76,17 @@ class GeneratePurchaseOrderDocumentUseCase:
                 po.status.value, PurchaseOrderStatus.GENERATED.value
             )
         if not po.is_complete:
-            raise PurchaseOrderIncompleteError(po.reference, po.missing_fields)
+            raise PurchaseOrderIncompleteError(po.display_reference, po.missing_fields)
+
+        # C'est ici que le bon de commande prend son rang dans la séquence de
+        # sa société émettrice : le numéro va s'imprimer, il devient définitif.
+        # Une régénération ne renumérote pas (`assign_reference` ne joue qu'une
+        # fois), le numéro ayant pu être communiqué au fournisseur.
+        if po.reference is None:
+            company_code = None
+            if po.company_id:
+                company_code = await self._cr_repo.get_company_code(po.company_id)
+            po.assign_reference(await self._po_repo.get_next_reference(company_code))
 
         third_party = (
             await self._tp_repo.get_by_id(po.third_party_id) if po.third_party_id else None
@@ -100,7 +110,7 @@ class GeneratePurchaseOrderDocumentUseCase:
         version = 1 + sum(
             1 for entry in po.status_history if entry.get("status") == PurchaseOrderStatus.GENERATED
         )
-        s3_key = f"purchase-orders/{po.reference}/bon_de_commande_v{version}.pdf"
+        s3_key = f"purchase-orders/{po.display_reference}/bon_de_commande_v{version}.pdf"
         await self._s3.upload_file(
             key=s3_key,
             content=pdf_content,
@@ -113,7 +123,7 @@ class GeneratePurchaseOrderDocumentUseCase:
         logger.info(
             "purchase_order_document_generated",
             purchase_order_id=str(saved.id),
-            reference=saved.reference,
+            reference=saved.display_reference,
             version=version,
             s3_key=s3_key,
         )
@@ -126,7 +136,7 @@ class GeneratePurchaseOrderDocumentUseCase:
             payment_terms = framework.contract_config.get("payment_terms")
 
         context: dict = {
-            "reference": po.reference,
+            "reference": po.display_reference,
             "order_date": datetime.now(UTC).strftime("%d/%m/%Y"),
             "framework_reference": framework.display_reference if framework else "",
             "framework_signed_date": self._framework_signed_date(framework),

@@ -233,6 +233,20 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-23 (feat: numéro provisoire du BDC, préremplissage complet, panel fournisseur)
+
+Trois retouches du bon de commande, du numéro jusqu'au rattachement.
+
+**Numérotation en deux temps** (migration 080). Un brouillon abandonné consommait un numéro de la séquence de sa société, que l'article « Bon de Commande » du contrat cadre exige continue. Le BDC porte désormais `provisional_reference` (`PROV-BC-AAAA-NNN`) dès sa création ; la référence définitive `XXX-BC-NNN` n'est prise **qu'à la génération du document**, là où le numéro s'imprime. `display_reference` sert partout à l'affichage, et l'entête signale un numéro provisoire. Régénérer ne renumérote pas — le numéro a pu être communiqué. Changer de société émettrice, en revanche, libère la référence définitive : elle vit dans la séquence de cette société et ne peut pas la suivre ailleurs. Le mécanisme de renumérotation immédiate à chaque changement de société disparaît.
+
+**Préremplissage depuis le positionnement**. Le TJM et les jours de gratuité restaient vides sur un BDC créé sans prestation, alors que le positionnement Boond les porte : `averageDailyPriceExcludingTax` (tarif de vente journalier) alimente le TJM, `numberOfDaysFree` la gratuité. La prestation reste prioritaire quand elle existe, y compris lorsqu'elle affirme **zéro** jour gratuit — un zéro explicite est une donnée, pas un trou (`first_present`). La documentation qui prétendait que seule la prestation connaissait la gratuité est corrigée.
+
+**Sélecteur fournisseur limité au panel**. La liste proposait tous les tiers connus de Bobby, SIREN à l'appui. Nouvel endpoint `GET /purchase-orders/suppliers?company_id=` : seuls les fournisseurs ayant un contrat cadre — signé ou en cours — avec la **société émettrice** du BDC, présentés avec la référence de ce cadre, l'information qui autorise la commande. La règle de sélection est pure et testée (`application/panel_suppliers.py`) : cadre signé de la société > cadre signé sans société (héritage) > dossier en cours, un fournisseur par ligne, cadres annulés ou redirigés Payfit exclus. La carte devient « Rattachement » et porte aussi la **société émettrice**, jusqu'ici non modifiable alors qu'elle décide du cadre, du panel et de la numérotation.
+
+**Au passage** : un fournisseur sans raison sociale s'affichait « — » sur le BDC quel que soit le rattachement, donnant l'impression qu'il ne changeait pas. `supplier_label` (domaine tiers) donne un nom toujours lisible : raison sociale, à défaut signataire, à défaut adresse de contact.
+
+347 tests `contract_management` verts (+33), 617 tests backend (hors modules bloqués par `cryptography` en bac à sable), front `tsc`/`eslint`/282 tests OK.
+
 ### 2026-08-21 (feat: classer la ressource Boond selon le type de tiers)
 
 BoondManager distingue trois types de ressources utiles ici : **0 Consultant Interne**, **1 Consultant Externe** et **10 Consultant Portage Commercial**. Freelance, sous-traitance et portage salarial partagent le type 1 ; seul le portage commercial a le sien.

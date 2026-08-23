@@ -3275,7 +3275,7 @@ function PurchaseOrdersSection({ contractRequestId }: { contractRequestId: strin
             >
               <div className="min-w-0">
                 <p className="nm truncate">
-                  <span className="ref mr-2">{po.reference}</span>
+                  <span className="ref mr-2">{po.display_reference}</span>
                   {po.mission_title || 'Mission à préciser'}
                 </p>
                 <p className="ns truncate">
@@ -3370,7 +3370,7 @@ function MissionConsultants({
               {consultant.email && <p className="ds !mt-1">{consultant.email}</p>}
               <p className="ds !mt-1">
                 {consultant.orders.length} mission{consultant.orders.length > 1 ? 's' : ''} ·{' '}
-                {consultant.orders.map((po) => po.reference).join(', ')}
+                {consultant.orders.map((po) => po.display_reference).join(', ')}
               </p>
             </button>
           ))}

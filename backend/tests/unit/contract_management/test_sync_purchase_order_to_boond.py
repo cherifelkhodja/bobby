@@ -24,6 +24,7 @@ from app.contract_management.domain.value_objects.purchase_order_status import (
 
 def _signed_po(**overrides) -> PurchaseOrder:
     defaults = {
+        "provisional_reference": "PROV-BC-2026-001",
         "reference": "GEM-BC-001",
         "status": PurchaseOrderStatus.SIGNED,
         "third_party_id": uuid4(),

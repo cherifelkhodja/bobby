@@ -115,8 +115,13 @@ class BoondCrmAdapter:
                 # Prestation Boond : support du renouvellement natif
                 # (POST /deliveries/{id}/renew).
                 "delivery_id": delivery_id,
+                # Deux taux distincts, comme sur le bon de commande : le coût
+                # journalier moyen préremplit le CJM d'achat, le tarif de vente
+                # journalier le TJM — interne, jamais imprimé.
                 "daily_rate": attributes.get("averageDailyCost"),
+                "sale_daily_rate": attributes.get("averageDailyPriceExcludingTax"),
                 "quantity": attributes.get("numberOfDaysInvoicedOrQuantity"),
+                "free_days": attributes.get("numberOfDaysFree"),
                 "start_date": attributes.get("startDate"),
                 "end_date": attributes.get("endDate"),
                 "consultant_first_name": consultant_first_name,
@@ -135,9 +140,10 @@ class BoondCrmAdapter:
 
         La prestation est l'équivalent natif du bon de commande côté Boond :
         elle porte la période, le prix de vente, le coût, les jours vendus et
-        les **jours de gratuité** (`numberOfDaysFree`). C'est donc la meilleure
-        source de préremplissage d'un BDC, meilleure que le positionnement qui
-        ne connaît ni la gratuité ni le contrat en cours.
+        les jours de gratuité, tous renégociés à la signature. C'est donc la
+        meilleure source de préremplissage d'un BDC, meilleure que le
+        positionnement, qui porte les mêmes conditions mais telles qu'elles
+        étaient à la proposition, et qui ignore le contrat déjà rattaché.
 
         Returns:
             Les données de la prestation, ou None si elle est illisible.

@@ -88,6 +88,16 @@ class ThirdParty:
         return self.compliance_status == ComplianceStatus.COMPLIANT
 
     @property
+    def display_name(self) -> str:
+        """Nom affichable du tiers, jamais vide."""
+        return supplier_label(
+            company_name=self.company_name,
+            signatory_first_name=self.signatory_first_name,
+            signatory_last_name=self.signatory_last_name,
+            contact_email=self.contact_email,
+        )
+
+    @property
     def full_legal_identity(self) -> str:
         """Return formatted legal identity string."""
         parts = [
@@ -99,3 +109,26 @@ class ThirdParty:
             f"RCS {self.rcs_city} {self.rcs_number}" if self.rcs_city and self.rcs_number else None,
         ]
         return ", ".join(p for p in parts if p)
+
+
+def supplier_label(
+    *,
+    company_name: str | None,
+    signatory_first_name: str | None = None,
+    signatory_last_name: str | None = None,
+    contact_email: str | None = None,
+) -> str:
+    """Nom d'un tiers pour l'affichage, du plus précis au plus sûr.
+
+    La raison sociale d'abord ; à défaut le signataire, connu avant elle sur un
+    dossier ouvert par mail ; en dernier recours l'adresse de contact, toujours
+    renseignée. Renvoyer une chaîne vide ferait afficher « — » à la place du
+    fournisseur rattaché, et donner l'impression que le rattachement n'a pas
+    pris.
+    """
+    if company_name and company_name.strip():
+        return company_name.strip()
+    signatory = " ".join(p for p in (signatory_first_name, signatory_last_name) if p).strip()
+    if signatory:
+        return signatory
+    return (contact_email or "").strip()

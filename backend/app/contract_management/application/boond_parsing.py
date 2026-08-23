@@ -35,3 +35,16 @@ def to_decimal(raw: object) -> Decimal | None:
         return Decimal(str(raw))
     except (InvalidOperation, ValueError, TypeError):
         return None
+
+
+def first_present(*values: object) -> object | None:
+    """Première valeur renseignée parmi celles proposées.
+
+    ``None`` et la chaîne vide valent « absent » ; un zéro explicite, non :
+    zéro jour de gratuité est une donnée, pas un trou à combler par la source
+    suivante.
+    """
+    for value in values:
+        if value is not None and value != "":
+            return value
+    return None

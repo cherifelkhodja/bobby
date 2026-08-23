@@ -76,7 +76,7 @@ export function PurchaseOrders() {
   const createMutation = useMutation({
     mutationFn: (id: number) => purchaseOrdersApi.create(id),
     onSuccess: (po) => {
-      toast.success(`Bon de commande ${po.reference} créé.`);
+      toast.success(`Bon de commande ${po.display_reference} créé.`);
       setShowCreate(false);
       setPositioningId('');
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
@@ -225,7 +225,7 @@ export function PurchaseOrders() {
               className={`row click ${gridCols} group`}
               onClick={() => navigate(`/contracts/bdc/${po.id}`)}
             >
-              <span className="ref">{po.reference}</span>
+              <span className="ref">{po.display_reference}</span>
               <div className="min-w-0">
                 <p className="nm truncate">{po.consultant_name || 'Consultant à identifier'}</p>
                 <p className="ns truncate">

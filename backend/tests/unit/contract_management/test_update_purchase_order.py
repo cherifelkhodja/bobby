@@ -28,6 +28,7 @@ from app.contract_management.domain.value_objects.purchase_order_status import (
 
 def _make_po(**overrides) -> PurchaseOrder:
     defaults = {
+        "provisional_reference": "PROV-BC-2026-001",
         "reference": "GEM-BC-001",
         "boond_positioning_id": 41,
         "days_sold": Decimal("20"),
@@ -246,28 +247,44 @@ class TestDocumentFreshness:
             await use_case.execute(_command(po, client_name="Autre client"))
 
 
-class TestReferenceReallocation:
-    """La référence suit la société émettrice."""
+class TestReferenceNumbering:
+    """Le numéro définitif n'est pris qu'à la génération, et suit la société."""
 
     @pytest.mark.asyncio
-    async def test_changing_the_issuing_company_reallocates_the_reference(self):
-        po = _make_po(company_id=uuid4())
+    async def test_a_draft_is_not_numbered_when_it_is_completed(self):
+        """Compléter un brouillon ne consomme pas de numéro définitif."""
+        po = _make_po(company_id=uuid4(), reference=None)
         use_case, po_repo, cr_repo = _make_use_case(po)
-        new_company = uuid4()
 
-        result = await use_case.execute(_command(po, company_id=new_company))
+        result = await use_case.execute(_command(po, company_id=uuid4()))
 
-        cr_repo.get_company_code.assert_awaited_once_with(new_company)
-        po_repo.get_next_reference.assert_awaited_once_with("GCI")
-        assert result.reference == "GEM-BC-002"
+        po_repo.get_next_reference.assert_not_awaited()
+        cr_repo.get_company_code.assert_not_awaited()
+        assert result.reference is None
+        assert result.display_reference == "PROV-BC-2026-001"
+
+    @pytest.mark.asyncio
+    async def test_changing_the_issuing_company_releases_the_definitive_reference(self):
+        """Un numéro Gemini ne peut pas suivre le bon dans la séquence d'une autre société."""
+        po = _make_po(company_id=uuid4())
+        use_case, po_repo, _ = _make_use_case(po)
+
+        result = await use_case.execute(_command(po, company_id=uuid4()))
+
+        # Aucun numéro n'est pris ici : la nouvelle séquence sera servie à la
+        # prochaine génération du document.
+        po_repo.get_next_reference.assert_not_awaited()
+        assert result.reference is None
+        assert result.display_reference == "PROV-BC-2026-001"
 
     @pytest.mark.asyncio
     async def test_the_reference_is_kept_when_the_company_does_not_change(self):
+        """Corriger la mission ne renumérote pas un bon déjà généré."""
         company_id = uuid4()
         po = _make_po(company_id=company_id)
         use_case, po_repo, _ = _make_use_case(po)
 
-        result = await use_case.execute(_command(po, company_id=company_id))
+        result = await use_case.execute(_command(po, company_id=company_id, client_name="ACME"))
 
         po_repo.get_next_reference.assert_not_awaited()
         assert result.reference == "GEM-BC-001"

@@ -10,11 +10,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import AdvOrAdminUser, ContractAccessUser
 from app.config import get_settings
 from app.contract_management.api.purchase_order_schemas import (
+    PanelSupplierListResponse,
+    PanelSupplierResponse,
     PurchaseOrderCreate,
     PurchaseOrderListResponse,
     PurchaseOrderRenew,
     PurchaseOrderResponse,
     PurchaseOrderUpdate,
+)
+from app.contract_management.application.panel_suppliers import (
+    PanelSupplier,
+    select_panel_suppliers,
 )
 from app.contract_management.application.use_cases.create_purchase_order import (
     CreatePurchaseOrderFromPositioningUseCase,
@@ -45,9 +51,13 @@ from app.contract_management.infrastructure.adapters.postgres_contract_repo impo
 from app.contract_management.infrastructure.adapters.postgres_purchase_order_repo import (
     PurchaseOrderRepository,
 )
-from app.contract_management.infrastructure.models import ContractCompanyModel
+from app.contract_management.infrastructure.models import (
+    ContractCompanyModel,
+    ContractRequestModel,
+)
 from app.dependencies import get_db
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
+from app.third_party.domain.entities.third_party import supplier_label
 from app.third_party.infrastructure.models import ThirdPartyModel
 
 logger = structlog.get_logger()
@@ -75,7 +85,9 @@ def _po_to_response(
     framework_signed = po.is_covered_by(framework)
     return PurchaseOrderResponse(
         id=po.id,
+        provisional_reference=po.provisional_reference,
         reference=po.reference,
+        display_reference=po.display_reference,
         status=po.status.value,
         status_display=po.status.display_name,
         is_editable=po.status.is_editable,
@@ -137,13 +149,32 @@ def _po_to_response(
 
 
 async def _third_party_names(db: AsyncSession, ids: list[UUID]) -> dict[UUID, str]:
-    """Nom des fournisseurs, en une requête pour toute une liste."""
+    """Nom des fournisseurs, en une requête pour toute une liste.
+
+    Un dossier dont la raison sociale n'est pas encore saisie garde un nom
+    lisible — son signataire, à défaut son adresse de contact. Sans cela, le
+    bon de commande afficherait « — » quel que soit le fournisseur rattaché.
+    """
     if not ids:
         return {}
     result = await db.execute(
-        select(ThirdPartyModel.id, ThirdPartyModel.company_name).where(ThirdPartyModel.id.in_(ids))
+        select(
+            ThirdPartyModel.id,
+            ThirdPartyModel.company_name,
+            ThirdPartyModel.signatory_first_name,
+            ThirdPartyModel.signatory_last_name,
+            ThirdPartyModel.contact_email,
+        ).where(ThirdPartyModel.id.in_(ids))
     )
-    return {row[0]: row[1] for row in result.all() if row[1]}
+    return {
+        row[0]: supplier_label(
+            company_name=row[1],
+            signatory_first_name=row[2],
+            signatory_last_name=row[3],
+            contact_email=row[4],
+        )
+        for row in result.all()
+    }
 
 
 async def _company_names(db: AsyncSession, ids: list[UUID]) -> dict[UUID, str]:
@@ -246,7 +277,7 @@ async def create_purchase_order(
         details={
             "kind": "purchase_order",
             "source": "manual",
-            "reference": po.reference,
+            "reference": po.display_reference,
             "positioning_id": body.boond_positioning_id,
         },
     )
@@ -324,6 +355,89 @@ async def list_purchase_orders(  # noqa: PLR0913
         total=total,
         skip=skip,
         limit=limit,
+    )
+
+
+@router.get(
+    "/suppliers",
+    response_model=PanelSupplierListResponse,
+    summary="Fournisseurs du panel d'une société émettrice",
+)
+async def list_panel_suppliers(
+    _auth: ContractAccessUser,
+    company_id: UUID | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Liste les fournisseurs rattachables à un bon de commande.
+
+    Ce ne sont pas tous les tiers connus de Bobby : seulement ceux avec qui la
+    société émettrice a un contrat cadre, signé ou en cours. Chaque fournisseur
+    est présenté avec la référence de ce cadre — l'information utile à l'ADV,
+    là où le SIREN ne dit rien du droit à commander.
+    """
+    result = await db.execute(
+        select(
+            ContractRequestModel.id,
+            ContractRequestModel.status,
+            ContractRequestModel.reference,
+            ContractRequestModel.provisional_reference,
+            ContractRequestModel.company_id,
+            ThirdPartyModel.id,
+            ThirdPartyModel.company_name,
+            ThirdPartyModel.type,
+            ThirdPartyModel.signatory_first_name,
+            ThirdPartyModel.signatory_last_name,
+            ThirdPartyModel.contact_email,
+        )
+        .join(ThirdPartyModel, ThirdPartyModel.id == ContractRequestModel.third_party_id)
+        .order_by(ContractRequestModel.created_at.desc())
+    )
+
+    candidates = [
+        PanelSupplier(
+            third_party_id=tp_id,
+            company_name=company_name,
+            third_party_type=tp_type,
+            contract_request_id=cr_id,
+            framework_reference=reference or provisional_reference,
+            framework_status=cr_status,
+            framework_company_id=cr_company_id,
+            signatory_first_name=signatory_first_name,
+            signatory_last_name=signatory_last_name,
+            contact_email=contact_email,
+        )
+        for (
+            cr_id,
+            cr_status,
+            reference,
+            provisional_reference,
+            cr_company_id,
+            tp_id,
+            company_name,
+            tp_type,
+            signatory_first_name,
+            signatory_last_name,
+            contact_email,
+        ) in result.all()
+    ]
+
+    suppliers = select_panel_suppliers(candidates, company_id)
+
+    return PanelSupplierListResponse(
+        items=[
+            PanelSupplierResponse(
+                third_party_id=supplier.third_party_id,
+                label=supplier.label,
+                company_name=supplier.company_name,
+                third_party_type=supplier.third_party_type,
+                contract_request_id=supplier.contract_request_id,
+                framework_reference=supplier.framework_reference,
+                framework_status=supplier.framework_status,
+                framework_signed=supplier.framework_signed,
+            )
+            for supplier in suppliers
+        ],
+        total=len(suppliers),
     )
 
 
@@ -437,7 +551,7 @@ async def cancel_purchase_order(
         AuditResource.CONTRACT_REQUEST,
         user_id=user_id,
         resource_id=str(saved.id),
-        details={"kind": "purchase_order", "reference": saved.reference},
+        details={"kind": "purchase_order", "reference": saved.display_reference},
     )
 
     return await _respond(db, cr_repo, saved)
@@ -530,7 +644,7 @@ async def get_purchase_order_document(
         )
 
     url = await S3StorageClient(get_settings()).get_presigned_url(s3_key)
-    return {"url": url, "reference": po.reference, "signed": signed}
+    return {"url": url, "reference": po.display_reference, "signed": signed}
 
 
 @router.post(
@@ -574,7 +688,7 @@ async def send_purchase_order_for_signature(
     logger.info(
         "purchase_order_sent_for_signature",
         purchase_order_id=str(saved.id),
-        reference=saved.reference,
+        reference=saved.display_reference,
     )
     return await _respond(db, cr_repo, saved)
 
@@ -627,7 +741,7 @@ async def mark_purchase_order_as_signed(
             detail="Document trop volumineux (16 Mo maximum).",
         )
 
-    s3_key = f"purchase-orders/{po.reference}/signe.{extension}"
+    s3_key = f"purchase-orders/{po.display_reference}/signe.{extension}"
     await S3StorageClient(get_settings()).upload_file(
         key=s3_key,
         content=content,
@@ -647,7 +761,7 @@ async def mark_purchase_order_as_signed(
         AuditResource.CONTRACT,
         user_id=user_id,
         resource_id=str(saved.id),
-        details={"kind": "purchase_order", "reference": saved.reference},
+        details={"kind": "purchase_order", "reference": saved.display_reference},
     )
     return await _respond(db, cr_repo, saved)
 
@@ -709,7 +823,7 @@ async def push_purchase_order_to_boond(
         resource_id=str(po.id),
         details={
             "kind": "purchase_order",
-            "reference": po.reference,
+            "reference": po.display_reference,
             "boond_contract_id": po.boond_contract_id,
             "boond_purchase_order_id": po.boond_purchase_order_id,
         },
@@ -776,7 +890,7 @@ async def renew_purchase_order(
         details={
             "kind": "purchase_order",
             "source": "renewal",
-            "reference": renewal.reference,
+            "reference": renewal.display_reference,
             "parent_id": str(purchase_order_id),
         },
     )

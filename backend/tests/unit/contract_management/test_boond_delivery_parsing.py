@@ -84,7 +84,7 @@ class TestGetDelivery:
 
     @pytest.mark.asyncio
     async def test_reads_the_quantities_including_free_days(self):
-        """La gratuité n'existe que sur la prestation, pas sur le positionnement."""
+        """Jours vendus et gratuité négociés sur la prestation priment sur le positionnement."""
         delivery = await _make_adapter(DELIVERY_RESPONSE).get_delivery(797)
 
         assert delivery["days_sold"] == 0

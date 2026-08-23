@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 
 import type {
+  PanelSupplierListResponse,
   PurchaseOrder,
   PurchaseOrderListResponse,
   PurchaseOrderStatus,
@@ -38,6 +39,19 @@ export interface PurchaseOrderUpdateInput {
 }
 
 export const purchaseOrdersApi = {
+  /**
+   * Fournisseurs rattachables : ceux du panel de la société émettrice, c'est-à-dire
+   * avec qui elle a un contrat cadre signé ou en cours. Sans `company_id`, tout
+   * le panel du groupe est renvoyé.
+   */
+  panelSuppliers: async (companyId?: string | null): Promise<PanelSupplierListResponse> => {
+    const response = await apiClient.get<PanelSupplierListResponse>(
+      '/purchase-orders/suppliers',
+      { params: companyId ? { company_id: companyId } : undefined },
+    );
+    return response.data;
+  },
+
   /**
    * `company_id` et `contract_request_id` isolent les missions d'une société
    * émettrice : un fournisseur travaillant avec plusieurs sociétés du groupe a

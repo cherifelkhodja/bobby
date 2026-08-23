@@ -1056,7 +1056,12 @@ export const PURCHASE_ORDER_STATUS_CONFIG: Record<
 
 export interface PurchaseOrder {
   id: string;
-  reference: string;
+  /** Numéro provisoire (PROV-BC-AAAA-NNN), porté dès la création. */
+  provisional_reference: string;
+  /** Numéro définitif (XXX-BC-NNN), attribué à la génération du document. */
+  reference: string | null;
+  /** Numéro à afficher : définitif s'il existe, provisoire sinon. */
+  display_reference: string;
   status: PurchaseOrderStatus;
   status_display: string;
   is_editable: boolean;
@@ -1128,6 +1133,27 @@ export interface PurchaseOrder {
   status_history: Array<{ status: PurchaseOrderStatus; entered_at: string }>;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Un fournisseur du panel d'une société émettrice : le contrat cadre qui l'y
+ * fait entrer l'identifie mieux que son SIREN.
+ */
+export interface PanelSupplier {
+  third_party_id: string;
+  /** Libellé prêt à afficher : raison sociale, à défaut signataire ou contact. */
+  label: string;
+  company_name: string | null;
+  third_party_type: string | null;
+  contract_request_id: string;
+  framework_reference: string;
+  framework_status: ContractRequestStatus;
+  framework_signed: boolean;
+}
+
+export interface PanelSupplierListResponse {
+  items: PanelSupplier[];
+  total: number;
 }
 
 export interface PurchaseOrderListResponse {

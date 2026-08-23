@@ -20,6 +20,7 @@ from app.contract_management.domain.value_objects.purchase_order_status import (
 def _complete_po(**overrides) -> PurchaseOrder:
     """A purchase order with everything needed to be generated."""
     defaults = {
+        "provisional_reference": "PROV-BC-2026-001",
         "reference": "GEM-BC-001",
         "company_id": uuid4(),
         "third_party_id": uuid4(),
@@ -79,7 +80,7 @@ class TestAmounts:
 
     def test_amounts_are_zero_when_mission_is_empty(self):
         """Un BDC tout juste créé par webhook n'a pas encore de montant."""
-        po = PurchaseOrder(reference="GEM-BC-002")
+        po = PurchaseOrder(provisional_reference="PROV-BC-2026-002")
         assert po.billable_days == Decimal("0")
         assert po.total_amount == Decimal("0")
 
@@ -89,7 +90,7 @@ class TestCompleteness:
 
     def test_webhook_created_order_needs_a_third_party(self):
         """Un BDC né du webhook est « à rattacher »."""
-        po = PurchaseOrder(reference="GEM-BC-002", boond_positioning_id=41)
+        po = PurchaseOrder(provisional_reference="PROV-BC-2026-002", boond_positioning_id=41)
         assert po.needs_third_party
         assert not po.is_complete
         assert "le fournisseur" in po.missing_fields
@@ -120,7 +121,7 @@ class TestLifecycle:
 
     def test_generation_requires_completeness(self):
         """Générer un BDC incomplet est refusé."""
-        po = PurchaseOrder(reference="GEM-BC-002", boond_positioning_id=41)
+        po = PurchaseOrder(provisional_reference="PROV-BC-2026-002", boond_positioning_id=41)
         with pytest.raises(PurchaseOrderIncompleteError) as exc:
             po.mark_generated("contracts/bdc/draft.pdf")
         assert "le fournisseur" in str(exc.value)

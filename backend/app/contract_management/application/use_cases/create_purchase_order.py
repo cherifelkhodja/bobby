@@ -5,7 +5,11 @@ from uuid import UUID
 
 import structlog
 
-from app.contract_management.application.boond_parsing import parse_date, to_decimal
+from app.contract_management.application.boond_parsing import (
+    first_present,
+    parse_date,
+    to_decimal,
+)
 from app.contract_management.domain.entities.purchase_order import PurchaseOrder
 from app.contract_management.domain.exceptions import (
     PositioningNotFoundError,
@@ -92,13 +96,12 @@ class CreatePurchaseOrderFromPositioningUseCase:
         company_id = await self._resolve_company(need.get("agency_id"))
         commercial_email = await self._resolve_commercial(need)
 
-        company_code = None
-        if company_id and self._company_repo:
-            company_code = await self._company_repo.get_company_code(company_id)
-        reference = await self._po_repo.get_next_reference(company_code)
+        # Le numéro définitif n'est attribué qu'à la génération du document :
+        # un brouillon abandonné ne doit pas trouer la séquence.
+        reference = await self._po_repo.get_next_provisional_reference()
 
         purchase_order = PurchaseOrder(
-            reference=reference,
+            provisional_reference=reference,
             company_id=company_id,
             boond_positioning_id=positioning_id,
             boond_need_id=positioning.get("need_id") or delivery.get("need_id"),
@@ -120,14 +123,24 @@ class CreatePurchaseOrderFromPositioningUseCase:
             mission_title=need.get("title") or delivery.get("title") or None,
             mission_description=need.get("description") or None,
             # La prestation prime sur le positionnement quand elle existe :
-            # elle seule connaît les jours de gratuité et le prix de vente.
-            # `averageDailyCost` est un coût : il préremplit le CJM d'achat.
+            # elle porte les conditions négociées. Le positionnement sert de
+            # repli — il connaît lui aussi les deux taux, les jours vendus et
+            # la gratuité. `averageDailyCost` est un coût : il préremplit le
+            # CJM d'achat ; `averageDailyPriceExcludingTax` est le tarif de
+            # vente : il préremplit le TJM, interne.
             purchase_daily_rate=to_decimal(
                 delivery.get("purchase_daily_rate") or positioning.get("daily_rate")
             ),
-            sale_daily_rate=to_decimal(delivery.get("sale_daily_rate")),
+            sale_daily_rate=to_decimal(
+                delivery.get("sale_daily_rate") or positioning.get("sale_daily_rate")
+            ),
             days_sold=to_decimal(delivery.get("days_sold") or positioning.get("quantity")),
-            free_days=to_decimal(delivery.get("free_days")) or Decimal("0"),
+            # Zéro jour de gratuité est une donnée : la prestation qui l'affirme
+            # prime sur le positionnement, elle ne lui laisse pas la main.
+            free_days=to_decimal(
+                first_present(delivery.get("free_days"), positioning.get("free_days"))
+            )
+            or Decimal("0"),
             start_date=parse_date(delivery.get("start_date") or positioning.get("start_date")),
             end_date=parse_date(delivery.get("end_date") or positioning.get("end_date")),
             # Contrat déjà en place sur la prestation : le report Boond ne doit
@@ -142,7 +155,7 @@ class CreatePurchaseOrderFromPositioningUseCase:
         logger.info(
             "purchase_order_created_from_positioning",
             purchase_order_id=str(saved.id),
-            reference=saved.reference,
+            reference=saved.display_reference,
             positioning_id=positioning_id,
             consultant=saved.consultant_name,
             missing_fields=saved.missing_fields,

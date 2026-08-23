@@ -107,7 +107,7 @@ async def _notify_purchase_order_created(db: AsyncSession, purchase_order) -> No
         try:
             await email_service.send_purchase_order_created_notification(
                 to=recipient,
-                reference=purchase_order.reference,
+                reference=purchase_order.display_reference,
                 consultant_name=purchase_order.consultant_name or "Consultant à préciser",
                 client_name=purchase_order.client_name or "Client à préciser",
                 link=link,
@@ -116,7 +116,7 @@ async def _notify_purchase_order_created(db: AsyncSession, purchase_order) -> No
             logger.warning(
                 "purchase_order_notification_failed",
                 recipient=recipient,
-                reference=purchase_order.reference,
+                reference=purchase_order.display_reference,
                 error=str(exc),
             )
 
@@ -236,7 +236,7 @@ async def handle_boond_positioning_webhook(
         logger.info(
             "webhook_purchase_order_created",
             purchase_order_id=str(purchase_order.id),
-            reference=purchase_order.reference,
+            reference=purchase_order.display_reference,
             positioning_id=positioning_id,
         )
 
@@ -244,7 +244,7 @@ async def handle_boond_positioning_webhook(
 
         return WebhookResponse(
             status="ok",
-            message=f"Purchase order {purchase_order.reference} created",
+            message=f"Purchase order {purchase_order.display_reference} created",
         )
 
     return WebhookResponse(status="ok", message="No action taken")

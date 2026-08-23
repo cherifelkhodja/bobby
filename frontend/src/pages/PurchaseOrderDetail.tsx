@@ -16,7 +16,7 @@ import {
 import { toast } from 'sonner';
 
 import { purchaseOrdersApi, type PurchaseOrderUpdateInput } from '../api/purchaseOrders';
-import { vigilanceApi } from '../api/vigilance';
+import { contractCompaniesApi } from '../api/contracts';
 import { getErrorMessage } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import { Button } from '../components/ui/Button';
@@ -98,6 +98,7 @@ export function PurchaseOrderDetail() {
 
   const [form, setForm] = useState<MissionForm | null>(null);
   const [supplierId, setSupplierId] = useState('');
+  const [companyId, setCompanyId] = useState('');
   const [showRenew, setShowRenew] = useState(false);
   const [renewForm, setRenewForm] = useState({
     start_date: '',
@@ -114,9 +115,17 @@ export function PurchaseOrderDetail() {
     enabled: Boolean(id),
   });
 
+  // Le panel dépend de la société émettrice : un fournisseur sous contrat avec
+  // une société du groupe n'est pas commandable par une autre.
   const { data: suppliers } = useQuery({
-    queryKey: ['third-parties', 'picker'],
-    queryFn: () => vigilanceApi.listThirdParties({ limit: 200 }),
+    queryKey: ['purchase-order-suppliers', companyId || po?.company_id || null],
+    queryFn: () => purchaseOrdersApi.panelSuppliers(companyId || po?.company_id),
+    enabled: isAdv && Boolean(po),
+  });
+
+  const { data: companies } = useQuery({
+    queryKey: ['contract-companies', 'active'],
+    queryFn: () => contractCompaniesApi.listActive(),
     enabled: isAdv,
   });
 
@@ -124,6 +133,7 @@ export function PurchaseOrderDetail() {
     if (po && form === null) {
       setForm(toForm(po));
       setSupplierId(po.third_party_id ?? '');
+      setCompanyId(po.company_id ?? '');
     }
   }, [po, form]);
 
@@ -175,7 +185,7 @@ export function PurchaseOrderDetail() {
         purchase_daily_rate: num(renewForm.purchase_daily_rate),
       }),
     onSuccess: (renewal) => {
-      toast.success(`Reconduction ouverte : ${renewal.reference}.`);
+      toast.success(`Reconduction ouverte : ${renewal.display_reference}.`);
       setShowRenew(false);
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       navigate(`/contracts/bdc/${renewal.id}`);
@@ -212,6 +222,9 @@ export function PurchaseOrderDetail() {
 
   const config = PURCHASE_ORDER_STATUS_CONFIG[po.status];
   const editable = isAdv && po.is_editable;
+  const panelSuppliers = suppliers?.items ?? [];
+  const attachmentChanged =
+    supplierId !== (po.third_party_id ?? '') || companyId !== (po.company_id ?? '');
 
   const saveMission = () => {
     updateMutation.mutate({
@@ -248,11 +261,19 @@ export function PurchaseOrderDetail() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="h1">
-            {po.reference}
+            {po.display_reference}
             <span className={`st ${config.color} ml-3 align-middle`}>
               <span className="dot" />
               {config.label}
             </span>
+            {!po.reference && (
+              <span
+                className="st bg-sla-bg text-sla-fg ml-2 align-middle"
+                title="Le numéro définitif est attribué à la génération du document."
+              >
+                Numéro provisoire
+              </span>
+            )}
           </h1>
           <p className="sub">
             {po.mission_title || 'Mission à préciser'}
@@ -354,7 +375,7 @@ export function PurchaseOrderDetail() {
             <Button
               variant="secondary"
               onClick={() => {
-                if (confirm(`Annuler le bon de commande ${po.reference} ?`)) {
+                if (confirm(`Annuler le bon de commande ${po.display_reference} ?`)) {
                   actionMutation.mutate('cancel');
                 }
               }}
@@ -470,35 +491,76 @@ export function PurchaseOrderDetail() {
         <div className="card">
           <h2 className="ct">
             <Building2 className="h-4 w-4 inline mr-2" />
-            Fournisseur
+            Rattachement
           </h2>
           <p className="ds mb-3">
-            La société qui porte le consultant. Son contrat cadre est rattaché automatiquement.
+            La société du groupe qui commande, et le fournisseur qui porte le consultant. Le
+            contrat cadre qui lie les deux est rattaché automatiquement.
           </p>
-          <div className="flex items-end gap-2 flex-wrap">
-            <div className="flex-1 min-w-64">
+          <div className="f-grid">
+            <div>
+              <label className="f-lab" htmlFor="issuer">
+                Société émettrice
+              </label>
+              <select
+                id="issuer"
+                value={companyId}
+                disabled={!editable}
+                onChange={(e) => setCompanyId(e.target.value)}
+                className="f-in"
+              >
+                <option value="">— Choisir une société —</option>
+                {(companies ?? []).map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+              <p className="ds mt-1">Elle porte le contrat cadre et la numérotation du document.</p>
+            </div>
+            <div>
               <label className="f-lab" htmlFor="supplier">
-                Société du panel
+                Fournisseur du panel
               </label>
               <select
                 id="supplier"
                 value={supplierId}
-                disabled={!editable}
+                disabled={!editable || !panelSuppliers.length}
                 onChange={(e) => setSupplierId(e.target.value)}
                 className="f-in"
               >
                 <option value="">— Choisir un fournisseur —</option>
-                {(suppliers?.items ?? []).map((tp) => (
-                  <option key={tp.id} value={tp.id}>
-                    {tp.company_name ?? tp.contact_email}
-                    {tp.siren ? ` · ${tp.siren}` : ''}
+                {/* Le fournisseur déjà rattaché reste visible même si le
+                    changement de société émettrice le sort du panel. */}
+                {supplierId &&
+                  !panelSuppliers.some((s) => s.third_party_id === supplierId) && (
+                    <option value={supplierId}>
+                      {po.third_party_name ?? 'Fournisseur actuel'} · hors panel de cette société
+                    </option>
+                  )}
+                {panelSuppliers.map((supplier) => (
+                  <option key={supplier.third_party_id} value={supplier.third_party_id}>
+                    {supplier.label} · {supplier.framework_reference}
+                    {supplier.framework_signed ? '' : ' (cadre en cours)'}
                   </option>
                 ))}
               </select>
+              <p className="ds mt-1">
+                {panelSuppliers.length
+                  ? 'Fournisseurs ayant un contrat cadre avec cette société.'
+                  : "Aucun fournisseur du panel pour cette société : ouvrez d'abord un contrat cadre."}
+              </p>
             </div>
+          </div>
+          <div className="flex justify-end mt-3">
             <Button
-              onClick={() => updateMutation.mutate({ third_party_id: supplierId || null })}
-              disabled={!editable || supplierId === (po.third_party_id ?? '')}
+              onClick={() =>
+                updateMutation.mutate({
+                  company_id: companyId || null,
+                  third_party_id: supplierId || null,
+                })
+              }
+              disabled={!editable || !attachmentChanged}
               isLoading={updateMutation.isPending}
             >
               Rattacher
@@ -615,7 +677,7 @@ export function PurchaseOrderDetail() {
       <Modal
         isOpen={showRenew}
         onClose={() => setShowRenew(false)}
-        title={`Reconduire ${po.reference}`}
+        title={`Reconduire ${po.display_reference}`}
         size="md"
       >
         <div className="space-y-4">

@@ -73,7 +73,10 @@ class PurchaseOrderResponse(BaseModel):
     """Bon de commande, enrichi des données calculées et du contexte cadre."""
 
     id: UUID
-    reference: str
+    provisional_reference: str
+    reference: str | None = None
+    # Référence à afficher : définitive dès la génération, provisoire avant.
+    display_reference: str
     status: str
     status_display: str
     is_editable: bool
@@ -154,3 +157,26 @@ class PurchaseOrderListResponse(BaseModel):
     total: int
     skip: int
     limit: int
+
+
+class PanelSupplierResponse(BaseModel):
+    """Un fournisseur du panel, proposé au rattachement d'un bon de commande."""
+
+    third_party_id: UUID
+    # Libellé prêt à afficher : raison sociale, à défaut signataire ou contact.
+    label: str
+    company_name: str | None = None
+    third_party_type: str | None = None
+    contract_request_id: UUID
+    # Le cadre identifie le fournisseur bien mieux que son SIREN : c'est lui
+    # qui autorise la mission, et il est propre à la société émettrice.
+    framework_reference: str
+    framework_status: str
+    framework_signed: bool = False
+
+
+class PanelSupplierListResponse(BaseModel):
+    """Panel fournisseur d'une société émettrice."""
+
+    items: list[PanelSupplierResponse]
+    total: int

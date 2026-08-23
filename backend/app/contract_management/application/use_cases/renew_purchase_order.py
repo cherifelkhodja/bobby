@@ -79,7 +79,7 @@ class RenewPurchaseOrderUseCase:
 
         if source.status not in RENEWABLE_STATUSES:
             raise InvalidPurchaseOrderDataError(
-                f"Le bon de commande {source.reference} n'est pas reconductible "
+                f"Le bon de commande {source.display_reference} n'est pas reconductible "
                 f"(état : {source.status.display_name})."
             )
         if command.end_date < command.start_date:
@@ -98,13 +98,12 @@ class RenewPurchaseOrderUseCase:
                 "Les jours de gratuité ne peuvent pas dépasser les jours vendus."
             )
 
-        company_code = None
-        if source.company_id:
-            company_code = await self._cr_repo.get_company_code(source.company_id)
-        reference = await self._po_repo.get_next_reference(company_code)
+        # Comme toute création, la reconduction part d'un numéro provisoire :
+        # elle prendra son rang dans la séquence à la génération du document.
+        reference = await self._po_repo.get_next_provisional_reference()
 
         renewal = PurchaseOrder(
-            reference=reference,
+            provisional_reference=reference,
             parent_purchase_order_id=source.id,
             company_id=source.company_id,
             third_party_id=source.third_party_id,
@@ -150,8 +149,8 @@ class RenewPurchaseOrderUseCase:
         logger.info(
             "purchase_order_renewed",
             purchase_order_id=str(saved.id),
-            reference=saved.reference,
-            parent_reference=source.reference,
+            reference=saved.display_reference,
+            parent_reference=source.display_reference,
             start_date=str(command.start_date),
             end_date=str(command.end_date),
         )
