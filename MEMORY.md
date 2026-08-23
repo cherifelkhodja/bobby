@@ -233,6 +233,15 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-21 (fix: la fiche cadre s'intitule d'après le fournisseur)
+
+Le titre affichait encore un consultant (`GEM-CC-003 · Bobby_prenom Bobby_name`) alors que l'entête montrait bien WOHM en partenaire. Deux causes, l'une visible, l'autre en dessous.
+
+- **Titre** : le repli sur le consultant est supprimé. Un contrat cadre lie deux sociétés, jamais un consultant — même quand c'est lui qui a fait ouvrir le dossier. Le nom du fournisseur est résolu comme dans l'entête, avec repli sur celui remonté par la conformité.
+- **Cause réelle** : seule la *liste* résolvait `third_party_name`, `company_name` et `purchase_orders_count` ; le *détail* renvoyait un dossier sans ces trois champs. D'où un titre sans fournisseur et des « Missions : Aucune » systématiques. Nouveau `_enrich_cr_response`, appliqué aux **21 routes** qui renvoient une demande isolée, pour que toutes répondent la même chose.
+
+302 tests `contract_management` verts, front `tsc`/`eslint`/282 tests/build OK.
+
 ### 2026-08-21 (fix: écrans de contractualisation alignés sur le modèle fournisseur)
 
 Trois retouches d'interface, toutes sur le même constat : les écrans décrivaient encore un dossier centré sur un consultant.

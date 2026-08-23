@@ -661,9 +661,7 @@ export default function ContractDetail() {
     ? contracts[contracts.length - 1]
     : null;
 
-  const consultantName = [cr.consultant_first_name, cr.consultant_last_name]
-    .filter(Boolean)
-    .join(' ');
+  const partnerName = cr.third_party_name ?? complianceDocs?.company_name ?? null;
   const statusChipClass = `st ${statusConfig?.color ?? 'bg-sla-bg text-sla-fg'}`;
   const issuingCompany =
     companies.find(
@@ -749,13 +747,9 @@ export default function ContractDetail() {
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="h1">
               {cr.display_reference}
-              {/* Le cadre porte sur une société, pas sur un consultant : celui-ci
-                  n'apparaît qu'en repli, tant que le tiers n'est pas identifié. */}
-              {cr.third_party_name
-                ? ` · ${cr.third_party_name}`
-                : consultantName
-                  ? ` · ${consultantName}`
-                  : ''}
+              {/* Un contrat cadre lie deux sociétés : jamais un consultant, même
+                  quand c'est lui qui a fait ouvrir le dossier. */}
+              {partnerName ? ` · ${partnerName}` : ''}
             </h1>
             <span className={statusChipClass}>
               <span className="dot" />

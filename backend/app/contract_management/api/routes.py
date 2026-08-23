@@ -400,8 +400,7 @@ async def create_manual_contract_request(
         },
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 # Les routes littérales doivent précéder `/{contract_request_id}` : déclarée
@@ -486,6 +485,38 @@ async def lookup_supplier(
         ],
         open_contract_request_id=open_cr.id if open_cr else None,
         open_contract_request_status=open_cr.status.value if open_cr else None,
+    )
+
+
+async def _enrich_cr_response(
+    db: AsyncSession, cr, *, portal_url: str | None = None
+) -> ContractRequestResponse:
+    """Réponse complète d'une demande : fournisseur, société émettrice, missions.
+
+    La liste résolvait déjà ces trois données, pas le détail — l'écran affichait
+    donc un dossier sans nom de fournisseur et sans ses missions.
+    """
+    from sqlalchemy import select as _sel
+
+    from app.third_party.infrastructure.models import ThirdPartyModel
+
+    third_party_name = None
+    if cr.third_party_id:
+        result = await db.execute(
+            _sel(ThirdPartyModel.company_name).where(ThirdPartyModel.id == cr.third_party_id)
+        )
+        third_party_name = result.scalar_one_or_none()
+
+    company_names = await _issuer_company_names(db, [cr.company_id])
+    counts = await _purchase_order_counts(db, [cr.id])
+
+    return _cr_to_response(
+        cr,
+        commercial_name=await _resolve_commercial_name(db, cr.commercial_email),
+        third_party_name=third_party_name,
+        company_name=company_names.get(cr.company_id),
+        purchase_orders_count=counts.get(cr.id, 0),
+        portal_url=portal_url,
     )
 
 
@@ -628,8 +659,7 @@ async def create_supplier_dossier(
         },
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.get(
@@ -675,8 +705,7 @@ async def get_contract_request(
                 portal_url = f"{settings.BOBBY_PORTAL_BASE_URL}/{active_link.token}"
                 break
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name, portal_url=portal_url)
+    return await _enrich_cr_response(db, cr, portal_url=portal_url)
 
 
 @router.post(
@@ -816,8 +845,7 @@ async def sync_from_boond(
         positioning_id=cr.boond_positioning_id,
     )
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 @router.post(
@@ -946,8 +974,7 @@ async def validate_commercial(
             color="#f59e0b",
         )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.get(
@@ -1053,8 +1080,7 @@ async def save_third_party_info(
         third_party_id=str(tp.id),
     )
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 @router.post(
@@ -1151,8 +1177,7 @@ async def resend_collection_email(
         details={"action": "resend_collection_email"},
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.post(
@@ -1177,8 +1202,7 @@ async def configure_contract(
         logger.error("configure_contract_failed", error=str(exc), cr_id=str(contract_request_id))
         raise HTTPException(status_code=400, detail="La configuration du contrat a échoué.")
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.patch(
@@ -1245,8 +1269,7 @@ async def save_article_overrides(
     cr.contract_config = cfg
     saved = await cr_repo.save(cr)
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 @router.post(
@@ -1278,8 +1301,7 @@ async def compliance_override(
         details={"reason": body.reason},
     )
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 @router.post(
@@ -1358,8 +1380,7 @@ async def skip_documents(
         },
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.post(
@@ -1398,8 +1419,7 @@ async def start_compliance_review(
         details={"action": "start_compliance_review"},
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.post(
@@ -1434,8 +1454,7 @@ async def block_compliance(
         details={"action": "block_compliance", "reason": body.reason},
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.delete(
@@ -1518,8 +1537,7 @@ async def cancel_contract_request(
         company_name=_c_name,
     )
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 @router.post(
@@ -1795,8 +1813,7 @@ async def send_draft_to_partner(
         company_name=company_name,
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.post(
@@ -1882,8 +1899,7 @@ async def approve_draft_internal(
         details={"action": "approve_draft_internal"},
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.post(
@@ -1950,8 +1966,7 @@ async def resend_draft_email(
         logger.error("resend_draft_email_failed", error=str(exc))
         raise HTTPException(status_code=400, detail="Le renvoi de l'email de relecture a échoué.")
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.get(
@@ -2068,8 +2083,7 @@ async def send_for_signature(
     excluded = set(excluded_charter_ids)
     await _ensure_signature_checklist(db, cr, excluded_charter_ids=excluded)
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.get(
@@ -2401,8 +2415,7 @@ async def mark_as_signed(
             error=str(exc),
         )
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 async def _upload_signed_docs_to_boond(db, cr) -> dict:
@@ -2664,8 +2677,7 @@ async def push_to_crm(
         company_name=_c_name,
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.post(
@@ -2736,8 +2748,7 @@ async def retry_boond_sync(
     except Exception as exc:
         logger.warning("retry_boond_doc_upload_failed", error=str(exc))
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 # ── Actions Boond individuelles ────────────────────────────────────────────────
@@ -3397,8 +3408,7 @@ async def rollback_status(
         details={"action": "rollback", "new_status": saved.status.value},
     )
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 # ── Contract Consultants ─────────────────────────────────────────────────────
