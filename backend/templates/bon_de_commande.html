@@ -1,10 +1,10 @@
 {#
-  Bon de commande — charte « Éditorial ».
+  Bon de commande — charte « Éditorial », maquette « Bon de commande.dc.html »
+  (projet Claude Design « Refonte templates Craftmania et Leonum »).
 
-  Document d'une à deux pages, signé par les deux Parties, qui matérialise une
-  mission sous le contrat cadre du fournisseur. Même socle de marque que le
-  contrat et les chartes (`_marque.css.html`), mise en page propre : ce n'est
-  ni une charte multipage ni un formulaire unilatéral.
+  Document de deux pages : la commande elle-même (parties, mission, chiffres,
+  signatures), puis les conditions de facturation et de paiement, qui tiennent
+  leur propre page pour rester lisibles et opposables.
 
   Contrainte tenue par ce gabarit : **seul le CJM d'achat figure ici**. Le TJM
   de vente au client est une donnée interne et ne doit jamais être injectée
@@ -27,103 +27,138 @@
     @bottom-center { content: element(rfoot); vertical-align: bottom; }
   }
 
-  body { font-size: 12px; line-height: 1.55; }
+  body { font-size: 12.5px; line-height: 1.55; }
 
   /* ===== PIED DE PAGE COURANT ===== */
   .rfoot {
     position: running(rfoot);
     width: 174mm;                       /* 210mm - 18mm - 18mm */
-    padding-top: 8px;
+    padding-top: 9px;
     border-top: 1px solid #e5e3df;
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 9.5px; letter-spacing: .07em; text-transform: uppercase; color: #a09f9a;
+    font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: #a09f9a;
   }
   .rfoot table { width: 100%; border-collapse: collapse; }
   .rfoot td { padding: 0; vertical-align: middle; }
   .rfoot .nm { font-weight: 700; color: {{ brand_strong | default('#c1301c') }}; }
-  .rfoot .c { text-align: right; color: {{ brand_strong | default('#c1301c') }}; }
+  .rfoot .right { text-align: right; }
+  .rfoot .c { color: {{ brand_strong | default('#c1301c') }}; }
 
   /* ===== EN-TÊTE ===== */
-  .hd { width: 100%; border-collapse: collapse; }
-  .hd td { padding: 0; vertical-align: top; }
-  .hd-kick {
-    font-family: 'Space Grotesk', sans-serif; font-size: 11.5px; letter-spacing: .11em;
-    text-transform: uppercase; text-align: right; font-weight: 600;
-    color: {{ brand_strong | default('#c1301c') }}; line-height: 1.6;
+  .po-head { width: 100%; border-collapse: collapse; }
+  .po-head td { padding: 0; vertical-align: top; }
+  .po-hr {
+    font-family: 'Space Grotesk', sans-serif; font-size: 11px; letter-spacing: .06em;
+    text-transform: uppercase; color: #8a8984; text-align: right; line-height: 1.6;
   }
-  .hd-ref { font-size: 15px; letter-spacing: -.01em; color: #201f1e; font-weight: 700; }
-  .doc-title {
-    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 30px;
-    letter-spacing: -.02em; color: #201f1e; margin: 16px 0 0; line-height: 1.05;
-  }
-  .doc-sub { font-size: 13px; color: #5c5b58; margin: 6px 0 16px; }
-
-  /* ===== SECTIONS ===== */
-  .lblh {
-    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 11px; letter-spacing: .09em;
+  .po-hr b { color: {{ brand_strong | default('#c1301c') }}; font-weight: 700; }
+  .po-eyebrow {
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px; letter-spacing: .14em;
     text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }};
-    margin: 14px 0 7px; padding-bottom: 6px; border-bottom: 1px solid #e5e3df;
+    font-weight: 600; margin: 26px 0 0;
+  }
+  .po-title {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px;
+    line-height: 1; letter-spacing: -.03em; color: #201f1e; margin: 12px 0 0;
   }
 
-  /* Deux colonnes de parties : table, car flex n'égalise pas les hauteurs ici. */
-  .parties { width: 100%; border-collapse: separate; border-spacing: 10px 0; margin: 0 -10px; }
-  .parties td {
-    width: 50%; vertical-align: top; border: 1px solid #e5e3df; border-radius: 12px;
-    padding: 12px 15px; background: #fdfcfb;
+  /* ===== PARTIES ===== */
+  /* Deux cartes de même hauteur : bordure portée par le <td>, flex n'égalisant
+     pas les hauteurs sous WeasyPrint. */
+  .po-parties { width: 100%; border-collapse: separate; border-spacing: 8px 0; margin: 20px -8px 0; }
+  .po-parties td { width: 50%; vertical-align: top; border: 1px solid #e5e3df; border-radius: 12px; padding: 14px 17px; }
+  .po-parties .pr {
+    font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: .08em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }};
+    font-weight: 700; margin-bottom: 8px;
   }
-  .party-role {
-    font-family: 'Space Grotesk', sans-serif; font-size: 10px; letter-spacing: .1em;
-    text-transform: uppercase; color: #8a8984; font-weight: 700; margin-bottom: 6px;
-  }
-  .party-name { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; }
-  .party-tx { font-size: 11.5px; line-height: 1.55; color: #4a4946; margin-top: 4px; }
+  .po-parties .lines { font-size: 12.5px; line-height: 1.6; color: #33322f; }
+  .po-parties .lines b { font-family: 'Space Grotesk', sans-serif; font-weight: 600; color: #201f1e; }
 
-  /* Tableau clé/valeur, utilisé pour le consultant et la mission. */
-  .kv { width: 100%; border-collapse: collapse; }
-  .kv td { padding: 5px 0; border-bottom: 1px solid #eeece8; vertical-align: top; }
-  .kv tr:last-child td { border-bottom: 0; }
-  .kv .k {
-    width: 165px; font-family: 'Space Grotesk', sans-serif; font-size: 10px; letter-spacing: .04em;
-    text-transform: uppercase; color: #8a8984; font-weight: 600; padding-right: 12px;
+  /* ===== BANDEAU DE MÉTADONNÉES ===== */
+  .po-meta { border-top: 1px solid #e5e3df; border-bottom: 1px solid #e5e3df; padding: 14px 0; margin-top: 18px; }
+  .po-meta table { width: 100%; border-collapse: collapse; }
+  .po-meta td { vertical-align: top; padding-right: 16px; }
+  .po-meta td:last-child { padding-right: 0; }
+  .po-meta .k {
+    font-family: 'Space Grotesk', sans-serif; font-size: 10px; letter-spacing: .07em;
+    text-transform: uppercase; color: #9a9994; font-weight: 600;
   }
-  .kv .v { font-size: 12px; color: #201f1e; }
-  .kv .v b { font-weight: 600; }
+  .po-meta .v { font-size: 13px; color: #201f1e; font-weight: 600; margin-top: 5px; line-height: 1.35; }
+  .po-period { padding: 16px 0 0; border-top: none; border-bottom: none; margin-top: 0; }
 
-  /* ===== CONDITIONS FINANCIÈRES ===== */
-  .money { width: 100%; border-collapse: collapse; margin-top: 2px; }
-  .money th {
-    font-family: 'Space Grotesk', sans-serif; font-size: 9.5px; letter-spacing: .06em;
-    text-transform: uppercase; color: #8a8984; font-weight: 600; text-align: right;
-    padding: 0 10px 6px; border-bottom: 1px solid #e5e3df;
+  /* ===== SOUS-TITRES ===== */
+  .h3 {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; letter-spacing: .02em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; margin: 18px 0 8px;
   }
-  .money th.lbl, .money td.lbl { text-align: left; padding-left: 0; }
-  .money td { font-size: 12.5px; text-align: right; padding: 8px 10px; border-bottom: 1px solid #eeece8; }
-  .money tr.total td {
-    border-bottom: 0; border-top: 1.5px solid {{ brand | default('#e24a1a') }};
-    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; color: #201f1e;
-    padding-top: 10px;
+  .p { font-size: 12.5px; line-height: 1.6; color: #33322f; margin: 0 0 9px; }
+  .p b { font-weight: 600; color: #201f1e; }
+  .li li { padding-left: 18px; font-size: 12.5px; line-height: 1.55; margin-bottom: 5px; }
+  .li li::before { width: 5px; height: 5px; top: 8px; }
+
+  /* ===== DÉTAIL DE LA COMMANDE ===== */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 2px; }
+  .tbl th {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 9.5px; letter-spacing: .04em;
+    text-transform: uppercase; color: #8a8984; text-align: left;
+    padding: 0 10px 8px; border-bottom: 2px solid {{ brand | default('#e24a1a') }};
   }
-  .money .unit { color: #8a8984; font-size: 10.5px; }
+  .tbl th:first-child, .tbl td:first-child { padding-left: 0; }
+  .tbl th.r, .tbl td.r { text-align: right; }
+  .tbl td { border-bottom: 1px solid #e5e3df; padding: 9px 10px; color: #33322f; vertical-align: top; }
+  .tbl .desc { font-family: 'Space Grotesk', sans-serif; font-weight: 600; color: #201f1e; }
+  .tbl .sub { font-family: 'Hanken Grotesk', sans-serif; font-weight: 400; font-size: 11px; color: #6b6a66; line-height: 1.5; }
+
+  /* Totaux : table alignée à droite, WeasyPrint n'étirant pas un flex ici. */
+  .po-tot { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  .po-tot td { padding: 3px 0; }
+  .po-tot .l {
+    text-align: right; padding-right: 24px; color: #5c5b58;
+    font-family: 'Space Grotesk', sans-serif; font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+  }
+  .po-tot .v { text-align: right; width: 130px; font-family: 'Space Grotesk', sans-serif; font-weight: 600; }
+  .po-tot .ht .l { color: #201f1e; font-weight: 700; }
+  .po-tot .ht .v { font-weight: 700; }
+  .po-tot .ttc td { border-top: 2px solid #201f1e; padding-top: 7px; }
+  .po-tot .ttc .l { color: {{ brand_strong | default('#c1301c') }}; font-weight: 700; }
+  .po-tot .ttc .v { font-size: 16px; color: {{ brand_strong | default('#c1301c') }}; font-weight: 700; }
 
   /* ===== SIGNATURES ===== */
   .sigblock { margin-top: 14px; }
+  .sigblock-hd { font-size: 18px; margin-bottom: 6px; }
+  .sig-lead { font-size: 11.5px; line-height: 1.5; color: #5c5b58; margin-bottom: 10px; }
   .sigcard { padding: 14px 16px; width: 50%; }
-  .sigcard-id { margin-top: 8px; min-height: 30px; }
-  .sigzone { margin-top: 10px; height: 52px; }
-  .sigmeta { margin-top: 10px; }
+  .sigcard-id { margin-top: 7px; min-height: 44px; }
+  .sigzone { margin-top: 11px; height: 62px; }
+  .sigmeta { margin-top: 10px; font-size: 11.5px; }
+
+  /* ===== CONDITIONS DE FACTURATION (page 2) ===== */
+  .p2 { page-break-before: always; }
+  .sec { width: 100%; border-collapse: collapse; border-bottom: 1px solid #e5e3df; margin: 16px 0 10px; page-break-after: avoid; }
+  .sec td { padding: 0 0 9px; vertical-align: baseline; }
+  .sec .n {
+    width: 44px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px;
+    color: {{ brand | default('#e24a1a') }}; line-height: .9;
+  }
+  .sec .t {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px;
+    color: #201f1e; text-transform: uppercase;
+  }
 </style>
 </head>
 <body>
 
-<!-- Pied de page courant (pages 2+) -->
+<!-- Pied de page courant -->
 <div class="rfoot">
   <table><tr>
-    <td><span class="nm">{{ issuer_company_name }}</span> · Bon de commande {{ reference }}</td>
-    <td class="c">{{ partner_company_name }}</td>
+    <td><span class="nm">{{ issuer_company_name | upper }}</span> · Bon de commande</td>
+    <td class="right">Réf. {{ reference }} · <span class="c">Confidentiel</span></td>
   </tr></table>
 </div>
 
-<table class="hd"><tr>
+<!-- ===== EN-TÊTE ===== -->
+<table class="po-head"><tr>
   <td>
     {% if logo_b64 %}
       <img class="cov-logo" src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="{{ issuer_company_name }}">
@@ -131,142 +166,184 @@
       <img class="cov-logo" src="{{ logo_filename }}" alt="{{ issuer_company_name }}">
     {% endif %}
   </td>
-  <td class="hd-kick">
-    Bon de commande<br>
-    <span class="hd-ref">{{ reference }}</span><br>
-    {{ order_date }}
+  <td class="po-hr">
+    <b>Commande d'achat</b><br>
+    Réf. {{ reference }}<br>
+    Confidentiel
   </td>
 </tr></table>
 <div class="cov-key"></div>
 
-<h1 class="doc-title">{{ mission_title | default('Mission de prestation') }}</h1>
-<div class="doc-sub">
-  {% if consultant_name %}{{ consultant_name }}{% endif %}
-  {%- if consultant_name and client_name %} · {% endif -%}
-  {% if client_name %}Client : {{ client_name }}{% endif %}
-</div>
+<div class="po-eyebrow">Commande d'achat</div>
+<h1 class="po-title">Bon de commande</h1>
 
-<div class="ident">
-  <div class="ident-pr">Bon de commande établi par</div>
-  <div class="ident-tx">
-    La société <b>{{ issuer_company_name }}</b>, {{ issuer_legal_form }} au capital de <b>{{ issuer_capital | capital }}</b>,
-    siège social <b>{{ issuer_head_office }}</b> — R.C.S. {{ issuer_rcs_city }} <b>{{ issuer_rcs_number | siren }}</b>{% if issuer_tva_number %} · TVA <b>{{ issuer_tva_number }}</b>{% endif %}.
-  </div>
-</div>
-
-<div class="callout">
-  Le présent bon de commande est régi par le contrat cadre de sous-traitance
-  {% if framework_reference %}<b>{{ framework_reference }}</b>{% endif %}
-  {%- if framework_signed_date %} signé le <b>{{ framework_signed_date }}</b>{% endif %}, conclu entre les Parties.
-  Il en constitue les Conditions Particulières et ne vaut que pour la mission décrite ci-dessous.
-</div>
-
-<div class="lblh">Parties</div>
-<table class="parties"><tr>
+<!-- ===== PARTIES ===== -->
+<table class="po-parties"><tr>
   <td>
-    <div class="party-role">Le client</div>
-    <div class="party-name">{{ issuer_company_name }}</div>
-    <div class="party-tx">
-      {{ issuer_head_office }}<br>
-      Représentée par {{ issuer_representative_name | expand_civility }}{% if issuer_representative_quality %}, {{ issuer_representative_quality }}{% endif %}
+    <div class="pr">Fournisseur — à l'attention de</div>
+    <div class="lines">
+      <b>{{ partner_company_name }}</b><br>
+      {% if partner_head_office %}{{ partner_head_office }}<br>{% endif %}
+      {% if partner_siren %}SIREN {{ partner_siren | siren }}<br>{% endif %}
+      {% if partner_signatory_name %}{{ partner_signatory_name | expand_civility }}{% endif %}
     </div>
   </td>
   <td>
-    <div class="party-role">Le partenaire</div>
-    <div class="party-name">{{ partner_company_name }}</div>
-    <div class="party-tx">
-      {{ partner_head_office }}<br>
-      {% if partner_siren %}SIREN {{ partner_siren | siren }}{% endif %}
-      {%- if partner_representative_name %}<br>Représentée par {{ partner_representative_civility | civility }} {{ partner_representative_name }}{% if partner_representative_title %}, {{ partner_representative_title }}{% endif %}{% endif %}
+    <div class="pr">Adresse de facturation</div>
+    <div class="lines">
+      <b>{{ issuer_company_name | upper }}</b><br>
+      {% if issuer_head_office %}{{ issuer_head_office }}<br>{% endif %}
+      {% if invoices_company_mail %}{{ invoices_company_mail }}{% endif %}
     </div>
   </td>
 </tr></table>
 
-<div class="lblh">Collaborateur affecté</div>
-<table class="kv">
-  <tr>
-    <td class="k">Consultant</td>
-    <td class="v"><b>{{ consultant_civility | civility }} {{ consultant_name }}</b></td>
-  </tr>
-  {% if consultant_email or consultant_phone %}
-  <tr>
-    <td class="k">Coordonnées</td>
-    <td class="v">{{ consultant_email }}{% if consultant_email and consultant_phone %} · {% endif %}{{ consultant_phone }}</td>
-  </tr>
-  {% endif %}
-</table>
-
-<div class="lblh">Mission</div>
-<table class="kv">
-  {% if client_name %}
-  <tr><td class="k">Client final</td><td class="v"><b>{{ client_name }}</b></td></tr>
-  {% endif %}
-  <tr><td class="k">Objet</td><td class="v">{{ mission_title }}</td></tr>
-  {% if mission_description %}
-  <tr><td class="k">Description</td><td class="v">{{ mission_description }}</td></tr>
-  {% endif %}
-  {% if mission_place %}
-  <tr><td class="k">Lieu d'exécution</td><td class="v">{{ mission_place }}</td></tr>
-  {% endif %}
-  <tr><td class="k">Période</td><td class="v">Du <b>{{ start_date }}</b> au <b>{{ end_date }}</b></td></tr>
-</table>
-
-<div class="lblh">Conditions financières</div>
-<table class="money">
-  <tr>
-    <th class="lbl">Désignation</th>
-    <th>Quantité</th>
-    <th>Prix unitaire HT</th>
-    <th>Montant HT</th>
-  </tr>
-  <tr>
-    <td class="lbl">Prestation d'assistance technique</td>
-    <td>{{ billable_days }} <span class="unit">j</span></td>
-    <td>{{ purchase_daily_rate }} <span class="unit">€ / j</span></td>
-    <td>{{ total_amount }} <span class="unit">€</span></td>
-  </tr>
-  {% if free_days and free_days != '0' %}
-  <tr>
-    <td class="lbl">Jours de gratuité <span class="unit">(non facturés)</span></td>
-    <td>{{ free_days }} <span class="unit">j</span></td>
-    <td>—</td>
-    <td>0 <span class="unit">€</span></td>
-  </tr>
-  {% endif %}
-  <tr class="total">
-    <td class="lbl">Total HT</td>
-    <td>{{ days_sold }} <span class="unit">j vendus</span></td>
-    <td></td>
-    <td>{{ total_amount }} <span class="unit">€</span></td>
-  </tr>
-</table>
-<div class="callout">
-  {% if free_days and free_days != '0' %}
-  Sur les <b>{{ days_sold }}</b> jours vendus, <b>{{ free_days }}</b> sont accordés à titre gracieux :
-  <b>{{ billable_days }}</b> jours sont facturables.
-  {% endif %}
-  Facturation mensuelle à terme échu sur la base des jours réellement réalisés{% if payment_terms_label %}, paiement {{ payment_terms_label }}{% endif %}.
-  {% if invoices_company_mail %}Factures à adresser à <span class="mail">{{ invoices_company_mail }}</span>.{% endif %}
+<!-- ===== MÉTADONNÉES ===== -->
+<div class="po-meta">
+  <table><tr>
+    <td><div class="k">Référence</div><div class="v">{{ reference }}</div></td>
+    <td><div class="k">Contrat cadre</div><div class="v">{{ framework_reference | default('—', true) }}</div></td>
+    <td><div class="k">Date de commande</div><div class="v">{{ order_date }}</div></td>
+    <td><div class="k">Conditions de paiement</div><div class="v">{% if payment_terms_label %}Paiement {{ payment_terms_label }}{% else %}Selon contrat cadre{% endif %}</div></td>
+  </tr></table>
+  <table class="po-period"><tr>
+    <td><div class="k">Période d'exécution</div><div class="v">Du {{ start_date }} au {{ end_date }}</div></td>
+  </tr></table>
 </div>
 
-<div class="lblh">Signatures</div>
+{% if mission_description %}
+<div class="h3">Objet de la mission</div>
+<p class="p">{{ mission_description }}</p>
+{% endif %}
+
+<!-- ===== DÉTAIL DE LA COMMANDE ===== -->
+<div class="h3">Détail de la commande</div>
+<table class="tbl">
+  <thead><tr>
+    <th>Description</th>
+    <th class="r">Quantité</th>
+    <th class="r">Prix unit. HT</th>
+    <th class="r">TVA</th>
+    <th class="r">Total HT</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td>
+        <div class="desc">{{ mission_title }}</div>
+        <div class="sub">
+          {%- if consultant_name %}Consultant : {{ consultant_civility }} {{ consultant_name }}<br>{% endif -%}
+          {%- if client_name %}Client final : {{ client_name }}<br>{% endif -%}
+          {%- if mission_place %}Lieu d'exécution : {{ mission_place }}{% endif -%}
+        </div>
+      </td>
+      <td class="r">{{ billable_days }} j</td>
+      <td class="r">{{ purchase_daily_rate }} €</td>
+      <td class="r">{{ vat_rate }} %</td>
+      <td class="r">{{ total_amount }} €</td>
+    </tr>
+    {% if free_days and free_days != '0' %}
+    <tr>
+      <td>
+        <div class="desc">Jours de gratuité</div>
+        <div class="sub">Accordés à titre gracieux, non facturés</div>
+      </td>
+      <td class="r">{{ free_days }} j</td>
+      <td class="r">—</td>
+      <td class="r">—</td>
+      <td class="r">0 €</td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+<table class="po-tot">
+  <tr class="ht"><td class="l">Total HT</td><td class="v">{{ total_amount }} €</td></tr>
+  <tr><td class="l">TVA ({{ vat_rate }} %)</td><td class="v">{{ vat_amount }} €</td></tr>
+  <tr class="ttc"><td class="l">Total TTC</td><td class="v">{{ total_amount_ttc }} €</td></tr>
+</table>
+
+<!-- ===== INTERLOCUTEURS ===== -->
+{% if commercial_email or invoices_company_mail or partner_contact_name or partner_contact_email %}
+<div class="h3">Interlocuteurs</div>
+<ul class="li">
+  {% if commercial_email %}
+  <li><b>Correspondant commercial</b> — {{ commercial_email }}</li>
+  {% endif %}
+  {% if invoices_company_mail %}
+  <li><b>Contact ADV / gestion</b> — {{ invoices_company_mail }}</li>
+  {% endif %}
+  {% if partner_contact_name or partner_contact_email %}
+  <li><b>Correspondant fournisseur</b> — {{ partner_contact_name | expand_civility }}{% if partner_contact_name and partner_contact_email %} · {% endif %}{{ partner_contact_email }}</li>
+  {% endif %}
+</ul>
+{% endif %}
+
+<!-- ===== SIGNATURES ===== -->
 <div class="sigblock">
+  <div class="sigblock-hd">Signatures</div>
+  <p class="sig-lead">
+    Bon de commande émis en application du contrat cadre de sous-traitance
+    {%- if framework_reference %} <b>{{ framework_reference }}</b>{% endif %}
+    {%- if framework_signed_date %}, signé le <b>{{ framework_signed_date }}</b>{% endif %}.
+    Document signé électroniquement via Yousign ; l'horodatage de la plateforme
+    vaut acceptation et fait foi de la date.
+  </p>
   <table class="sigrow" style="width: 100%"><tr>
     <td class="sigcard">
-      <div class="sigcard-role">Pour {{ issuer_company_name }}</div>
-      <div class="sigcard-id"><b>{{ issuer_signatory_name }}</b></div>
+      <div class="sigcard-role">Pour {{ issuer_company_name | upper }}</div>
+      <div class="sigcard-id"><table>
+        <tr class="sl"><td class="k">Société</td><td class="v"><b>{{ issuer_company_name | upper }}</b></td></tr>
+        <tr class="sl"><td class="k">Représentée par</td><td class="v">
+          {%- if issuer_representative_is_entity -%}
+            {{ issuer_representative_name }}, elle-même représentée par <b>{{ issuer_signatory_name | expand_civility }}</b>
+          {%- else -%}
+            <b>{{ issuer_signatory_name | expand_civility }}</b>
+          {%- endif -%}
+        </td></tr>
+        <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ issuer_representative_sub_quality | default(issuer_representative_quality, true) }}</b></td></tr>
+      </table></div>
       <div class="sigzone"></div>
       <div class="sigmeta">Le <span class="fillin"></span></div>
     </td>
     <td class="sigcard">
-      <div class="sigcard-role">Pour {{ partner_company_name }}</div>
-      <div class="sigcard-id">
-        <b>{% if partner_signatory_name %}{{ partner_signatory_name }}{% else %}{{ partner_representative_name }}{% endif %}</b>
-      </div>
+      <div class="sigcard-role">Pour le Fournisseur</div>
+      <div class="sigcard-id"><table>
+        <tr class="sl"><td class="k">Société</td><td class="v"><b>{{ partner_company_name | upper }}</b></td></tr>
+        <tr class="sl"><td class="k">Représentée par</td><td class="v"><b>{% if partner_signatory_name %}{{ partner_signatory_name | expand_civility }}{% else %}{{ partner_representative_civility | civility }} {{ partner_representative_name }}{% endif %}</b></td></tr>
+        <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ partner_representative_title }}</b></td></tr>
+      </table></div>
       <div class="sigzone"></div>
-      <div class="sigmeta">Le <span class="fillin"></span>, précédé de la mention « Bon pour accord »</div>
+      <div class="sigmeta">Le <span class="fillin"></span></div>
     </td>
   </tr></table>
+</div>
+
+<!-- ===== PAGE 2 — CONDITIONS DE FACTURATION ===== -->
+<h2 class="po-title p2" style="font-size: 26px">Conditions de facturation et de paiement</h2>
+<p class="p" style="margin-top: 12px">Le règlement des factures est strictement conditionné au respect intégral des dispositions ci-dessous.</p>
+
+<table class="sec"><tr><td class="n">1</td><td class="t">Mentions obligatoires</td></tr></table>
+<p class="p">Conformément à l'article L.441-9 du Code de commerce, toute facture doit comporter l'ensemble des mentions légales obligatoires, et notamment : numéro de facture unique, date d'émission, identité complète du client, numéro de bon de commande, désignation précise de la prestation, montant HT, taux de TVA, montant TVA, montant TTC. Toute facture incomplète ou non conforme pourra être rejetée.</p>
+
+<table class="sec"><tr><td class="n">2</td><td class="t">Numérotation des factures</td></tr></table>
+<p class="p">Les factures doivent suivre une numérotation unique, continue et chronologique, sans rupture ni doublon. Un seul numéro est attribué par facture. Toute anomalie de numérotation entraîne le rejet automatique de la facture.</p>
+
+<table class="sec"><tr><td class="n">3</td><td class="t">Date de facture</td></tr></table>
+<p class="p">La facture doit impérativement être datée au dernier jour du mois correspondant à la période de facturation (exemple : période de janvier 2026 → date de facture 31/01/2026). Les factures établies à une autre date seront rejetées.</p>
+
+<table class="sec"><tr><td class="n">4</td><td class="t">Rejet et suspension du délai de paiement</td></tr></table>
+<p class="p">Toute facture non conforme pourra être rejetée sans préavis et suspendra automatiquement le délai de paiement. Un nouveau délai contractuel de paiement commencera à courir uniquement à compter de la réception d'une facture rectifiée et conforme.</p>
+
+<table class="sec"><tr><td class="n">5</td><td class="t">Pénalités et indemnité forfaitaire</td></tr></table>
+<p class="p">Conformément aux articles L.441-10 et D.441-5 du Code de commerce, des pénalités de retard sont exigibles de plein droit en cas de paiement tardif, et une indemnité forfaitaire de 40 € pour frais de recouvrement est due de plein droit.</p>
+
+{% if invoices_company_mail %}
+<p class="p">Les factures sont à adresser à <span class="mail">{{ invoices_company_mail }}</span>, en rappelant la référence <b>{{ reference }}</b> du présent bon de commande.</p>
+{% endif %}
+
+<div class="callout">
+  Bon de commande régi par le contrat cadre de sous-traitance en vigueur. En cas
+  de contradiction, les stipulations du contrat cadre prévalent sur le présent
+  bon de commande.
 </div>
 
 </body>

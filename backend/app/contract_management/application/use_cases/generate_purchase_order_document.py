@@ -25,6 +25,9 @@ TEMPLATE_NAME = "bon_de_commande.html"
 
 # Libellés des conditions de paiement, repris du contrat cadre quand il en
 # porte une : le bon de commande n'invente pas ses propres délais.
+# Taux de TVA appliqué aux prestations de services intérieures.
+VAT_RATE = Decimal("20")
+
 PAYMENT_TERMS_LABELS = {
     "immediate": "comptant",
     "net_30": "à 30 jours",
@@ -135,6 +138,10 @@ class GeneratePurchaseOrderDocumentUseCase:
         if framework and framework.contract_config:
             payment_terms = framework.contract_config.get("payment_terms")
 
+        # La TVA n'est pas une donnée du bon de commande : elle est calculée au
+        # taux normal, seul applicable à une prestation de services intérieure.
+        vat_amount = (po.total_amount * VAT_RATE / Decimal("100")).quantize(Decimal("0.01"))
+
         context: dict = {
             "reference": po.display_reference,
             "order_date": datetime.now(UTC).strftime("%d/%m/%Y"),
@@ -158,7 +165,12 @@ class GeneratePurchaseOrderDocumentUseCase:
             "free_days": _fmt_quantity(po.free_days),
             "billable_days": _fmt_quantity(po.billable_days),
             "total_amount": _fmt_amount(po.total_amount),
+            "vat_rate": _fmt_quantity(VAT_RATE),
+            "vat_amount": _fmt_amount(vat_amount),
+            "total_amount_ttc": _fmt_amount(po.total_amount + vat_amount),
             "payment_terms_label": PAYMENT_TERMS_LABELS.get(payment_terms or "", ""),
+            # Interlocuteurs
+            "commercial_email": po.commercial_email or "",
         }
 
         if company:
@@ -170,8 +182,12 @@ class GeneratePurchaseOrderDocumentUseCase:
                     "issuer_head_office": company.head_office,
                     "issuer_rcs_city": company.rcs_city,
                     "issuer_rcs_number": company.rcs_number,
+                    "issuer_representative_is_entity": company.representative_is_entity,
                     "issuer_representative_name": company.representative_name,
                     "issuer_representative_quality": company.representative_quality,
+                    "issuer_representative_sub_quality": (
+                        company.representative_sub_quality or ""
+                    ),
                     "issuer_signatory_name": company.signatory_name,
                     "issuer_color_code": company.color_code,
                     "issuer_tva_number": company.tva_number or "",
@@ -189,6 +205,12 @@ class GeneratePurchaseOrderDocumentUseCase:
                     "partner_representative_name": third_party.representative_name or "",
                     "partner_representative_title": third_party.representative_title or "",
                     "partner_signatory_name": _signatory_name(third_party),
+                    "partner_contact_name": _adv_contact_name(third_party),
+                    "partner_contact_email": (
+                        getattr(third_party, "adv_contact_email", None)
+                        or getattr(third_party, "contact_email", None)
+                        or ""
+                    ),
                 }
             )
 
@@ -261,6 +283,15 @@ def _signatory_name(third_party) -> str:
     last = getattr(third_party, "signatory_last_name", None)
     name = " ".join(p for p in (first, last) if p).strip()
     return name or (third_party.representative_name or "")
+
+
+def _adv_contact_name(third_party) -> str:
+    """Correspondant administratif du fournisseur, à défaut son signataire."""
+    first = getattr(third_party, "adv_contact_first_name", None)
+    last = getattr(third_party, "adv_contact_last_name", None)
+    civility = getattr(third_party, "adv_contact_civility", None)
+    name = " ".join(p for p in (civility, first, last) if p).strip()
+    return name or _signatory_name(third_party)
 
 
 def _fmt_date(value: date | None) -> str:

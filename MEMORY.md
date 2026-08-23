@@ -233,6 +233,22 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-23 (feat: bon de commande refait d'après la maquette Claude Design)
+
+Le PDF du bon de commande suit désormais la maquette `Bon de commande.dc.html`
+du projet « Refonte templates Craftmania et Leonum », comme le contrat et les
+chartes suivent la leur.
+
+- **Page 1 — la commande** : entête logo + « Commande d'achat / Réf. / Confidentiel », filet dégradé, titre, deux cartes de parties (fournisseur à l'attention de / adresse de facturation), bandeau de métadonnées (référence, contrat cadre, date, conditions de paiement, période), objet de la mission, tableau « Détail de la commande » (description, quantité, prix unitaire, TVA, total), totaux HT / TVA / TTC, interlocuteurs, signatures.
+- **Page 2 — les conditions de facturation et de paiement** : les cinq articles de la maquette (mentions obligatoires, numérotation, date de facture, rejet et suspension du délai, pénalités et indemnité forfaitaire), l'adresse de facturation rappelée avec la référence du bon, et le rappel que le contrat cadre prévaut.
+- **TVA** : le document affiche désormais un total TTC. Le taux n'est pas une donnée du bon de commande — il est calculé au taux normal (20 %), seul applicable à une prestation de services intérieure.
+- **Bloc signataire aligné sur le contrat** : Société / Représentée par / Fonction, la personne morale dépliée (« SC HOLDING, elle-même représentée par… »), mention Yousign conservée (document bilatéral).
+- **Interlocuteurs** : correspondant commercial (email porté par le bon), contact ADV/gestion (adresse de facturation de la société émettrice), correspondant fournisseur (contact ADV du tiers, à défaut son signataire).
+- **Le TJM reste hors du document** : la garde tenue par les deux tests d'origine vaut pour le nouveau gabarit, qui n'imprime que le CJM.
+- Pagination : la commande tient sa page, les conditions ouvrent la leur. Un dossier complet (description de mission, gratuité, trois interlocuteurs) sort en trois pages, le bloc signatures ne tenant pas sous le tableau.
+
+353 tests `contract_management` verts, dont les rendus PDF réels (WeasyPrint) du gabarit.
+
 ### 2026-08-23 (feat: numéro provisoire du BDC, préremplissage complet, panel fournisseur)
 
 Trois retouches du bon de commande, du numéro jusqu'au rattachement.

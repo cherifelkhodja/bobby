@@ -67,8 +67,12 @@ def _company():
         head_office="54 avenue Hoche, 75008 Paris",
         rcs_city="Paris",
         rcs_number="842799959",
-        representative_name="Mme Selma HIZEM",
+        # La présidence est tenue par une personne morale : le bloc signataire
+        # doit dire « SC HOLDING, elle-même représentée par… ».
+        representative_is_entity=True,
+        representative_name="SC HOLDING",
         representative_quality="Présidente",
+        representative_sub_quality="Présidente",
         signatory_name="Mme Selma HIZEM",
         color_code="#e95a6b",
         tva_number="FR23842799959",
@@ -87,6 +91,11 @@ def _third_party():
         representative_title="Président",
         signatory_first_name="Karim",
         signatory_last_name="BENALI",
+        adv_contact_civility="Mme",
+        adv_contact_first_name="Nadia",
+        adv_contact_last_name="SELLAM",
+        adv_contact_email="adv@akema-tech.fr",
+        contact_email="contact@akema-tech.fr",
     )
 
 
@@ -242,11 +251,35 @@ class TestTemplateRendering:
         assert "gratuité" not in without_free
 
     def test_both_parties_have_a_signature_card(self):
+        """Chaque carte nomme sa société, son représentant et sa fonction."""
         html = self._html()
 
         assert "Pour LEONUM" in html
-        assert "Pour AKEMA TECH" in html
-        assert "Bon pour accord" in html
+        assert "Pour le Fournisseur" in html
+        assert "AKEMA TECH" in html
+        # Présidence tenue par une personne morale : la chaîne doit apparaître.
+        assert "SC HOLDING, elle-même représentée par" in html
+        assert "Karim BENALI" in html
+        # Signature électronique : mention Yousign obligatoire (document bilatéral).
+        assert "Yousign" in html
+
+    def test_the_second_page_carries_the_invoicing_terms(self):
+        """Les conditions de facturation tiennent leur propre page."""
+        html = self._html()
+
+        assert "Conditions de facturation et de paiement" in html
+        assert "L.441-9" in html
+        assert "indemnité forfaitaire de 40" in html
+
+    def test_the_totals_carry_the_vat(self):
+        """Total HT, TVA au taux normal et total TTC."""
+        html = self._html()
+
+        # 18 j facturables x 500 € = 9 000 € HT, 1 800 € de TVA, 10 800 € TTC.
+        assert "9 000 €" in html
+        assert "TVA (20 %)" in html
+        assert "1 800 €" in html
+        assert "10 800 €" in html
 
 
 class TestGeneration:
