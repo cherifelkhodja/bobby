@@ -49,6 +49,9 @@ class ContractRequestResponse(BaseModel):
     compliance_override_reason: str | None = None
     documents_skipped: bool = False
     company_id: UUID | None = None
+    company_name: str | None = None
+    # Nombre de bons de commande rattachés : ce qui vit sous ce contrat cadre.
+    purchase_orders_count: int = 0
     contract_config: dict | None = None
     status_history: list[dict] = []
     created_at: datetime

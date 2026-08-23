@@ -189,15 +189,6 @@ export function ContractManagement() {
 
   const createConsultantIdValid = /^\d+$/.test(createForm.boond_consultant_id.trim());
 
-  const formatDate = (dateStr: string | null) =>
-    dateStr
-      ? new Date(dateStr).toLocaleDateString('fr-FR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: '2-digit',
-        })
-      : '—';
-
   if (crLoading) return <PageSpinner />;
 
   const items = crData?.items ?? [];
@@ -227,7 +218,7 @@ export function ContractManagement() {
 
   const paged = filtered.slice(page * pageSize, page * pageSize + pageSize);
 
-  const gridCols = 'grid-cols-[72px_1.5fr_110px_90px_90px_210px_60px]';
+  const gridCols = 'grid-cols-[92px_1.5fr_120px_120px_80px_210px_60px]';
 
   const selectedCompanyName =
     companies.find((c) => c.id === supplierForm.company_id)?.name ?? 'cette société';
@@ -239,14 +230,14 @@ export function ContractManagement() {
 
   return (
     <div>
-      <p className="bc">Contrats / Demandes</p>
+      <p className="bc">Contrats / Fournisseurs</p>
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="h1">Demandes de contractualisation</h1>
+          <h1 className="h1">Fournisseurs</h1>
           <p className="sub">
             {isAdv
-              ? 'Synchronisées depuis BoondManager · statut 7 « Gagné attente contrat »'
-              : 'Vos demandes de contractualisation'}
+              ? 'Un contrat cadre par fournisseur et par société émettrice · les missions se rattachent en bons de commande'
+              : 'Vos dossiers fournisseurs'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -287,7 +278,7 @@ export function ContractManagement() {
 
       <div className="kpis">
         <div className="kpi">
-          <p className="kl">Demandes actives</p>
+          <p className="kl">Dossiers en cours</p>
           <p className="kv">{activeItems.length}</p>
           <p className="ks">sur {items.length} au total</p>
         </div>
@@ -299,7 +290,7 @@ export function ContractManagement() {
         <div className="kpi">
           <p className="kl">À traiter par l'ADV</p>
           <p className="kv">{todoCount}</p>
-          <p className="ks">validation, configuration, drafts</p>
+          <p className="ks">validation, conformité, brouillons</p>
         </div>
         <div className="kpi">
           <p className="kl">Bloquées conformité</p>
@@ -311,10 +302,10 @@ export function ContractManagement() {
       <div className="tabs">
         {(
           [
-            { key: 'all' as FilterTab, label: 'Toutes' },
+            { key: 'all' as FilterTab, label: 'Tous' },
             { key: 'todo' as FilterTab, label: 'À traiter' },
             { key: 'waiting' as FilterTab, label: 'En attente du tiers' },
-            { key: 'done' as FilterTab, label: 'Finalisées' },
+            { key: 'done' as FilterTab, label: 'Sous contrat' },
           ]
         ).map(({ key, label }) => (
           <button
@@ -329,36 +320,38 @@ export function ContractManagement() {
             {label} · {counts[key]}
           </button>
         ))}
-        <span className="sort">Trier : échéance de démarrage</span>
+        <span className="sort">Trier : dossier le plus récent</span>
       </div>
 
       {filtered.length === 0 ? (
         <div className="card text-center py-12">
           <FileSignature className="h-10 w-10 text-mut2 mx-auto mb-4" />
-          <p className="dn">Aucune demande</p>
+          <p className="dn">Aucun dossier fournisseur</p>
           <p className="ds mt-1.5">
-            Les demandes arrivent automatiquement depuis BoondManager (statut 7).
+            Ouvrez-en un avec « Nouveau fournisseur », ou depuis un consultant déjà connu de
+            BoondManager.
           </p>
         </div>
       ) : (
         <div className="tbl">
           <div className={`thead ${gridCols}`}>
             <span>Réf.</span>
-            <span>Consultant / Partenaire</span>
-            <span>Client</span>
-            <span>TJM achat</span>
-            <span>Démarrage</span>
+            <span>Fournisseur</span>
+            <span>Type</span>
+            <span>Société émettrice</span>
+            <span>Missions</span>
             <span>Étape</span>
             <span></span>
           </div>
           {paged.map((cr) => {
-            const consultantName =
-              [cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ') ||
-              'Consultant à identifier';
+            // Le fournisseur est le sujet du dossier ; le consultant, quand il
+            // y en a un, n'est que ce qui l'a fait ouvrir.
+            const consultantName = [cr.consultant_first_name, cr.consultant_last_name]
+              .filter(Boolean)
+              .join(' ');
             const thirdPartyLabel = cr.third_party_type
               ? THIRD_PARTY_TYPE_LABELS[cr.third_party_type] ?? cr.third_party_type
-              : null;
-            const subParts = [cr.third_party_name, thirdPartyLabel].filter(Boolean);
+              : '—';
             return (
               <div
                 key={cr.id}
@@ -368,16 +361,19 @@ export function ContractManagement() {
                 <span className="ref">{cr.display_reference}</span>
                 <div className="min-w-0">
                   <p className="nm truncate">
-                    {cr.consultant_civility && `${cr.consultant_civility} `}
-                    {consultantName}
+                    {cr.third_party_name ?? 'Société à identifier'}
                   </p>
                   <p className="ns truncate">
-                    {subParts.length > 0 ? subParts.join(' · ') : 'Partenaire en attente'}
+                    {consultantName
+                      ? `Ouvert pour ${cr.consultant_civility ? `${cr.consultant_civility} ` : ''}${consultantName}`
+                      : 'Dossier fournisseur'}
                   </p>
                 </div>
-                <span className="cell truncate">{cr.client_name || '—'}</span>
-                <span className="tjm">{cr.daily_rate ? `${cr.daily_rate} €` : '—'}</span>
-                <span className="cell">{formatDate(cr.start_date)}</span>
+                <span className="cell truncate">{thirdPartyLabel}</span>
+                <span className="cell truncate">{cr.company_name ?? '—'}</span>
+                <span className="cell">
+                  {cr.purchase_orders_count > 0 ? cr.purchase_orders_count : '—'}
+                </span>
                 <div>
                   <span className={chipClass(cr.status)}>
                     <span className="dot" />
@@ -419,7 +415,7 @@ export function ContractManagement() {
           })}
           <div className="tfoot">
             <span>
-              {filtered.length} demande{filtered.length > 1 ? 's' : ''}
+              {filtered.length} dossier{filtered.length > 1 ? 's' : ''}
               {statusFilter &&
                 ` · filtre : ${CONTRACT_STATUS_CONFIG[statusFilter as ContractRequestStatus]?.label ?? statusFilter}`}
             </span>

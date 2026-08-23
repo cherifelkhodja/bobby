@@ -788,6 +788,9 @@ export interface ContractRequest {
   /** Dépôt des documents de vigilance volontairement ignoré (saisie manuelle ADV). */
   documents_skipped: boolean;
   company_id: string | null;
+  company_name: string | null;
+  /** Nombre de bons de commande vivants sous ce contrat cadre. */
+  purchase_orders_count: number;
   contract_config: Record<string, unknown> | null;
   status_history: Array<{ status: ContractRequestStatus; entered_at: string; comment?: string }>;
   created_at: string;

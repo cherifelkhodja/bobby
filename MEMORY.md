@@ -233,6 +233,17 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-21 (fix: la page Contrats parlait encore de l'ancien modèle)
+
+L'écran `/contracts` décrivait toujours des « demandes de contractualisation » synchronisées depuis BoondManager au statut 7, alors que ce webhook crée désormais des bons de commande et que les dossiers fournisseurs s'ouvrent à la main.
+
+- Renommée **Fournisseurs** (navigation, fil d'Ariane, titre), sous-titre remplacé par la règle réelle : un contrat cadre par fournisseur et par société émettrice, les missions se rattachant en bons de commande.
+- **Le fournisseur devient le sujet des lignes** : sa raison sociale en tête, le consultant en sous-titre quand le dossier a été ouvert depuis l'un d'eux. Les colonnes de mission (client, TJM achat, démarrage), qui appartiennent maintenant au bon de commande, cèdent la place à **Type de tiers**, **Société émettrice** et **Missions** (nombre de BDC vivants).
+- Onglet « Finalisées » → « Sous contrat », état vide réécrit (les dossiers ne tombent plus du ciel), KPI reformulés.
+- API : `company_name` et `purchase_orders_count` exposés sur la demande de contrat, ce dernier compté en une requête groupée, hors bons de commande annulés.
+
+302 tests `contract_management` verts, front `tsc`/`eslint`/282 tests/build OK.
+
 ### 2026-08-21 (feat: distinguer les missions par société émettrice)
 
 Suite du correctif précédent, côté lecture : un fournisseur sous contrat avec plusieurs sociétés du groupe a des missions distinctes pour chacune, qui ne doivent pas se mélanger à l'écran.

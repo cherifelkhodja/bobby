@@ -100,7 +100,7 @@ export function Sidebar() {
             <NavItem
               to="/contracts"
               icon={FileSignature}
-              label="Demandes"
+              label="Fournisseurs"
               count={contractsData?.total}
               hot
             />

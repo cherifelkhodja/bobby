@@ -164,6 +164,8 @@ def _cr_to_response(
     *,
     commercial_name: str | None = None,
     third_party_name: str | None = None,
+    company_name: str | None = None,
+    purchase_orders_count: int = 0,
     portal_url: str | None = None,
 ) -> ContractRequestResponse:
     """Convert a ContractRequest entity to response."""
@@ -207,6 +209,8 @@ def _cr_to_response(
         compliance_override_reason=cr.compliance_override_reason,
         documents_skipped=cr.documents_skipped,
         company_id=cr.company_id,
+        company_name=company_name,
+        purchase_orders_count=purchase_orders_count,
         contract_config=cr.contract_config,
         status_history=cr.status_history or [],
         created_at=cr.created_at,
@@ -297,12 +301,17 @@ async def list_contract_requests(
         )
         tp_name_map = {row[0]: row[1] for row in result.all() if row[1]}
 
+    company_name_map = await _issuer_company_names(db, [cr.company_id for cr in items])
+    order_counts = await _purchase_order_counts(db, [cr.id for cr in items])
+
     return ContractRequestListResponse(
         items=[
             _cr_to_response(
                 cr,
                 commercial_name=name_map.get(cr.commercial_email),
                 third_party_name=tp_name_map.get(cr.third_party_id),
+                company_name=company_name_map.get(cr.company_id),
+                purchase_orders_count=order_counts.get(cr.id, 0),
             )
             for cr in items
         ],
@@ -478,6 +487,30 @@ async def lookup_supplier(
         open_contract_request_id=open_cr.id if open_cr else None,
         open_contract_request_status=open_cr.status.value if open_cr else None,
     )
+
+
+async def _purchase_order_counts(db: AsyncSession, contract_request_ids: list) -> dict:
+    """Nombre de bons de commande vivants par contrat cadre, en une requête.
+
+    Les bons de commande annulés ne comptent pas : ils ne représentent aucune
+    mission.
+    """
+    from sqlalchemy import func as _func
+    from sqlalchemy import select as _sel
+
+    from app.contract_management.infrastructure.models import PurchaseOrderModel
+
+    if not contract_request_ids:
+        return {}
+    result = await db.execute(
+        _sel(PurchaseOrderModel.contract_request_id, _func.count(PurchaseOrderModel.id))
+        .where(
+            PurchaseOrderModel.contract_request_id.in_(contract_request_ids),
+            PurchaseOrderModel.status != "cancelled",
+        )
+        .group_by(PurchaseOrderModel.contract_request_id)
+    )
+    return {row[0]: row[1] for row in result.all()}
 
 
 async def _issuer_company_names(db: AsyncSession, company_ids: list) -> dict:
