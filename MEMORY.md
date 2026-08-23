@@ -233,6 +233,19 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-21 (feat: nouveau type de tiers « Portage commercial »)
+
+Cinquième type de tiers, aux côtés du freelance, du sous-traitant, du portage salarial et du salarié.
+
+- `ThirdPartyType.PORTAGE_COMMERCIAL` : requiert un contrat cadre, et son consultant est **externe** — ce qui décide des chartes qui lui sont opposables.
+- La règle « consultant externe » quitte la route pour rejoindre le type (`ThirdPartyType.is_external` + `EXTERNAL_THIRD_PARTY_TYPES`) : elle était écrite en dur à deux endroits de `routes.py`, et un type ajouté y serait passé inaperçu.
+- Côté Boond, `typeOf = 7`, déjà prévu dans la table de correspondance, distinct du portage salarial (6).
+- **Vigilance inchangée** : une société de portage commercial est une société ordinaire ; la garantie financière ne concerne que le portage salarial. Le portail lui propose donc « société » par défaut, et non « EI ».
+- Front : proposé à l'ouverture d'un fournisseur et à la validation commerciale, libellé dans la liste des fournisseurs et le tableau de bord conformité. La cascade de ternaires de la fiche contrat, qui affichait « Salarié » pour tout type non prévu, s'appuie désormais sur la table de libellés.
+- Aucune migration : les colonnes `type` et `third_party_type` sont des `String(20)` sans contrainte de valeur.
+
+12 tests sur le type et les schémas. 314 tests `contract_management` verts, front `tsc`/`eslint`/282 tests/build OK.
+
 ### 2026-08-21 (fix: la fiche cadre s'intitule d'après le fournisseur)
 
 Le titre affichait encore un consultant (`GEM-CC-003 · Bobby_prenom Bobby_name`) alors que l'entête montrait bien WOHM en partenaire. Deux causes, l'une visible, l'autre en dessous.

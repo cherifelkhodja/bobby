@@ -17,6 +17,7 @@ const THIRD_PARTY_TYPE_LABELS: Record<string, string> = {
   freelance: 'Freelance',
   sous_traitant: 'Sous-traitant',
   portage_salarial: 'Portage salarial',
+  portage_commercial: 'Portage commercial',
   salarie: 'Salarié',
 };
 
@@ -559,6 +560,11 @@ export function ContractManagement() {
                   { key: 'sous_traitant', label: 'Sous-traitant', hint: 'Société de prestation' },
                   { key: 'freelance', label: 'Freelance', hint: 'Indépendant, EI ou société' },
                   { key: 'portage_salarial', label: 'Portage salarial', hint: 'Société de portage' },
+                  {
+                    key: 'portage_commercial',
+                    label: 'Portage commercial',
+                    hint: 'Société portant la relation commerciale',
+                  },
                   { key: 'salarie', label: 'Salarié', hint: 'Redirigé vers PayFit' },
                 ] as const
               ).map(({ key, label, hint }) => (

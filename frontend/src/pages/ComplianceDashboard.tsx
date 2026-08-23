@@ -54,6 +54,7 @@ const TYPE_LABELS: Record<string, string> = {
   freelance: 'Freelance',
   sous_traitant: 'Sous-traitant',
   portage_salarial: 'Portage salarial',
+  portage_commercial: 'Portage commercial',
   portage: 'Portage salarial',
   salarie: 'Salarié',
   esn: 'ESN',

@@ -144,6 +144,11 @@ const THIRD_PARTY_TYPE_CARDS = [
     desc: 'Contrat conclu avec la société de portage',
   },
   {
+    value: 'portage_commercial',
+    label: 'Portage commercial',
+    desc: 'Société portant la relation commerciale du consultant',
+  },
+  {
     value: 'salarie',
     label: 'Salarié',
     desc: 'Embauche directe · redirigée vers le process Payfit',
@@ -1984,7 +1989,9 @@ export default function ContractDetail() {
                       <div>
                         <p className="ml">Type de tiers</p>
                         <p className="mv">
-                          {cr.third_party_type === 'freelance' ? 'Freelance / EI' : cr.third_party_type === 'sous_traitant' ? 'Sous-traitant' : cr.third_party_type === 'portage_salarial' ? 'Portage salarial' : 'Salarié'}
+                          {cr.third_party_type
+                            ? (THIRD_PARTY_TYPE_LABELS[cr.third_party_type] ?? cr.third_party_type)
+                            : '—'}
                         </p>
                       </div>
                     )}

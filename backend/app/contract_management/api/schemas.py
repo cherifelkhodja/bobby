@@ -75,7 +75,7 @@ class CommercialValidationRequest(BaseModel):
     """
 
     third_party_type: str = Field(
-        ..., pattern=r"^(freelance|sous_traitant|salarie|portage_salarial)$"
+        ..., pattern=r"^(freelance|sous_traitant|salarie|portage_salarial|portage_commercial)$"
     )
     contact_email: EmailStr
     company_id: UUID | None = None
@@ -150,7 +150,7 @@ class SupplierDossierCreate(BaseModel):
     """
 
     third_party_type: str = Field(
-        ..., pattern=r"^(freelance|sous_traitant|salarie|portage_salarial)$"
+        ..., pattern=r"^(freelance|sous_traitant|salarie|portage_salarial|portage_commercial)$"
     )
     contact_email: EmailStr = Field(..., description="Contact contractualisation du fournisseur")
     company_id: UUID | None = Field(None, description="Société émettrice du contrat")

@@ -627,6 +627,9 @@ function CompanyInfoForm({ token, thirdPartyType, initialData, onSuccess }: Comp
     if (isPortageSalarial) return 'portage_salarial';
     if (initialData?.entity_category === 'societe') return 'societe';
     if (initialData?.entity_category === 'portage_salarial') return 'portage_salarial';
+    // Une société de portage commercial est toujours une société : la garantie
+    // financière, elle, ne concerne que le portage salarial.
+    if (thirdPartyType === 'portage_commercial') return 'societe';
     return 'ei';
   };
 

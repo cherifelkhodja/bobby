@@ -468,7 +468,7 @@ nouveau → en_cours → entretien → accepté
 - `GET /siret-lookup/{siret}` - SIRET auto-fill INSEE+INPI for ADV manual entry (ADV/admin)
 - `GET /{id}` - Get contract request detail
 - `POST /{id}/sync-from-boond` - Re-sync data from Boond (ADV/admin)
-- `POST /{id}/validate-commercial` - Commercial validation (type tiers, contact, consultant; `notify_third_party` to skip the fournisseur email for manual entry, `skip_documents` to also skip the vigilance deposit)
+- `POST /{id}/validate-commercial` - Commercial validation (type tiers — freelance, sous_traitant, portage_salarial, portage_commercial, salarie —, contact, consultant; `notify_third_party` to skip the fournisseur email for manual entry, `skip_documents` to also skip the vigilance deposit)
 - `POST /{id}/third-party-info` - Manually enter third-party identity + contacts, no email (ADV/admin)
 - `POST /{id}/resend-collection-email` - Resend document collection email
 - `POST /{id}/configure` - Configure contract (ADV/admin)

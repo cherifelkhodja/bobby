@@ -64,6 +64,9 @@ from app.third_party.application.company_info_mapper import apply_company_info
 from app.third_party.application.use_cases.generate_magic_link import (
     GenerateMagicLinkUseCase,
 )
+from app.third_party.domain.value_objects.third_party_type import (
+    EXTERNAL_THIRD_PARTY_TYPES,
+)
 from app.third_party.infrastructure.adapters.postgres_magic_link_repo import (
     MagicLinkRepository,
 )
@@ -2013,7 +2016,7 @@ async def get_signature_preview(
 
         # Check consultant scope
         if c.target == "consultant" and c.consultant_scope != "all":
-            is_external = cr.third_party_type in ("freelance", "sous_traitant", "portage_salarial")
+            is_external = cr.third_party_type in EXTERNAL_THIRD_PARTY_TYPES
             if c.consultant_scope == "external" and not is_external:
                 continue
             if c.consultant_scope == "internal" and is_external:
@@ -2250,11 +2253,7 @@ async def _ensure_signature_checklist(db, cr, excluded_charter_ids: set | None =
 
             # Check consultant scope
             if c.target == "consultant" and c.consultant_scope != "all":
-                is_external = cr.third_party_type in (
-                    "freelance",
-                    "sous_traitant",
-                    "portage_salarial",
-                )
+                is_external = cr.third_party_type in EXTERNAL_THIRD_PARTY_TYPES
                 if c.consultant_scope == "external" and not is_external:
                     continue
                 if c.consultant_scope == "internal" and is_external:
