@@ -7,19 +7,15 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.contract_management.application.boond_mappings import (
+    resource_type_of,
+    state_reason_type_of,
+)
 from app.contract_management.domain.value_objects.contract_request_status import (
     ContractRequestStatus,
 )
 
 logger = structlog.get_logger()
-
-# Maps third_party_type → Boond contract typeOf
-_THIRD_PARTY_TYPE_TO_CONTRACT_TYPE: dict[str, int] = {
-    "sous_traitant": 2,
-    "freelance": 3,
-    "portage_salarial": 6,
-    "portage_commercial": 7,
-}
 
 
 def _format_siren(siren: str) -> str:
@@ -348,14 +344,16 @@ class SyncToBoondAfterSigningUseCase:
 
         is_candidate = cr.boond_consultant_type == "candidate" or cr.boond_consultant_type is None
         is_resource = not is_candidate  # Already a resource in Boond
-        state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
         if resource_id and is_candidate:
             try:
                 new_resource_id = await self._crm.convert_candidate_to_resource(
                     resource_id,
                     state=3,
-                    state_reason_type_of=state_reason_type_of,
-                    type_of=state_reason_type_of,  # 0=salarié, 1=externe
+                    state_reason_type_of=state_reason_type_of(cr.third_party_type),
+                    # Le type de ressource distingue le portage commercial des
+                    # autres externes ; le motif, lui, ne connaît qu'interne ou
+                    # externe.
+                    type_of=resource_type_of(cr.third_party_type),
                     manager_id=manager_id,
                 )
                 is_resource = True

@@ -233,6 +233,17 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-21 (feat: classer la ressource Boond selon le type de tiers)
+
+BoondManager distingue trois types de ressources utiles ici : **0 Consultant Interne**, **1 Consultant Externe** et **10 Consultant Portage Commercial**. Freelance, sous-traitance et portage salarial partagent le type 1 ; seul le portage commercial a le sien.
+
+- Nouveau module `application/boond_mappings.py` : type de contrat, type de ressource et motif de changement d'état, en un seul endroit. Les deux premières tables étaient dupliquées entre la synchro du contrat cadre, celle des bons de commande et `routes.py` — un type ajouté aurait été classé différemment selon le chemin.
+- **Le type de ressource ne se confond pas avec le motif** : `stateReason.typeOf` ne connaît qu'interne (0) ou externe (1), alors que `typeOf` porte le détail. Le code posait la même valeur pour les deux, ce qui aurait envoyé un motif « 10 » inexistant.
+- **Correction dans la synchro des bons de commande** : la conversion candidat → ressource n'envoyait aucun type, la ressource naissait donc mal classée. Elle pose désormais le type déduit du fournisseur.
+- Un type de tiers inconnu donne « Consultant Externe » : mieux vaut cela qu'un consultant compté comme interne.
+
+322 tests `contract_management` verts, ruff et mypy propres.
+
 ### 2026-08-21 (feat: nouveau type de tiers « Portage commercial »)
 
 Cinquième type de tiers, aux côtés du freelance, du sous-traitant, du portage salarial et du salarié.

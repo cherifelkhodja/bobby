@@ -5,6 +5,11 @@ from uuid import UUID
 
 import structlog
 
+from app.contract_management.application.boond_mappings import (
+    contract_type_of,
+    resource_type_of,
+    state_reason_type_of,
+)
 from app.contract_management.domain.entities.purchase_order import PurchaseOrder
 from app.contract_management.domain.exceptions import (
     PurchaseOrderBoondSyncError,
@@ -15,15 +20,6 @@ from app.contract_management.domain.value_objects.purchase_order_status import (
 )
 
 logger = structlog.get_logger()
-
-# third_party_type → typeOf du contrat Boond. Repris de la synchronisation du
-# contrat cadre pour que les deux chemins classent les contrats à l'identique.
-THIRD_PARTY_TYPE_TO_CONTRACT_TYPE: dict[str, int] = {
-    "sous_traitant": 2,
-    "freelance": 3,
-    "portage_salarial": 6,
-    "portage_commercial": 7,
-}
 
 # État Boond « Arrivée prochaine » d'une ressource fraîchement convertie.
 RESOURCE_STATE_ARRIVING = 3
@@ -144,8 +140,15 @@ class SyncPurchaseOrderToBoondUseCase:
         if existing:
             return existing
 
+        # Le type de tiers du fournisseur classe la ressource dans Boond :
+        # externe pour la sous-traitance et le portage salarial, type dédié pour
+        # le portage commercial. Sans lui, la ressource naîtrait mal classée.
+        third_party_type = await self._third_party_type(po)
         resource_id = await self._crm.convert_candidate_to_resource(
-            po.boond_consultant_id, state=RESOURCE_STATE_ARRIVING
+            po.boond_consultant_id,
+            state=RESOURCE_STATE_ARRIVING,
+            state_reason_type_of=state_reason_type_of(third_party_type),
+            type_of=resource_type_of(third_party_type),
         )
         if not resource_id:
             raise PurchaseOrderBoondSyncError(
@@ -289,16 +292,21 @@ class SyncPurchaseOrderToBoondUseCase:
                 "à recaler dans BoondManager."
             )
 
-    async def _contract_type_of(self, po: PurchaseOrder) -> int:
-        """Type de contrat Boond, déduit du type de tiers du fournisseur."""
-        third_party_type = ""
+    async def _third_party_type(self, po: PurchaseOrder) -> str:
+        """Type de tiers du fournisseur : celui du cadre, sinon celui de la fiche."""
         if po.contract_request_id:
             framework = await self._cr_repo.get_by_id(po.contract_request_id)
-            third_party_type = (framework.third_party_type if framework else "") or ""
-        if not third_party_type and po.third_party_id:
+            if framework and framework.third_party_type:
+                return framework.third_party_type
+        if po.third_party_id:
             third_party = await self._tp_repo.get_by_id(po.third_party_id)
-            third_party_type = third_party.type.value if third_party else ""
-        return THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(third_party_type, 3)
+            if third_party:
+                return third_party.type.value
+        return ""
+
+    async def _contract_type_of(self, po: PurchaseOrder) -> int:
+        """Type de contrat Boond, déduit du type de tiers du fournisseur."""
+        return contract_type_of(await self._third_party_type(po))
 
     async def _agency_id(self, po: PurchaseOrder) -> int | None:
         """Agence Boond de la société émettrice du bon de commande."""

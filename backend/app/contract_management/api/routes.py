@@ -24,6 +24,15 @@ from app.contract_management.api.schemas import (
     SupplierFrameworkSummary,
     SupplierLookupResponse,
 )
+from app.contract_management.application.boond_mappings import (
+    contract_type_of as boond_contract_type_of,
+)
+from app.contract_management.application.boond_mappings import (
+    resource_type_of as boond_resource_type_of,
+)
+from app.contract_management.application.boond_mappings import (
+    state_reason_type_of as boond_state_reason_type_of,
+)
 from app.contract_management.application.use_cases.block_compliance import (
     BlockComplianceUseCase,
 )
@@ -2805,9 +2814,6 @@ async def boond_convert_candidate(
             "already_resource": True,
         }
 
-    # Determine state_reason_type_of: 0 = salarié, 1 = externe
-    state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
-
     # Fetch manager_id from Boond need (required as dependsOn for conversion)
     manager_id: int | None = None
     if cr.boond_need_id:
@@ -2822,8 +2828,10 @@ async def boond_convert_candidate(
         new_resource_id = await crm.convert_candidate_to_resource(
             cr.boond_candidate_id,
             state=3,
-            state_reason_type_of=state_reason_type_of,
-            type_of=state_reason_type_of,  # 0=salarié, 1=externe
+            state_reason_type_of=boond_state_reason_type_of(cr.third_party_type),
+            # Le type de ressource distingue le portage commercial des autres
+            # externes ; le motif, lui, ne connaît qu'interne ou externe.
+            type_of=boond_resource_type_of(cr.third_party_type),
             manager_id=manager_id,
         )
         # Persist the new resource ID and type
@@ -2875,9 +2883,6 @@ async def boond_create_contract(
     """
     from sqlalchemy import select as _select
 
-    from app.contract_management.application.use_cases.sync_to_boond_after_signing import (
-        _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE,
-    )
     from app.contract_management.infrastructure.models import ContractCompanyModel
 
     settings = get_settings()
@@ -2924,7 +2929,7 @@ async def boond_create_contract(
         )
         company = result.scalar_one_or_none()
 
-    contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(cr.third_party_type or "", 3)
+    contract_type_of = boond_contract_type_of(cr.third_party_type)
     start_date_str = None
     if cr.start_date:
         start_date_str = (

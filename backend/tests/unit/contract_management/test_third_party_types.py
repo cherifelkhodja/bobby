@@ -11,8 +11,10 @@ from app.contract_management.api.schemas import (
     CommercialValidationRequest,
     SupplierDossierCreate,
 )
-from app.contract_management.application.use_cases.sync_purchase_order_to_boond import (
-    THIRD_PARTY_TYPE_TO_CONTRACT_TYPE,
+from app.contract_management.application.boond_mappings import (
+    CONTRACT_TYPE_BY_THIRD_PARTY_TYPE,
+    resource_type_of,
+    state_reason_type_of,
 )
 from app.third_party.domain.value_objects.third_party_type import (
     EXTERNAL_THIRD_PARTY_TYPES,
@@ -38,8 +40,17 @@ class TestPortageCommercial:
 
     def test_the_boond_contract_type(self):
         """typeOf 7 côté Boond, distinct du portage salarial (6)."""
-        assert THIRD_PARTY_TYPE_TO_CONTRACT_TYPE["portage_commercial"] == 7
-        assert THIRD_PARTY_TYPE_TO_CONTRACT_TYPE["portage_salarial"] == 6
+        assert CONTRACT_TYPE_BY_THIRD_PARTY_TYPE["portage_commercial"] == 7
+        assert CONTRACT_TYPE_BY_THIRD_PARTY_TYPE["portage_salarial"] == 6
+
+    def test_the_boond_resource_type(self):
+        """« Consultant Portage Commercial » (10) a son propre type dans Boond."""
+        assert resource_type_of("portage_commercial") == 10
+
+    def test_the_state_reason_stays_internal_or_external(self):
+        """Le motif du changement d'état ne connaît que ces deux valeurs."""
+        assert state_reason_type_of("portage_commercial") == 1
+        assert state_reason_type_of("salarie") == 0
 
     def test_opening_a_supplier_dossier_accepts_it(self):
         dossier = SupplierDossierCreate(
@@ -82,3 +93,23 @@ class TestAcceptedTypes:
                 notify_third_party=True,
                 skip_documents=False,
             )
+
+
+class TestBoondResourceTypes:
+    """Classement des ressources dans BoondManager, configuré côté CRM."""
+
+    @pytest.mark.parametrize(
+        "third_party_type",
+        ["freelance", "sous_traitant", "portage_salarial"],
+    )
+    def test_the_usual_externals_share_one_type(self, third_party_type):
+        """« Consultant Externe » (1) couvre les trois."""
+        assert resource_type_of(third_party_type) == 1
+
+    def test_an_employee_is_internal(self):
+        assert resource_type_of("salarie") == 0
+
+    def test_an_unknown_type_falls_back_to_external(self):
+        """Mieux vaut une ressource externe qu'un consultant compté comme interne."""
+        assert resource_type_of(None) == 1
+        assert resource_type_of("") == 1

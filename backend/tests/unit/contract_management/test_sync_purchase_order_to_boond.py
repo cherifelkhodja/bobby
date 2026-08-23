@@ -124,8 +124,26 @@ class TestResourceResolution:
 
         await use_case.execute(po.id)
 
-        crm.convert_candidate_to_resource.assert_awaited_once_with(4242, state=3)
+        crm.convert_candidate_to_resource.assert_awaited_once_with(
+            4242,
+            state=3,
+            # Sous-traitance : « Consultant Externe » côté Boond.
+            state_reason_type_of=1,
+            type_of=1,
+        )
         assert crm.create_boond_contract.await_args.kwargs["resource_id"] == 9001
+
+    @pytest.mark.asyncio
+    async def test_a_commercial_portage_consultant_gets_its_own_resource_type(self):
+        """Le portage commercial a son type de ressource dans Boond (10)."""
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po, third_party_type="portage_commercial")
+
+        await use_case.execute(po.id)
+
+        assert crm.convert_candidate_to_resource.await_args.kwargs["type_of"] == 10
+        # Le motif du changement d'état, lui, reste « externe ».
+        assert crm.convert_candidate_to_resource.await_args.kwargs["state_reason_type_of"] == 1
 
     @pytest.mark.asyncio
     async def test_an_existing_resource_is_reused(self):
