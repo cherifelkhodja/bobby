@@ -150,6 +150,10 @@ const THIRD_PARTY_TYPE_CARDS = [
   },
 ];
 
+const THIRD_PARTY_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  THIRD_PARTY_TYPE_CARDS.map((card) => [card.value, card.label]),
+);
+
 export default function ContractDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -736,7 +740,7 @@ export default function ContractDetail() {
         onClick={() => navigate('/contracts')}
         className="bc block cursor-pointer !text-mut2 hover:!text-mut"
       >
-        ← Contrats / Demandes / {cr.display_reference}
+        ← Contrats / Fournisseurs / {cr.display_reference}
       </button>
 
       {/* Entête */}
@@ -745,7 +749,13 @@ export default function ContractDetail() {
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="h1">
               {cr.display_reference}
-              {consultantName && ` · ${consultantName}`}
+              {/* Le cadre porte sur une société, pas sur un consultant : celui-ci
+                  n'apparaît qu'en repli, tant que le tiers n'est pas identifié. */}
+              {cr.third_party_name
+                ? ` · ${cr.third_party_name}`
+                : consultantName
+                  ? ` · ${consultantName}`
+                  : ''}
             </h1>
             <span className={statusChipClass}>
               <span className="dot" />
@@ -1032,16 +1042,24 @@ export default function ContractDetail() {
             </div>
           )}
           <div>
-            <p className="ml">Client final</p>
-            <p className="mv">{cr.client_name ?? '—'}</p>
+            <p className="ml">Type de tiers</p>
+            <p className="mv">
+              {cr.third_party_type
+                ? (THIRD_PARTY_TYPE_LABELS[cr.third_party_type] ?? cr.third_party_type)
+                : '—'}
+            </p>
           </div>
           <div>
-            <p className="ml">TJM achat</p>
-            <p className="mv">{cr.daily_rate != null ? `${cr.daily_rate} €` : '—'}</p>
+            <p className="ml">Société émettrice</p>
+            <p className="mv">{cr.company_name ?? issuingCompany?.name ?? '—'}</p>
           </div>
           <div>
-            <p className="ml">Démarrage</p>
-            <p className="mv">{cr.start_date ? formatDate(cr.start_date) : '—'}</p>
+            <p className="ml">Missions</p>
+            <p className="mv">
+              {cr.purchase_orders_count > 0
+                ? `${cr.purchase_orders_count} bon${cr.purchase_orders_count > 1 ? 's' : ''} de commande`
+                : 'Aucune'}
+            </p>
           </div>
           <div>
             <p className="ml">Commercial</p>
@@ -2095,19 +2113,8 @@ export default function ContractDetail() {
                     );
                   })()}
 
-                  {/* Consultant sub-section */}
-                  {(cr.consultant_first_name || cr.consultant_last_name) && (
-                    <div className="border-t border-lin2 mt-4 pt-4">
-                      <p className="ml mb-2.5">Consultant</p>
-                      <div className="bg-srf2 border border-lin2 rounded-[10px] p-3 inline-block min-w-[250px]">
-                        <p className="mv !text-[13px]">
-                          {[cr.consultant_civility, cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ')}
-                        </p>
-                        {cr.consultant_email && <p className="ds !mt-1">{cr.consultant_email}</p>}
-                        {cr.consultant_phone && <p className="ds !mt-0.5">{cr.consultant_phone}</p>}
-                      </div>
-                    </div>
-                  )}
+                  {/* Consultants en mission sous ce contrat cadre */}
+                  <MissionConsultants contractRequestId={cr.id} cr={cr} />
                   </>
                   )}
                 </div>
@@ -3279,6 +3286,91 @@ function PurchaseOrdersSection({ contractRequestId }: { contractRequestId: strin
                 <span className="dot" />
                 {PURCHASE_ORDER_STATUS_CONFIG[po.status].label}
               </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/**
+ * Consultants en mission sous ce contrat cadre.
+ *
+ * Le cadre ne porte pas un consultant : il encadre la relation avec un
+ * fournisseur, et ce sont les bons de commande qui affectent des consultants.
+ * La liste est donc dérivée d'eux. Le consultant à l'origine du dossier, quand
+ * il y en a un, n'est rappelé que tant qu'aucune mission n'existe.
+ */
+function MissionConsultants({
+  contractRequestId,
+  cr,
+}: {
+  contractRequestId: string;
+  cr: ContractRequest;
+}) {
+  const navigate = useNavigate();
+
+  // Même clé que la carte « Bons de commande » : React Query ne requête qu'une fois.
+  const { data } = useQuery({
+    queryKey: ['purchase-orders', 'by-framework', contractRequestId],
+    queryFn: () =>
+      purchaseOrdersApi.list({ contract_request_id: contractRequestId, limit: 100 }),
+  });
+
+  const orders = (data?.items ?? []).filter((po) => po.status !== 'cancelled');
+
+  // Un consultant peut avoir plusieurs missions successives : on le compte une
+  // fois, en gardant ses bons de commande pour l'accès direct.
+  const consultants = new Map<string, { name: string; email: string | null; orders: typeof orders }>();
+  for (const po of orders) {
+    const key = po.boond_consultant_id ? String(po.boond_consultant_id) : (po.consultant_name ?? po.id);
+    const entry = consultants.get(key);
+    if (entry) {
+      entry.orders.push(po);
+    } else {
+      consultants.set(key, {
+        name: po.consultant_name || 'Consultant à identifier',
+        email: po.consultant_email,
+        orders: [po],
+      });
+    }
+  }
+
+  const openingConsultant = [cr.consultant_civility, cr.consultant_first_name, cr.consultant_last_name]
+    .filter(Boolean)
+    .join(' ');
+
+  if (consultants.size === 0 && !openingConsultant) return null;
+
+  return (
+    <div className="border-t border-lin2 mt-4 pt-4">
+      <p className="ml mb-2.5">
+        {consultants.size > 0 ? 'Consultants en mission' : 'Consultant'}
+      </p>
+
+      {consultants.size === 0 ? (
+        <div className="bg-srf2 border border-lin2 rounded-[10px] p-3 inline-block min-w-[250px]">
+          <p className="mv !text-[13px]">{openingConsultant}</p>
+          {cr.consultant_email && <p className="ds !mt-1">{cr.consultant_email}</p>}
+          <p className="ds !mt-1">Dossier ouvert pour ce consultant · aucune mission à ce jour</p>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {[...consultants.values()].map((consultant) => (
+            <button
+              key={consultant.name}
+              type="button"
+              onClick={() => navigate(`/contracts/bdc/${consultant.orders[0].id}`)}
+              className="bg-srf2 border border-lin2 rounded-[10px] p-3 text-left min-w-[250px] hover:border-pri transition-colors"
+            >
+              <p className="mv !text-[13px]">{consultant.name}</p>
+              {consultant.email && <p className="ds !mt-1">{consultant.email}</p>}
+              <p className="ds !mt-1">
+                {consultant.orders.length} mission{consultant.orders.length > 1 ? 's' : ''} ·{' '}
+                {consultant.orders.map((po) => po.reference).join(', ')}
+              </p>
             </button>
           ))}
         </div>

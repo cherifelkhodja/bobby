@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FileSignature, X, Trash2, Plus, ChevronRight, Building2 } from 'lucide-react';
+import { FileSignature, X, Trash2, ChevronRight, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { contractsApi, contractCompaniesApi } from '../api/contracts';
@@ -74,7 +74,6 @@ export function ContractManagement() {
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [cancelTarget, setCancelTarget] = useState<{ id: string; reference: string } | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
   const [showSupplier, setShowSupplier] = useState(false);
   const [supplierForm, setSupplierForm] = useState({
     siret: '',
@@ -86,11 +85,6 @@ export function ContractManagement() {
     reuse_third_party_id: '' as string,
   });
   const [supplierLookup, setSupplierLookup] = useState<SupplierLookupResult | null>(null);
-  const [createForm, setCreateForm] = useState<{
-    boond_consultant_id: string;
-    consultant_type: 'candidate' | 'resource';
-    company_id: string;
-  }>({ boond_consultant_id: '', consultant_type: 'candidate', company_id: '' });
   const pageSize = 20;
   // The group tabs span several statuses, and the API status_filter only accepts a
   // single status — so group filtering, counts and pagination are done client-side
@@ -170,25 +164,6 @@ export function ContractManagement() {
     onError: (error) => toast.error(getErrorMessage(error)),
   });
 
-  const createManualMutation = useMutation({
-    mutationFn: () =>
-      contractsApi.createManual({
-        boond_consultant_id: parseInt(createForm.boond_consultant_id, 10),
-        consultant_type: createForm.consultant_type,
-        company_id: createForm.company_id || undefined,
-      }),
-    onSuccess: (cr) => {
-      toast.success('Dossier de contrat créé.');
-      setShowCreate(false);
-      setCreateForm({ boond_consultant_id: '', consultant_type: 'candidate', company_id: '' });
-      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
-      navigate(`/contracts/${cr.id}`);
-    },
-    onError: (error) => toast.error(getErrorMessage(error)),
-  });
-
-  const createConsultantIdValid = /^\d+$/.test(createForm.boond_consultant_id.trim());
-
   if (crLoading) return <PageSpinner />;
 
   const items = crData?.items ?? [];
@@ -257,21 +232,12 @@ export function ContractManagement() {
             ))}
           </select>
           {isAdv && (
-            <>
-              <Button
-                variant="secondary"
-                onClick={() => setShowCreate(true)}
-                leftIcon={<Plus className="h-3.5 w-3.5" />}
-              >
-                Depuis un consultant
-              </Button>
-              <Button
-                onClick={() => setShowSupplier(true)}
-                leftIcon={<Building2 className="h-3.5 w-3.5" />}
-              >
-                Nouveau fournisseur
-              </Button>
-            </>
+            <Button
+              onClick={() => setShowSupplier(true)}
+              leftIcon={<Building2 className="h-3.5 w-3.5" />}
+            >
+              Nouveau fournisseur
+            </Button>
           )}
         </div>
       </div>
@@ -285,7 +251,7 @@ export function ContractManagement() {
         <div className="kpi">
           <p className="kl">En attente du tiers</p>
           <p className="kv">{waitingCount}</p>
-          <p className="ks">Relances auto J+3 · J+7 · J+14</p>
+          <p className="ks">documents ou signature attendus</p>
         </div>
         <div className="kpi">
           <p className="kl">À traiter par l'ADV</p>
@@ -477,103 +443,6 @@ export function ContractManagement() {
             </div>
           </div>
         )}
-      </Modal>
-
-      {/* Manual creation modal */}
-      <Modal
-        isOpen={showCreate}
-        onClose={() => setShowCreate(false)}
-        title="Nouveau contrat (saisie manuelle)"
-      >
-        <div className="space-y-4">
-          <p className="notec">
-            Créez un dossier de contrat sans déclencheur Boond. Saisissez l'ID Boond du
-            consultant : son identité est récupérée automatiquement depuis Boond.
-          </p>
-          <div>
-            <label className="f-lab">Le consultant est un… *</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(
-                [
-                  {
-                    key: 'candidate' as const,
-                    label: 'Candidat',
-                    hint: 'Converti en ressource à la signature',
-                  },
-                  {
-                    key: 'resource' as const,
-                    label: 'Ressource',
-                    hint: 'Déjà une ressource dans Boond',
-                  },
-                ]
-              ).map(({ key, label, hint }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setCreateForm((f) => ({ ...f, consultant_type: key }))}
-                  className={`tcard text-left ${createForm.consultant_type === key ? 'on' : ''}`}
-                >
-                  <span className="tt">{label}</span>
-                  <span className="td2 block">{hint}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="f-lab">ID Boond du consultant *</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={createForm.boond_consultant_id}
-              onChange={(e) =>
-                setCreateForm((f) => ({
-                  ...f,
-                  boond_consultant_id: e.target.value.replace(/[^\d]/g, ''),
-                }))
-              }
-              placeholder="Ex : 4242"
-              className="f-in"
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="f-lab">Société émettrice</label>
-            <select
-              value={createForm.company_id}
-              onChange={(e) => setCreateForm((f) => ({ ...f, company_id: e.target.value }))}
-              className="f-in !px-2.5"
-            >
-              <option value="">Sélectionner (optionnel)…</option>
-              {companies
-                .filter((c) => c.is_active)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.code})
-                  </option>
-                ))}
-            </select>
-          </div>
-          <p className="f-hint">
-            Le type de tiers et les autres informations seront renseignés à l'étape de validation
-            commerciale.
-          </p>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
-              variant="secondary"
-              onClick={() => setShowCreate(false)}
-              disabled={createManualMutation.isPending}
-            >
-              Annuler
-            </Button>
-            <Button
-              onClick={() => createManualMutation.mutate()}
-              disabled={!createConsultantIdValid || createManualMutation.isPending}
-              isLoading={createManualMutation.isPending}
-            >
-              Créer le dossier
-            </Button>
-          </div>
-        </div>
       </Modal>
 
       {/* Ouverture d'un dossier fournisseur : ni consultant, ni positionnement */}

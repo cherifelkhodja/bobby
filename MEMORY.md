@@ -38,7 +38,7 @@
 | Contrats cadres & BDC | ✅ Done | Deux objets : fournisseur (ContractRequest, ouvert à la main) et mission (PurchaseOrder, `cm_purchase_orders`). Webhook positionnement → premier BDC, TJM vente interne / CJM achat imprimé, signature séparée, report Boond, reconduction |
 | Vigilance documentaire | ✅ Done | Cycle de vie docs légaux tiers (request → upload → validate/reject → expiration) ; dépôt sautable en saisie en personne (`documents_skipped`) |
 | Portail tiers (magic link) | ✅ Done | Upload documents + review contrat via lien sécurisé |
-| CRON jobs (APScheduler) | ✅ Done | Expirations documents, relances, purge magic links |
+| CRON jobs (APScheduler) | ✅ Done | Expirations documents, purge magic links, archivage des contrats cadres inactifs (les relances automatiques n'ont jamais été planifiées) |
 
 ---
 
@@ -232,6 +232,17 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-08-21 (fix: écrans de contractualisation alignés sur le modèle fournisseur)
+
+Trois retouches d'interface, toutes sur le même constat : les écrans décrivaient encore un dossier centré sur un consultant.
+
+- **Point d'entrée « Depuis un consultant » retiré** de la page Fournisseurs, avec sa modale, son état et son appel API (`createManual` et `ManualContractInput` supprimés du client). La route backend `/contract-requests/manual` reste disponible, sans appelant.
+- **Mention « Relances auto J+3 · J+7 · J+14 » retirée** : aucune relance n'a jamais été planifiée. Le scheduler ne porte que les expirations de documents, la purge des magic links et l'archivage des cadres inactifs ; `EmailService.send_document_reminder` existe mais n'a aucun appelant. Le tableau d'état de ce fichier, qui annonçait ces relances, est corrigé.
+- **Fiche contrat cadre** : fil d'Ariane et titre passent au fournisseur (`LEO-CC-001 · MVP TECHNOLOGY` au lieu du consultant) ; les champs de mission de l'entête — client final, TJM achat, démarrage, tous vides sur un cadre — cèdent la place au type de tiers, à la société émettrice et au nombre de missions.
+- **Bloc « Consultant » remplacé par « Consultants en mission »** : la liste est dérivée des bons de commande du cadre, dédoublonnée par consultant, chaque entrée ouvrant sa mission. Tant qu'aucun bon de commande n'existe, le consultant à l'origine du dossier reste affiché, explicitement comme tel.
+
+Front `tsc`/`eslint`/282 tests/build OK, 302 tests backend verts.
 
 ### 2026-08-21 (fix: la page Contrats parlait encore de l'ancien modèle)
 
