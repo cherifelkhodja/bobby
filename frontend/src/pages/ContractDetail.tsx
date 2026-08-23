@@ -2118,10 +2118,8 @@ export default function ContractDetail() {
                 <ConsultantsSection contractRequestId={cr.id} cr={cr} />
               )}
 
-              {/* Missions rattachées à ce fournisseur */}
-              {cr.third_party_id && (
-                <PurchaseOrdersSection thirdPartyId={cr.third_party_id} />
-              )}
+              {/* Missions rattachées à ce contrat cadre */}
+              <PurchaseOrdersSection contractRequestId={cr.id} />
             </div>
           )}
 
@@ -3227,17 +3225,20 @@ function ConsultantsSection({ contractRequestId, cr }: { contractRequestId: stri
 
 
 /**
- * Bons de commande du fournisseur.
+ * Bons de commande de CE contrat cadre.
  *
- * Un contrat cadre porte N missions dans le temps : cette carte les liste et
- * signale celles qui attendent encore d'être complétées.
+ * Un contrat cadre porte N missions dans le temps. Le filtre porte sur le
+ * cadre et non sur le fournisseur : celui-ci peut être sous contrat avec
+ * plusieurs sociétés du groupe, et les missions d'une société n'ont rien à
+ * faire dans la fiche d'une autre.
  */
-function PurchaseOrdersSection({ thirdPartyId }: { thirdPartyId: string }) {
+function PurchaseOrdersSection({ contractRequestId }: { contractRequestId: string }) {
   const navigate = useNavigate();
 
   const { data } = useQuery({
-    queryKey: ['purchase-orders', 'by-third-party', thirdPartyId],
-    queryFn: () => purchaseOrdersApi.list({ third_party_id: thirdPartyId, limit: 100 }),
+    queryKey: ['purchase-orders', 'by-framework', contractRequestId],
+    queryFn: () =>
+      purchaseOrdersApi.list({ contract_request_id: contractRequestId, limit: 100 }),
   });
 
   const orders = data?.items ?? [];

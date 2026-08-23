@@ -88,7 +88,10 @@ class PurchaseOrderResponse(BaseModel):
     framework_contract_signed: bool = False
     can_send_for_signature: bool = False
 
+    # Société émettrice : deux missions d'un même fournisseur peuvent relever
+    # de deux sociétés du groupe, sous deux contrats cadres différents.
     company_id: UUID | None = None
+    company_name: str | None = None
 
     # Consultant
     boond_consultant_id: int | None = None

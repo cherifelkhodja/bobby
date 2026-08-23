@@ -5,6 +5,7 @@ import { ChevronRight, ClipboardList, Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { purchaseOrdersApi } from '../api/purchaseOrders';
+import { contractCompaniesApi } from '../api/contracts';
 import { getErrorMessage } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import { Button } from '../components/ui/Button';
@@ -45,6 +46,7 @@ export function PurchaseOrders() {
 
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [search, setSearch] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
   const [page, setPage] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
   const [positioningId, setPositioningId] = useState('');
@@ -54,10 +56,21 @@ export function PurchaseOrders() {
   // complète, chargée en une fois (plafonnée à FETCH_LIMIT).
   const FETCH_LIMIT = 500;
 
+  const { data: companies = [] } = useQuery({
+    queryKey: ['contract-companies-active'],
+    queryFn: contractCompaniesApi.listActive,
+    enabled: isAdv,
+  });
+
   const { data, isLoading } = useQuery({
-    queryKey: ['purchase-orders', search],
+    queryKey: ['purchase-orders', search, companyFilter],
     queryFn: () =>
-      purchaseOrdersApi.list({ skip: 0, limit: FETCH_LIMIT, ...(search ? { search } : {}) }),
+      purchaseOrdersApi.list({
+        skip: 0,
+        limit: FETCH_LIMIT,
+        ...(search ? { search } : {}),
+        ...(companyFilter ? { company_id: companyFilter } : {}),
+      }),
   });
 
   const createMutation = useMutation({
@@ -90,7 +103,7 @@ export function PurchaseOrders() {
 
   if (isLoading) return <PageSpinner />;
 
-  const gridCols = 'grid-cols-[86px_1.5fr_120px_90px_150px_180px_40px]';
+  const gridCols = 'grid-cols-[86px_1.4fr_110px_110px_80px_140px_170px_40px]';
 
   return (
     <div>
@@ -101,6 +114,23 @@ export function PurchaseOrders() {
           <p className="sub">Une mission, un consultant, sous le contrat cadre du fournisseur</p>
         </div>
         <div className="flex items-center gap-2">
+          <select
+            value={companyFilter}
+            onChange={(e) => {
+              setCompanyFilter(e.target.value);
+              setPage(0);
+            }}
+            className="filter-select"
+          >
+            <option value="">Toutes les sociétés</option>
+            {companies
+              .filter((c) => c.is_active)
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+          </select>
           <div className="relative">
             <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-mut2" />
             <input
@@ -182,6 +212,7 @@ export function PurchaseOrders() {
           <div className={`thead ${gridCols}`}>
             <span>Réf.</span>
             <span>Consultant / Fournisseur</span>
+            <span>Société</span>
             <span>Client</span>
             <span>CJM</span>
             <span>Période</span>
@@ -203,6 +234,7 @@ export function PurchaseOrders() {
                   )}
                 </p>
               </div>
+              <span className="cell truncate">{po.company_name ?? '—'}</span>
               <span className="cell truncate">{po.client_name || '—'}</span>
               <span className="tjm">
                 {po.purchase_daily_rate ? `${formatAmount(po.purchase_daily_rate)} €` : '—'}

@@ -233,6 +233,17 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-21 (feat: distinguer les missions par société émettrice)
+
+Suite du correctif précédent, côté lecture : un fournisseur sous contrat avec plusieurs sociétés du groupe a des missions distinctes pour chacune, qui ne doivent pas se mélanger à l'écran.
+
+- **Fiche contrat cadre** : la carte « Bons de commande » filtre désormais sur le **cadre** et non sur le fournisseur. La fiche du cadre Gemini ne montre plus les missions émises par Leonum.
+- **Liste des bons de commande** : colonne « Société » et filtre par société émettrice.
+- **Détail d'un bon de commande** : la société émettrice figure dans l'entête, à côté du contrat cadre. Le bandeau d'attente nomme les deux parties concernées — « aucun contrat cadre signé entre WOHM et Leonum » — au lieu d'un message générique.
+- API : `company_name` exposé sur le bon de commande ; filtres `company_id` et `contract_request_id` sur la liste.
+
+302 tests `contract_management` verts, front `tsc`/`eslint`/282 tests/build OK.
+
 ### 2026-08-21 (fix: le contrat cadre est propre à une société émettrice)
 
 Un fournisseur peut travailler avec plusieurs sociétés du groupe, et il lui faut **un contrat cadre par société**. La recherche d'un cadre en vigueur ignorait cette dimension : elle répondait « sous contrat » dès qu'un cadre existait avec n'importe quelle société.

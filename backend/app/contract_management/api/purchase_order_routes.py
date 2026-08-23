@@ -45,6 +45,7 @@ from app.contract_management.infrastructure.adapters.postgres_contract_repo impo
 from app.contract_management.infrastructure.adapters.postgres_purchase_order_repo import (
     PurchaseOrderRepository,
 )
+from app.contract_management.infrastructure.models import ContractCompanyModel
 from app.dependencies import get_db
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
 from app.third_party.infrastructure.models import ThirdPartyModel
@@ -67,6 +68,7 @@ def _po_to_response(
     po: PurchaseOrder,
     *,
     third_party_name: str | None = None,
+    company_name: str | None = None,
     framework=None,
 ) -> PurchaseOrderResponse:
     """Convert a PurchaseOrder entity to its API response."""
@@ -90,6 +92,7 @@ def _po_to_response(
             po.status == PurchaseOrderStatus.GENERATED and framework_signed and po.is_complete
         ),
         company_id=po.company_id,
+        company_name=company_name,
         boond_consultant_id=po.boond_consultant_id,
         boond_consultant_type=po.boond_consultant_type,
         consultant_civility=po.consultant_civility,
@@ -143,6 +146,19 @@ async def _third_party_names(db: AsyncSession, ids: list[UUID]) -> dict[UUID, st
     return {row[0]: row[1] for row in result.all() if row[1]}
 
 
+async def _company_names(db: AsyncSession, ids: list[UUID]) -> dict[UUID, str]:
+    """Nom des sociétés émettrices, en une requête pour toute une liste."""
+    wanted = [i for i in ids if i]
+    if not wanted:
+        return {}
+    result = await db.execute(
+        select(ContractCompanyModel.id, ContractCompanyModel.name).where(
+            ContractCompanyModel.id.in_(wanted)
+        )
+    )
+    return {row[0]: row[1] for row in result.all()}
+
+
 async def _load_framework(cr_repo: ContractRequestRepository, po: PurchaseOrder):
     """Charge le dossier cadre rattaché au bon de commande, s'il y en a un."""
     if not po.contract_request_id:
@@ -155,11 +171,13 @@ async def _respond(
     cr_repo: ContractRequestRepository,
     po: PurchaseOrder,
 ) -> PurchaseOrderResponse:
-    """Réponse complète d'un bon de commande : nom du fournisseur et cadre."""
+    """Réponse complète : fournisseur, société émettrice et contrat cadre."""
     names = await _third_party_names(db, [po.third_party_id] if po.third_party_id else [])
+    companies = await _company_names(db, [po.company_id] if po.company_id else [])
     return _po_to_response(
         po,
         third_party_name=names.get(po.third_party_id),
+        company_name=companies.get(po.company_id),
         framework=await _load_framework(cr_repo, po),
     )
 
@@ -240,16 +258,23 @@ async def create_purchase_order(
     response_model=PurchaseOrderListResponse,
     summary="Lister les bons de commande",
 )
-async def list_purchase_orders(
+async def list_purchase_orders(  # noqa: PLR0913
     auth: ContractAccessUser,
     skip: int = 0,
     limit: int = 50,
     status_filter: str | None = None,
     third_party_id: UUID | None = None,
+    company_id: UUID | None = None,
+    contract_request_id: UUID | None = None,
     search: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Liste les bons de commande, filtrables par statut, fournisseur ou texte."""
+    """Liste les bons de commande, filtrables par statut, fournisseur ou texte.
+
+    `company_id` et `contract_request_id` isolent les missions d'une société
+    émettrice : un fournisseur travaillant avec plusieurs sociétés du groupe a
+    des missions distinctes pour chacune, sous des contrats cadres différents.
+    """
     _user_id, role, email = auth
     po_repo = PurchaseOrderRepository(db)
     cr_repo = ContractRequestRepository(db)
@@ -264,14 +289,15 @@ async def list_purchase_orders(
                 detail=f"Statut invalide : {status_filter}",
             )
 
-    items = await po_repo.list_all(
-        skip=skip,
-        limit=limit,
-        status=status_obj,
-        third_party_id=third_party_id,
-        search=search,
-    )
-    total = await po_repo.count(status=status_obj, third_party_id=third_party_id, search=search)
+    filters = {
+        "status": status_obj,
+        "third_party_id": third_party_id,
+        "company_id": company_id,
+        "contract_request_id": contract_request_id,
+        "search": search,
+    }
+    items = await po_repo.list_all(skip=skip, limit=limit, **filters)
+    total = await po_repo.count(**filters)
 
     # Le commercial ne voit que les missions dont il est le commercial : le
     # filtre est appliqué après coup, la pagination restant portée par l'ADV.
@@ -279,6 +305,7 @@ async def list_purchase_orders(
         items = [po for po in items if (po.commercial_email or "").lower() == email.lower()]
 
     names = await _third_party_names(db, [po.third_party_id for po in items if po.third_party_id])
+    companies = await _company_names(db, [po.company_id for po in items])
     frameworks = {}
     for po in items:
         if po.contract_request_id and po.contract_request_id not in frameworks:
@@ -289,6 +316,7 @@ async def list_purchase_orders(
             _po_to_response(
                 po,
                 third_party_name=names.get(po.third_party_id),
+                company_name=companies.get(po.company_id),
                 framework=frameworks.get(po.contract_request_id),
             )
             for po in items
@@ -323,12 +351,7 @@ async def get_purchase_order(
     if role == "commercial" and (po.commercial_email or "").lower() != email.lower():
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès non autorisé.")
 
-    names = await _third_party_names(db, [po.third_party_id] if po.third_party_id else [])
-    return _po_to_response(
-        po,
-        third_party_name=names.get(po.third_party_id),
-        framework=await _load_framework(cr_repo, po),
-    )
+    return await _respond(db, cr_repo, po)
 
 
 @router.patch(
@@ -374,12 +397,7 @@ async def update_purchase_order(
 
     await db.commit()
 
-    names = await _third_party_names(db, [po.third_party_id] if po.third_party_id else [])
-    return _po_to_response(
-        po,
-        third_party_name=names.get(po.third_party_id),
-        framework=await _load_framework(cr_repo, po),
-    )
+    return await _respond(db, cr_repo, po)
 
 
 @router.post(
@@ -422,12 +440,7 @@ async def cancel_purchase_order(
         details={"kind": "purchase_order", "reference": saved.reference},
     )
 
-    names = await _third_party_names(db, [saved.third_party_id] if saved.third_party_id else [])
-    return _po_to_response(
-        saved,
-        third_party_name=names.get(saved.third_party_id),
-        framework=await _load_framework(cr_repo, saved),
-    )
+    return await _respond(db, cr_repo, saved)
 
 
 @router.post(

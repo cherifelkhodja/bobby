@@ -380,9 +380,12 @@ export function PurchaseOrderDetail() {
         <div className="alert">
           <AlertTriangle className="h-[18px] w-[18px] shrink-0" />
           <span>
-            Contrat cadre en cours de contractualisation
-            {po.framework_contract_reference ? ` (${po.framework_contract_reference})` : ''} : le
-            bon de commande pourra être envoyé en signature dès qu'il sera signé.
+            Aucun contrat cadre signé entre {po.third_party_name ?? 'ce fournisseur'} et{' '}
+            {po.company_name ?? 'la société émettrice'}
+            {po.framework_contract_reference
+              ? ` — dossier ${po.framework_contract_reference} en cours`
+              : ''}
+            . Le bon de commande pourra être envoyé en signature dès sa signature.
           </span>
           {po.contract_request_id && (
             <button
@@ -408,6 +411,10 @@ export function PurchaseOrderDetail() {
           <div>
             <p className="ml">Fournisseur</p>
             <p className="mv">{po.third_party_name ?? '—'}</p>
+          </div>
+          <div>
+            <p className="ml">Société émettrice</p>
+            <p className="mv">{po.company_name ?? '—'}</p>
           </div>
           <div>
             <p className="ml">Contrat cadre</p>

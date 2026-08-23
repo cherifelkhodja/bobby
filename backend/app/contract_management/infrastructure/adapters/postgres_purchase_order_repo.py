@@ -80,45 +80,72 @@ class PurchaseOrderRepository:
         )
         return [self._to_entity(m) for m in result.scalars().all()]
 
-    async def list_all(
+    async def list_all(  # noqa: PLR0913
         self,
         skip: int = 0,
         limit: int = 50,
         status: PurchaseOrderStatus | None = None,
         third_party_id: UUID | None = None,
+        company_id: UUID | None = None,
+        contract_request_id: UUID | None = None,
         search: str | None = None,
     ) -> list[PurchaseOrder]:
         """List purchase orders with optional filters."""
-        query = self._filtered_query(select(PurchaseOrderModel), status, third_party_id, search)
+        query = self._filtered_query(
+            select(PurchaseOrderModel),
+            status,
+            third_party_id,
+            company_id,
+            contract_request_id,
+            search,
+        )
         query = query.order_by(PurchaseOrderModel.created_at.desc()).offset(skip).limit(limit)
         result = await self.session.execute(query)
         return [self._to_entity(m) for m in result.scalars().all()]
 
-    async def count(
+    async def count(  # noqa: PLR0913
         self,
         status: PurchaseOrderStatus | None = None,
         third_party_id: UUID | None = None,
+        company_id: UUID | None = None,
+        contract_request_id: UUID | None = None,
         search: str | None = None,
     ) -> int:
         """Count purchase orders matching the same filters as `list_all`."""
         query = self._filtered_query(
-            select(func.count(PurchaseOrderModel.id)), status, third_party_id, search
+            select(func.count(PurchaseOrderModel.id)),
+            status,
+            third_party_id,
+            company_id,
+            contract_request_id,
+            search,
         )
         result = await self.session.execute(query)
         return result.scalar_one()
 
-    def _filtered_query(
+    def _filtered_query(  # noqa: PLR0913
         self,
         query,
         status: PurchaseOrderStatus | None,
         third_party_id: UUID | None,
+        company_id: UUID | None,
+        contract_request_id: UUID | None,
         search: str | None,
     ):
-        """Apply the shared filters of `list_all` and `count`."""
+        """Apply the shared filters of `list_all` and `count`.
+
+        `company_id` isole les missions d'une société émettrice : un fournisseur
+        travaillant avec plusieurs sociétés du groupe a des missions distinctes
+        pour chacune, qui ne doivent pas se mélanger.
+        """
         if status:
             query = query.where(PurchaseOrderModel.status == status.value)
         if third_party_id:
             query = query.where(PurchaseOrderModel.third_party_id == third_party_id)
+        if company_id:
+            query = query.where(PurchaseOrderModel.company_id == company_id)
+        if contract_request_id:
+            query = query.where(PurchaseOrderModel.contract_request_id == contract_request_id)
         if search:
             pattern = f"%{search.lower()}%"
             query = query.where(

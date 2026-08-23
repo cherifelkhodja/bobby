@@ -38,11 +38,18 @@ export interface PurchaseOrderUpdateInput {
 }
 
 export const purchaseOrdersApi = {
+  /**
+   * `company_id` et `contract_request_id` isolent les missions d'une société
+   * émettrice : un fournisseur travaillant avec plusieurs sociétés du groupe a
+   * des missions distinctes pour chacune.
+   */
   list: async (params?: {
     skip?: number;
     limit?: number;
     status_filter?: PurchaseOrderStatus;
     third_party_id?: string;
+    company_id?: string;
+    contract_request_id?: string;
     search?: string;
   }): Promise<PurchaseOrderListResponse> => {
     const response = await apiClient.get<PurchaseOrderListResponse>('/purchase-orders', {

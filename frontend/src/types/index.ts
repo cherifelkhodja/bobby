@@ -1068,7 +1068,10 @@ export interface PurchaseOrder {
   framework_contract_signed: boolean;
   can_send_for_signature: boolean;
 
+  // Société émettrice : deux missions d'un même fournisseur peuvent relever de
+  // deux sociétés du groupe, sous deux contrats cadres différents.
   company_id: string | null;
+  company_name: string | null;
 
   // Consultant
   boond_consultant_id: number | null;
