@@ -233,6 +233,21 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (feat: rattacher à la main la prestation Boond d'une mission)
+
+Le report d'un bon de commande fait naître la prestation en passant le positionnement à « Gagné », puis relit le positionnement pour en récupérer le numéro. Sur la mission 538, la prestation est bien créée dans le CRM mais cette relecture ne la rend pas : l'achat fournisseur s'accroche à la prestation, la mission reste donc bloquée — et rien ne permettait de dire à Bobby laquelle.
+
+`POST /purchase-orders/{id}/attach-delivery` (ADV/admin) : l'ADV colle le numéro lu dans BoondManager, relance le report, l'achat se crée.
+
+- **La prestation est relue dans le CRM avant d'être retenue.** Un numéro saisi de travers poserait l'achat sur la mission d'un autre consultant, et un achat mal rattaché ne se corrige pas — `PUT /purchases/{id}/information` n'expose pas `delivery`, il faut le supprimer et le recréer.
+- **Possible quel que soit l'état du bon de commande**, annulé excepté. Passer par la modification ordinaire (`PATCH`) aurait rendu le champ inutile au moment précis où il sert : elle s'arrête au brouillon, alors que le report a lieu après la signature.
+- L'avertissement du report est effacé au rattachement : le laisser afficherait un blocage levé. Rien n'est régénéré — la prestation est un lien de CRM, elle ne s'imprime pas.
+- Saisie dans la carte BoondManager du bon de commande, à la place du tiret de la prestation manquante.
+
+> **Contournement, pas correctif.** La cause reste ouverte : Bobby cherche `relationships.delivery` sur le positionnement, clé absente de la réponse de BoondManager — dont les relations sont `opportunity`, `project`, `files`, `dependsOn`, `createdBy`. Une prestation pend à un **projet** (`_parse_delivery` lit `relationships.project`) et dépend d'une ressource ; le chemin est donc `positionnement → projet → prestations du projet → celle de notre ressource`. Reste à confirmer contre l'API l'appel qui liste les prestations d'un projet, et à vérifier si l'écriture minimale `{"state": 2}` suffit à faire naître la prestation là où l'interface Boond sauvegarde l'onglet entier.
+
+7 tests sur le rattachement. 476 tests contractualisation verts.
+
 ### 2026-08-24 (fix: l'achat Boond était multiplié une seconde fois)
 
 Le schéma officiel de `POST /purchases`, confronté à une réponse réelle de `GET /purchases/default`, met au jour trois défauts du report d'un bon de commande.

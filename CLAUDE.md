@@ -503,6 +503,7 @@ nouveau → en_cours → entretien → accepté
 - `GET /{id}/document` - Presigned download URL (`?signed=true` for the signed copy)
 - `POST /{id}/send-for-signature` - Send to the supplier (refused until the framework contract is signed)
 - `POST /{id}/mark-as-signed` - Upload the signed document (ADV/admin)
+- `POST /{id}/attach-delivery` - Rattacher à la main la prestation Boond que le report n'a pas su retrouver, son numéro relu dans le CRM avant d'être retenu (ADV/admin, possible après signature)
 - `POST /{id}/push-to-boond` - Push resource, delivery, contract and purchase order to Boond (ADV/admin, available before signature, never re-creates what is already pushed; can be replayed to complete what is missing)
 - `POST /{id}/delete-from-boond` - [Test] Delete from Boond what the push created — purchase, contract, delivery — and put the positioning back to « Gagné attente contrat » (ADV/admin)
 - `POST /{id}/renew` - Renew the mission with a new purchase order (ADV/admin)

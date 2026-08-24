@@ -53,6 +53,16 @@ class PurchaseOrderUpdate(BaseModel):
     commercial_email: str | None = Field(None, max_length=255)
 
 
+class PurchaseOrderAttachDelivery(BaseModel):
+    """Rattacher à la main la prestation Boond d'une mission.
+
+    Recours quand le report n'a pas su la retrouver alors que le CRM l'a bien
+    créée : sans elle, l'achat fournisseur n'a rien à quoi pendre.
+    """
+
+    delivery_id: int = Field(gt=0, description="Identifiant de la prestation dans BoondManager")
+
+
 class PurchaseOrderRenew(BaseModel):
     """Reconduire une mission par un nouveau bon de commande.
 

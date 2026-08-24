@@ -142,6 +142,18 @@ export const purchaseOrdersApi = {
     return response.data;
   },
 
+  /**
+   * Rattache à la main la prestation Boond que le report n'a pas su retrouver.
+   * L'achat fournisseur s'y accroche : sans elle, le report s'arrête là.
+   */
+  attachDelivery: async (id: string, deliveryId: number): Promise<PurchaseOrder> => {
+    const response = await apiClient.post<PurchaseOrder>(
+      `/purchase-orders/${id}/attach-delivery`,
+      { delivery_id: deliveryId },
+    );
+    return response.data;
+  },
+
   pushToBoond: async (id: string): Promise<PurchaseOrder> => {
     const response = await apiClient.post<PurchaseOrder>(`/purchase-orders/${id}/push-to-boond`);
     return response.data;

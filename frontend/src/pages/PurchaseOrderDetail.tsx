@@ -126,6 +126,7 @@ export function PurchaseOrderDetail() {
   const [companyId, setCompanyId] = useState('');
   const [showRenew, setShowRenew] = useState(false);
   const [confirmBoondDelete, setConfirmBoondDelete] = useState(false);
+  const [deliveryInput, setDeliveryInput] = useState('');
   const [renewForm, setRenewForm] = useState({
     start_date: '',
     end_date: '',
@@ -199,6 +200,18 @@ export function PurchaseOrderDetail() {
       } else {
         toast.success('Action effectuée.');
       }
+      invalidate();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const attachDeliveryMutation = useMutation({
+    mutationFn: (deliveryId: number) => purchaseOrdersApi.attachDelivery(id!, deliveryId),
+    onSuccess: (updated) => {
+      toast.success(
+        `Prestation #${updated.boond_delivery_id} rattachée. Relancez le report pour créer l'achat.`,
+      );
+      setDeliveryInput('');
       invalidate();
     },
     onError: (error) => toast.error(getErrorMessage(error)),
@@ -886,7 +899,35 @@ export function PurchaseOrderDetail() {
           </div>
           <div>
             <p className="ml">Prestation</p>
-            <p className="mv font-mono">{po.boond_delivery_id ?? '—'}</p>
+            {po.boond_delivery_id ? (
+              <p className="mv font-mono">{po.boond_delivery_id}</p>
+            ) : isAdv && po.status !== 'cancelled' ? (
+              // Le report fait naître la prestation en passant le positionnement
+              // à « Gagné », puis la relit. Quand elle existe dans le CRM sans
+              // qu'il l'ait vue, la mission reste bloquée : l'achat fournisseur
+              // s'y accroche. L'ADV colle alors son numéro, lu dans Boond.
+              <div className="flex items-center gap-2">
+                <input
+                  aria-label="Numéro de la prestation dans BoondManager"
+                  className="f-in font-mono"
+                  inputMode="numeric"
+                  placeholder="n° prestation"
+                  value={deliveryInput}
+                  onChange={(event) => setDeliveryInput(event.target.value.replace(/\D/g, ''))}
+                />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!deliveryInput || attachDeliveryMutation.isPending}
+                  isLoading={attachDeliveryMutation.isPending}
+                  onClick={() => attachDeliveryMutation.mutate(Number(deliveryInput))}
+                >
+                  Rattacher
+                </Button>
+              </div>
+            ) : (
+              <p className="mv font-mono">—</p>
+            )}
           </div>
           <div>
             <p className="ml">Contrat Boond</p>

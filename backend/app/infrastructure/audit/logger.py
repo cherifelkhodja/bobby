@@ -71,6 +71,8 @@ class AuditAction(str, Enum):
     CONTRACT_SIGNED = "contract_signed"
     CONTRACT_PUSHED_TO_CRM = "contract_pushed_to_crm"
     CONTRACT_REQUEST_CANCELLED = "contract_request_cancelled"
+    # Rattachement manuel d'une prestation, quand le report ne l'a pas trouvée.
+    PURCHASE_ORDER_DELIVERY_ATTACHED = "purchase_order_delivery_attached"
 
     # Admin data management
     DATA_RESET = "data_reset"
