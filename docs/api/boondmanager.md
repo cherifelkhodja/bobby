@@ -491,7 +491,27 @@ async def create_contact(
 ```
 
 **Mapping civility** : `"M."` → 0 (homme), `"Mme"` → 1 (femme)
-**Types de contact** : 1=dirigeant, 2=facturation, 3=adv
+
+**Types de contact** (`typesOf`) — configurés dans BoondManager, Administration →
+Types des contacts. Les valeurs ci-dessous sont celles du CRM du groupe :
+
+| ID | Libellé | Utilisé par Bobby |
+|----|---------|-------------------|
+| 0 | Décideur | — |
+| 1 | Prescripteur | — |
+| 2 | Contact facturation | contact facturation du fournisseur |
+| 3 | Acheteur | — |
+| 4 | Contact - secondaire (archivé) | — |
+| 5 | Inactif | — |
+| 6 | Client - ADV (archivé) | — |
+| 7 | Dirigeant | signataire déclaré dirigeant |
+| 8 | Commercial | — |
+| 9 | Contact ADV | contact ADV du fournisseur |
+| 10 | Signataire | signataire du contrat |
+
+Un contact cumulant plusieurs rôles porte plusieurs types : le dédoublonnage se
+fait sur prénom + nom + email (`application/boond_contacts.py`), partagé par la
+synchronisation automatique et par l'action manuelle de l'ADV.
 
 ### Conversion candidat → ressource
 
@@ -627,7 +647,7 @@ async def create_purchase_order(
 | Étape | Action | Endpoint Boond | Données persistées |
 |-------|--------|----------------|-------------------|
 | 1 | Créer société fournisseur | `POST /companies` | `tp.boond_provider_id` |
-| 2 | Créer contacts (signataire + facturation) | `POST /contacts` | `tp.boond_signer_contact_id`, `tp.boond_billing_contact_id` |
+| 2 | Créer contacts (signataire, ADV, facturation) | `POST /contacts` | `tp.boond_signatory_contact_id`, `tp.boond_adv_contact_id`, `tp.boond_billing_contact_id` |
 | 3 | Convertir candidat → ressource | `PUT /candidates/{id}/information` | `cr.boond_candidate_id` (nouvel ID), `cr.boond_consultant_type = "resource"` |
 | 4 | Créer contrat Boond | `POST /contracts` | `cr.boond_contract_id` |
 | 5 | Créer bon de commande | `POST /purchase-orders` | `cr.boond_purchase_order_id` |

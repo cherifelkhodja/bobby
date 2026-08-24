@@ -815,6 +815,7 @@ updated_at: datetime
 | 079_add_purchase_orders.py | cm_purchase_orders (bons de commande) + index unique partiel sur boond_positioning_id |
 | 080_purchase_order_provisional_reference.py | provisional_reference sur cm_purchase_orders, reference nullable (numéro définitif pris à la génération) |
 | 081_add_vat_liable_to_third_parties.py | vat_liable sur tp_third_parties (fournisseur non assujetti à la TVA) |
+| 082_rename_commercial_contact_to_billing.py | boond_commercial_contact_id → boond_billing_contact_id (contact facturation du fournisseur) |
 
 ## Environment Variables
 

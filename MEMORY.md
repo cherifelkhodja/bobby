@@ -233,6 +233,18 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (fix: le contact facturation du fournisseur partait en « Commercial » dans Boond)
+
+La configuration réelle du CRM (Administration → Types des contacts) donne 2 = Contact facturation, 7 = Dirigeant, 8 = Commercial, 9 = Contact ADV, 10 = Signataire. Bobby poussait le **contact facturation du fournisseur avec le type 8 (Commercial)** et la fonction « Commercial » : la personne se rangeait dans la mauvaise colonne du CRM, sans que rien ne casse.
+
+- Type corrigé (2), fonction « Facturation », et la colonne suit : `boond_commercial_contact_id` devient `boond_billing_contact_id` (migration 082, simple renommage — les identifiants Boond déjà enregistrés restent valides).
+- **La règle était écrite deux fois** — dans la synchronisation automatique et dans l'action manuelle de l'ADV —, donc le bug l'était aussi. Rôles, types Boond et dédoublonnage vivent désormais dans `application/boond_contacts.py`, que les deux appellent. 8 tests couvrent le cumul de rôles (le gérant freelance qui est à la fois signataire, ADV et facturation ne fait qu'un contact à trois types), le repli sur le représentant légal et la casse dans la comparaison d'identité.
+- `docs/api/boondmanager.md` annonçait 1=dirigeant, 2=facturation, 3=adv : deux valeurs sur trois étaient fausses. La table complète du CRM la remplace.
+
+**Reste à trancher** : le contact rattaché à la ressource dans Boond (onglet administratif, `provider_contact_id`) est celui de la facturation. Le comportement est inchangé, mais l'ADV ou le signataire seraient peut-être plus justes.
+
+638 tests backend verts.
+
 ### 2026-08-24 (fix: le bon de commande reprend le protocole de facturation du cadre)
 
 Les conditions de paiement du bon de commande venaient bien du contrat cadre (`contract_config.payment_terms`), mais **pas le canal de facturation** : le document imprimait l'adresse de facturation de la société émettrice quoi qu'il arrive. Un cadre configuré en dépôt BoondManager produisait donc un bon de commande qui demandait des factures par mail — l'inverse de ce que le fournisseur avait signé.

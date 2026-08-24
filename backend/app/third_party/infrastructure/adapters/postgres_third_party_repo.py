@@ -48,7 +48,7 @@ class ThirdPartyRepository:
             model.boond_resource_id = third_party.boond_resource_id
             model.boond_signatory_contact_id = third_party.boond_signatory_contact_id
             model.boond_adv_contact_id = third_party.boond_adv_contact_id
-            model.boond_commercial_contact_id = third_party.boond_commercial_contact_id
+            model.boond_billing_contact_id = third_party.boond_billing_contact_id
             model.type = third_party.type.value
             model.company_name = third_party.company_name
             model.legal_form = third_party.legal_form
@@ -184,7 +184,7 @@ class ThirdPartyRepository:
             boond_resource_id=model.boond_resource_id,
             boond_signatory_contact_id=model.boond_signatory_contact_id,
             boond_adv_contact_id=model.boond_adv_contact_id,
-            boond_commercial_contact_id=model.boond_commercial_contact_id,
+            boond_billing_contact_id=model.boond_billing_contact_id,
             type=ThirdPartyType(model.type),
             company_name=model.company_name,
             legal_form=model.legal_form,
@@ -240,7 +240,7 @@ class ThirdPartyRepository:
             boond_resource_id=entity.boond_resource_id,
             boond_signatory_contact_id=entity.boond_signatory_contact_id,
             boond_adv_contact_id=entity.boond_adv_contact_id,
-            boond_commercial_contact_id=entity.boond_commercial_contact_id,
+            boond_billing_contact_id=entity.boond_billing_contact_id,
             type=entity.type.value,
             company_name=entity.company_name,
             legal_form=entity.legal_form,

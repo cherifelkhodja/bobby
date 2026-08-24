@@ -20,7 +20,7 @@ class ThirdPartyModel(Base):
     boond_resource_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     boond_signatory_contact_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     boond_adv_contact_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    boond_commercial_contact_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    boond_billing_contact_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     type: Mapped[str] = mapped_column(String(20), nullable=False)
     company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     legal_form: Mapped[str | None] = mapped_column(String(100), nullable=True)

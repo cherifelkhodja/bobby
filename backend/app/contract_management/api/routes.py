@@ -24,6 +24,7 @@ from app.contract_management.api.schemas import (
     SupplierFrameworkSummary,
     SupplierLookupResponse,
 )
+from app.contract_management.application.boond_contacts import supplier_contacts
 from app.contract_management.application.boond_mappings import (
     contract_type_of as boond_contract_type_of,
 )
@@ -2963,7 +2964,7 @@ async def boond_create_contract(
             await crm.update_resource_administrative(
                 resource_id=effective_resource_id,
                 provider_company_id=tp.boond_provider_id,
-                provider_contact_id=tp.boond_commercial_contact_id,
+                provider_contact_id=tp.boond_billing_contact_id,
             )
             provider_linked = True
 
@@ -3098,105 +3099,44 @@ async def boond_create_company(
             created_company = True
             logger.info("boond_create_company_ok", cr_id=str(cr.id), provider_id=provider_id)
 
-        # Build deduplicated contacts
-        # Boond typesOf: 7=dirigeant, 8=commercial, 9=adv, 10=signataire
-        signatory_types = [10]  # signataire
-        if tp.signatory_is_director:
-            signatory_types.append(7)  # dirigeant
-
-        role_entries: list[tuple] = [
-            (
-                tp.signatory_civility or tp.representative_civility,
-                tp.signatory_first_name or tp.representative_first_name,
-                tp.signatory_last_name or tp.representative_last_name,
-                tp.signatory_email or tp.representative_email,
-                tp.signatory_phone or tp.representative_phone,
-                tp.representative_title,
-                signatory_types,
-                "signataire",
-            ),
-            (
-                tp.adv_contact_civility,
-                tp.adv_contact_first_name,
-                tp.adv_contact_last_name,
-                tp.adv_contact_email,
-                tp.adv_contact_phone,
-                "ADV",
-                [9],
-                "adv",
-            ),
-            (
-                tp.billing_contact_civility,
-                tp.billing_contact_first_name,
-                tp.billing_contact_last_name,
-                tp.billing_contact_email,
-                tp.billing_contact_phone,
-                "Commercial",
-                [8],
-                "commercial",
-            ),
-        ]
-
-        # Group by identity key (normalized first_name + last_name + email)
-        merged: dict[str, dict] = {}
-        for civ, fn, ln, email, phone, job_title, types_of_list, label in role_entries:
-            if not (fn or email):
-                continue
-            key = f"{(fn or '').strip().lower()}|{(ln or '').strip().lower()}|{(email or '').strip().lower()}"
-            if key in merged:
-                merged[key]["types_of"].extend(types_of_list)
-                merged[key]["labels"].append(label)
-                if job_title and job_title not in ("ADV", "Commercial"):
-                    merged[key]["job_title"] = job_title
-            else:
-                merged[key] = {
-                    "civility": civ,
-                    "first_name": fn,
-                    "last_name": ln,
-                    "email": email,
-                    "phone": phone,
-                    "job_title": job_title,
-                    "types_of": list(types_of_list),
-                    "labels": [label],
-                }
-
+        # Contacts du fournisseur : rôles, types Boond et dédoublonnage sont
+        # dans `boond_contacts`, partagés avec la synchronisation automatique.
         agency_id = company.boond_agency_id if company else None
-        postcode = tp.head_office_postal_code
 
         contacts_created = []
-        label_to_contact_id: dict[str, int] = {}
-        for entry in merged.values():
+        role_to_contact_id: dict[str, int] = {}
+        for contact in supplier_contacts(tp):
             contact_id = await crm.create_contact(
                 company_id=provider_id,
-                civility=entry["civility"],
-                first_name=entry["first_name"],
-                last_name=entry["last_name"],
-                email=entry["email"],
-                phone=entry["phone"],
-                job_title=entry["job_title"],
-                types_of=entry["types_of"],
-                postcode=postcode,
+                civility=contact.civility,
+                first_name=contact.first_name,
+                last_name=contact.last_name,
+                email=contact.email,
+                phone=contact.phone,
+                job_title=contact.job_title,
+                types_of=list(contact.types_of),
+                postcode=tp.head_office_postal_code,
                 address=tp.head_office_street or tp.head_office_address,
                 town=tp.head_office_city,
                 agency_id=agency_id,
             )
             contacts_created.append(
                 {
-                    "label": " + ".join(entry["labels"]),
+                    "label": " + ".join(contact.roles),
                     "boond_contact_id": contact_id,
                 }
             )
-            for lbl in entry["labels"]:
-                label_to_contact_id[lbl] = contact_id
+            for role in contact.roles:
+                role_to_contact_id[role] = contact_id
 
         # Persist Boond contact IDs on the ThirdParty for future reference
-        if label_to_contact_id.get("signataire"):
-            tp.boond_signatory_contact_id = label_to_contact_id["signataire"]
-        if label_to_contact_id.get("adv"):
-            tp.boond_adv_contact_id = label_to_contact_id["adv"]
-        if label_to_contact_id.get("commercial"):
-            tp.boond_commercial_contact_id = label_to_contact_id["commercial"]
-        if label_to_contact_id:
+        if role_to_contact_id.get("signataire"):
+            tp.boond_signatory_contact_id = role_to_contact_id["signataire"]
+        if role_to_contact_id.get("adv"):
+            tp.boond_adv_contact_id = role_to_contact_id["adv"]
+        if role_to_contact_id.get("facturation"):
+            tp.boond_billing_contact_id = role_to_contact_id["facturation"]
+        if role_to_contact_id:
             await tp_repo.save(tp)
 
         return {

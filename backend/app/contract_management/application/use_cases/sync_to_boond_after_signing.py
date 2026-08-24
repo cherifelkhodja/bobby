@@ -7,6 +7,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.contract_management.application.boond_contacts import supplier_contacts
 from app.contract_management.application.boond_mappings import (
     resource_type_of,
     state_reason_type_of,
@@ -197,108 +198,49 @@ class SyncToBoondAfterSigningUseCase:
                 )
 
         # ── Étape 2 : Création des contacts (dédupliqués) ─────────────────
-        # Boond typesOf: 7=dirigeant, 8=commercial, 9=adv, 10=signataire
+        # Contacts du fournisseur : rôles, types Boond et dédoublonnage sont
+        # dans `boond_contacts`, partagés avec l'action manuelle de l'ADV.
         boond_contact_ids: dict[str, int] = {}
 
         if tp and tp.boond_provider_id:
             # Idempotence : réutiliser les contacts déjà créés lors d'un run
             # précédent — un retry-boond-sync ne doit pas créer de doublons.
-            _persisted_contact_ids: dict[str, int | None] = {
+            persisted_contact_ids: dict[str, int | None] = {
                 "signataire": tp.boond_signatory_contact_id,
                 "adv": tp.boond_adv_contact_id,
-                "commercial": tp.boond_commercial_contact_id,
+                "facturation": tp.boond_billing_contact_id,
             }
-            for _lbl, _pid in _persisted_contact_ids.items():
-                if _pid:
-                    boond_contact_ids[_lbl] = _pid
-
-            signatory_types = [10]
-            if tp.signatory_is_director:
-                signatory_types.append(7)
-
-            role_entries: list[tuple] = [
-                (
-                    tp.signatory_civility or tp.representative_civility,
-                    tp.signatory_first_name or tp.representative_first_name,
-                    tp.signatory_last_name or tp.representative_last_name,
-                    tp.signatory_email or tp.representative_email,
-                    tp.signatory_phone or tp.representative_phone,
-                    tp.representative_title,
-                    signatory_types,
-                    "signataire",
-                ),
-                (
-                    tp.adv_contact_civility,
-                    tp.adv_contact_first_name,
-                    tp.adv_contact_last_name,
-                    tp.adv_contact_email,
-                    tp.adv_contact_phone,
-                    "ADV",
-                    [9],
-                    "adv",
-                ),
-                (
-                    tp.billing_contact_civility,
-                    tp.billing_contact_first_name,
-                    tp.billing_contact_last_name,
-                    tp.billing_contact_email,
-                    tp.billing_contact_phone,
-                    "Commercial",
-                    [8],
-                    "commercial",
-                ),
-            ]
-
-            # Merge contacts with same identity
-            merged: dict[str, dict] = {}
-            for civ, fn, ln, email, phone, job_title, types_of_list, label in role_entries:
-                if not (fn or email):
-                    continue
-                key = f"{(fn or '').strip().lower()}|{(ln or '').strip().lower()}|{(email or '').strip().lower()}"
-                if key in merged:
-                    merged[key]["types_of"].extend(types_of_list)
-                    merged[key]["labels"].append(label)
-                    if job_title and job_title not in ("ADV", "Commercial"):
-                        merged[key]["job_title"] = job_title
-                else:
-                    merged[key] = {
-                        "civility": civ,
-                        "first_name": fn,
-                        "last_name": ln,
-                        "email": email,
-                        "phone": phone,
-                        "job_title": job_title,
-                        "types_of": list(types_of_list),
-                        "labels": [label],
-                    }
+            for role, contact_id in persisted_contact_ids.items():
+                if contact_id:
+                    boond_contact_ids[role] = contact_id
 
             agency_id = company.boond_agency_id if company else None
-            for entry in merged.values():
-                # Skip si tous les rôles de ce contact ont déjà un ID persisté.
-                if all(_persisted_contact_ids.get(lbl) for lbl in entry["labels"]):
+            for contact in supplier_contacts(tp):
+                # Sauter les contacts dont tous les rôles ont déjà un ID.
+                if all(persisted_contact_ids.get(role) for role in contact.roles):
                     continue
                 try:
                     contact_id = await self._crm.create_contact(
                         company_id=tp.boond_provider_id,
-                        civility=entry["civility"],
-                        first_name=entry["first_name"],
-                        last_name=entry["last_name"],
-                        email=entry["email"],
-                        phone=entry["phone"],
-                        job_title=entry["job_title"],
-                        types_of=entry["types_of"],
+                        civility=contact.civility,
+                        first_name=contact.first_name,
+                        last_name=contact.last_name,
+                        email=contact.email,
+                        phone=contact.phone,
+                        job_title=contact.job_title,
+                        types_of=list(contact.types_of),
                         postcode=tp.head_office_postal_code,
                         address=tp.head_office_street or tp.head_office_address,
                         town=tp.head_office_city,
                         agency_id=agency_id,
                     )
-                    for lbl in entry["labels"]:
-                        boond_contact_ids[lbl] = contact_id
+                    for role in contact.roles:
+                        boond_contact_ids[role] = contact_id
                 except Exception as exc:
                     logger.warning(
                         "sync_boond_create_contact_failed",
                         cr_id=str(cr.id),
-                        types_of=entry["types_of"],
+                        types_of=list(contact.types_of),
                         error=str(exc),
                     )
 
@@ -307,8 +249,8 @@ class SyncToBoondAfterSigningUseCase:
                 tp.boond_signatory_contact_id = boond_contact_ids["signataire"]
             if boond_contact_ids.get("adv"):
                 tp.boond_adv_contact_id = boond_contact_ids["adv"]
-            if boond_contact_ids.get("commercial"):
-                tp.boond_commercial_contact_id = boond_contact_ids["commercial"]
+            if boond_contact_ids.get("facturation"):
+                tp.boond_billing_contact_id = boond_contact_ids["facturation"]
             if boond_contact_ids:
                 await self._tp_repo.save(tp)
 
@@ -409,23 +351,26 @@ class SyncToBoondAfterSigningUseCase:
         # be a resource in Boond (trigger ressource_4/5) or become one later.
         is_external = cr.third_party_type != "salarie"
         if resource_id and is_external and tp and tp.boond_provider_id:
-            commercial_contact_id = tp.boond_commercial_contact_id or boond_contact_ids.get(
-                "commercial"
+            # Contact rattaché à la ressource côté Boond : celui de la
+            # facturation, seul contact fournisseur que porte l'onglet
+            # administratif.
+            provider_contact_id = tp.boond_billing_contact_id or boond_contact_ids.get(
+                "facturation"
             )
             logger.info(
                 "sync_boond_link_provider_to_resource",
                 cr_id=str(cr.id),
                 resource_id=resource_id,
                 provider_company_id=tp.boond_provider_id,
-                commercial_contact_id=commercial_contact_id,
-                tp_boond_commercial_contact_id=tp.boond_commercial_contact_id,
+                provider_contact_id=provider_contact_id,
+                tp_boond_billing_contact_id=tp.boond_billing_contact_id,
                 boond_contact_ids=boond_contact_ids,
             )
             try:
                 await self._crm.update_resource_administrative(
                     resource_id=resource_id,
                     provider_company_id=tp.boond_provider_id,
-                    provider_contact_id=commercial_contact_id,
+                    provider_contact_id=provider_contact_id,
                 )
             except Exception as exc:
                 logger.warning(
