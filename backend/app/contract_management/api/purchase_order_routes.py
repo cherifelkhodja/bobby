@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import AdvOrAdminUser, ContractAccessUser
 from app.config import get_settings
 from app.contract_management.api.purchase_order_schemas import (
+    BoondDeletionResponse,
     PanelSupplierListResponse,
     PanelSupplierResponse,
     PurchaseOrderCreate,
@@ -829,6 +830,64 @@ async def push_purchase_order_to_boond(
         },
     )
     return await _respond(db, cr_repo, po)
+
+
+@router.post(
+    "/{purchase_order_id}/delete-from-boond",
+    response_model=BoondDeletionResponse,
+    summary="[Test] Supprimer dans BoondManager ce que le report y a créé",
+)
+async def delete_purchase_order_from_boond(
+    purchase_order_id: UUID,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Défait le report : achat, contrat, prestation, et positionnement remis en attente.
+
+    Outil de test, pour rejouer un report sans laisser d'objets fantômes dans
+    le CRM. La conversion du candidat en ressource n'est pas défaite —
+    BoondManager ne sait pas revenir en arrière — ni la société fournisseur,
+    qui appartient au contrat cadre. ADV/admin uniquement.
+    """
+    from app.contract_management.application.use_cases.delete_purchase_order_from_boond import (
+        DeletePurchaseOrderFromBoondUseCase,
+    )
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.infrastructure.boond.client import BoondClient
+
+    settings = get_settings()
+    po_repo = PurchaseOrderRepository(db)
+    cr_repo = ContractRequestRepository(db)
+
+    use_case = DeletePurchaseOrderFromBoondUseCase(
+        purchase_order_repository=po_repo,
+        crm_service=BoondCrmAdapter(BoondClient(settings)),
+    )
+
+    try:
+        po, report = await use_case.execute(purchase_order_id)
+    except PurchaseOrderNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+    await db.commit()
+
+    audit_logger.log(
+        AuditAction.CONTRACT_PUSHED_TO_CRM,
+        AuditResource.CONTRACT,
+        user_id=user_id,
+        resource_id=str(po.id),
+        details={
+            "kind": "purchase_order",
+            "action": "delete_from_boond",
+            "reference": po.display_reference,
+            "report": report,
+        },
+    )
+    return BoondDeletionResponse(
+        purchase_order=await _respond(db, cr_repo, po), report=report
+    )
 
 
 @router.post(

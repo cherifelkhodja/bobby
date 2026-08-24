@@ -180,3 +180,11 @@ class PanelSupplierListResponse(BaseModel):
 
     items: list[PanelSupplierResponse]
     total: int
+
+
+class BoondDeletionResponse(BaseModel):
+    """Compte rendu d'une suppression dans BoondManager (outil de test)."""
+
+    purchase_order: PurchaseOrderResponse
+    # Une ligne par objet traité : ce qui a été supprimé, ce qui a résisté.
+    report: list[str]

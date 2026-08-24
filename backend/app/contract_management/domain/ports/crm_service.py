@@ -73,6 +73,18 @@ class CrmServicePort(Protocol):
         """Create the supplier purchase attached to a delivery. Returns its ID."""
         ...
 
+    async def delete_supplier_purchase(self, purchase_id: int) -> bool:
+        """Delete a supplier purchase. True once it is gone."""
+        ...
+
+    async def delete_boond_contract(self, contract_id: int) -> bool:
+        """Delete a CRM contract. True once it is gone."""
+        ...
+
+    async def delete_delivery(self, delivery_id: int) -> bool:
+        """Delete a delivery. True once it is gone."""
+        ...
+
     async def create_purchase_order(
         self,
         provider_id: int,

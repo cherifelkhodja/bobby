@@ -233,6 +233,17 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (feat: rejouer un report Boond, et le défaire)
+
+Le badge « Dans Boond » fermait la porte : une fois le premier objet créé, le bouton disparaissait et l'ADV ne pouvait plus rien reporter — ni compléter ce qui avait manqué, ni recommencer après un essai.
+
+- **Le report se rejoue.** Le bouton reste disponible et devient « Repousser dans Boond ». Chaque étape restant idempotente, relancer ne recrée rien : cela complète ce qui manque, un achat resté en échec par exemple.
+- **Bouton « Supprimer dans Boond »** (`POST /{id}/delete-from-boond`, ADV/admin), pour rejouer un report d'essai sans laisser d'objets fantômes. Suppression à l'envers de la création — achat, contrat, prestation, l'achat pendant à la prestation —, puis le positionnement repasse à « Gagné attente contrat », son état à l'ouverture du bon de commande.
+- **Chaque objet est traité à part** : l'échec de l'un n'arrête pas les autres, et un identifiant n'est effacé du bon de commande que si l'objet a bien disparu du CRM — le garder est le seul moyen de ne pas créer un doublon au report suivant. Le compte rendu, ligne à ligne, remonte dans l'écran.
+- **Ce qui ne se défait pas** : la conversion candidat → ressource, que l'API ne sait pas annuler, et la société fournisseur, qui appartient au contrat cadre et sert à d'autres missions. Les deux sont annoncés dans la confirmation.
+
+14 tests (suppression et adaptateur). 774 tests backend verts.
+
 ### 2026-08-24 (fix: le déploiement rétablit lui-même `alembic_version`)
 
 Trois déploiements de suite mouraient au démarrage sur `DuplicateTableError: relation "users" already exists` : la table `alembic_version` a disparu de la base de prod, Alembic croyait donc la base vierge et rejouait `001_initial_schema`. Rien à corriger côté code — la chaîne des 82 migrations est saine (racine unique, tête unique, aucune branche) et rien dans l'application ne crée de table hors Alembic.

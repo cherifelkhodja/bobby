@@ -247,6 +247,42 @@ class TestSupplierPurchaseCreation:
             await adapter.create_supplier_purchase(delivery_id=1234, title="GEM-BC-001")
 
 
+class TestSuppressions:
+    """Défaire un report : un 404 vaut suppression, le reste doit remonter."""
+
+    @pytest.mark.asyncio
+    async def test_chaque_objet_a_son_endpoint(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value={})
+
+        await adapter.delete_supplier_purchase(666)
+        await adapter.delete_boond_contract(555)
+        await adapter.delete_delivery(797)
+
+        appels = [(c.args[0], c.args[1]) for c in boond._make_request.await_args_list]
+        assert appels == [
+            ("DELETE", "/purchases/666"),
+            ("DELETE", "/contracts/555"),
+            ("DELETE", "/deliveries/797"),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_un_objet_deja_absent_compte_comme_supprime(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=_http_status_error(404))
+
+        assert await adapter.delete_supplier_purchase(666) is True
+
+    @pytest.mark.asyncio
+    async def test_un_refus_est_propage(self):
+        """Conclure à la suppression sur un 403 ferait créer un doublon ensuite."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=_http_status_error(403))
+
+        with pytest.raises(httpx.HTTPStatusError):
+            await adapter.delete_boond_contract(555)
+
+
 class TestConsultantExistence:
     """``candidate_exists`` / ``resource_exists`` : mêmes règles que pour une société.
 

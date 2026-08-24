@@ -10,6 +10,7 @@ import {
   RefreshCw,
   RotateCcw,
   Send,
+  Trash2,
   Upload,
   X,
 } from 'lucide-react';
@@ -94,15 +95,14 @@ function formatAmount(value: number | null): string {
 }
 
 function boondPushSummary(po: PurchaseOrder): string {
-  // Le report peut n'avoir que partiellement abouti : dire ce qui est en place
-  // évite d'aller le vérifier dans BoondManager.
+  // Ce que le report a laissé dans le CRM, donc ce qu'une suppression
+  // reprendrait. La ressource n'y figure pas : elle ne se défait pas.
   const done = [
-    po.boond_consultant_type === 'resource' ? 'ressource' : null,
-    po.boond_delivery_id ? `prestation #${po.boond_delivery_id}` : null,
-    po.boond_contract_id ? `contrat #${po.boond_contract_id}` : null,
-    po.boond_purchase_order_id ? `achat #${po.boond_purchase_order_id}` : null,
+    po.boond_purchase_order_id ? `l'achat #${po.boond_purchase_order_id}` : null,
+    po.boond_contract_id ? `le contrat #${po.boond_contract_id}` : null,
+    po.boond_delivery_id ? `la prestation #${po.boond_delivery_id}` : null,
   ].filter(Boolean);
-  return `Dans BoondManager : ${done.join(', ')}`;
+  return done.join(', ');
 }
 
 function formatDate(value: string | null): string {
@@ -125,6 +125,7 @@ export function PurchaseOrderDetail() {
   const [supplierId, setSupplierId] = useState('');
   const [companyId, setCompanyId] = useState('');
   const [showRenew, setShowRenew] = useState(false);
+  const [confirmBoondDelete, setConfirmBoondDelete] = useState(false);
   const [renewForm, setRenewForm] = useState({
     start_date: '',
     end_date: '',
@@ -198,6 +199,18 @@ export function PurchaseOrderDetail() {
       } else {
         toast.success('Action effectuée.');
       }
+      invalidate();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const deleteFromBoondMutation = useMutation({
+    mutationFn: () => purchaseOrdersApi.deleteFromBoond(id!),
+    onSuccess: ({ report }) => {
+      // Chaque objet est traité à part : le compte rendu dit lesquels ont
+      // résisté, ce qu'un simple « c'est fait » masquerait.
+      toast.success(report.join(' '), { duration: 8000 });
+      setConfirmBoondDelete(false);
       invalidate();
     },
     onError: (error) => toast.error(getErrorMessage(error)),
@@ -392,29 +405,31 @@ export function PurchaseOrderDetail() {
               </Button>
             </>
           )}
-          {isAdv && po.status !== 'cancelled' && !pushedToBoond && (
+          {isAdv && po.status !== 'cancelled' && (
             <Button
               onClick={() => actionMutation.mutate('push')}
               isLoading={actionMutation.isPending}
               disabled={!boondReady}
               title={
                 boondReady
-                  ? 'Ressource, prestation, contrat et achat dans BoondManager, sans attendre la signature'
+                  ? 'Ressource, prestation, contrat et achat dans BoondManager, sans attendre la signature. Relancer complète ce qui manque.'
                   : 'Complétez le CJM, les jours vendus et la période avant de reporter'
               }
               leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
             >
-              Pousser dans Boond
+              {pushedToBoond ? 'Repousser dans Boond' : 'Pousser dans Boond'}
             </Button>
           )}
           {isAdv && pushedToBoond && (
-            <span
-              className="st bg-grn-bg text-grn-fg"
-              title={boondPushSummary(po)}
+            <Button
+              variant="danger"
+              onClick={() => setConfirmBoondDelete(true)}
+              isLoading={deleteFromBoondMutation.isPending}
+              title={`Supprime dans BoondManager ${boondPushSummary(po)}`}
+              leftIcon={<Trash2 className="h-3.5 w-3.5" />}
             >
-              <span className="dot" />
-              Dans Boond
-            </span>
+              Supprimer dans Boond
+            </Button>
           )}
           {isAdv && (po.status === 'active' || po.status === 'closed') && (
             <Button
@@ -735,6 +750,37 @@ export function PurchaseOrderDetail() {
           </ul>
         </div>
       )}
+
+      <Modal
+        isOpen={confirmBoondDelete}
+        onClose={() => setConfirmBoondDelete(false)}
+        title="Supprimer dans BoondManager"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="ds">
+            Seront supprimés du CRM : {boondPushSummary(po)}. Le positionnement repasse à
+            « Gagné attente contrat », et le bon de commande pourra être repoussé.
+          </p>
+          <p className="dn">
+            Ne sont pas défaits : la ressource — BoondManager ne sait pas la reconvertir en
+            candidat — et la société fournisseur, qui appartient au contrat cadre.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmBoondDelete(false)}>
+              Annuler
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => deleteFromBoondMutation.mutate()}
+              isLoading={deleteFromBoondMutation.isPending}
+              leftIcon={<Trash2 className="h-3.5 w-3.5" />}
+            >
+              Supprimer
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={showRenew}

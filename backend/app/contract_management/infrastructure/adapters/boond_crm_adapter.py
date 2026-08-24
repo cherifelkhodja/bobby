@@ -782,6 +782,39 @@ class BoondCrmAdapter:
                 return False
             raise
 
+    async def _delete_entity(self, path: str, kind: str, entity_id: int) -> bool:
+        """Supprime une fiche Boond. Un 404 vaut suppression : elle n'est plus là.
+
+        Toute autre erreur est propagée : l'appelant doit savoir que l'objet
+        subsiste dans le CRM, sous peine d'en créer un doublon au report
+        suivant.
+        """
+        try:
+            await self._boond._make_request("DELETE", path)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 404:
+                raise
+            logger.info("boond_entity_already_absent", kind=kind, entity_id=entity_id)
+            return True
+        logger.info("boond_entity_deleted", kind=kind, entity_id=entity_id)
+        return True
+
+    async def delete_supplier_purchase(self, purchase_id: int) -> bool:
+        """Supprime un achat fournisseur.
+
+        Seule façon de le déplacer : sa prestation ne se change pas après coup
+        (`PUT /purchases/{id}/information` ne l'expose pas).
+        """
+        return await self._delete_entity(f"/purchases/{purchase_id}", "purchase", purchase_id)
+
+    async def delete_boond_contract(self, contract_id: int) -> bool:
+        """Supprime un contrat Boond."""
+        return await self._delete_entity(f"/contracts/{contract_id}", "contract", contract_id)
+
+    async def delete_delivery(self, delivery_id: int) -> bool:
+        """Supprime une prestation Boond."""
+        return await self._delete_entity(f"/deliveries/{delivery_id}", "delivery", delivery_id)
+
     async def candidate_exists(self, candidate_id: int) -> bool:
         """Cet identifiant est-il celui d'un candidat Boond ?"""
         return await self._entity_exists(

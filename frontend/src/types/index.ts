@@ -1140,6 +1140,13 @@ export interface PurchaseOrder {
   updated_at: string;
 }
 
+/** Compte rendu d'une suppression dans BoondManager (outil de test). */
+export interface BoondDeletion {
+  purchase_order: PurchaseOrder;
+  // Une ligne par objet traité : ce qui a été supprimé, ce qui a résisté.
+  report: string[];
+}
+
 /**
  * Un fournisseur du panel d'une société émettrice : le contrat cadre qui l'y
  * fait entrer l'identifie mieux que son SIREN.

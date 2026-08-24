@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 
 import type {
+  BoondDeletion,
   PanelSupplierListResponse,
   PurchaseOrder,
   PurchaseOrderListResponse,
@@ -143,6 +144,14 @@ export const purchaseOrdersApi = {
 
   pushToBoond: async (id: string): Promise<PurchaseOrder> => {
     const response = await apiClient.post<PurchaseOrder>(`/purchase-orders/${id}/push-to-boond`);
+    return response.data;
+  },
+
+  // Outil de test : défait le report pour pouvoir le rejouer.
+  deleteFromBoond: async (id: string): Promise<BoondDeletion> => {
+    const response = await apiClient.post<BoondDeletion>(
+      `/purchase-orders/${id}/delete-from-boond`,
+    );
     return response.data;
   },
 };
