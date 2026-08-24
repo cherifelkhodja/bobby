@@ -233,6 +233,19 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (fix: la prestation se retrouve par le projet du positionnement)
+
+Un positionnement n'expose **aucune** relation `delivery` — vérifié contre le CRM sur les positionnements 538 et 539, dont les relations sont `opportunity`, `project`, `files`, `dependsOn` et `createdBy`. Le report cherchait donc une clé qui n'existe pas : il ne pouvait structurellement jamais retrouver la prestation, sur aucune mission.
+
+Une prestation pend à un **projet** (`_parse_delivery` lit `relationships.project`) et dépend d'une ressource. Le projet, lui, est rempli par Boond sur le positionnement au passage à « Gagné ». C'est la voie retenue.
+
+- `get_positioning()` rend désormais `project_id`.
+- `find_project_delivery(project_id, resource_id)` cherche la prestation du projet. **Deux lectures, la seconde en repli** : le projet lui-même (`GET /projects/{id}`), puis le pré-remplissage d'achat (`GET /purchases/default?project=`), déjà utilisé par la création d'achat et qui accepte `project`. Aucune des deux n'est confirmée contre la documentation comme portant les prestations d'un projet ; ce sont des lectures, leur échec ne coûte que le repli sur la saisie manuelle, et le journal dit laquelle a répondu (`boond_project_delivery_found`, champ `source`).
+- **Plusieurs prestations sans correspondance de ressource ne donnent rien** : en prendre une au hasard poserait l'achat sur la mission d'un autre consultant, et un achat mal rattaché ne se corrige qu'en le supprimant.
+- La recherche est best-effort : ce qu'elle ne trouve pas se rattrape par le rattachement manuel, et une lecture qui échoue ne retient pas la création du contrat.
+
+12 tests sur la recherche et le projet du positionnement. 488 tests contractualisation verts.
+
 ### 2026-08-24 (feat: rattacher à la main la prestation Boond d'une mission)
 
 Le report d'un bon de commande fait naître la prestation en passant le positionnement à « Gagné », puis relit le positionnement pour en récupérer le numéro. Sur la mission 538, la prestation est bien créée dans le CRM mais cette relecture ne la rend pas : l'achat fournisseur s'accroche à la prestation, la mission reste donc bloquée — et rien ne permettait de dire à Bobby laquelle.

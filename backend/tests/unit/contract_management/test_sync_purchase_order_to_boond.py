@@ -93,6 +93,7 @@ def _make_use_case(po, *, provider_id=777, third_party_type="sous_traitant", thi
         }
     )
     crm.get_positioning = AsyncMock(return_value={"delivery_id": 797})
+    crm.find_project_delivery = AsyncMock(return_value=None)
     crm.create_boond_contract = AsyncMock(return_value=555)
     crm.create_supplier_purchase = AsyncMock(return_value=666)
     crm.renew_delivery = AsyncMock(return_value={"id": 798, "purchase_id": 900, "contract_id": 264})
@@ -313,6 +314,55 @@ class TestDelivery:
         assert "l'état est resté à 7" in result.boond_sync_error
 
     @pytest.mark.asyncio
+    async def test_the_delivery_is_looked_up_by_project_when_absent(self):
+        """Un positionnement n'expose pas de relation `delivery` : le projet est la voie."""
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po)
+        crm.get_positioning = AsyncMock(return_value={"state": 2, "project_id": 224})
+        crm.find_project_delivery = AsyncMock(return_value=800)
+
+        result = await use_case.execute(po.id)
+
+        assert result.boond_delivery_id == 800
+        assert result.boond_sync_error is None
+
+    @pytest.mark.asyncio
+    async def test_the_lookup_names_the_resource_of_the_mission(self):
+        """Un projet peut porter plusieurs prestations : celle du consultant est la bonne."""
+        po = _signed_po(boond_consultant_id=2870, boond_consultant_type="resource")
+        use_case, crm, _ = _make_use_case(po)
+        crm.get_positioning = AsyncMock(return_value={"state": 2, "project_id": 224})
+        crm.find_project_delivery = AsyncMock(return_value=800)
+
+        await use_case.execute(po.id)
+
+        crm.find_project_delivery.assert_awaited_once_with(224, resource_id=2870)
+
+    @pytest.mark.asyncio
+    async def test_a_read_delivery_spares_the_lookup(self):
+        """Si le CRM la rend directement, inutile de passer par le projet."""
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po)
+        crm.get_positioning = AsyncMock(return_value={"delivery_id": 797, "project_id": 224})
+
+        await use_case.execute(po.id)
+
+        crm.find_project_delivery.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_failing_lookup_does_not_break_the_report(self):
+        """Ce qu'elle ne trouve pas se rattrape par la saisie de l'ADV."""
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po)
+        crm.get_positioning = AsyncMock(return_value={"state": 2, "project_id": 224})
+        crm.find_project_delivery = AsyncMock(side_effect=RuntimeError("Boond 404"))
+
+        result = await use_case.execute(po.id)
+
+        assert result.boond_contract_id == 555
+        assert "n'a pas été retrouvée" in result.boond_sync_error
+
+    @pytest.mark.asyncio
     async def test_a_state_ignored_outright_is_named_as_such(self):
         """Boond renvoie déjà l'ancien état : l'écriture n'a pas été prise en compte."""
         po = _signed_po(boond_delivery_id=797)
@@ -356,7 +406,7 @@ class TestDelivery:
 
         result = await use_case.execute(po.id)
 
-        assert "n'a pas rattaché de prestation" in result.boond_sync_error
+        assert "n'a pas été retrouvée" in result.boond_sync_error
         crm.update_delivery.assert_not_awaited()
 
     @pytest.mark.asyncio

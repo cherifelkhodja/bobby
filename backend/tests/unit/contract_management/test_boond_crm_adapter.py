@@ -226,6 +226,147 @@ def _purchase_calls(boond: AsyncMock) -> tuple[dict, dict]:
     return prefill.kwargs["params"], creation.kwargs["json"]["data"]
 
 
+class TestProjectDeliveryLookup:
+    """Retrouver la prestation d'un positionnement gagné, par son projet.
+
+    Un positionnement n'expose **aucune** relation `delivery` — vérifié contre
+    le CRM sur les positionnements 538 et 539, dont les relations sont
+    `opportunity`, `project`, `files`, `dependsOn` et `createdBy`. Le lien passe
+    donc par le projet, auquel la prestation pend.
+    """
+
+    @staticmethod
+    def _project(*deliveries) -> dict:
+        return {
+            "data": {"id": "224", "type": "project", "relationships": {}},
+            "included": [
+                {
+                    "id": str(did),
+                    "type": "delivery",
+                    "relationships": {"dependsOn": {"data": {"id": str(rid), "type": "resource"}}},
+                }
+                for did, rid in deliveries
+            ],
+        }
+
+    @pytest.mark.asyncio
+    async def test_the_only_delivery_of_a_project_is_taken(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value=self._project((800, 2870)))
+
+        assert await adapter.find_project_delivery(224) == 800
+
+    @pytest.mark.asyncio
+    async def test_the_delivery_of_our_consultant_is_singled_out(self):
+        """Un projet peut en porter plusieurs : une par consultant de la mission."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value=self._project((800, 2870), (801, 2999)))
+
+        assert await adapter.find_project_delivery(224, resource_id=2999) == 801
+
+    @pytest.mark.asyncio
+    async def test_several_deliveries_without_a_match_are_refused(self):
+        """En prendre une au hasard poserait l'achat sur la mission d'un autre."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value=self._project((800, 2870), (801, 2999)))
+
+        assert await adapter.find_project_delivery(224, resource_id=1234) is None
+
+    @pytest.mark.asyncio
+    async def test_deliveries_listed_only_as_relationships_are_read(self):
+        """Certaines réponses ne les détaillent pas dans `included`."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value={
+                "data": {
+                    "id": "224",
+                    "type": "project",
+                    "relationships": {
+                        "deliveries": {"data": [{"id": "800", "type": "delivery"}]},
+                    },
+                },
+                "included": [],
+            }
+        )
+
+        assert await adapter.find_project_delivery(224) == 800
+
+    @pytest.mark.asyncio
+    async def test_the_purchase_prefill_is_the_fallback(self):
+        """`GET /purchases/default` accepte `project` — endpoint déjà éprouvé."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            side_effect=[
+                {"data": {"id": "224", "type": "project", "relationships": {}}, "included": []},
+                {
+                    "data": {
+                        "type": "purchase",
+                        "relationships": {"delivery": {"data": {"id": "800", "type": "delivery"}}},
+                    }
+                },
+            ]
+        )
+
+        assert await adapter.find_project_delivery(224) == 800
+
+    @pytest.mark.asyncio
+    async def test_an_unreadable_project_falls_through_to_the_prefill(self):
+        """Aucune des deux lectures n'est confirmée : l'échec de l'une n'arrête pas l'autre."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            side_effect=[
+                RuntimeError("404 Not Found"),
+                {
+                    "data": {
+                        "type": "purchase",
+                        "relationships": {"delivery": {"data": {"id": "800", "type": "delivery"}}},
+                    }
+                },
+            ]
+        )
+
+        assert await adapter.find_project_delivery(224) == 800
+
+    @pytest.mark.asyncio
+    async def test_two_dead_ends_give_nothing(self):
+        """L'ADV rattachera la prestation à la main plutôt que de recevoir un faux numéro."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=[RuntimeError("404"), RuntimeError("404")])
+
+        assert await adapter.find_project_delivery(224) is None
+
+
+class TestPositioningProject:
+    """Le projet du positionnement, seule voie connue vers la prestation."""
+
+    @pytest.mark.asyncio
+    async def test_the_project_is_read_from_the_positioning(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value={
+                "data": {
+                    "id": "539",
+                    "type": "positioning",
+                    "attributes": {"state": 2},
+                    "relationships": {
+                        "opportunity": {"data": {"id": "1628", "type": "opportunity"}},
+                        "project": {"data": {"id": "224", "type": "project"}},
+                        "files": {"data": []},
+                        "dependsOn": {"data": {"id": "2398", "type": "candidate"}},
+                        "createdBy": {"data": {"id": "1", "type": "resource"}},
+                    },
+                },
+                "included": [],
+            }
+        )
+
+        positioning = await adapter.get_positioning(539)
+
+        assert positioning["project_id"] == 224
+        # La relation que Bobby interrogeait n'existe pas sur un positionnement.
+        assert positioning["delivery_id"] is None
+
+
 class TestSupplierPurchaseCreation:
     """L'achat fournisseur : pré-remplissage Boond, puis `POST /purchases`.
 

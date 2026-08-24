@@ -768,6 +768,19 @@ créée.
 async def update_positioning_state(self, positioning_id: int, state: int) -> None
 ```
 
+> **Un positionnement n'expose pas la prestation.** Ses relations sont
+> `opportunity`, `project`, `files`, `dependsOn`, `createdBy` — vérifié sur les
+> positionnements 538 et 539. Relire `relationships.delivery` après l'avoir
+> gagné ne rend donc jamais rien. La prestation pend à un **projet**, que Boond
+> remplit sur le positionnement au passage à « Gagné » : c'est par lui qu'on la
+> retrouve (`find_project_delivery`), en retenant celle dont le `dependsOn` est
+> la ressource de la mission.
+>
+> Les deux lectures tentées — `GET /projects/{id}` puis
+> `GET /purchases/default?project={id}` — ne sont **pas confirmées** par la
+> documentation comme portant les prestations d'un projet. Le journal
+> (`boond_project_delivery_found`, champ `source`) dira laquelle répond.
+
 ```python
 async def create_supplier_purchase(
     self, delivery_id: int, title: str,

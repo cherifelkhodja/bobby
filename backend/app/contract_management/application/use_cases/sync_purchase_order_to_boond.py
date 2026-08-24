@@ -443,8 +443,14 @@ class SyncPurchaseOrderToBoondUseCase:
                 + "À passer à « Gagné » à la main."
             )
 
-        delivery_id = positioning.get("delivery_id")
-        if delivery_id and not po.boond_delivery_id:
+        if po.boond_delivery_id:
+            return
+
+        # Un positionnement n'expose pas de relation `delivery` : la prestation
+        # se retrouve par le projet, que Boond remplit au passage à « Gagné ».
+        # La lecture directe reste tentée d'abord, au cas où le CRM la rendrait.
+        delivery_id = positioning.get("delivery_id") or await self._find_delivery(po, positioning)
+        if delivery_id:
             po.boond_delivery_id = delivery_id
             logger.info(
                 "purchase_order_delivery_created",
@@ -452,11 +458,40 @@ class SyncPurchaseOrderToBoondUseCase:
                 positioning_id=po.boond_positioning_id,
                 delivery_id=delivery_id,
             )
-        elif not po.boond_delivery_id:
-            warnings.append(
-                f"Positionnement {po.boond_positioning_id} passé à « Gagné », mais "
-                "BoondManager n'a pas rattaché de prestation : à vérifier dans le CRM."
+            return
+
+        warnings.append(
+            f"Positionnement {po.boond_positioning_id} passé à « Gagné », mais la prestation "
+            "n'a pas été retrouvée : relevez son numéro dans BoondManager et rattachez-la "
+            "sur le bon de commande, puis relancez le report."
+        )
+
+    async def _find_delivery(self, po: PurchaseOrder, positioning: dict) -> int | None:
+        """Cherche la prestation par le projet du positionnement.
+
+        Best-effort : ce qu'elle ne trouve pas se rattrape par la saisie de
+        l'ADV, et une lecture qui échoue ne doit pas retenir le contrat.
+        """
+        project_id = positioning.get("project_id")
+        if not project_id:
+            return None
+        try:
+            return await self._crm.find_project_delivery(
+                project_id,
+                # La prestation dépend de la ressource, pas du candidat : le
+                # consultant est déjà converti à ce stade du report.
+                resource_id=po.boond_consultant_id
+                if po.boond_consultant_type == "resource"
+                else None,
             )
+        except Exception as exc:
+            logger.warning(
+                "purchase_order_delivery_lookup_failed",
+                purchase_order_id=str(po.id),
+                project_id=project_id,
+                error=_readable_error(exc),
+            )
+            return None
 
     async def _won_state(self, warnings: list[str]) -> int | None:
         """Valeur de l'état « Gagné » pour un positionnement, dans ce CRM.
