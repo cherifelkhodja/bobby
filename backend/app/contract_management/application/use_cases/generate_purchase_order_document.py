@@ -23,11 +23,11 @@ logger = structlog.get_logger()
 
 TEMPLATE_NAME = "bon_de_commande.html"
 
-# Libellés des conditions de paiement, repris du contrat cadre quand il en
-# porte une : le bon de commande n'invente pas ses propres délais.
 # Taux de TVA appliqué aux prestations de services intérieures.
 VAT_RATE = Decimal("20")
 
+# Libellés des conditions de paiement, repris du contrat cadre quand il en
+# porte une : le bon de commande n'invente pas ses propres délais.
 PAYMENT_TERMS_LABELS = {
     "immediate": "comptant",
     "net_30": "à 30 jours",
@@ -134,9 +134,17 @@ class GeneratePurchaseOrderDocumentUseCase:
 
     def _build_context(self, po: PurchaseOrder, third_party, framework, company) -> dict:
         """Construit le contexte du gabarit, sans jamais y mettre le TJM."""
-        payment_terms = None
-        if framework and framework.contract_config:
-            payment_terms = framework.contract_config.get("payment_terms")
+        # Délai de paiement et protocole de facturation viennent tous deux du
+        # contrat cadre : ce sont ceux que le fournisseur a acceptés en le
+        # signant, et le bon de commande n'en invente pas d'autres. À défaut de
+        # configuration, l'adresse de facturation de la société émettrice sert
+        # de repli — c'est celle qu'imprime aussi le contrat.
+        framework_config = (framework.contract_config or {}) if framework else {}
+        payment_terms = framework_config.get("payment_terms")
+        invoice_method = framework_config.get("invoice_submission_method") or "email"
+        invoice_address = framework_config.get("invoice_email") or (
+            (company.invoices_company_mail or "") if company else ""
+        )
 
         # Tous les fournisseurs ne facturent pas la TVA : franchise en base,
         # autoliquidation. Le tiers porte cet assujettissement ; le taux, lui,
@@ -177,6 +185,8 @@ class GeneratePurchaseOrderDocumentUseCase:
             "vat_amount": _fmt_amount(vat_amount),
             "total_amount_ttc": _fmt_amount(po.total_amount + vat_amount),
             "payment_terms_label": PAYMENT_TERMS_LABELS.get(payment_terms or "", ""),
+            "invoice_submission_method": invoice_method,
+            "invoice_address": invoice_address,
             # Interlocuteurs
             "commercial_email": po.commercial_email or "",
         }

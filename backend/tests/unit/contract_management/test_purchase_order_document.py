@@ -287,6 +287,53 @@ class TestTemplateRendering:
         assert "Total TTC" not in html
         assert "Fournisseur non assujetti à la TVA" in html
 
+    def test_the_invoicing_channel_follows_the_framework_contract(self):
+        """Cadre configuré en dépôt BoondManager : le bon de commande le dit."""
+        framework = _framework()
+        framework.contract_config = {
+            "payment_terms": "net_30",
+            "invoice_submission_method": "boondmanager",
+        }
+        use_case, _ = _make_use_case(_purchase_order(), framework=framework)
+        context = use_case._build_context(
+            _purchase_order(), _third_party(), framework, _company()
+        )
+        apply_brand_theme(context)
+        html = build_environment().get_template("bon_de_commande.html").render(**context)
+
+        assert "déposer sur la plateforme BoondManager" in html
+        assert "Dépôt sur la plateforme BoondManager" in html
+        # L'adresse de la société n'est pas proposée comme destination des
+        # factures ; elle ne subsiste que comme contact de gestion.
+        assert "adresser à" not in html
+        assert "Paiement à 30 jours" in html
+
+    def test_the_invoicing_address_of_the_framework_wins(self):
+        """L'adresse saisie à la configuration prime sur celle de la société."""
+        framework = _framework()
+        framework.contract_config = {"invoice_email": "compta-leonum@akema-tech.fr"}
+        use_case, _ = _make_use_case(_purchase_order(), framework=framework)
+        context = use_case._build_context(
+            _purchase_order(), _third_party(), framework, _company()
+        )
+
+        assert context["invoice_address"] == "compta-leonum@akema-tech.fr"
+
+    def test_without_configuration_the_issuing_company_address_is_used(self):
+        """Un cadre non configuré laisse l'adresse de facturation de la société."""
+        framework = _framework()
+        framework.contract_config = {}
+        use_case, _ = _make_use_case(_purchase_order(), framework=framework)
+        context = use_case._build_context(
+            _purchase_order(), _third_party(), framework, _company()
+        )
+
+        assert context["invoice_address"] == "factures@leonum.fr"
+        assert context["invoice_submission_method"] == "email"
+        # Sans délai configuré, le document renvoie au cadre plutôt que d'en
+        # inventer un.
+        assert context["payment_terms_label"] == ""
+
     def test_the_mission_description_stays_internal(self):
         """La description de mission ne s'imprime pas sur le bon de commande."""
         html = self._html()

@@ -197,7 +197,10 @@
     <div class="lines">
       <b>{{ issuer_company_name | upper }}</b><br>
       {% if issuer_head_office %}{{ issuer_head_office }}<br>{% endif %}
-      {% if invoices_company_mail %}{{ invoices_company_mail }}{% endif %}
+      {# Destination des factures : celle du contrat cadre, pas une règle du
+         bon de commande. #}
+      {% if invoice_submission_method == 'boondmanager' %}Dépôt sur la plateforme BoondManager
+      {%- elif invoice_address %}{{ invoice_address }}{% endif %}
     </div>
   </td>
 </tr></table>
@@ -352,8 +355,12 @@
 <table class="sec"><tr><td class="n">5</td><td class="t">Pénalités et indemnité forfaitaire</td></tr></table>
 <p class="p">Conformément aux articles L.441-10 et D.441-5 du Code de commerce, des pénalités de retard sont exigibles de plein droit en cas de paiement tardif, et une indemnité forfaitaire de 40 € pour frais de recouvrement est due de plein droit.</p>
 
-{% if invoices_company_mail %}
-<p class="p">Les factures sont à adresser à <span class="mail">{{ invoices_company_mail }}</span>, en rappelant la référence <b>{{ reference }}</b> du présent bon de commande.</p>
+{# Canal de facturation : celui du contrat cadre, pas une règle propre au bon
+   de commande. #}
+{% if invoice_submission_method == 'boondmanager' %}
+<p class="p">Les factures sont à déposer sur la plateforme BoondManager de {{ issuer_company_name }}, en rappelant la référence <b>{{ reference }}</b> du présent bon de commande.</p>
+{% elif invoice_address %}
+<p class="p">Les factures sont à adresser à <span class="mail">{{ invoice_address }}</span>, en rappelant la référence <b>{{ reference }}</b> du présent bon de commande.</p>
 {% endif %}
 
 <div class="callout">

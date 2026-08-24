@@ -233,6 +233,16 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (fix: le bon de commande reprend le protocole de facturation du cadre)
+
+Les conditions de paiement du bon de commande venaient bien du contrat cadre (`contract_config.payment_terms`), mais **pas le canal de facturation** : le document imprimait l'adresse de facturation de la société émettrice quoi qu'il arrive. Un cadre configuré en dépôt BoondManager produisait donc un bon de commande qui demandait des factures par mail — l'inverse de ce que le fournisseur avait signé.
+
+- `invoice_submission_method` et `invoice_email` du cadre alimentent désormais le bon de commande : la carte « Adresse de facturation » et la page des conditions annoncent le dépôt BoondManager ou l'adresse retenue. À défaut de configuration, l'adresse de la société émettrice sert de repli, comme dans le contrat.
+- **`invoice_email` n'avait jusqu'ici aucun effet** : le contrat affichait toujours l'adresse de la société. Les deux documents appliquent maintenant la même règle — adresse configurée si elle existe, adresse de la société sinon —, faute de quoi ils auraient pu s'annoncer différemment.
+- Le « Contact ADV / gestion » des interlocuteurs reste l'adresse de la société : c'est un contact, pas le canal de facturation.
+
+3 tests sur la provenance de ces conditions. 360 tests `contract_management` verts, 630 tests backend.
+
 ### 2026-08-23 (feat: TVA optionnelle, signatures alignées, mission sans description)
 
 Trois retouches des documents contractuels, après relecture du nouveau bon de commande.
