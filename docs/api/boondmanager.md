@@ -626,8 +626,12 @@ async def update_resource_administrative(
 
 ### Bon de commande
 
-#### POST /purchase-orders
-Crée un bon de commande lié au fournisseur et au positionnement.
+#### POST /purchases
+Crée l'**achat fournisseur** (« bon de commande » côté Bobby), lié au fournisseur
+et au positionnement. C'est le même objet que celui produit par le
+renouvellement natif d'une prestation, qui le renvoie dans
+`relationships.purchase`. `/purchase-orders`, longtemps écrit ici, n'existe pas
+dans l'API et répondait 404.
 
 ```python
 async def create_purchase_order(
@@ -650,7 +654,7 @@ async def create_purchase_order(
 | 2 | Créer contacts (signataire, ADV, facturation) | `POST /contacts` | `tp.boond_signatory_contact_id`, `tp.boond_adv_contact_id`, `tp.boond_billing_contact_id` |
 | 3 | Convertir candidat → ressource | `PUT /candidates/{id}/information` | `cr.boond_candidate_id` (nouvel ID), `cr.boond_consultant_type = "resource"` |
 | 4 | Créer contrat Boond | `POST /contracts` | `cr.boond_contract_id` |
-| 5 | Créer bon de commande | `POST /purchase-orders` | `cr.boond_purchase_order_id` |
+| 5 | Créer l'achat fournisseur | `POST /purchases` | `cr.boond_purchase_order_id` |
 | 6 | Archiver positionnement | `PATCH /positionings/{id}` | — |
 
 > **Pré-requis étape 3** : `manager_id` récupéré via `get_need()` (mainManager du besoin).

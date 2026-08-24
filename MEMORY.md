@@ -233,6 +233,16 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (fix: l'achat fournisseur se crée sur /purchases, pas /purchase-orders)
+
+Le report d'un bon de commande échouait sur `404 Not Found` pour `POST /purchase-orders` : **cet endpoint n'existe pas** dans l'API BoondManager. L'objet est un **achat** (`purchase`) — c'est celui que le renouvellement natif d'une prestation renvoie dans `relationships.purchase`, donc les deux chemins créent bien la même chose.
+
+- Endpoint `/purchases`, type JSON:API `purchase`. Un test verrouille les deux : l'erreur était invisible tant que personne ne poussait un bon de commande.
+- `docs/api/boondmanager.md` annonçait le mauvais endpoint depuis l'origine ; corrigé.
+- **À confirmer en production** : la forme du corps (attributs et relations) n'a jamais pu être validée contre l'API, faute d'accès. Si Boond répond 422, sa réponse nommera ce qui manque.
+
+667 tests backend verts.
+
 ### 2026-08-24 (feat: purger un cadre annulé emporte les traces du fournisseur)
 
 Supprimer définitivement un contrat cadre annulé ne retirait que le dossier : les bons de commande, les documents de vigilance et la fiche du tiers restaient, et le fournisseur ne pouvait pas être ressaisi proprement.

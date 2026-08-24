@@ -49,6 +49,31 @@ def _http_status_error(status_code: int) -> httpx.HTTPStatusError:
     return httpx.HTTPStatusError(f"HTTP {status_code}", request=request, response=response)
 
 
+class TestPurchaseCreation:
+    """L'achat fournisseur : `POST /purchases`, type `purchase`.
+
+    `/purchase-orders` n'existe pas dans l'API BoondManager — il répondait 404
+    et faisait échouer tout le report d'un bon de commande.
+    """
+
+    @pytest.mark.asyncio
+    async def test_the_purchase_is_posted_on_the_right_resource(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value={"data": {"id": "666"}})
+
+        purchase_id = await adapter.create_purchase_order(
+            provider_id=777, positioning_id=41, reference="GEM-BC-001", amount=9000.0
+        )
+
+        assert purchase_id == 666
+        method, path = boond._make_request.await_args.args[:2]
+        assert (method, path) == ("POST", "/purchases")
+        data = boond._make_request.await_args.kwargs["json"]["data"]
+        assert data["type"] == "purchase"
+        assert data["attributes"]["amountExcludingTax"] == 9000.0
+        assert data["attributes"]["reference"] == "GEM-BC-001"
+
+
 class TestConsultantExistence:
     """``candidate_exists`` / ``resource_exists`` : mêmes règles que pour une société.
 

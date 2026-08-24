@@ -519,15 +519,20 @@ class BoondCrmAdapter:
         Returns:
             Boond purchase order ID.
         """
+        # L'objet Boond est un **achat** (`purchase`), pas un « purchase order » :
+        # `/purchase-orders` n'existe pas et répondait 404. C'est le même objet
+        # que celui produit par le renouvellement natif d'une prestation, qui le
+        # renvoie dans `relationships.purchase` — les deux chemins créent donc
+        # bien la même chose.
         payload = {
             "data": {
-                "type": "purchaseorder",
+                "type": "purchase",
                 "attributes": {
                     "reference": reference,
                     # Montant d'achat total de la mission, soit
-                    # (jours vendus - jours de gratuité) x CJM. Le bon de commande
-                    # Boond matérialise un engagement d'achat sur une période :
-                    # c'est bien un total, pas un prix unitaire.
+                    # (jours vendus - jours de gratuité) x CJM. L'achat Boond
+                    # matérialise un engagement sur une période : c'est bien un
+                    # total, pas un prix unitaire.
                     "amountExcludingTax": amount,
                 },
                 "relationships": {
@@ -537,7 +542,7 @@ class BoondCrmAdapter:
             }
         }
 
-        response = await self._boond._make_request("POST", "/purchase-orders", json=payload)
+        response = await self._boond._make_request("POST", "/purchases", json=payload)
         purchase_order_id = self._require_created_id(response, "bon de commande")
         logger.info(
             "boond_purchase_order_created",
