@@ -28,8 +28,32 @@ class CrmServicePort(Protocol):
         """
         ...
 
+    async def positioning_states(self) -> dict[int, str]:
+        """CRM-configured positioning states, as ``{value: label}``."""
+        ...
+
+    async def update_positioning_state(self, positioning_id: int, state: int) -> int | None:
+        """Change l'état d'un positionnement (« Gagné » crée la prestation).
+
+        Renvoie l'état que le CRM confirme, quand il en confirme un.
+        """
+        ...
+
     async def resolve_resource_id(self, candidate_id: int) -> int | None:
         """Resolve the Boond resource ID linked to a candidate ID (or None)."""
+        ...
+
+    async def candidate_exists(self, candidate_id: int) -> bool:
+        """Cet identifiant est-il celui d'un candidat ?"""
+        ...
+
+    async def resource_exists(self, resource_id: int) -> bool:
+        """Cet identifiant est-il celui d'une ressource ?
+
+        Candidats et ressources ont deux séries d'identifiants : le même numéro
+        peut désigner deux personnes. À n'interroger qu'une fois établi que le
+        numéro n'est pas celui d'un candidat.
+        """
         ...
 
     async def create_provider(
@@ -41,6 +65,33 @@ class CrmServicePort(Protocol):
         """Create a minimal provider in the CRM."""
         ...
 
+    async def create_supplier_purchase(
+        self,
+        delivery_id: int,
+        title: str,
+        provider_id: int | None = None,
+        provider_contact_id: int | None = None,
+        reference: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        quantity: float | None = None,
+        amount: float | None = None,
+    ) -> int:
+        """Create the supplier purchase attached to a delivery. Returns its ID."""
+        ...
+
+    async def delete_supplier_purchase(self, purchase_id: int) -> bool:
+        """Delete a supplier purchase. True once it is gone."""
+        ...
+
+    async def delete_boond_contract(self, contract_id: int) -> bool:
+        """Delete a CRM contract. True once it is gone."""
+        ...
+
+    async def delete_delivery(self, delivery_id: int) -> bool:
+        """Delete a delivery. True once it is gone."""
+        ...
+
     async def create_purchase_order(
         self,
         provider_id: int,
@@ -48,7 +99,7 @@ class CrmServicePort(Protocol):
         reference: str,
         amount: float,
     ) -> int:
-        """Create a purchase order in the CRM."""
+        """Create a purchase order in the CRM (ancienne méthode, adossée au contrat cadre)."""
         ...
 
     async def convert_candidate_to_resource(

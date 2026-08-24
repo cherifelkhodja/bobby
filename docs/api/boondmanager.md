@@ -347,6 +347,59 @@ async def get_need(self, need_id: int) -> dict[str, Any] | None
 
 **Retourne** : `{"title", "commercial_email", "manager_id", "agency_id"}`
 
+#### GET /deliveries/{id}
+Récupère une **prestation** : l'équivalent natif du bon de commande côté Boond.
+Elle porte la période, le prix de vente, le coût, les jours vendus et les jours de gratuité.
+
+```python
+async def get_delivery(self, delivery_id: int) -> dict[str, Any] | None
+```
+
+**Correspondance avec le bon de commande Bobby** :
+
+| Attribut Boond | Champ Bobby | Rôle |
+|---|---|---|
+| `averageDailyPriceExcludingTax` | `sale_daily_rate` | TJM de vente client (interne) |
+| `averageDailyContractCost` / `averageDailyCost` | `purchase_daily_rate` | CJM d'achat fournisseur |
+| `numberOfDaysInvoicedOrQuantity` | `days_sold` | Jours vendus |
+| `numberOfDaysFree` | `free_days` | Jours de gratuité |
+| `startDate` / `endDate` | `start_date` / `end_date` | Période |
+| `relationships.contract` | `boond_contract_id` | Contrat déjà rattaché à la ressource |
+| `relationships.dependsOn` | ressource | Consultant affecté |
+| `relationships.project` | — | Projet (lui-même rattaché au besoin et au client) |
+
+La prestation prime sur le positionnement au préremplissage : elle seule connaît la
+gratuité, le prix de vente et le contrat en cours.
+
+#### POST /deliveries/{id}/renew
+Renouvellement natif d'une prestation. **Action REST sans corps de requête** : ni JSON,
+ni paramètres d'URL. Boond duplique la prestation (mêmes projet, ressource et contrat)
+et crée, selon la configuration du dossier, l'achat fournisseur et la commande client.
+
+```python
+async def renew_delivery(self, delivery_id: int) -> dict[str, Any] | None
+```
+
+La prestation créée **reprend la période de l'originale** : elle doit être recalée sur
+les dates du nouveau bon de commande.
+
+#### PUT /deliveries/{id}
+Recale une prestation sur la période et les conditions d'un bon de commande.
+
+```python
+async def update_delivery(
+    self, delivery_id: int, start_date=None, end_date=None,
+    days_sold=None, free_days=None, purchase_daily_rate=None, sale_daily_rate=None,
+) -> None
+```
+
+`forceAverageDailyPriceExcludingTax` est posé avec le prix de vente, sinon Boond le
+recalcule depuis la grille du projet et écrase la valeur du bon de commande.
+
+> **NEEDS-CONFIRMATION** : contrairement au renouvellement, la forme de cette mise à
+> jour n'a pas été observée. L'échec du recalage n'invalide pas la synchronisation :
+> il est signalé sur le bon de commande pour reprise manuelle.
+
 #### GET /resources/{id}/information ou GET /candidates/{id}/information
 Récupère les infos du consultant. Route vers `/resources/` ou `/candidates/` selon `consultant_type`.
 Si inconnu, essaie `/resources/` d'abord puis fallback `/candidates/`.
@@ -438,7 +491,27 @@ async def create_contact(
 ```
 
 **Mapping civility** : `"M."` → 0 (homme), `"Mme"` → 1 (femme)
-**Types de contact** : 1=dirigeant, 2=facturation, 3=adv
+
+**Types de contact** (`typesOf`) — configurés dans BoondManager, Administration →
+Types des contacts. Les valeurs ci-dessous sont celles du CRM du groupe :
+
+| ID | Libellé | Utilisé par Bobby |
+|----|---------|-------------------|
+| 0 | Décideur | — |
+| 1 | Prescripteur | — |
+| 2 | Contact facturation | contact facturation du fournisseur |
+| 3 | Acheteur | — |
+| 4 | Contact - secondaire (archivé) | — |
+| 5 | Inactif | — |
+| 6 | Client - ADV (archivé) | — |
+| 7 | Dirigeant | signataire déclaré dirigeant |
+| 8 | Commercial | — |
+| 9 | Contact ADV | contact ADV du fournisseur |
+| 10 | Signataire | signataire du contrat |
+
+Un contact cumulant plusieurs rôles porte plusieurs types : le dédoublonnage se
+fait sur prénom + nom + email (`application/boond_contacts.py`), partagé par la
+synchronisation automatique et par l'action manuelle de l'ADV.
 
 ### Conversion candidat → ressource
 
@@ -553,14 +626,125 @@ async def update_resource_administrative(
 
 ### Bon de commande
 
-#### POST /purchase-orders
-Crée un bon de commande lié au fournisseur et au positionnement.
+#### GET /purchases/default puis POST /purchases
+Crée l'**achat fournisseur** (« bon de commande » côté Bobby). Il se rattache à
+une **prestation**, pas à un positionnement, et **seulement à la création** :
+`PUT /purchases/{id}/information` n'expose que `mainManager`, `agency`, `pole`,
+`company`, `contact` et `billingDetail`. Un achat posé sur la mauvaise
+prestation se supprime (`DELETE /purchases/{id}`) et se recrée.
+
+C'est le même objet que celui produit par le renouvellement natif d'une
+prestation, qui le renvoie dans `relationships.purchase`. `/purchase-orders`,
+longtemps écrit ici, n'existe pas dans l'API et répondait 404.
+
+**En deux temps**, comme le fait l'interface :
+
+1. `GET /purchases/default?delivery={id}` — Boond renvoie un achat vide déjà
+   accordé au contexte de la prestation : `mainManager`, `agency`, `pole`,
+   `company`, `contact`, `project`, `delivery`, plus un bloc `included`.
+   Paramètres acceptés : `project`, `delivery`, `additionalTurnoverAndCosts`,
+   `contact`, `company`.
+2. `POST /purchases` — on renvoie ce corps, ajusté. Seul `title` est
+   obligatoire dans `attributes`.
+
+Composer le corps à la main plutôt que de partir de ce pré-remplissage est la
+cause classique des 422 : prestation, projet, société et agence doivent
+s'accorder.
+
+```json
+{
+  "data": {
+    "type": "purchase",
+    "attributes": {
+      "title": "GEM-BC-001 - Développeur Python",
+      "reference": "GEM-BC-001",
+      "date": "2026-09-01",
+      "startDate": "2026-09-01",
+      "endDate": "2027-02-28",
+      "quantity": 18,
+      "amountExcludingTax": 9000
+    },
+    "relationships": {
+      "delivery": {"data": {"id": "1234", "type": "delivery"}},
+      "project": {"data": {"id": "567", "type": "project"}},
+      "company":  {"data": {"id": "777", "type": "company"}},
+      "contact":  {"data": {"id": "2864", "type": "contact"}},
+      "agency":   {"data": {"id": "1", "type": "agency"}}
+    }
+  }
+}
+```
+
+> **Coquille de la doc** : le schéma de `POST /purchases` décrit la relation
+> `delivery` avec `type: "project"` (copier-coller du bloc voisin). Le type
+> attendu est bien `delivery`, comme le confirment les schémas de réponse de
+> `/purchases/default` et de `POST /purchases`.
+
+> **La société est le fournisseur**, pas le client : le pré-remplissage vient de
+> la prestation et désigne le client, à remplacer — son contact part avec elle.
+> Bobby y met le contact de facturation du fournisseur.
+
+Autres attributs disponibles : `number` (réf. fournisseur), `typeOf`, `state`,
+`subscription`, `paymentTerm`, `paymentMethod`, `taxRates`, `toReinvoice`,
+`reinvoiceRate`, `reinvoiceAmountExcludingTax`, `informationComments`,
+`createPayments`, `exchangeRate`, `currency`.
+
+Pour un achat rattaché à un frais ou un CA additionnel plutôt qu'à une
+prestation : même flux avec `?additionalTurnoverAndCosts={id}`.
+
+> Ne pas confondre : `/purchases` (finance) est l'**achat fournisseur**,
+> `/orders` (staffing) la **commande client**. Le catalogue de l'API ne connaît
+> aucun `/purchase-orders`.
+
+#### PUT /positionings/{id} — faire naître la prestation
+
+L'API ne crée pas de prestation. C'est le passage du positionnement à l'état
+**1 (« Gagné »)** qui la fait produire par BoondManager, à partir du
+positionnement. Le report d'un bon de commande sans prestation passe donc par
+là, puis relit le positionnement pour récupérer l'identifiant de la prestation
+créée.
+
+> ⚠️ **Chaque entité a sa propre échelle d'états.** L'état `1` vaut « Gagné »
+> pour une **opportunité** et « Refus Client » pour un **positionnement** :
+> écrire l'un pour l'autre marque une affaire gagnée comme refusée. Les
+> libellés étant réglés par l'administrateur du CRM, ils se lisent dans le
+> dictionnaire — `GET /application/dictionary/setting.state.positioning` —
+> plutôt qu'ils ne se supposent.
+>
+> États des positionnements de ce CRM (9), à titre indicatif :
+>
+> | Valeur | Libellé | | Valeur | Libellé |
+> |---|---|---|---|---|
+> | 0 | Positionné (défaut) | | 5 | Refus Collaborateur |
+> | 1 | **Refus Client** | | 6 | Attente retour collaborateur/Client |
+> | 2 | **Gagné** | | 7 | Gagné attente contrat |
+> | 3 | CV Envoyé | | 8 | Relance Client |
+> | 4 | Présenté Client | | | |
+
+> **L'adresse d'écriture suit celle de lecture.** Un positionnement n'a pas
+> d'onglet `/information` — `PUT /positionings/{id}/information` répond **404**.
+> Il s'écrit à son adresse propre, comme les prestations (`PUT /deliveries/{id}`).
+> Les entités qui ont cet onglet sont celles qu'on lit ainsi : candidats,
+> sociétés, besoins (`/candidates/{id}/information`, `/companies/{id}/information`,
+> `/opportunities/{id}/information`), plus l'onglet `administrative` des ressources.
+
+> Seul l'état est envoyé : les données du positionnement — dates, tarif de
+> vente, jours — restent celles du commercial. Une réponse en 200 ne prouvant
+> pas que le changement a été pris, l'état renvoyé par Boond est comparé à
+> celui demandé, puis relu.
 
 ```python
-async def create_purchase_order(
-    self, provider_id: int, positioning_id: int,
-    reference: str, amount: float,
-) -> int  # Retourne purchase_order_id Boond
+async def update_positioning_state(self, positioning_id: int, state: int) -> None
+```
+
+```python
+async def create_supplier_purchase(
+    self, delivery_id: int, title: str,
+    provider_id: int | None = None, provider_contact_id: int | None = None,
+    reference: str | None = None,
+    start_date: str | None = None, end_date: str | None = None,
+    quantity: float | None = None, amount: float | None = None,
+) -> int  # Retourne l'ID de l'achat Boond
 ```
 
 ---
@@ -574,10 +758,10 @@ async def create_purchase_order(
 | Étape | Action | Endpoint Boond | Données persistées |
 |-------|--------|----------------|-------------------|
 | 1 | Créer société fournisseur | `POST /companies` | `tp.boond_provider_id` |
-| 2 | Créer contacts (signataire + facturation) | `POST /contacts` | `tp.boond_signer_contact_id`, `tp.boond_billing_contact_id` |
+| 2 | Créer contacts (signataire, ADV, facturation) | `POST /contacts` | `tp.boond_signatory_contact_id`, `tp.boond_adv_contact_id`, `tp.boond_billing_contact_id` |
 | 3 | Convertir candidat → ressource | `PUT /candidates/{id}/information` | `cr.boond_candidate_id` (nouvel ID), `cr.boond_consultant_type = "resource"` |
 | 4 | Créer contrat Boond | `POST /contracts` | `cr.boond_contract_id` |
-| 5 | Créer bon de commande | `POST /purchase-orders` | `cr.boond_purchase_order_id` |
+| 5 | Créer l'achat fournisseur | `POST /purchases` | `contract.boond_purchase_order_id` |
 | 6 | Archiver positionnement | `PATCH /positionings/{id}` | — |
 
 > **Pré-requis étape 3** : `manager_id` récupéré via `get_need()` (mainManager du besoin).

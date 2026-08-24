@@ -108,6 +108,66 @@ class ContractRequestRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
+    async def get_framework_contract_for_third_party(
+        self, third_party_id: UUID, company_id: UUID | None = None
+    ) -> ContractRequest | None:
+        """Retourne le contrat cadre en vigueur d'un fournisseur, s'il existe.
+
+        Un cadre est « en vigueur » dès qu'il a été signé : SIGNED (signature
+        enregistrée), ACTIVE (synchronisé dans Boond) et ARCHIVED (dossier
+        clos par le CRON après six mois sans activité, mais bel et bien signé)
+        comptent tous. C'est ce qui autorise l'envoi d'un bon de commande.
+
+        **Le cadre lie un fournisseur à une société émettrice**, pas au groupe :
+        un fournisseur sous contrat avec l'une doit en signer un autre pour
+        travailler avec une seconde. `company_id` restreint donc la recherche à
+        cette société. Les dossiers antérieurs à la gestion multi-sociétés
+        n'en portent pas : ils servent de repli quand la société demandée n'a
+        pas de cadre à elle, plutôt que de les rendre inutilisables.
+        """
+        frameworks = await self.list_framework_contracts_for_third_party(third_party_id)
+        if not frameworks:
+            return None
+        if company_id is None:
+            return frameworks[0]
+
+        for framework in frameworks:
+            if framework.company_id == company_id:
+                return framework
+        return next((f for f in frameworks if f.company_id is None), None)
+
+    async def list_framework_contracts_for_third_party(
+        self, third_party_id: UUID
+    ) -> list[ContractRequest]:
+        """Tous les contrats cadres signés d'un fournisseur, du plus récent au plus ancien.
+
+        Un fournisseur peut en avoir un par société émettrice du groupe.
+        """
+        result = await self.session.execute(
+            select(ContractRequestModel)
+            .where(
+                ContractRequestModel.third_party_id == third_party_id,
+                ContractRequestModel.status.in_(
+                    (
+                        ContractRequestStatus.SIGNED.value,
+                        ContractRequestStatus.ACTIVE.value,
+                        ContractRequestStatus.ARCHIVED.value,
+                    )
+                ),
+            )
+            .order_by(ContractRequestModel.created_at.desc())
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    async def list_by_third_party(self, third_party_id: UUID) -> list[ContractRequest]:
+        """List every contract request of a supplier, most recent first."""
+        result = await self.session.execute(
+            select(ContractRequestModel)
+            .where(ContractRequestModel.third_party_id == third_party_id)
+            .order_by(ContractRequestModel.created_at.desc())
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
     async def save(self, request: ContractRequest) -> ContractRequest:
         """Save a contract request (create or update)."""
         result = await self.session.execute(

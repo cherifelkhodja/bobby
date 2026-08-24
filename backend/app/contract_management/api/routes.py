@@ -20,12 +20,33 @@ from app.contract_management.api.schemas import (
     ContractResponse,
     ManualContractRequestCreate,
     SkipDocumentsRequest,
+    SupplierDossierCreate,
+    SupplierFrameworkSummary,
+    SupplierLookupResponse,
+)
+from app.contract_management.application.boond_contacts import (
+    persisted_contact_ids,
+    split_supplier_contacts,
+)
+from app.contract_management.application.boond_mappings import (
+    contract_type_of as boond_contract_type_of,
+)
+from app.contract_management.application.boond_mappings import (
+    resource_type_of as boond_resource_type_of,
+)
+from app.contract_management.application.boond_mappings import (
+    state_reason_type_of as boond_state_reason_type_of,
 )
 from app.contract_management.application.use_cases.block_compliance import (
     BlockComplianceUseCase,
 )
 from app.contract_management.application.use_cases.configure_contract import (
     ConfigureContractUseCase,
+)
+from app.contract_management.application.use_cases.create_supplier_dossier import (
+    CreateSupplierDossierUseCase,
+    SupplierDossierCommand,
+    siren_from_siret,
 )
 from app.contract_management.application.use_cases.skip_document_collection import (
     SkipDocumentCollectionUseCase,
@@ -55,6 +76,9 @@ from app.third_party.api.schemas import CompanyInfoRequest, SiretLookupResponse
 from app.third_party.application.company_info_mapper import apply_company_info
 from app.third_party.application.use_cases.generate_magic_link import (
     GenerateMagicLinkUseCase,
+)
+from app.third_party.domain.value_objects.third_party_type import (
+    EXTERNAL_THIRD_PARTY_TYPES,
 )
 from app.third_party.infrastructure.adapters.postgres_magic_link_repo import (
     MagicLinkRepository,
@@ -156,6 +180,9 @@ def _cr_to_response(
     *,
     commercial_name: str | None = None,
     third_party_name: str | None = None,
+    third_party_boond_provider_id: int | None = None,
+    company_name: str | None = None,
+    purchase_orders_count: int = 0,
     portal_url: str | None = None,
 ) -> ContractRequestResponse:
     """Convert a ContractRequest entity to response."""
@@ -194,11 +221,14 @@ def _cr_to_response(
         contractualization_contact_email=cr.contractualization_contact_email,
         third_party_id=cr.third_party_id,
         third_party_name=third_party_name,
+        third_party_boond_provider_id=third_party_boond_provider_id,
         portal_url=portal_url,
         compliance_override=cr.compliance_override,
         compliance_override_reason=cr.compliance_override_reason,
         documents_skipped=cr.documents_skipped,
         company_id=cr.company_id,
+        company_name=company_name,
+        purchase_orders_count=purchase_orders_count,
         contract_config=cr.contract_config,
         status_history=cr.status_history or [],
         created_at=cr.created_at,
@@ -289,12 +319,17 @@ async def list_contract_requests(
         )
         tp_name_map = {row[0]: row[1] for row in result.all() if row[1]}
 
+    company_name_map = await _issuer_company_names(db, [cr.company_id for cr in items])
+    order_counts = await _purchase_order_counts(db, [cr.id for cr in items])
+
     return ContractRequestListResponse(
         items=[
             _cr_to_response(
                 cr,
                 commercial_name=name_map.get(cr.commercial_email),
                 third_party_name=tp_name_map.get(cr.third_party_id),
+                company_name=company_name_map.get(cr.company_id),
+                purchase_orders_count=order_counts.get(cr.id, 0),
             )
             for cr in items
         ],
@@ -383,8 +418,272 @@ async def create_manual_contract_request(
         },
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
+
+
+# Les routes littérales doivent précéder `/{contract_request_id}` : déclarée
+# avant, la route paramétrée capterait « suppliers » et échouerait sur le
+# parsing d'UUID.
+@router.get(
+    "/suppliers/lookup",
+    response_model=SupplierLookupResponse,
+    summary="Rechercher un fournisseur par SIRET avant d'ouvrir un dossier",
+)
+async def lookup_supplier(
+    siret: str,
+    user_id: AdvOrAdminUser,
+    company_id: UUID | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Dit si un fournisseur est déjà connu, et où en est sa contractualisation.
+
+    Évite d'ouvrir une seconde fiche pour une société déjà enregistrée — c'est
+    ce doublon qui fait redemander au fournisseur des documents de vigilance
+    déjà fournis.
+
+    Un contrat cadre lie le fournisseur à **une** société émettrice : avec
+    `company_id`, la réponse dit s'il en a un avec celle-ci, et liste dans tous
+    les cas ceux qu'il a avec les autres sociétés du groupe. ADV/admin.
+    """
+    siren = siren_from_siret(siret)
+    if not siren:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="SIRET invalide : au moins 9 chiffres sont attendus.",
+        )
+
+    tp_repo = ThirdPartyRepository(db)
+    third_party = await tp_repo.get_by_siren(siren)
+    if not third_party:
+        return SupplierLookupResponse(exists=False, siren=siren)
+
+    cr_repo = ContractRequestRepository(db)
+    framework = await cr_repo.get_framework_contract_for_third_party(third_party.id, company_id)
+    all_frameworks = await cr_repo.list_framework_contracts_for_third_party(third_party.id)
+    issuer_names = await _issuer_company_names(db, [f.company_id for f in all_frameworks])
+
+    # Dossier encore en cours pour ce fournisseur chez la même société : le
+    # signaler évite d'en ouvrir un second en parallèle. Un dossier chez une
+    # autre société n'a pas à bloquer celui-ci.
+    open_cr = next(
+        (
+            cr
+            for cr in await cr_repo.list_by_third_party(third_party.id)
+            if cr.status
+            not in (
+                ContractRequestStatus.SIGNED,
+                ContractRequestStatus.ACTIVE,
+                ContractRequestStatus.ARCHIVED,
+                ContractRequestStatus.CANCELLED,
+                ContractRequestStatus.REDIRECTED_PAYFIT,
+            )
+            and (company_id is None or cr.company_id in (company_id, None))
+        ),
+        None,
+    )
+
+    return SupplierLookupResponse(
+        exists=True,
+        third_party_id=third_party.id,
+        company_name=third_party.company_name,
+        siren=third_party.siren or siren,
+        compliance_status=third_party.compliance_status.value,
+        has_framework_contract=framework is not None,
+        framework_contract_id=framework.id if framework else None,
+        framework_contract_reference=framework.display_reference if framework else None,
+        framework_contracts=[
+            SupplierFrameworkSummary(
+                contract_request_id=f.id,
+                reference=f.display_reference,
+                status=f.status.value,
+                issuer_company_id=f.company_id,
+                issuer_company_name=issuer_names.get(f.company_id),
+            )
+            for f in all_frameworks
+        ],
+        open_contract_request_id=open_cr.id if open_cr else None,
+        open_contract_request_status=open_cr.status.value if open_cr else None,
+    )
+
+
+async def _enrich_cr_response(
+    db: AsyncSession, cr, *, portal_url: str | None = None
+) -> ContractRequestResponse:
+    """Réponse complète d'une demande : fournisseur, société émettrice, missions.
+
+    La liste résolvait déjà ces trois données, pas le détail — l'écran affichait
+    donc un dossier sans nom de fournisseur et sans ses missions.
+    """
+    from sqlalchemy import select as _sel
+
+    from app.third_party.infrastructure.models import ThirdPartyModel
+
+    third_party_name = None
+    boond_provider_id = None
+    if cr.third_party_id:
+        result = await db.execute(
+            _sel(ThirdPartyModel.company_name, ThirdPartyModel.boond_provider_id).where(
+                ThirdPartyModel.id == cr.third_party_id
+            )
+        )
+        row = result.one_or_none()
+        if row:
+            third_party_name, boond_provider_id = row
+
+    company_names = await _issuer_company_names(db, [cr.company_id])
+    counts = await _purchase_order_counts(db, [cr.id])
+
+    return _cr_to_response(
+        cr,
+        commercial_name=await _resolve_commercial_name(db, cr.commercial_email),
+        third_party_name=third_party_name,
+        third_party_boond_provider_id=boond_provider_id,
+        company_name=company_names.get(cr.company_id),
+        purchase_orders_count=counts.get(cr.id, 0),
+        portal_url=portal_url,
+    )
+
+
+async def _purchase_order_counts(db: AsyncSession, contract_request_ids: list) -> dict:
+    """Nombre de bons de commande vivants par contrat cadre, en une requête.
+
+    Les bons de commande annulés ne comptent pas : ils ne représentent aucune
+    mission.
+    """
+    from sqlalchemy import func as _func
+    from sqlalchemy import select as _sel
+
+    from app.contract_management.infrastructure.models import PurchaseOrderModel
+
+    if not contract_request_ids:
+        return {}
+    result = await db.execute(
+        _sel(PurchaseOrderModel.contract_request_id, _func.count(PurchaseOrderModel.id))
+        .where(
+            PurchaseOrderModel.contract_request_id.in_(contract_request_ids),
+            PurchaseOrderModel.status != "cancelled",
+        )
+        .group_by(PurchaseOrderModel.contract_request_id)
+    )
+    return {row[0]: row[1] for row in result.all()}
+
+
+async def _issuer_company_names(db: AsyncSession, company_ids: list) -> dict:
+    """Nom des sociétés émettrices, en une requête."""
+    from sqlalchemy import select as _sel
+
+    from app.contract_management.infrastructure.models import ContractCompanyModel
+
+    wanted = [cid for cid in company_ids if cid]
+    if not wanted:
+        return {}
+    result = await db.execute(
+        _sel(ContractCompanyModel.id, ContractCompanyModel.name).where(
+            ContractCompanyModel.id.in_(wanted)
+        )
+    )
+    return {row[0]: row[1] for row in result.all()}
+
+
+@router.post(
+    "/suppliers",
+    response_model=ContractRequestResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Ouvrir un dossier de contractualisation fournisseur (contrat cadre)",
+)
+async def create_supplier_dossier(
+    body: SupplierDossierCreate,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Ouvre un contrat cadre sans consultant ni positionnement.
+
+    L'ADV saisit le type de tiers, le contact et le mode de collecte : la
+    demande part directement en collecte de documents (portail magic link), ou
+    en revue de conformité si le dépôt est ignoré. ADV/admin uniquement.
+    """
+    from sqlalchemy import select as _select
+
+    settings = get_settings()
+    cr_repo = ContractRequestRepository(db)
+    tp_repo = ThirdPartyRepository(db)
+    ml_repo = MagicLinkRepository(db)
+    doc_repo = DocumentRepository(db)
+
+    from app.infrastructure.email.sender import EmailService
+
+    email_service = EmailService(settings)
+    generate_magic_link_uc = GenerateMagicLinkUseCase(
+        third_party_repository=tp_repo,
+        magic_link_repository=ml_repo,
+        email_service=email_service,
+        portal_base_url=settings.BOBBY_PORTAL_BASE_URL,
+    )
+    request_documents_uc = RequestDocumentsUseCase(
+        third_party_repository=tp_repo,
+        document_repository=doc_repo,
+    )
+    validate_commercial_uc = ValidateCommercialUseCase(
+        contract_request_repository=cr_repo,
+        third_party_repository=tp_repo,
+        find_or_create_third_party_use_case=None,
+        generate_magic_link_use_case=generate_magic_link_uc,
+        request_documents_use_case=request_documents_uc,
+        document_repository=doc_repo,
+    )
+
+    creator_email = ""
+    row = (await db.execute(_select(UserModel.email).where(UserModel.id == user_id))).first()
+    if row and row[0]:
+        creator_email = str(row[0])
+
+    company_email_from, company_name = await _resolve_company_email_ctx(db, body.company_id)
+
+    use_case = CreateSupplierDossierUseCase(
+        contract_request_repository=cr_repo,
+        third_party_repository=tp_repo,
+        validate_commercial_use_case=validate_commercial_uc,
+    )
+
+    try:
+        cr = await use_case.execute(
+            SupplierDossierCommand(
+                third_party_type=body.third_party_type,
+                contact_email=str(body.contact_email),
+                company_id=body.company_id,
+                siret=body.siret,
+                commercial_email=creator_email,
+                notify_third_party=body.notify_third_party,
+                skip_documents=body.skip_documents,
+                reuse_third_party_id=body.reuse_third_party_id,
+                from_email=company_email_from,
+                company_name=company_name,
+            )
+        )
+    except Exception as exc:
+        await db.rollback()
+        logger.error("supplier_dossier_creation_failed", error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La création du dossier fournisseur a échoué.",
+        )
+
+    await db.commit()
+
+    audit_logger.log(
+        AuditAction.CONTRACT_REQUEST_CREATED,
+        AuditResource.CONTRACT_REQUEST,
+        user_id=user_id,
+        resource_id=str(cr.id),
+        details={
+            "source": "supplier_manual",
+            "reference": cr.display_reference,
+            "notify_third_party": body.notify_third_party,
+            "skip_documents": body.skip_documents,
+        },
+    )
+
+    return await _enrich_cr_response(db, cr)
 
 
 @router.get(
@@ -430,8 +729,7 @@ async def get_contract_request(
                 portal_url = f"{settings.BOBBY_PORTAL_BASE_URL}/{active_link.token}"
                 break
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name, portal_url=portal_url)
+    return await _enrich_cr_response(db, cr, portal_url=portal_url)
 
 
 @router.post(
@@ -571,8 +869,7 @@ async def sync_from_boond(
         positioning_id=cr.boond_positioning_id,
     )
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 @router.post(
@@ -701,8 +998,7 @@ async def validate_commercial(
             color="#f59e0b",
         )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.get(
@@ -808,8 +1104,7 @@ async def save_third_party_info(
         third_party_id=str(tp.id),
     )
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 @router.post(
@@ -906,8 +1201,7 @@ async def resend_collection_email(
         details={"action": "resend_collection_email"},
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.post(
@@ -932,8 +1226,7 @@ async def configure_contract(
         logger.error("configure_contract_failed", error=str(exc), cr_id=str(contract_request_id))
         raise HTTPException(status_code=400, detail="La configuration du contrat a échoué.")
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.patch(
@@ -1000,8 +1293,7 @@ async def save_article_overrides(
     cr.contract_config = cfg
     saved = await cr_repo.save(cr)
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 @router.post(
@@ -1033,8 +1325,7 @@ async def compliance_override(
         details={"reason": body.reason},
     )
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 @router.post(
@@ -1113,8 +1404,7 @@ async def skip_documents(
         },
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.post(
@@ -1153,8 +1443,7 @@ async def start_compliance_review(
         details={"action": "start_compliance_review"},
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.post(
@@ -1189,8 +1478,7 @@ async def block_compliance(
         details={"action": "block_compliance", "reason": body.reason},
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.delete(
@@ -1273,8 +1561,7 @@ async def cancel_contract_request(
         company_name=_c_name,
     )
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 @router.post(
@@ -1306,6 +1593,28 @@ async def purge_contract_request(
         raise HTTPException(
             status_code=400,
             detail="Seules les demandes annulées peuvent être supprimées définitivement.",
+        )
+    # Un cadre signé ne peut pas être annulé (la machine à états l'interdit) :
+    # atteindre ce point garantit qu'aucun contrat n'a jamais été conclu.
+
+    # Les bons de commande du cadre partent avec lui — sauf ceux qui vivent leur
+    # propre vie : en signature, signés, actifs, clos, ou déjà reportés dans le
+    # CRM. Ceux-là doivent être annulés d'abord, sinon la purge laisserait des
+    # objets orphelins dans BoondManager.
+    from app.contract_management.infrastructure.adapters.postgres_purchase_order_repo import (
+        PurchaseOrderRepository,
+    )
+
+    po_repo = PurchaseOrderRepository(db)
+    purchase_orders = await po_repo.list_by_contract_request(contract_request_id)
+    blocking = [po for po in purchase_orders if po.blocks_framework_purge]
+    if blocking:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Annulez d'abord les bons de commande de ce fournisseur : "
+                + ", ".join(po.display_reference for po in blocking)
+            ),
         )
 
     # Delete related data (respect FK order)
@@ -1354,10 +1663,39 @@ async def purge_contract_request(
     if cr.boond_positioning_id:
         await webhook_repo.delete_by_prefix(f"positioning_update_{cr.boond_positioning_id}_")
 
+    # Bons de commande du cadre : tous purgeables, la garde ci-dessus l'a vérifié.
+    for purchase_order in purchase_orders:
+        await po_repo.delete(purchase_order.id)
+
     # Delete the contract request itself
     await db.execute(
         sa_delete(ContractRequestModel).where(ContractRequestModel.id == contract_request_id)
     )
+
+    # Le fournisseur ne survit pas à son dernier dossier : sans cadre ni mission
+    # ailleurs, sa fiche et ses documents de vigilance n'ont plus d'objet et
+    # empêcheraient de le ressaisir proprement. Il reste intact s'il travaille
+    # avec une autre société du groupe.
+    third_party_purged = False
+    if cr.third_party_id:
+        remaining_requests = await cr_repo.list_by_third_party(cr.third_party_id)
+        remaining_orders = await po_repo.list_by_third_party(cr.third_party_id)
+        if not remaining_requests and not remaining_orders:
+            from app.third_party.infrastructure.models import ThirdPartyModel
+            from app.vigilance.infrastructure.models import VigilanceDocumentModel
+
+            await db.execute(
+                sa_delete(VigilanceDocumentModel).where(
+                    VigilanceDocumentModel.third_party_id == cr.third_party_id
+                )
+            )
+            await db.execute(
+                sa_delete(MagicLinkModel).where(MagicLinkModel.third_party_id == cr.third_party_id)
+            )
+            await db.execute(
+                sa_delete(ThirdPartyModel).where(ThirdPartyModel.id == cr.third_party_id)
+            )
+            third_party_purged = True
 
     await db.commit()
 
@@ -1366,10 +1704,20 @@ async def purge_contract_request(
         AuditResource.CONTRACT_REQUEST,
         user_id=user_id,
         resource_id=str(contract_request_id),
-        details={"action": "purge", "reference": cr.reference},
+        details={
+            "action": "purge",
+            "reference": cr.reference,
+            "purchase_orders_deleted": len(purchase_orders),
+            "third_party_purged": third_party_purged,
+        },
     )
 
-    return {"status": "ok", "message": f"Demande {cr.display_reference} supprimée définitivement."}
+    detail = f"Demande {cr.display_reference} supprimée définitivement"
+    if purchase_orders:
+        detail += f", avec {len(purchase_orders)} bon(s) de commande"
+    if third_party_purged:
+        detail += " et la fiche du fournisseur"
+    return {"status": "ok", "message": f"{detail}."}
 
 
 @router.get(
@@ -1550,8 +1898,7 @@ async def send_draft_to_partner(
         company_name=company_name,
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.post(
@@ -1637,8 +1984,7 @@ async def approve_draft_internal(
         details={"action": "approve_draft_internal"},
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.post(
@@ -1705,8 +2051,7 @@ async def resend_draft_email(
         logger.error("resend_draft_email_failed", error=str(exc))
         raise HTTPException(status_code=400, detail="Le renvoi de l'email de relecture a échoué.")
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.get(
@@ -1753,7 +2098,7 @@ async def get_signature_preview(
 
         # Check consultant scope
         if c.target == "consultant" and c.consultant_scope != "all":
-            is_external = cr.third_party_type in ("freelance", "sous_traitant", "portage_salarial")
+            is_external = cr.third_party_type in EXTERNAL_THIRD_PARTY_TYPES
             if c.consultant_scope == "external" and not is_external:
                 continue
             if c.consultant_scope == "internal" and is_external:
@@ -1823,8 +2168,7 @@ async def send_for_signature(
     excluded = set(excluded_charter_ids)
     await _ensure_signature_checklist(db, cr, excluded_charter_ids=excluded)
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.get(
@@ -1991,11 +2335,7 @@ async def _ensure_signature_checklist(db, cr, excluded_charter_ids: set | None =
 
             # Check consultant scope
             if c.target == "consultant" and c.consultant_scope != "all":
-                is_external = cr.third_party_type in (
-                    "freelance",
-                    "sous_traitant",
-                    "portage_salarial",
-                )
+                is_external = cr.third_party_type in EXTERNAL_THIRD_PARTY_TYPES
                 if c.consultant_scope == "external" and not is_external:
                     continue
                 if c.consultant_scope == "internal" and is_external:
@@ -2156,8 +2496,7 @@ async def mark_as_signed(
             error=str(exc),
         )
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 async def _upload_signed_docs_to_boond(db, cr) -> dict:
@@ -2419,8 +2758,7 @@ async def push_to_crm(
         company_name=_c_name,
     )
 
-    name = await _resolve_commercial_name(db, cr.commercial_email)
-    return _cr_to_response(cr, commercial_name=name)
+    return await _enrich_cr_response(db, cr)
 
 
 @router.post(
@@ -2491,8 +2829,7 @@ async def retry_boond_sync(
     except Exception as exc:
         logger.warning("retry_boond_doc_upload_failed", error=str(exc))
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 # ── Actions Boond individuelles ────────────────────────────────────────────────
@@ -2511,6 +2848,34 @@ def _boond_deps(db: AsyncSession, settings):
     tp_repo = ThirdPartyRepository(db)
     crm = BoondCrmAdapter(BoondClient(settings))
     return cr_repo, contract_repo, tp_repo, crm
+
+
+# Statuts sur lesquels plus rien ne se reporte : le dossier ne mènera pas à un
+# contrat.
+_CLOSED_STATUSES = ("cancelled", "redirected_payfit")
+
+
+def _require_pushable_supplier(cr, tp):
+    """Vérifie qu'un fournisseur peut être reporté dans BoondManager.
+
+    Le report n'attend pas la signature : l'ADV a souvent besoin de la fiche
+    fournisseur dans le CRM pendant que le contrat circule. Il exige en
+    revanche une identité complète — Boond refuse une société sans nom, et une
+    fiche incomplète devrait être corrigée à la main ensuite.
+    """
+    if cr.status.value in _CLOSED_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Dossier {cr.status.display_name.lower()} : rien à reporter dans BoondManager.",
+        )
+    if not (tp.company_name and tp.siret):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Identité du fournisseur incomplète (raison sociale, SIRET) : "
+                "saisissez-la avant de la reporter dans BoondManager."
+            ),
+        )
 
 
 def _require_signed_or_archived(cr, contract_request_id: UUID):
@@ -2550,9 +2915,6 @@ async def boond_convert_candidate(
             "already_resource": True,
         }
 
-    # Determine state_reason_type_of: 0 = salarié, 1 = externe
-    state_reason_type_of = 0 if cr.third_party_type == "salarie" else 1
-
     # Fetch manager_id from Boond need (required as dependsOn for conversion)
     manager_id: int | None = None
     if cr.boond_need_id:
@@ -2567,8 +2929,10 @@ async def boond_convert_candidate(
         new_resource_id = await crm.convert_candidate_to_resource(
             cr.boond_candidate_id,
             state=3,
-            state_reason_type_of=state_reason_type_of,
-            type_of=state_reason_type_of,  # 0=salarié, 1=externe
+            state_reason_type_of=boond_state_reason_type_of(cr.third_party_type),
+            # Le type de ressource distingue le portage commercial des autres
+            # externes ; le motif, lui, ne connaît qu'interne ou externe.
+            type_of=boond_resource_type_of(cr.third_party_type),
             manager_id=manager_id,
         )
         # Persist the new resource ID and type
@@ -2620,9 +2984,6 @@ async def boond_create_contract(
     """
     from sqlalchemy import select as _select
 
-    from app.contract_management.application.use_cases.sync_to_boond_after_signing import (
-        _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE,
-    )
     from app.contract_management.infrastructure.models import ContractCompanyModel
 
     settings = get_settings()
@@ -2669,7 +3030,7 @@ async def boond_create_contract(
         )
         company = result.scalar_one_or_none()
 
-    contract_type_of = _THIRD_PARTY_TYPE_TO_CONTRACT_TYPE.get(cr.third_party_type or "", 3)
+    contract_type_of = boond_contract_type_of(cr.third_party_type)
     start_date_str = None
     if cr.start_date:
         start_date_str = (
@@ -2703,7 +3064,7 @@ async def boond_create_contract(
             await crm.update_resource_administrative(
                 resource_id=effective_resource_id,
                 provider_company_id=tp.boond_provider_id,
-                provider_contact_id=tp.boond_commercial_contact_id,
+                provider_contact_id=tp.boond_billing_contact_id,
             )
             provider_linked = True
 
@@ -2749,7 +3110,8 @@ async def boond_create_company(
     cr_repo, _cr2, tp_repo, crm = _boond_deps(db, settings)
 
     cr = await cr_repo.get_by_id(contract_request_id)
-    _require_signed_or_archived(cr, contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
 
     if not cr.third_party_id:
         raise HTTPException(status_code=400, detail="Pas de tiers associé à cette demande.")
@@ -2763,6 +3125,8 @@ async def boond_create_company(
         raise HTTPException(status_code=500, detail="Erreur lors du chargement du tiers.")
     if not tp:
         raise HTTPException(status_code=404, detail="Tiers introuvable.")
+
+    _require_pushable_supplier(cr, tp)
 
     # Fetch issuing company for agency_id
     from sqlalchemy import select as _select
@@ -2838,105 +3202,57 @@ async def boond_create_company(
             created_company = True
             logger.info("boond_create_company_ok", cr_id=str(cr.id), provider_id=provider_id)
 
-        # Build deduplicated contacts
-        # Boond typesOf: 7=dirigeant, 8=commercial, 9=adv, 10=signataire
-        signatory_types = [10]  # signataire
-        if tp.signatory_is_director:
-            signatory_types.append(7)  # dirigeant
-
-        role_entries: list[tuple] = [
-            (
-                tp.signatory_civility or tp.representative_civility,
-                tp.signatory_first_name or tp.representative_first_name,
-                tp.signatory_last_name or tp.representative_last_name,
-                tp.signatory_email or tp.representative_email,
-                tp.signatory_phone or tp.representative_phone,
-                tp.representative_title,
-                signatory_types,
-                "signataire",
-            ),
-            (
-                tp.adv_contact_civility,
-                tp.adv_contact_first_name,
-                tp.adv_contact_last_name,
-                tp.adv_contact_email,
-                tp.adv_contact_phone,
-                "ADV",
-                [9],
-                "adv",
-            ),
-            (
-                tp.billing_contact_civility,
-                tp.billing_contact_first_name,
-                tp.billing_contact_last_name,
-                tp.billing_contact_email,
-                tp.billing_contact_phone,
-                "Commercial",
-                [8],
-                "commercial",
-            ),
-        ]
-
-        # Group by identity key (normalized first_name + last_name + email)
-        merged: dict[str, dict] = {}
-        for civ, fn, ln, email, phone, job_title, types_of_list, label in role_entries:
-            if not (fn or email):
-                continue
-            key = f"{(fn or '').strip().lower()}|{(ln or '').strip().lower()}|{(email or '').strip().lower()}"
-            if key in merged:
-                merged[key]["types_of"].extend(types_of_list)
-                merged[key]["labels"].append(label)
-                if job_title and job_title not in ("ADV", "Commercial"):
-                    merged[key]["job_title"] = job_title
-            else:
-                merged[key] = {
-                    "civility": civ,
-                    "first_name": fn,
-                    "last_name": ln,
-                    "email": email,
-                    "phone": phone,
-                    "job_title": job_title,
-                    "types_of": list(types_of_list),
-                    "labels": [label],
-                }
-
+        # Contacts du fournisseur : rôles, types Boond et dédoublonnage sont
+        # dans `boond_contacts`, partagés avec la synchronisation automatique.
         agency_id = company.boond_agency_id if company else None
-        postcode = tp.head_office_postal_code
+
+        # Idempotence : un contact déjà reporté n'est pas recréé. Sans cela, un
+        # second appel — le report manuel avant signature, puis la
+        # synchronisation à la signature — donnerait des doublons dans le CRM.
+        to_create, already_pushed = split_supplier_contacts(tp)
+        existing_ids = persisted_contact_ids(tp)
 
         contacts_created = []
-        label_to_contact_id: dict[str, int] = {}
-        for entry in merged.values():
+        contacts_existing = [
+            {
+                "label": " + ".join(contact.roles),
+                "boond_contact_id": existing_ids[contact.roles[0]],
+            }
+            for contact in already_pushed
+        ]
+        role_to_contact_id: dict[str, int] = {}
+        for contact in to_create:
             contact_id = await crm.create_contact(
                 company_id=provider_id,
-                civility=entry["civility"],
-                first_name=entry["first_name"],
-                last_name=entry["last_name"],
-                email=entry["email"],
-                phone=entry["phone"],
-                job_title=entry["job_title"],
-                types_of=entry["types_of"],
-                postcode=postcode,
+                civility=contact.civility,
+                first_name=contact.first_name,
+                last_name=contact.last_name,
+                email=contact.email,
+                phone=contact.phone,
+                job_title=contact.job_title,
+                types_of=list(contact.types_of),
+                postcode=tp.head_office_postal_code,
                 address=tp.head_office_street or tp.head_office_address,
                 town=tp.head_office_city,
                 agency_id=agency_id,
             )
             contacts_created.append(
                 {
-                    "label": " + ".join(entry["labels"]),
+                    "label": " + ".join(contact.roles),
                     "boond_contact_id": contact_id,
                 }
             )
-            for lbl in entry["labels"]:
-                label_to_contact_id[lbl] = contact_id
+            for role in contact.roles:
+                role_to_contact_id[role] = contact_id
 
         # Persist Boond contact IDs on the ThirdParty for future reference
-        if label_to_contact_id.get("signataire"):
-            tp.boond_signatory_contact_id = label_to_contact_id["signataire"]
-        if label_to_contact_id.get("adv"):
-            tp.boond_adv_contact_id = label_to_contact_id["adv"]
-        if label_to_contact_id.get("commercial"):
-            tp.boond_commercial_contact_id = label_to_contact_id["commercial"]
-        if label_to_contact_id:
+        if role_to_contact_id.get("signataire"):
+            tp.boond_signatory_contact_id = role_to_contact_id["signataire"]
+        if role_to_contact_id.get("adv"):
+            tp.boond_adv_contact_id = role_to_contact_id["adv"]
+        if role_to_contact_id.get("facturation"):
+            tp.boond_billing_contact_id = role_to_contact_id["facturation"]
+        if role_to_contact_id:
             await tp_repo.save(tp)
 
         return {
@@ -2944,6 +3260,7 @@ async def boond_create_company(
             "created_company": created_company,
             "boond_provider_id": provider_id,
             "contacts_created": contacts_created,
+            "contacts_existing": contacts_existing,
         }
     except HTTPException:
         raise
@@ -3152,8 +3469,7 @@ async def rollback_status(
         details={"action": "rollback", "new_status": saved.status.value},
     )
 
-    name = await _resolve_commercial_name(db, saved.commercial_email)
-    return _cr_to_response(saved, commercial_name=name)
+    return await _enrich_cr_response(db, saved)
 
 
 # ── Contract Consultants ─────────────────────────────────────────────────────

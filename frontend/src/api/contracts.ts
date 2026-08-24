@@ -22,6 +22,7 @@ import type {
   ContractRequestListResponse,
   ContractRequestStatus,
   Contract,
+  SupplierLookupResult,
 } from '../types';
 
 export const contractsApi = {
@@ -44,11 +45,36 @@ export const contractsApi = {
     return response.data;
   },
 
-  // Create a contract request from scratch (no Boond webhook), entering the
-  // Boond resource ID. Consultant identity is best-effort enriched from Boond.
-  createManual: async (data: ManualContractInput): Promise<ContractRequest> => {
+  /**
+   * Recherche un fournisseur par SIRET avant d'ouvrir un dossier.
+   *
+   * `companyId` cible la société émettrice : le contrat cadre étant propre au
+   * couple fournisseur + société, un cadre signé avec l'une ne dispense pas
+   * d'en signer un avec l'autre.
+   */
+  lookupSupplier: async (
+    siret: string,
+    companyId?: string | null,
+  ): Promise<SupplierLookupResult> => {
+    const response = await apiClient.get<SupplierLookupResult>(
+      '/contract-requests/suppliers/lookup',
+      { params: { siret, ...(companyId ? { company_id: companyId } : {}) } },
+    );
+    return response.data;
+  },
+
+  /** Ouvre un dossier de contractualisation fournisseur (sans consultant). */
+  createSupplierDossier: async (data: {
+    third_party_type: string;
+    contact_email: string;
+    company_id?: string | null;
+    siret?: string | null;
+    reuse_third_party_id?: string | null;
+    notify_third_party: boolean;
+    skip_documents: boolean;
+  }): Promise<ContractRequest> => {
     const response = await apiClient.post<ContractRequest>(
-      '/contract-requests/manual',
+      '/contract-requests/suppliers',
       data,
     );
     return response.data;
@@ -266,11 +292,17 @@ export const contractsApi = {
     return response.data;
   },
 
+  /**
+   * Reporte le fournisseur (société + contacts) dans BoondManager. N'attend pas
+   * la signature du contrat cadre, et ne recrée ni la société ni les contacts
+   * déjà reportés.
+   */
   boondCreateCompany: async (id: string): Promise<{
     ok: boolean;
     created_company: boolean;
     boond_provider_id: number;
     contacts_created: { label: string; boond_contact_id: number }[];
+    contacts_existing: { label: string; boond_contact_id: number }[];
   }> => {
     const response = await apiClient.post(`/contract-requests/${id}/boond/create-company`);
     return response.data;
@@ -372,6 +404,8 @@ export interface ThirdPartyInfoInput {
   capital?: string | null;
   siret: string;
   vat_number?: string | null;
+  /** Faux en franchise en base ou en autoliquidation : le BDC n'imprime alors pas de TVA. */
+  vat_liable?: boolean;
   ape_code?: string | null;
   head_office_street: string;
   head_office_postal_code: string;
@@ -418,19 +452,6 @@ export interface SiretLookupResult {
 }
 
 // Manual creation of a contract request (no Boond webhook).
-export interface ManualContractInput {
-  boond_consultant_id: number;
-  consultant_type: 'candidate' | 'resource';
-  company_id?: string | null;
-  client_name?: string | null;
-  mission_title?: string | null;
-  consultant_civility?: string | null;
-  consultant_first_name?: string | null;
-  consultant_last_name?: string | null;
-  consultant_email?: string | null;
-  consultant_phone?: string | null;
-}
-
 // ── Contract companies ──────────────────────────────────────────────────────
 
 export interface ContractCompany {

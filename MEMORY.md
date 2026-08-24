@@ -35,10 +35,10 @@
 | Row Level Security | ✅ Done | PostgreSQL RLS |
 | Audit Logging | ✅ Done | Structuré |
 | Contractualisation | ✅ Done | Workflow BoondManager → validation → contrat PDF (HTML+WeasyPrint) → signature YouSign → push Boond |
-| Contrats cadres & BDC | ✅ Done | Workflows séparés : ContractRequest (simplifié, sans CONFIGURING_CONTRACT) + PurchaseOrderRequest (7 statuts). Webhooks candidat/ressource, re-contractualisation, UI progressive |
+| Contrats cadres & BDC | ✅ Done | Deux objets : fournisseur (ContractRequest, ouvert à la main) et mission (PurchaseOrder, `cm_purchase_orders`). Webhook positionnement → premier BDC, TJM vente interne / CJM achat imprimé, signature séparée, report Boond, reconduction |
 | Vigilance documentaire | ✅ Done | Cycle de vie docs légaux tiers (request → upload → validate/reject → expiration) ; dépôt sautable en saisie en personne (`documents_skipped`) |
 | Portail tiers (magic link) | ✅ Done | Upload documents + review contrat via lien sécurisé |
-| CRON jobs (APScheduler) | ✅ Done | Expirations documents, relances, purge magic links |
+| CRON jobs (APScheduler) | ✅ Done | Expirations documents, purge magic links, archivage des contrats cadres inactifs (les relances automatiques n'ont jamais été planifiées) |
 
 ---
 
@@ -144,6 +144,24 @@
   - le socle commun (polices, palette, filtres, environnement Jinja2) vit dans `pdf_rendering.py` + `_marque.css.html` : tout nouveau document de la charte s'appuie dessus plutôt que de recopier le CSS. Les gabarits de base `_charte_base.html` (multipage, unilatéral) et `_formulaire_base.html` (une page, signé) couvrent les deux familles existantes
 
 
+### ADR-012 : Workflow fournisseur / mission piloté par Bobby (réintroduction du BDC)
+- **Date** : 2026-08
+- **Décision** : Reprendre le workflow de contractualisation autour de deux objets : le **fournisseur** (contrat cadre, inchangé, ouvert à la main dans Bobby) et la **mission** (nouveau bon de commande, `cm_purchase_orders`). Les deux sont signés séparément par le fournisseur. Seul le webhook positionnement subsiste, redirigé vers la création du premier bon de commande d'une mission.
+- **Statut** : Implémenté le 2026-08-21 (cf. changelog).
+- **Raison** : Les webhooks Boond imposaient le rythme de la contractualisation et mélangeaient relation fournisseur et mission. La suppression du module BDC (2026-07-10) a laissé le contrat cadre renvoyer contractuellement à des bons de commande que l'application ne produisait plus.
+- **Documentation complète** : `docs/contracts/workflow-fournisseur-mission-bdc.md`
+- **Points structurants** :
+  - Le contrat cadre n'est pas modifié : le cadre **est** la `ContractRequest` signée (`signed`/`active`), pas de table `framework_contracts`
+  - Le cadre est propre au couple **fournisseur × société émettrice** : un fournisseur sous contrat avec une société du groupe doit en signer un autre pour travailler avec une seconde. La fiche tiers, elle, reste unique (identité et vigilance communes)
+  - Le BDC porte la mission : client, TJM vente (interne), CJM achat, jours vendus, jours de gratuité, dates ; montant = `(jours vendus - gratuité) x CJM`
+  - **Le TJM de vente n'apparaît jamais** sur le PDF fournisseur ni dans les données exposées au portail
+  - Le premier BDC d'une mission est créé par le **webhook positionnement** (seul webhook Boond conservé, filtré sur un état déclencheur configurable) ; il naît sans fournisseur, « à rattacher » par l'ADV. Saisie manuelle possible en parallèle ; les reconductions sont pilotées depuis Bobby
+  - Pas de tacite reconduction : une reconduction est un nouveau BDC lié par `parent_purchase_order_id`
+  - Envoi du BDC en signature bloqué tant que le contrat cadre n'est pas signé
+  - Mode « saisie en personne » choisi **dès la création** du fournisseur, portail magic link sinon
+  - Historique conservé : aucune donnée existante supprimée ni reprise automatiquement
+
+
 ## Problèmes connus
 
 | Problème | Impact | Workaround | Priorité |
@@ -164,7 +182,8 @@
 | Signature YouSign auto | `create_procedure` non branché (flux manuel `mark-as-signed` seul) ; webhook rendu idempotent mais inerte tant qu'aucun `yousign_procedure_id` n'est associé | Medium |
 | Format références contrat | Code en `:03d` (3 chiffres) vs docstrings `NNNN` (4 chiffres) — trancher avant d'atteindre 1000 réf/an/société | Medium |
 | Colonnes DateTime naïves | `TIMESTAMP WITHOUT TIME ZONE` → `datetime.utcnow()` conservé (asyncpg refuse tz-aware) ; migrer en `timezone=True` pour passer à `datetime.now(UTC)` | Low |
-| Montant PO Boond | `amountExcludingTax` = TJM unitaire (ni `quantity` ni `turnoverExcludingTax` envoyés) — confirmer la sémantique attendue par `/purchase-orders` | Medium |
+| Recalage d'une prestation renouvelée | `POST /deliveries/{id}/renew` est branché (action REST sans corps). En revanche la forme de `PUT /deliveries/{id}`, qui recale la prestation créée sur la période du nouveau BDC, n'a pas été observée : son échec est signalé sur le bon de commande pour reprise manuelle | Medium |
+| Signature BDC | Circuit manuel (téléchargement, envoi, dépôt du signé), comme le contrat cadre — YouSign non branché | Medium |
 | Repo sans `get_latest_by_candidate_id` | Garde anti double-CR best-effort côté candidat_11 pur (dédup pleine côté ressource) | Low |
 | RLS décorative | `set_rls_context` jamais appelé + policy `app.user_email` non définie + tables `cm_*` récentes sans policy — isolation reposant sur le filtre applicatif | Medium |
 | Webhook Boond `X-Webhook-Token` | Auth ajoutée (secret vide = rétrocompat) ; configurer Boond pour envoyer le header avant de renseigner le secret | Medium |
@@ -173,13 +192,9 @@
 
 ## Prochaines étapes
 
-- [ ] **Refonte contrat cadre/BDC** (ADR-009) — voir `docs/contracts/refonte-contrat-cadre-bdc.md`
-  - [ ] Webhooks candidat state 11 + ressource states 4/5
-  - [ ] Simplification saisie commerciale
-  - [ ] Simplification statuts contrat cadre
-  - [ ] UI progressive (sections masquées)
-  - [ ] Conformité intégrée dans page contrat
-  - [ ] Pages BDC séparées
+- [x] **Reprise du workflow fournisseur + mission** (ADR-012) — voir `docs/contracts/workflow-fournisseur-mission-bdc.md`
+- [ ] Brancher `POST /deliveries/{id}/renew` pour la reconduction côté Boond (corps de requête à confirmer)
+- [ ] Signature électronique du BDC (YouSign), aujourd'hui manuelle
 - [ ] Améliorer couverture tests E2E
 - [ ] Dashboard analytics cooptations
 - [ ] Notifications push
@@ -217,6 +232,354 @@ docker-compose up # Start all services
 ## Changelog
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
+
+### 2026-08-24 (fix: l'état « Gagné » se lit dans le CRM, il ne se suppose pas)
+
+Le report marquait le positionnement **« Refus Client »**. La valeur écrite, 1, venait de `OPPORTUNITY_STATE_NAMES` où elle vaut « Gagné » : c'est l'échelle des **opportunités**, pas celle des positionnements, où « Gagné » vaut **2** et 1 vaut « Refus Client ». Une affaire gagnée a donc été marquée refusée.
+
+- **La valeur se lit désormais dans le CRM** : `GET /application/dictionary/setting.state.positioning`, correspondance **exacte** sur le libellé « Gagné » — « Gagné attente contrat » commence pareil sans désigner le même état. Les libellés étant réglés par l'administrateur, les relire vaut mieux que les figer.
+- **Trois niveaux de confiance** : le réglage `bdc_won_positioning_state` s'il est renseigné, puis le dictionnaire, puis 2 — la valeur de ce CRM — si le dictionnaire est injoignable. Un dictionnaire lisible qui ne connaît pas « Gagné » ne mène pas au repli : le libellé a changé, et deviner reprendrait le risque. Le positionnement n'est alors pas touché, et l'ADV est prévenu.
+- **Même faute ailleurs** : `BOOND_POSITIONING_STATE_ID` valait 1 par défaut pour les positionnements créés par une **cooptation** — soit « Refus Client ». Passé à 0, « Positionné », l'état d'entrée du CRM. Sans effet là où la variable d'environnement est renseignée.
+- Le tableau des états de ce CRM est consigné dans `docs/api/boondmanager.md`, avec l'avertissement sur les échelles.
+
+9 tests sur la résolution de l'état et la lecture du dictionnaire. 790 tests backend verts.
+
+### 2026-08-24 (fix: un positionnement s'écrit à son adresse propre)
+
+`PUT /positionings/{id}/information` répond **404** : un positionnement n'a pas d'onglet « information ». Il s'écrit à son adresse propre, `PUT /positionings/{id}`, comme les prestations.
+
+- **La règle, visible dans le code depuis toujours** : l'adresse d'écriture suit celle de lecture. Les entités lues sur `/{entité}/{id}/information` — candidats, sociétés, besoins — s'y écrivent ; celles lues sur `/{entité}/{id}` — positionnements, prestations — s'écrivent là. `update_delivery` faisait déjà `PUT /deliveries/{id}`.
+- Seul l'état est envoyé : dates, tarif de vente et jours restent ceux du commercial.
+- C'est le motif remonté à l'ADV au report précédent qui a donné la réponse — sans lui, l'erreur restait « non passé à « Gagné » », sans plus.
+
+4 tests sur l'écriture de l'état. 781 tests backend verts.
+
+### 2026-08-24 (fix: l'onglet du positionnement se sauvegarde entier)
+
+Le passage à « Gagné » échouait en erreur HTTP, et le bon de commande n'en disait rien d'exploitable : « non passé à « Gagné » », sans le motif rendu par Boond. Deux corrections.
+
+- **Le motif remonte à l'ADV**, dans le bandeau du bon de commande : sans lui, impossible de savoir s'il faut corriger le dossier, demander un droit, ou appeler l'éditeur. Il n'était jusqu'ici que dans les journaux.
+- **L'écriture repart de l'onglet lu** (`GET /positionings/{id}/information`, état modifié, réécriture) : cet onglet se sauvegarde entier, et un corps réduit au seul état revenait à en demander l'enregistrement amputé. Même méthode que pour l'achat fournisseur, et même raison. Les relations vides sont écartées — les renvoyer à `null` demanderait leur effacement. Si la lecture échoue, l'écriture est tentée avec le corps minimal : c'est son erreur qui renseignera.
+
+5 tests sur l'écriture de l'état. 781 tests backend verts.
+
+### 2026-08-24 (fix: le report passe le positionnement à « Gagné »)
+
+Le report ne touchait au positionnement que s'il n'y avait **pas** de prestation rattachée. Or le bon de commande en enregistre une dès sa création : un positionnement en porte une à « Gagné attente contrat », l'état où le bon de commande s'ouvre. Le report ne changeait donc jamais rien, et la mission restait en attente dans le CRM.
+
+- Le passage à « Gagné » devient une **étape à part entière**, jouée même quand la prestation existe déjà : c'est l'état de la mission, pas seulement le moyen d'en produire une. Une prestation connue n'est pas recréée pour autant.
+- **L'état est relu après coup** : BoondManager peut accepter la demande sans l'appliquer. Le cas était jusqu'ici indiscernable d'un succès ; il ressort désormais en avertissement — « l'état est resté à 7 ».
+- Une reconduction ne passe toujours pas par là : son positionnement est gagné de longue date, sa prestation vient du renouvellement natif.
+
+3 tests sur l'état du positionnement. 776 tests backend verts.
+
+### 2026-08-24 (feat: rejouer un report Boond, et le défaire)
+
+Le badge « Dans Boond » fermait la porte : une fois le premier objet créé, le bouton disparaissait et l'ADV ne pouvait plus rien reporter — ni compléter ce qui avait manqué, ni recommencer après un essai.
+
+- **Le report se rejoue.** Le bouton reste disponible et devient « Repousser dans Boond ». Chaque étape restant idempotente, relancer ne recrée rien : cela complète ce qui manque, un achat resté en échec par exemple.
+- **Bouton « Supprimer dans Boond »** (`POST /{id}/delete-from-boond`, ADV/admin), pour rejouer un report d'essai sans laisser d'objets fantômes. Suppression à l'envers de la création — achat, contrat, prestation, l'achat pendant à la prestation —, puis le positionnement repasse à « Gagné attente contrat », son état à l'ouverture du bon de commande.
+- **Chaque objet est traité à part** : l'échec de l'un n'arrête pas les autres, et un identifiant n'est effacé du bon de commande que si l'objet a bien disparu du CRM — le garder est le seul moyen de ne pas créer un doublon au report suivant. Le compte rendu, ligne à ligne, remonte dans l'écran.
+- **Ce qui ne se défait pas** : la conversion candidat → ressource, que l'API ne sait pas annuler, et la société fournisseur, qui appartient au contrat cadre et sert à d'autres missions. Les deux sont annoncés dans la confirmation.
+
+14 tests (suppression et adaptateur). 774 tests backend verts.
+
+### 2026-08-24 (fix: le déploiement rétablit lui-même `alembic_version`)
+
+Trois déploiements de suite mouraient au démarrage sur `DuplicateTableError: relation "users" already exists` : la table `alembic_version` a disparu de la base de prod, Alembic croyait donc la base vierge et rejouait `001_initial_schema`. Rien à corriger côté code — la chaîne des 82 migrations est saine (racine unique, tête unique, aucune branche) et rien dans l'application ne crée de table hors Alembic.
+
+- **Réparation automatique** : `scripts/bootstrap_alembic_version.py` tourne avant `alembic upgrade head`. Il ne fait rien dans le cas normal ; si la table de suivi est vide ou absente alors que le schéma existe, il reconnaît la révision réellement appliquée et l'inscrit — un `alembic stamp` sans intervention humaine sur la base.
+- **Reconnaissance par empreintes** : `scripts/alembic_schema_fingerprints.py` associe à chaque migration un objet du schéma qui **bascule exactement là** — absent partout avant, présent partout après. Table *générée* en déroulant la chaîne sur un PostgreSQL réel (`scripts/generer_empreintes_alembic.py`), pas écrite à la main : 62 migrations reconnaissables, 20 sans trace (données seules). Un test échoue si une migration ajoutée n'y figure pas.
+- **Trois refus plutôt qu'une devinette** : schéma incohérent (une empreinte ancienne fausse sous une récente vraie), incertitude portant sur une migration de données (les rejouer effacerait des données), schéma étranger. Dans tous les cas, rien n'est écrit et le motif part dans les logs.
+- Le `CMD` enchaîne avec `||` et non `&&` : même un plantage de l'amorçage ne peut retenir un déploiement qui passerait sans lui.
+
+Vérifié en rejouant le `CMD` du conteneur sur sept états de base, dont la panne reproduite à l'identique. 74 tests d'amorçage. 760 tests backend verts.
+
+### 2026-08-24 (feat: l'achat fournisseur naît de la prestation)
+
+Le corps attendu par `POST /purchases` est confirmé, et il ne ressemble pas à celui qui était posté : l'achat ne se rattache pas à un **positionnement** mais à une **prestation**, et ce rattachement ne se fait **qu'à la création** (`PUT /purchases/{id}/information` n'expose ni `delivery` ni `project` — un achat posé sur la mauvaise prestation se supprime et se recrée).
+
+- Le corps part du pré-remplissage Boond, `GET /purchases/default?delivery={id}` : c'est lui qui accorde prestation, projet, société et agence entre eux, désaccord qui est la cause classique des 422. Bobby ne fait que l'ajuster — intitulé, référence, période, jours payés (jours vendus moins gratuité), montant HT — et **remplace la société par le fournisseur**, l'achat se payant à lui et non au client ; le contact du client s'en va avec elle, remplacé par celui de la facturation du fournisseur.
+- La doc décrit la relation `delivery` avec `type: "project"` : coquille de copier-coller. Le type attendu est bien `delivery`.
+- **Sans prestation, pas d'achat** : l'ADV est averti plutôt que de voir naître un achat orphelin, impossible à rattacher après coup. Un échec de l'achat n'invalide plus le report — ressource, contrat et prestation restent en place, la relance reprend là où ça s'est arrêté.
+- Le renouvellement d'une reconduction produit lui-même son achat : rien n'est créé par-dessus. Une reconduction dont la prestation d'origine est inconnue — premier bon de commande jamais reporté — repasse par le positionnement pour la faire naître.
+- `create_purchase_order` (achat adossé au contrat cadre, ancienne méthode) reste en place mais n'est plus le chemin du bon de commande.
+
+11 tests sur l'achat et son pré-remplissage. 686 tests backend verts.
+
+### 2026-08-24 (feat: la ressource Boond porte le contact du fournisseur)
+
+Le report d'un bon de commande rattachait la ressource à la société fournisseur, sans contact — Boond en attend un : l'interlocuteur du fournisseur pour ce consultant (`providerContact`, à côté de `providerCompany`).
+
+- Contact retenu : celui de la **facturation**, comme au report du contrat cadre ; à défaut l'ADV, puis le signataire. Un fournisseur sans aucun contact reste rattaché à sa société seule.
+- **Décision (positionnement)** : le report ne réécrit jamais les données du positionnement — dates, tarif de vente, jours restent celles du commercial. Seul son état passe à « Gagné », ce qui fait naître la prestation ; les conditions du bon de commande sont ensuite portées à la prestation, pas au positionnement.
+
+3 tests sur le rattachement. 674 tests backend verts.
+
+### 2026-08-24 (feat: le report du bon de commande fait naître la prestation)
+
+L'API BoondManager ne crée pas de prestation : c'est le passage du positionnement à l'état **1 (« Gagné »)** qui la fait produire, à partir du positionnement. Le report d'un bon de commande sans prestation se contentait donc de ne rien faire.
+
+- Nouvelle étape : quand le bon de commande n'a pas de prestation, Bobby passe le positionnement à « Gagné », relit le positionnement et retient la prestation créée — puis la recale sur la période et les conditions du document, comme avant.
+- Un positionnement déjà pourvu d'une prestation n'est pas touché : le rattrapage ne rejoue pas un état déjà acquis.
+- Deux échecs possibles, tous deux en avertissement plutôt qu'en blocage : le passage à « Gagné » qui échoue, et le positionnement gagné dont Boond ne rattache aucune prestation. Le contrat et l'achat restent créés, l'ADV reprend la prestation à la main.
+- `PUT /positionings/{id}/information` suit la forme déjà validée pour les candidats et les sociétés.
+
+7 tests sur la prestation. 671 tests backend verts.
+
+### 2026-08-24 (fix: l'achat fournisseur se crée sur /purchases, pas /purchase-orders)
+
+Le report d'un bon de commande échouait sur `404 Not Found` pour `POST /purchase-orders` : **cet endpoint n'existe pas** dans l'API BoondManager. L'objet est un **achat** (`purchase`) — c'est celui que le renouvellement natif d'une prestation renvoie dans `relationships.purchase`, donc les deux chemins créent bien la même chose.
+
+- Endpoint `/purchases`, type JSON:API `purchase`. Un test verrouille les deux : l'erreur était invisible tant que personne ne poussait un bon de commande.
+- `docs/api/boondmanager.md` annonçait le mauvais endpoint depuis l'origine ; corrigé.
+- **À confirmer en production** : la forme du corps (attributs et relations) n'a jamais pu être validée contre l'API, faute d'accès. Si Boond répond 422, sa réponse nommera ce qui manque.
+
+667 tests backend verts.
+
+### 2026-08-24 (feat: purger un cadre annulé emporte les traces du fournisseur)
+
+Supprimer définitivement un contrat cadre annulé ne retirait que le dossier : les bons de commande, les documents de vigilance et la fiche du tiers restaient, et le fournisseur ne pouvait pas être ressaisi proprement.
+
+- La purge emporte désormais **les bons de commande du cadre**, puis — si le fournisseur n'a plus aucun autre dossier ni aucune autre mission — **ses documents de vigilance, ses magic links et sa fiche**. Un fournisseur qui travaille avec une autre société du groupe reste intact : le cadre lie un fournisseur à une société, la purge aussi.
+- **Elle refuse** tant qu'un bon de commande vit sa propre vie : parti en signature, signé, actif, clos, ou déjà reporté dans BoondManager. Le message les nomme ; l'ADV les annule d'abord. Sans cette garde, la purge laisserait un document signé sans dossier, ou des objets orphelins dans le CRM.
+- La prestation ne compte pas comme une écriture Boond : Bobby ne la crée jamais, il la lit depuis le positionnement. Seuls le contrat et l'achat sont de son fait.
+- Aucun garde-fou supplémentaire n'est nécessaire sur l'état : un cadre signé ne peut pas être annulé, donc un dossier annulé n'a jamais été conclu.
+- Front : la confirmation dit ce qui part, et le message de retour ce qui est parti.
+
+7 tests sur la règle de purge (`PurchaseOrder.blocks_framework_purge`). 666 tests backend verts.
+
+### 2026-08-24 (fix: l'étape du contrat cadre nommée dans le sélecteur fournisseur)
+
+Le sélecteur de fournisseurs du panel affichait « (cadre en cours) » aussi bien pour un dossier à la collecte des documents que pour un cadre parti en signature. Vérification faite, **tous** les états en cours étaient déjà proposés — seuls les cadres annulés et redirigés Payfit sont écartés —, mais l'étiquette ne disait pas lequel. Elle distingue maintenant « en cours de signature », « à envoyer en signature » et « en cours de contractualisation ».
+
+### 2026-08-24 (fix: le consultant d'un bon de commande peut déjà être une ressource)
+
+Le report d'un bon de commande convertissait le consultant en ressource dès que sa fiche ne le disait pas déjà ressource. Un identifiant de **ressource** pris pour un candidat faisait échouer tout le report : `PUT /candidates/{id}` sur un numéro qui n'est pas celui d'un candidat.
+
+- Avant toute conversion, Bobby cherche d'abord la ressource liée au candidat (inchangé), puis — **seulement si aucun candidat ne porte ce numéro** — vérifie s'il s'agit d'une ressource, auquel cas il la prend telle quelle. La sonde est conditionnée : candidats et ressources ont deux séries d'identifiants, et se rabattre sur la ressource du même numéro rattacherait une autre personne.
+- Un consultant introuvable des deux côtés donne désormais un message clair au lieu d'une erreur BoondManager brute.
+- `candidate_exists` / `resource_exists` suivent la règle de `verify_company_exists` : seul un vrai 404 vaut « absent », toute autre erreur est propagée — conclure à l'absence sur un timeout ferait convertir une ressource.
+
+Le contrat cadre garde son comportement : sa conversion est best-effort et une erreur y est déjà consignée sans bloquer le reste.
+
+9 tests ajoutés. 659 tests backend verts.
+
+### 2026-08-24 (feat: reporter la mission dans Boond sans attendre la signature)
+
+Même geste que pour le fournisseur, appliqué à la suite du workflow : ressource, prestation, contrat, achat.
+
+- **Le report n'attend plus la signature.** Le bouton « Pousser dans Boond » apparaît dès que les conditions de la mission sont complètes, et cède la place à un état « Dans Boond » une fois l'achat créé. Un bon de commande annulé est refusé.
+- **Les prérequis sont ceux de Boond, pas ceux du document** : CJM, jours vendus et période. Le client final, la société émettrice et l'intitulé ne montent pas dans le CRM et ne retiennent donc plus le report — ils restent exigés pour générer le PDF.
+- **Nouvelle étape « prestation »** : Bobby ne crée jamais la prestation (Boond la produit depuis le positionnement gagné), mais il la met d'accord avec le bon de commande — période, jours vendus, gratuité, CJM. **Le prix de vente au client n'est pas touché** : il relève du commercial, pas d'un document d'achat. Un échec ici n'invalide pas le report, il laisse un avertissement à l'écran. Une reconduction ne passe pas par là : sa prestation vient du renouvellement natif, qui la recale lui-même.
+- **La ressource résolue est retenue** sur le bon de commande (`boond_consultant_id` + type « resource »). Elle ne l'était pas : un second report réinterrogeait Boond, et l'écran continuait d'afficher un candidat après sa conversion.
+- Le report reste idempotent étape par étape, et la mise en actif du bon de commande reste réservée à un document signé.
+- L'écran montre désormais la prestation à côté du positionnement, du besoin, du contrat et de l'achat ; le message de confirmation nomme ce qui a été créé.
+
+10 tests ajoutés (prestation, mémoire de la ressource, prérequis). 651 tests backend verts, front `tsc`/`eslint`/282 tests OK.
+
+### 2026-08-24 (feat: reporter le fournisseur dans Boond sans attendre la signature)
+
+L'ADV a souvent besoin de la fiche fournisseur dans le CRM pendant que le contrat circule ; le report n'existait qu'à la signature, et n'était exposé nulle part dans l'interface.
+
+- **Bouton « Pousser dans Boond »** dans l'entête de la fiche contrat cadre (ADV/admin). Une fois le fournisseur reporté, le bouton cède la place à un état « Fournisseur dans Boond » : plus rien à cliquer, conformément à la règle « ne pas pousser si déjà poussé ».
+- La route `boond/create-company` n'exige plus un contrat signé. Elle exige en revanche une **identité complète** (raison sociale + SIRET) et refuse un dossier annulé ou redirigé Payfit.
+- **Idempotence des contacts** : la route les recréait à chaque appel. Un contact dont tous les rôles portent déjà un identifiant Boond n'est plus recréé — sinon le report manuel puis la synchronisation à la signature laissaient des doublons dans le CRM. La règle vit dans `boond_contacts.split_supplier_contacts`, partagée par les deux chemins. Un contact qui *gagne* un rôle depuis le dernier report est en revanche recréé : Boond ne sait pas compléter les types d'un contact existant.
+- `third_party_boond_provider_id` exposé sur la demande de contrat, pour que l'écran sache si le report a eu lieu.
+
+12 tests sur les contacts fournisseur. 642 tests backend verts, front `tsc`/`eslint`/282 tests OK.
+
+### 2026-08-24 (fix: le contact facturation du fournisseur partait en « Commercial » dans Boond)
+
+La configuration réelle du CRM (Administration → Types des contacts) donne 2 = Contact facturation, 7 = Dirigeant, 8 = Commercial, 9 = Contact ADV, 10 = Signataire. Bobby poussait le **contact facturation du fournisseur avec le type 8 (Commercial)** et la fonction « Commercial » : la personne se rangeait dans la mauvaise colonne du CRM, sans que rien ne casse.
+
+- Type corrigé (2), fonction « Facturation », et la colonne suit : `boond_commercial_contact_id` devient `boond_billing_contact_id` (migration 082, simple renommage — les identifiants Boond déjà enregistrés restent valides).
+- **La règle était écrite deux fois** — dans la synchronisation automatique et dans l'action manuelle de l'ADV —, donc le bug l'était aussi. Rôles, types Boond et dédoublonnage vivent désormais dans `application/boond_contacts.py`, que les deux appellent. 8 tests couvrent le cumul de rôles (le gérant freelance qui est à la fois signataire, ADV et facturation ne fait qu'un contact à trois types), le repli sur le représentant légal et la casse dans la comparaison d'identité.
+- `docs/api/boondmanager.md` annonçait 1=dirigeant, 2=facturation, 3=adv : deux valeurs sur trois étaient fausses. La table complète du CRM la remplace.
+
+**Reste à trancher** : le contact rattaché à la ressource dans Boond (onglet administratif, `provider_contact_id`) est celui de la facturation. Le comportement est inchangé, mais l'ADV ou le signataire seraient peut-être plus justes.
+
+638 tests backend verts.
+
+### 2026-08-24 (fix: le bon de commande reprend le protocole de facturation du cadre)
+
+Les conditions de paiement du bon de commande venaient bien du contrat cadre (`contract_config.payment_terms`), mais **pas le canal de facturation** : le document imprimait l'adresse de facturation de la société émettrice quoi qu'il arrive. Un cadre configuré en dépôt BoondManager produisait donc un bon de commande qui demandait des factures par mail — l'inverse de ce que le fournisseur avait signé.
+
+- `invoice_submission_method` et `invoice_email` du cadre alimentent désormais le bon de commande : la carte « Adresse de facturation » et la page des conditions annoncent le dépôt BoondManager ou l'adresse retenue. À défaut de configuration, l'adresse de la société émettrice sert de repli, comme dans le contrat.
+- **`invoice_email` n'avait jusqu'ici aucun effet** : le contrat affichait toujours l'adresse de la société. Les deux documents appliquent maintenant la même règle — adresse configurée si elle existe, adresse de la société sinon —, faute de quoi ils auraient pu s'annoncer différemment.
+- Le « Contact ADV / gestion » des interlocuteurs reste l'adresse de la société : c'est un contact, pas le canal de facturation.
+
+3 tests sur la provenance de ces conditions. 360 tests `contract_management` verts, 630 tests backend.
+
+### 2026-08-23 (feat: TVA optionnelle, signatures alignées, mission sans description)
+
+Trois retouches des documents contractuels, après relecture du nouveau bon de commande.
+
+**Fournisseurs non assujettis à la TVA** (migration 081). Le taux normal était appliqué à tout le monde, alors qu'un fournisseur peut être en franchise en base ou en autoliquidation. Le numéro de TVA ne dit rien de cet assujettissement — le portail le calcule d'office depuis le SIREN quand le tiers ne le renseigne pas —, d'où un drapeau explicite `vat_liable` sur `tp_third_parties`, vrai par défaut. Il se saisit dans le portail fournisseur comme dans la saisie ADV (une case, un seul formulaire pour les deux). Non assujetti : le bon de commande n'affiche ni taux ni TTC, mais « TVA non applicable », un « Total à régler » égal au total HT et la mention explicative ; le numéro de TVA n'est plus calculé d'office.
+
+**Blocs de signature alignés**, sur le bon de commande comme sur le contrat de sous-traitance. Les deux signataires n'ont pas la même identité — « SC HOLDING, elle-même représentée par Madame Selma HIZEM » tient trois lignes là où le partenaire en tient une — et la zone de signature de gauche descendait plus bas que celle de droite. La carte est désormais coupée en deux cellules d'une même colonne : la ligne du haut porte les identités, dont les cellules partagent leur hauteur, celle du bas les zones de signature, qui partent donc à la même hauteur. Les deux moitiés se referment l'une sur l'autre (bordure ouverte au raccord) et ne forment qu'une carte. Une hauteur fixe aurait débordé dès qu'une raison sociale passe à la ligne ; deux tests mesurent les boîtes réellement produites plutôt que la présence de classes.
+
+**Description de mission retirée du bon de commande** : elle reste en base et à l'écran, mais ne s'imprime plus. Le document décrit la mission par son intitulé, le consultant, le client final et le lieu.
+
+357 tests `contract_management` verts, 627 tests backend, front `tsc`/`eslint`/282 tests OK.
+
+### 2026-08-23 (feat: bon de commande refait d'après la maquette Claude Design)
+
+Le PDF du bon de commande suit désormais la maquette `Bon de commande.dc.html`
+du projet « Refonte templates Craftmania et Leonum », comme le contrat et les
+chartes suivent la leur.
+
+- **Page 1 — la commande** : entête logo + « Commande d'achat / Réf. / Confidentiel », filet dégradé, titre, deux cartes de parties (fournisseur à l'attention de / adresse de facturation), bandeau de métadonnées (référence, contrat cadre, date, conditions de paiement, période), objet de la mission, tableau « Détail de la commande » (description, quantité, prix unitaire, TVA, total), totaux HT / TVA / TTC, interlocuteurs, signatures.
+- **Page 2 — les conditions de facturation et de paiement** : les cinq articles de la maquette (mentions obligatoires, numérotation, date de facture, rejet et suspension du délai, pénalités et indemnité forfaitaire), l'adresse de facturation rappelée avec la référence du bon, et le rappel que le contrat cadre prévaut.
+- **TVA** : le document affiche désormais un total TTC. Le taux n'est pas une donnée du bon de commande — il est calculé au taux normal (20 %), seul applicable à une prestation de services intérieure.
+- **Bloc signataire aligné sur le contrat** : Société / Représentée par / Fonction, la personne morale dépliée (« SC HOLDING, elle-même représentée par… »), mention Yousign conservée (document bilatéral).
+- **Interlocuteurs** : correspondant commercial (email porté par le bon), contact ADV/gestion (adresse de facturation de la société émettrice), correspondant fournisseur (contact ADV du tiers, à défaut son signataire).
+- **Le TJM reste hors du document** : la garde tenue par les deux tests d'origine vaut pour le nouveau gabarit, qui n'imprime que le CJM.
+- Pagination : la commande tient sa page, les conditions ouvrent la leur. Un dossier complet (description de mission, gratuité, trois interlocuteurs) sort en trois pages, le bloc signatures ne tenant pas sous le tableau.
+
+353 tests `contract_management` verts, dont les rendus PDF réels (WeasyPrint) du gabarit.
+
+### 2026-08-23 (feat: numéro provisoire du BDC, préremplissage complet, panel fournisseur)
+
+Trois retouches du bon de commande, du numéro jusqu'au rattachement.
+
+**Numérotation en deux temps** (migration 080). Un brouillon abandonné consommait un numéro de la séquence de sa société, que l'article « Bon de Commande » du contrat cadre exige continue. Le BDC porte désormais `provisional_reference` (`PROV-BC-AAAA-NNN`) dès sa création ; la référence définitive `XXX-BC-NNN` n'est prise **qu'à la génération du document**, là où le numéro s'imprime. `display_reference` sert partout à l'affichage, et l'entête signale un numéro provisoire. Régénérer ne renumérote pas — le numéro a pu être communiqué. Changer de société émettrice, en revanche, libère la référence définitive : elle vit dans la séquence de cette société et ne peut pas la suivre ailleurs. Le mécanisme de renumérotation immédiate à chaque changement de société disparaît.
+
+**Préremplissage depuis le positionnement**. Le TJM et les jours de gratuité restaient vides sur un BDC créé sans prestation, alors que le positionnement Boond les porte : `averageDailyPriceExcludingTax` (tarif de vente journalier) alimente le TJM, `numberOfDaysFree` la gratuité. La prestation reste prioritaire quand elle existe, y compris lorsqu'elle affirme **zéro** jour gratuit — un zéro explicite est une donnée, pas un trou (`first_present`). La documentation qui prétendait que seule la prestation connaissait la gratuité est corrigée.
+
+**Sélecteur fournisseur limité au panel**. La liste proposait tous les tiers connus de Bobby, SIREN à l'appui. Nouvel endpoint `GET /purchase-orders/suppliers?company_id=` : seuls les fournisseurs ayant un contrat cadre — signé ou en cours — avec la **société émettrice** du BDC, présentés avec la référence de ce cadre, l'information qui autorise la commande. La règle de sélection est pure et testée (`application/panel_suppliers.py`) : cadre signé de la société > cadre signé sans société (héritage) > dossier en cours, un fournisseur par ligne, cadres annulés ou redirigés Payfit exclus. La carte devient « Rattachement » et porte aussi la **société émettrice**, jusqu'ici non modifiable alors qu'elle décide du cadre, du panel et de la numérotation.
+
+**Au passage** : un fournisseur sans raison sociale s'affichait « — » sur le BDC quel que soit le rattachement, donnant l'impression qu'il ne changeait pas. `supplier_label` (domaine tiers) donne un nom toujours lisible : raison sociale, à défaut signataire, à défaut adresse de contact.
+
+347 tests `contract_management` verts (+33), 617 tests backend (hors modules bloqués par `cryptography` en bac à sable), front `tsc`/`eslint`/282 tests OK.
+
+### 2026-08-21 (feat: classer la ressource Boond selon le type de tiers)
+
+BoondManager distingue trois types de ressources utiles ici : **0 Consultant Interne**, **1 Consultant Externe** et **10 Consultant Portage Commercial**. Freelance, sous-traitance et portage salarial partagent le type 1 ; seul le portage commercial a le sien.
+
+- Nouveau module `application/boond_mappings.py` : type de contrat, type de ressource et motif de changement d'état, en un seul endroit. Les deux premières tables étaient dupliquées entre la synchro du contrat cadre, celle des bons de commande et `routes.py` — un type ajouté aurait été classé différemment selon le chemin.
+- **Le type de ressource ne se confond pas avec le motif** : `stateReason.typeOf` ne connaît qu'interne (0) ou externe (1), alors que `typeOf` porte le détail. Le code posait la même valeur pour les deux, ce qui aurait envoyé un motif « 10 » inexistant.
+- **Correction dans la synchro des bons de commande** : la conversion candidat → ressource n'envoyait aucun type, la ressource naissait donc mal classée. Elle pose désormais le type déduit du fournisseur.
+- Un type de tiers inconnu donne « Consultant Externe » : mieux vaut cela qu'un consultant compté comme interne.
+
+322 tests `contract_management` verts, ruff et mypy propres.
+
+### 2026-08-21 (feat: nouveau type de tiers « Portage commercial »)
+
+Cinquième type de tiers, aux côtés du freelance, du sous-traitant, du portage salarial et du salarié.
+
+- `ThirdPartyType.PORTAGE_COMMERCIAL` : requiert un contrat cadre, et son consultant est **externe** — ce qui décide des chartes qui lui sont opposables.
+- La règle « consultant externe » quitte la route pour rejoindre le type (`ThirdPartyType.is_external` + `EXTERNAL_THIRD_PARTY_TYPES`) : elle était écrite en dur à deux endroits de `routes.py`, et un type ajouté y serait passé inaperçu.
+- Côté Boond, `typeOf = 7`, déjà prévu dans la table de correspondance, distinct du portage salarial (6).
+- **Vigilance inchangée** : une société de portage commercial est une société ordinaire ; la garantie financière ne concerne que le portage salarial. Le portail lui propose donc « société » par défaut, et non « EI ».
+- Front : proposé à l'ouverture d'un fournisseur et à la validation commerciale, libellé dans la liste des fournisseurs et le tableau de bord conformité. La cascade de ternaires de la fiche contrat, qui affichait « Salarié » pour tout type non prévu, s'appuie désormais sur la table de libellés.
+- Aucune migration : les colonnes `type` et `third_party_type` sont des `String(20)` sans contrainte de valeur.
+
+12 tests sur le type et les schémas. 314 tests `contract_management` verts, front `tsc`/`eslint`/282 tests/build OK.
+
+### 2026-08-21 (fix: la fiche cadre s'intitule d'après le fournisseur)
+
+Le titre affichait encore un consultant (`GEM-CC-003 · Bobby_prenom Bobby_name`) alors que l'entête montrait bien WOHM en partenaire. Deux causes, l'une visible, l'autre en dessous.
+
+- **Titre** : le repli sur le consultant est supprimé. Un contrat cadre lie deux sociétés, jamais un consultant — même quand c'est lui qui a fait ouvrir le dossier. Le nom du fournisseur est résolu comme dans l'entête, avec repli sur celui remonté par la conformité.
+- **Cause réelle** : seule la *liste* résolvait `third_party_name`, `company_name` et `purchase_orders_count` ; le *détail* renvoyait un dossier sans ces trois champs. D'où un titre sans fournisseur et des « Missions : Aucune » systématiques. Nouveau `_enrich_cr_response`, appliqué aux **21 routes** qui renvoient une demande isolée, pour que toutes répondent la même chose.
+
+302 tests `contract_management` verts, front `tsc`/`eslint`/282 tests/build OK.
+
+### 2026-08-21 (fix: écrans de contractualisation alignés sur le modèle fournisseur)
+
+Trois retouches d'interface, toutes sur le même constat : les écrans décrivaient encore un dossier centré sur un consultant.
+
+- **Point d'entrée « Depuis un consultant » retiré** de la page Fournisseurs, avec sa modale, son état et son appel API (`createManual` et `ManualContractInput` supprimés du client). La route backend `/contract-requests/manual` reste disponible, sans appelant.
+- **Mention « Relances auto J+3 · J+7 · J+14 » retirée** : aucune relance n'a jamais été planifiée. Le scheduler ne porte que les expirations de documents, la purge des magic links et l'archivage des cadres inactifs ; `EmailService.send_document_reminder` existe mais n'a aucun appelant. Le tableau d'état de ce fichier, qui annonçait ces relances, est corrigé.
+- **Fiche contrat cadre** : fil d'Ariane et titre passent au fournisseur (`LEO-CC-001 · MVP TECHNOLOGY` au lieu du consultant) ; les champs de mission de l'entête — client final, TJM achat, démarrage, tous vides sur un cadre — cèdent la place au type de tiers, à la société émettrice et au nombre de missions.
+- **Bloc « Consultant » remplacé par « Consultants en mission »** : la liste est dérivée des bons de commande du cadre, dédoublonnée par consultant, chaque entrée ouvrant sa mission. Tant qu'aucun bon de commande n'existe, le consultant à l'origine du dossier reste affiché, explicitement comme tel.
+
+Front `tsc`/`eslint`/282 tests/build OK, 302 tests backend verts.
+
+### 2026-08-21 (fix: la page Contrats parlait encore de l'ancien modèle)
+
+L'écran `/contracts` décrivait toujours des « demandes de contractualisation » synchronisées depuis BoondManager au statut 7, alors que ce webhook crée désormais des bons de commande et que les dossiers fournisseurs s'ouvrent à la main.
+
+- Renommée **Fournisseurs** (navigation, fil d'Ariane, titre), sous-titre remplacé par la règle réelle : un contrat cadre par fournisseur et par société émettrice, les missions se rattachant en bons de commande.
+- **Le fournisseur devient le sujet des lignes** : sa raison sociale en tête, le consultant en sous-titre quand le dossier a été ouvert depuis l'un d'eux. Les colonnes de mission (client, TJM achat, démarrage), qui appartiennent maintenant au bon de commande, cèdent la place à **Type de tiers**, **Société émettrice** et **Missions** (nombre de BDC vivants).
+- Onglet « Finalisées » → « Sous contrat », état vide réécrit (les dossiers ne tombent plus du ciel), KPI reformulés.
+- API : `company_name` et `purchase_orders_count` exposés sur la demande de contrat, ce dernier compté en une requête groupée, hors bons de commande annulés.
+
+302 tests `contract_management` verts, front `tsc`/`eslint`/282 tests/build OK.
+
+### 2026-08-21 (feat: distinguer les missions par société émettrice)
+
+Suite du correctif précédent, côté lecture : un fournisseur sous contrat avec plusieurs sociétés du groupe a des missions distinctes pour chacune, qui ne doivent pas se mélanger à l'écran.
+
+- **Fiche contrat cadre** : la carte « Bons de commande » filtre désormais sur le **cadre** et non sur le fournisseur. La fiche du cadre Gemini ne montre plus les missions émises par Leonum.
+- **Liste des bons de commande** : colonne « Société » et filtre par société émettrice.
+- **Détail d'un bon de commande** : la société émettrice figure dans l'entête, à côté du contrat cadre. Le bandeau d'attente nomme les deux parties concernées — « aucun contrat cadre signé entre WOHM et Leonum » — au lieu d'un message générique.
+- API : `company_name` exposé sur le bon de commande ; filtres `company_id` et `contract_request_id` sur la liste.
+
+302 tests `contract_management` verts, front `tsc`/`eslint`/282 tests/build OK.
+
+### 2026-08-21 (fix: le contrat cadre est propre à une société émettrice)
+
+Un fournisseur peut travailler avec plusieurs sociétés du groupe, et il lui faut **un contrat cadre par société**. La recherche d'un cadre en vigueur ignorait cette dimension : elle répondait « sous contrat » dès qu'un cadre existait avec n'importe quelle société.
+
+Deux conséquences corrigées :
+
+- **Écran d'ouverture d'un fournisseur** : la société émettrice est demandée **avant** le SIRET, la recherche est bornée par elle, et le message distingue les trois cas — cadre signé avec la société choisie, cadres signés seulement avec d'autres sociétés du groupe (le dossier en ouvrira un), ou aucun cadre. Un dossier déjà en cours n'est signalé que s'il concerne la même société.
+- **Garde-fou de signature d'un bon de commande** (le plus gênant) : un BDC émis par une société pouvait partir en signature parce que le fournisseur avait un cadre signé avec une autre. La règle vit désormais dans le domaine (`PurchaseOrder.is_covered_by`) et exige un cadre signé **et** émis par la même société. Le rattachement du cadre au BDC est rejoué quand la société émettrice change, pas seulement le fournisseur.
+
+`get_framework_contract_for_third_party` prend un `company_id` optionnel et s'appuie sur `list_framework_contracts_for_third_party`. Les dossiers antérieurs au multi-sociétés, sans `company_id`, servent de repli pour ne pas rendre l'historique inutilisable, mais un cadre de la bonne société prime toujours.
+
+**Tests** : 11 cas de portée (sélection par société, repli historique, refus d'un cadre d'une autre société, rattachement rejoué au changement de société). 302 tests `contract_management` verts, front `tsc`/`eslint`/build OK.
+
+### 2026-08-21 (feat: reconduction branchée sur le renouvellement natif Boond)
+
+`POST /deliveries/{id}/renew` est une **action REST sans corps de requête** (confirmé côté client Boond) : elle duplique la prestation et crée, selon la configuration du dossier, l'achat fournisseur et la commande client.
+
+- `BoondCrmAdapter.renew_delivery` / `update_delivery` ajoutés ; le parsing d'une prestation est partagé entre la lecture et le renouvellement.
+- La synchronisation d'une reconduction passe désormais par ce renouvellement quand la prestation d'origine est connue : la nouvelle prestation est rattachée au BDC, et **l'achat créé par Boond est repris tel quel** au lieu d'en créer un second. Sans prestation connue, ou si Boond n'a pas produit d'achat, l'achat est créé sur la prestation (`POST /purchases`).
+- Boond duplique à l'identique : la prestation créée est **recalée** sur les dates, quantités et taux du nouveau bon de commande. `forceAverageDailyPriceExcludingTax` accompagne le prix de vente, sinon Boond le recalcule depuis la grille du projet.
+- Le recalage est non bloquant : prestation et achat existent déjà, un échec est signalé sur le dossier pour reprise manuelle plutôt que de faire échouer le report.
+- Le bandeau front passe de « Synchronisation en échec » à un intitulé neutre, ce champ portant désormais aussi des avertissements.
+
+**Tests** : 6 cas sur le chemin de reconduction (renouvellement natif, reprise de l'achat, repli, recalage, échec de recalage, réponse vide). 289 tests `contract_management` verts, ruff/mypy propres, front `tsc`/`eslint` OK.
+
+### 2026-08-21 (feat: reprise du workflow fournisseur + mission — implémentation ADR-012)
+
+Mise en œuvre complète de la spec `docs/contracts/workflow-fournisseur-mission-bdc.md`. Deux objets, deux cycles de vie : le **fournisseur** (contrat cadre, ouvert à la main) et la **mission** (bon de commande).
+
+**Socle** :
+- **Migration 079** : `cm_purchase_orders`. `third_party_id` et `contract_request_id` nullables — un BDC créé par webhook naît « à rattacher ». Index unique partiel sur `boond_positioning_id`, restreint aux BDC d'origine non annulés, qui rend le webhook idempotent sans gêner les reconductions.
+- `PurchaseOrderStatus` : `draft → generated → sent_for_signature → signed → active → closed`, annulable avant signature, avec retours arrière pour corriger un document généré ou envoyé.
+- Entité `PurchaseOrder` : **TJM de vente interne, CJM d'achat imprimé** ; montant = `(jours vendus - gratuité) x CJM` ; marge indicative réservée à l'affichage ; complétude vérifiée avant génération ; envoi en signature refusé tant que le contrat cadre n'est pas signé.
+- Références `XXX-BC-NNN` par société émettrice, même mécanique d'advisory lock que les contrats cadres.
+
+**Points d'entrée** :
+- `POST /contract-requests/suppliers` : dossier fournisseur **sans consultant**, avec déduplication par SIREN (`/suppliers/lookup` renseigne l'ADV avant création) et choix du mode de collecte dès la création.
+- Webhook `positioning-update` redirigé : il crée le **premier BDC** d'une mission, plus jamais de demande de contrat cadre. État déclencheur configurable (`app_settings` → `bdc_trigger_positioning_state`, 7 par défaut). Webhooks candidat et ressource supprimés, ainsi que les deux use cases devenus inatteignables.
+- `POST /purchases` : même chemin, déclenché à la main (rattrapage).
+
+**Cycle du BDC** : complétion (fournisseur, mission, conditions) → génération du PDF (`bon_de_commande.html`, charte « Éditorial », **sans le TJM**) → envoi en signature → dépôt du signé → report Boond (conversion candidat, rattachement fournisseur, contrat au CJM, bon de commande au montant d'achat), chaque écriture idempotente et l'erreur conservée pour relance.
+
+**Reconduction** : nouveau BDC relié par `parent_purchase_order_id`, positionnement Boond conservé, pas de second contrat Boond. Le CRON d'archivage épargne désormais les contrats cadres portant des missions vivantes.
+
+**Décidé au passage** : le montant du bon de commande Boond est le **total d'achat**, ce qui lève le `NEEDS-CONFIRMATION` sur `amountExcludingTax` posé en mars.
+
+**Front** : pages `/contracts/bdc` et `/contracts/bdc/:id`, modale « Nouveau fournisseur » avec recherche SIRET, carte « Bons de commande » sur la fiche cadre, entrée de navigation avec compteur.
+
+**Tests** : 90 nouveaux tests unitaires (entité, statuts, création depuis positionnement, complétion, génération et confidentialité du TJM, synchronisation Boond, reconduction, lecture des webhooks). 268 tests `contract_management` verts, ruff/mypy propres, front `tsc`/`eslint`/`vitest` (282) et build Vite OK.
+
+### 2026-08-21 (spec: workflow cible fournisseur + mission/BDC — ADR-012)
+
+Cadrage complet de la reprise du workflow de contractualisation, écrit avant implémentation dans `docs/contracts/workflow-fournisseur-mission-bdc.md`. Remplace la partie BDC de `refonte-contrat-cadre-bdc.md`, obsolète depuis la suppression du module le 2026-07-10.
+
+- **Deux objets créés à la main dans Bobby**, sans déclencheur Boond : le fournisseur (contrat cadre, workflow actuel inchangé) et la mission (nouveau BDC). Signatures séparées.
+- **Nouvelle table `cm_purchase_orders`** : fournisseur, contrat cadre de rattachement, consultant (ID candidat/ressource), positionnement et besoin Boond, mission, TJM vente / CJM achat, jours vendus, jours de gratuité, dates, documents, IDs Boond, `parent_purchase_order_id` pour les reconductions.
+- **Machine à états BDC** : `draft → generated → sent_for_signature → signed → active → closed`, `cancelled` avant signature. Envoi en signature refusé tant que le contrat cadre n'est pas `signed`/`active`.
+- **Confidentialité des marges** : le TJM de vente reste interne, seul le CJM figure sur le document du fournisseur. Montant du BDC = `(jours vendus - gratuité) x CJM` — lève le `NEEDS-CONFIRMATION` sur `amountExcludingTax` du bon de commande Boond.
+- **Push Boond à la signature du BDC** : conversion candidat → ressource, rattachement fournisseur, `POST /contracts` (CJM + dates), `POST /purchases` (prestation + montant achat). La création de la société fournisseur et des chartes partenaire reste à la signature du cadre.
+- **Webhooks** : `positioning-update` conservé et redirigé vers la création du premier BDC (il ne crée plus de demande de contrat cadre) ; `candidate-state-update` et `resource-state-update` supprimés ; webhook YouSign conservé.
+- **Défauts retenus, à confirmer en revue** : état de positionnement déclencheur = 7 « Gagné attente contrat », stocké dans `app_settings` (`bdc_trigger_positioning_state`) parce que les états Boond sont paramétrables côté client et ont déjà changé deux fois ; reconduction Boond = nouveau bon de commande sur le positionnement d'origine (le positionnement n'est pas dupliqué, l'ancien bon de commande est conservé) + recul de la date de fin du contrat Boond, sous réserve que l'API accepte la mise à jour d'un contrat existant — non vérifié, seul `POST /contracts` est câblé aujourd'hui.
 
 ### 2026-08-21 (feat: chartes, accusés de réception et engagement — charte « Éditorial »)
 

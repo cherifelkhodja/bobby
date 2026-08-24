@@ -25,6 +25,8 @@ import { OpportunityDetail } from './pages/OpportunityDetail';
 import ProposeCandidate from './pages/ProposeCandidate';
 import { ContractManagement } from './pages/ContractManagement';
 import ContractDetail from './pages/ContractDetail';
+import { PurchaseOrders } from './pages/PurchaseOrders';
+import { PurchaseOrderDetail } from './pages/PurchaseOrderDetail';
 import ComplianceDashboard from './pages/ComplianceDashboard';
 import DocumentsToValidate from './pages/DocumentsToValidate';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -112,6 +114,24 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin', 'adv', 'commercial']}>
               <ContractManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="contracts/bdc"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'adv', 'commercial']}>
+              <PurchaseOrders />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="contracts/bdc/:id"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'adv', 'commercial']}>
+              <ErrorBoundary level="page">
+                <PurchaseOrderDetail />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />

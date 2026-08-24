@@ -162,6 +162,7 @@ async def get_third_party_documents(
         siren=tp.siren,
         siret=tp.siret,
         vat_number=tp.vat_number,
+        vat_liable=tp.vat_liable,
         ape_code=tp.ape_code,
         rcs_city=tp.rcs_city,
         rcs_number=tp.rcs_number,

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FileSignature, X, Trash2, Plus, ChevronRight } from 'lucide-react';
+import { FileSignature, X, Trash2, ChevronRight, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { contractsApi, contractCompaniesApi } from '../api/contracts';
@@ -10,13 +10,14 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
 import { getErrorMessage } from '../api/client';
-import type { ContractRequest, ContractRequestStatus } from '../types';
+import type { ContractRequest, ContractRequestStatus, SupplierLookupResult } from '../types';
 import { CONTRACT_STATUS_CONFIG } from '../types';
 
 const THIRD_PARTY_TYPE_LABELS: Record<string, string> = {
   freelance: 'Freelance',
   sous_traitant: 'Sous-traitant',
   portage_salarial: 'Portage salarial',
+  portage_commercial: 'Portage commercial',
   salarie: 'Salarié',
 };
 
@@ -74,12 +75,17 @@ export function ContractManagement() {
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [cancelTarget, setCancelTarget] = useState<{ id: string; reference: string } | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState<{
-    boond_consultant_id: string;
-    consultant_type: 'candidate' | 'resource';
-    company_id: string;
-  }>({ boond_consultant_id: '', consultant_type: 'candidate', company_id: '' });
+  const [showSupplier, setShowSupplier] = useState(false);
+  const [supplierForm, setSupplierForm] = useState({
+    siret: '',
+    third_party_type: 'sous_traitant',
+    contact_email: '',
+    company_id: '',
+    collection: 'portal' as 'portal' | 'in_person',
+    skip_documents: false,
+    reuse_third_party_id: '' as string,
+  });
+  const [supplierLookup, setSupplierLookup] = useState<SupplierLookupResult | null>(null);
   const pageSize = 20;
   // The group tabs span several statuses, and the API status_filter only accepts a
   // single status — so group filtering, counts and pagination are done client-side
@@ -107,6 +113,39 @@ export function ContractManagement() {
       }),
   });
 
+  const lookupSupplierMutation = useMutation({
+    mutationFn: (siret: string) =>
+      contractsApi.lookupSupplier(siret, supplierForm.company_id || null),
+    onSuccess: (result) => {
+      setSupplierLookup(result);
+      if (result.exists && result.third_party_id) {
+        setSupplierForm((f) => ({ ...f, reuse_third_party_id: result.third_party_id ?? '' }));
+      }
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const createSupplierMutation = useMutation({
+    mutationFn: () =>
+      contractsApi.createSupplierDossier({
+        third_party_type: supplierForm.third_party_type,
+        contact_email: supplierForm.contact_email.trim(),
+        company_id: supplierForm.company_id || null,
+        siret: supplierForm.siret.trim() || null,
+        reuse_third_party_id: supplierForm.reuse_third_party_id || null,
+        notify_third_party: supplierForm.collection === 'portal',
+        skip_documents: supplierForm.collection === 'in_person' && supplierForm.skip_documents,
+      }),
+    onSuccess: (cr) => {
+      toast.success(`Dossier ${cr.display_reference} ouvert.`);
+      setShowSupplier(false);
+      setSupplierLookup(null);
+      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+      navigate(`/contracts/${cr.id}`);
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
   const cancelCrMutation = useMutation({
     mutationFn: (id: string) => contractsApi.cancel(id),
     onSuccess: () => {
@@ -119,40 +158,15 @@ export function ContractManagement() {
 
   const purgeCrMutation = useMutation({
     mutationFn: (id: string) => contractsApi.purge(id),
-    onSuccess: () => {
-      toast.success('Demande supprimée.');
+    onSuccess: (result) => {
+      // Le serveur dit ce qu'il a emporté : bons de commande, fiche du
+      // fournisseur. Le taire laisserait croire qu'un dossier seul a disparu.
+      toast.success(result.message);
       queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['third-parties'] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
-
-  const createManualMutation = useMutation({
-    mutationFn: () =>
-      contractsApi.createManual({
-        boond_consultant_id: parseInt(createForm.boond_consultant_id, 10),
-        consultant_type: createForm.consultant_type,
-        company_id: createForm.company_id || undefined,
-      }),
-    onSuccess: (cr) => {
-      toast.success('Dossier de contrat créé.');
-      setShowCreate(false);
-      setCreateForm({ boond_consultant_id: '', consultant_type: 'candidate', company_id: '' });
-      queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
-      navigate(`/contracts/${cr.id}`);
-    },
-    onError: (error) => toast.error(getErrorMessage(error)),
-  });
-
-  const createConsultantIdValid = /^\d+$/.test(createForm.boond_consultant_id.trim());
-
-  const formatDate = (dateStr: string | null) =>
-    dateStr
-      ? new Date(dateStr).toLocaleDateString('fr-FR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: '2-digit',
-        })
-      : '—';
 
   if (crLoading) return <PageSpinner />;
 
@@ -183,18 +197,26 @@ export function ContractManagement() {
 
   const paged = filtered.slice(page * pageSize, page * pageSize + pageSize);
 
-  const gridCols = 'grid-cols-[72px_1.5fr_110px_90px_90px_210px_60px]';
+  const gridCols = 'grid-cols-[92px_1.5fr_120px_120px_80px_210px_60px]';
+
+  const selectedCompanyName =
+    companies.find((c) => c.id === supplierForm.company_id)?.name ?? 'cette société';
+  // Cadres signés avec les AUTRES sociétés du groupe : ils n'autorisent rien
+  // ici, mais disent à l'ADV que le fournisseur est déjà connu contractuellement.
+  const otherCompanyFrameworks = (supplierLookup?.framework_contracts ?? []).filter(
+    (f) => f.issuer_company_id !== supplierForm.company_id,
+  );
 
   return (
     <div>
-      <p className="bc">Contrats / Demandes</p>
+      <p className="bc">Contrats / Fournisseurs</p>
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="h1">Demandes de contractualisation</h1>
+          <h1 className="h1">Fournisseurs</h1>
           <p className="sub">
             {isAdv
-              ? 'Synchronisées depuis BoondManager · statut 7 « Gagné attente contrat »'
-              : 'Vos demandes de contractualisation'}
+              ? 'Un contrat cadre par fournisseur et par société émettrice · les missions se rattachent en bons de commande'
+              : 'Vos dossiers fournisseurs'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -214,8 +236,11 @@ export function ContractManagement() {
             ))}
           </select>
           {isAdv && (
-            <Button onClick={() => setShowCreate(true)} leftIcon={<Plus className="h-3.5 w-3.5" />}>
-              Nouveau contrat
+            <Button
+              onClick={() => setShowSupplier(true)}
+              leftIcon={<Building2 className="h-3.5 w-3.5" />}
+            >
+              Nouveau fournisseur
             </Button>
           )}
         </div>
@@ -223,19 +248,19 @@ export function ContractManagement() {
 
       <div className="kpis">
         <div className="kpi">
-          <p className="kl">Demandes actives</p>
+          <p className="kl">Dossiers en cours</p>
           <p className="kv">{activeItems.length}</p>
           <p className="ks">sur {items.length} au total</p>
         </div>
         <div className="kpi">
           <p className="kl">En attente du tiers</p>
           <p className="kv">{waitingCount}</p>
-          <p className="ks">Relances auto J+3 · J+7 · J+14</p>
+          <p className="ks">documents ou signature attendus</p>
         </div>
         <div className="kpi">
           <p className="kl">À traiter par l'ADV</p>
           <p className="kv">{todoCount}</p>
-          <p className="ks">validation, configuration, drafts</p>
+          <p className="ks">validation, conformité, brouillons</p>
         </div>
         <div className="kpi">
           <p className="kl">Bloquées conformité</p>
@@ -247,10 +272,10 @@ export function ContractManagement() {
       <div className="tabs">
         {(
           [
-            { key: 'all' as FilterTab, label: 'Toutes' },
+            { key: 'all' as FilterTab, label: 'Tous' },
             { key: 'todo' as FilterTab, label: 'À traiter' },
             { key: 'waiting' as FilterTab, label: 'En attente du tiers' },
-            { key: 'done' as FilterTab, label: 'Finalisées' },
+            { key: 'done' as FilterTab, label: 'Sous contrat' },
           ]
         ).map(({ key, label }) => (
           <button
@@ -265,36 +290,38 @@ export function ContractManagement() {
             {label} · {counts[key]}
           </button>
         ))}
-        <span className="sort">Trier : échéance de démarrage</span>
+        <span className="sort">Trier : dossier le plus récent</span>
       </div>
 
       {filtered.length === 0 ? (
         <div className="card text-center py-12">
           <FileSignature className="h-10 w-10 text-mut2 mx-auto mb-4" />
-          <p className="dn">Aucune demande</p>
+          <p className="dn">Aucun dossier fournisseur</p>
           <p className="ds mt-1.5">
-            Les demandes arrivent automatiquement depuis BoondManager (statut 7).
+            Ouvrez-en un avec « Nouveau fournisseur », ou depuis un consultant déjà connu de
+            BoondManager.
           </p>
         </div>
       ) : (
         <div className="tbl">
           <div className={`thead ${gridCols}`}>
             <span>Réf.</span>
-            <span>Consultant / Partenaire</span>
-            <span>Client</span>
-            <span>TJM achat</span>
-            <span>Démarrage</span>
+            <span>Fournisseur</span>
+            <span>Type</span>
+            <span>Société émettrice</span>
+            <span>Missions</span>
             <span>Étape</span>
             <span></span>
           </div>
           {paged.map((cr) => {
-            const consultantName =
-              [cr.consultant_first_name, cr.consultant_last_name].filter(Boolean).join(' ') ||
-              'Consultant à identifier';
+            // Le fournisseur est le sujet du dossier ; le consultant, quand il
+            // y en a un, n'est que ce qui l'a fait ouvrir.
+            const consultantName = [cr.consultant_first_name, cr.consultant_last_name]
+              .filter(Boolean)
+              .join(' ');
             const thirdPartyLabel = cr.third_party_type
               ? THIRD_PARTY_TYPE_LABELS[cr.third_party_type] ?? cr.third_party_type
-              : null;
-            const subParts = [cr.third_party_name, thirdPartyLabel].filter(Boolean);
+              : '—';
             return (
               <div
                 key={cr.id}
@@ -304,16 +331,19 @@ export function ContractManagement() {
                 <span className="ref">{cr.display_reference}</span>
                 <div className="min-w-0">
                   <p className="nm truncate">
-                    {cr.consultant_civility && `${cr.consultant_civility} `}
-                    {consultantName}
+                    {cr.third_party_name ?? 'Société à identifier'}
                   </p>
                   <p className="ns truncate">
-                    {subParts.length > 0 ? subParts.join(' · ') : 'Partenaire en attente'}
+                    {consultantName
+                      ? `Ouvert pour ${cr.consultant_civility ? `${cr.consultant_civility} ` : ''}${consultantName}`
+                      : 'Dossier fournisseur'}
                   </p>
                 </div>
-                <span className="cell truncate">{cr.client_name || '—'}</span>
-                <span className="tjm">{cr.daily_rate ? `${cr.daily_rate} €` : '—'}</span>
-                <span className="cell">{formatDate(cr.start_date)}</span>
+                <span className="cell truncate">{thirdPartyLabel}</span>
+                <span className="cell truncate">{cr.company_name ?? '—'}</span>
+                <span className="cell">
+                  {cr.purchase_orders_count > 0 ? cr.purchase_orders_count : '—'}
+                </span>
                 <div>
                   <span className={chipClass(cr.status)}>
                     <span className="dot" />
@@ -338,7 +368,14 @@ export function ContractManagement() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (confirm(`Supprimer définitivement ${cr.display_reference} ?`)) {
+                        if (
+                          confirm(
+                            `Supprimer définitivement ${cr.display_reference} ?\n\n` +
+                              'Le dossier part avec ses bons de commande non signés, ses ' +
+                              'documents et ses brouillons. La fiche du fournisseur est ' +
+                              "effacée aussi s'il ne travaille avec aucune autre société du groupe.",
+                          )
+                        ) {
                           purgeCrMutation.mutate(cr.id);
                         }
                       }}
@@ -355,7 +392,7 @@ export function ContractManagement() {
           })}
           <div className="tfoot">
             <span>
-              {filtered.length} demande{filtered.length > 1 ? 's' : ''}
+              {filtered.length} dossier{filtered.length > 1 ? 's' : ''}
               {statusFilter &&
                 ` · filtre : ${CONTRACT_STATUS_CONFIG[statusFilter as ContractRequestStatus]?.label ?? statusFilter}`}
             </span>
@@ -419,71 +456,30 @@ export function ContractManagement() {
         )}
       </Modal>
 
-      {/* Manual creation modal */}
+      {/* Ouverture d'un dossier fournisseur : ni consultant, ni positionnement */}
       <Modal
-        isOpen={showCreate}
-        onClose={() => setShowCreate(false)}
-        title="Nouveau contrat (saisie manuelle)"
+        isOpen={showSupplier}
+        onClose={() => setShowSupplier(false)}
+        title="Nouveau fournisseur"
+        size="lg"
       >
         <div className="space-y-4">
           <p className="notec">
-            Créez un dossier de contrat sans déclencheur Boond. Saisissez l'ID Boond du
-            consultant : son identité est récupérée automatiquement depuis Boond.
+            Ouvre un contrat cadre pour une société, indépendamment de toute mission. Les missions
+            se rattachent ensuite via des bons de commande.
           </p>
+
           <div>
-            <label className="f-lab">Le consultant est un… *</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(
-                [
-                  {
-                    key: 'candidate' as const,
-                    label: 'Candidat',
-                    hint: 'Converti en ressource à la signature',
-                  },
-                  {
-                    key: 'resource' as const,
-                    label: 'Ressource',
-                    hint: 'Déjà une ressource dans Boond',
-                  },
-                ]
-              ).map(({ key, label, hint }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setCreateForm((f) => ({ ...f, consultant_type: key }))}
-                  className={`tcard text-left ${createForm.consultant_type === key ? 'on' : ''}`}
-                >
-                  <span className="tt">{label}</span>
-                  <span className="td2 block">{hint}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="f-lab">ID Boond du consultant *</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={createForm.boond_consultant_id}
-              onChange={(e) =>
-                setCreateForm((f) => ({
-                  ...f,
-                  boond_consultant_id: e.target.value.replace(/[^\d]/g, ''),
-                }))
-              }
-              placeholder="Ex : 4242"
-              className="f-in"
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="f-lab">Société émettrice</label>
+            <label className="f-lab">Société émettrice *</label>
             <select
-              value={createForm.company_id}
-              onChange={(e) => setCreateForm((f) => ({ ...f, company_id: e.target.value }))}
+              value={supplierForm.company_id}
+              onChange={(e) => {
+                setSupplierForm((f) => ({ ...f, company_id: e.target.value }));
+                setSupplierLookup(null);
+              }}
               className="f-in !px-2.5"
             >
-              <option value="">Sélectionner (optionnel)…</option>
+              <option value="">Sélectionner…</option>
               {companies
                 .filter((c) => c.is_active)
                 .map((c) => (
@@ -492,25 +488,186 @@ export function ContractManagement() {
                   </option>
                 ))}
             </select>
+            <p className="f-hint">
+              Le contrat cadre lie le fournisseur à cette société : un contrat signé avec
+              l'une du groupe ne couvre pas les missions émises par une autre.
+            </p>
           </div>
-          <p className="f-hint">
-            Le type de tiers et les autres informations seront renseignés à l'étape de validation
-            commerciale.
-          </p>
+
+          <div>
+            <label className="f-lab">SIRET du fournisseur</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={supplierForm.siret}
+                onChange={(e) => {
+                  setSupplierForm((f) => ({ ...f, siret: e.target.value, reuse_third_party_id: '' }));
+                  setSupplierLookup(null);
+                }}
+                placeholder="Ex : 894 213 669 00017"
+                className="f-in"
+                autoFocus
+              />
+              <Button
+                variant="secondary"
+                onClick={() => lookupSupplierMutation.mutate(supplierForm.siret.trim())}
+                disabled={
+                  !supplierForm.company_id ||
+                  supplierForm.siret.replace(/\D/g, '').length < 9 ||
+                  lookupSupplierMutation.isPending
+                }
+                isLoading={lookupSupplierMutation.isPending}
+              >
+                Rechercher
+              </Button>
+            </div>
+            <p className="f-hint">
+              Recherche la société dans le panel pour éviter d'ouvrir une seconde fiche.
+            </p>
+          </div>
+
+          {supplierLookup && (
+            <div className="alert">
+              {supplierLookup.exists ? (
+                <span>
+                  <b>{supplierLookup.company_name ?? 'Fournisseur connu'}</b> est déjà au panel.{' '}
+                  {supplierLookup.has_framework_contract ? (
+                    <>
+                      Contrat cadre signé avec <b>{selectedCompanyName}</b> (
+                      {supplierLookup.framework_contract_reference}).
+                    </>
+                  ) : otherCompanyFrameworks.length > 0 ? (
+                    <>
+                      Sous contrat avec{' '}
+                      <b>
+                        {otherCompanyFrameworks
+                          .map((f) => f.issuer_company_name ?? f.reference)
+                          .join(', ')}
+                      </b>
+                      , mais aucun cadre avec <b>{selectedCompanyName}</b> : ce dossier en
+                      ouvrira un.
+                    </>
+                  ) : (
+                    <>Aucun contrat cadre signé à ce jour.</>
+                  )}
+                  {supplierLookup.open_contract_request_id
+                    ? ' Un dossier est déjà en cours pour cette société.'
+                    : ''}{' '}
+                  Ses documents de vigilance encore valides seront réutilisés.
+                </span>
+              ) : (
+                <span>Aucune société connue avec ce SIRET : une nouvelle fiche sera créée.</span>
+              )}
+            </div>
+          )}
+
+          <div>
+            <label className="f-lab">Type de tiers *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { key: 'sous_traitant', label: 'Sous-traitant', hint: 'Société de prestation' },
+                  { key: 'freelance', label: 'Freelance', hint: 'Indépendant, EI ou société' },
+                  { key: 'portage_salarial', label: 'Portage salarial', hint: 'Société de portage' },
+                  {
+                    key: 'portage_commercial',
+                    label: 'Portage commercial',
+                    hint: 'Société portant la relation commerciale',
+                  },
+                  { key: 'salarie', label: 'Salarié', hint: 'Redirigé vers PayFit' },
+                ] as const
+              ).map(({ key, label, hint }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSupplierForm((f) => ({ ...f, third_party_type: key }))}
+                  className={`tcard text-left ${supplierForm.third_party_type === key ? 'on' : ''}`}
+                >
+                  <span className="tt">{label}</span>
+                  <span className="td2 block">{hint}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="f-lab">Email de contact contractualisation *</label>
+            <input
+              type="email"
+              value={supplierForm.contact_email}
+              onChange={(e) => setSupplierForm((f) => ({ ...f, contact_email: e.target.value }))}
+              placeholder="contact@fournisseur.fr"
+              className="f-in"
+            />
+          </div>
+
+          <div>
+            <label className="f-lab">Collecte des documents *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  {
+                    key: 'portal' as const,
+                    label: 'Portail fournisseur',
+                    hint: 'Lien sécurisé envoyé au contact',
+                  },
+                  {
+                    key: 'in_person' as const,
+                    label: 'Je saisis en personne',
+                    hint: 'Aucun email au fournisseur',
+                  },
+                ]
+              ).map(({ key, label, hint }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() =>
+                    setSupplierForm((f) => ({
+                      ...f,
+                      collection: key,
+                      skip_documents: key === 'portal' ? false : f.skip_documents,
+                    }))
+                  }
+                  className={`tcard text-left ${supplierForm.collection === key ? 'on' : ''}`}
+                >
+                  <span className="tt">{label}</span>
+                  <span className="td2 block">{hint}</span>
+                </button>
+              ))}
+            </div>
+            {supplierForm.collection === 'in_person' && (
+              <label className="flex items-center gap-2 mt-3 ds">
+                <input
+                  type="checkbox"
+                  checked={supplierForm.skip_documents}
+                  onChange={(e) =>
+                    setSupplierForm((f) => ({ ...f, skip_documents: e.target.checked }))
+                  }
+                />
+                Vigilance documentaire traitée hors Bobby (dérogation tracée)
+              </label>
+            )}
+          </div>
+
           <div className="flex justify-end gap-2 pt-2">
             <Button
               variant="secondary"
-              onClick={() => setShowCreate(false)}
-              disabled={createManualMutation.isPending}
+              onClick={() => setShowSupplier(false)}
+              disabled={createSupplierMutation.isPending}
             >
               Annuler
             </Button>
             <Button
-              onClick={() => createManualMutation.mutate()}
-              disabled={!createConsultantIdValid || createManualMutation.isPending}
-              isLoading={createManualMutation.isPending}
+              onClick={() => createSupplierMutation.mutate()}
+              disabled={
+                !supplierForm.company_id ||
+                !supplierForm.contact_email.includes('@') ||
+                createSupplierMutation.isPending
+              }
+              isLoading={createSupplierMutation.isPending}
             >
-              Créer le dossier
+              Ouvrir le dossier
             </Button>
           </div>
         </div>

@@ -479,6 +479,50 @@ class EmailService:
             to, subject, html_body, from_email=from_email, company_name=company_name
         )
 
+    async def send_purchase_order_created_notification(
+        self,
+        to: str,
+        reference: str,
+        consultant_name: str,
+        client_name: str,
+        link: str,
+        from_email: str | None = None,
+        company_name: str | None = None,
+    ) -> bool:
+        """Prévient l'ADV qu'un bon de commande vient d'être créé par webhook."""
+        subject = f"Nouveau bon de commande a rattacher - {reference}"
+        html_body = f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #0ea5e9;">Bon de commande a completer</h1>
+                <p>Un positionnement gagne a ouvert le bon de commande <strong>{reference}</strong>.</p>
+                <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 6px 0; color: #666;">Consultant</td>
+                        <td style="padding: 6px 0;"><strong>{consultant_name}</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px 0; color: #666;">Client</td>
+                        <td style="padding: 6px 0;"><strong>{client_name}</strong></td>
+                    </tr>
+                </table>
+                <p>Il reste a choisir le fournisseur et a completer les conditions de la mission.</p>
+                <p style="text-align: center; margin: 30px 0;">
+                    <a href="{link}" style="background-color: #0ea5e9; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                        Ouvrir le bon de commande
+                    </a>
+                </p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #666; font-size: 12px;">Cet email a ete envoye par Bobby.</p>
+            </div>
+        </body></html>
+        """
+        return await self._send_email(
+            to, subject, html_body, from_email=from_email, company_name=company_name
+        )
+
     async def send_document_collection_request(
         self,
         to: str,

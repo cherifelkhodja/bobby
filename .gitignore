@@ -71,3 +71,7 @@ logs/
 # Coverage
 coverage/
 *.lcov
+
+# Instantané Redis, déposé par un redis-server lancé depuis le dossier
+# de travail (rejeu local de la chaîne CI). Jamais un livrable.
+dump.rdb

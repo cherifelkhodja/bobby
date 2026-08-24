@@ -1,0 +1,373 @@
+{#
+  Bon de commande — charte « Éditorial », maquette « Bon de commande.dc.html »
+  (projet Claude Design « Refonte templates Craftmania et Leonum »).
+
+  Document de deux pages : la commande elle-même (parties, mission, chiffres,
+  signatures), puis les conditions de facturation et de paiement, qui tiennent
+  leur propre page pour rester lisibles et opposables.
+
+  Contrainte tenue par ce gabarit : **seul le CJM d'achat figure ici**. Le TJM
+  de vente au client est une donnée interne et ne doit jamais être injectée
+  dans ce contexte.
+
+  Comme les autres gabarits : tables plutôt que grid/flex (support partiel dans
+  WeasyPrint), et polices résolues via `base_url` = backend/templates.
+#}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<style>
+{% include "_marque.css.html" %}
+
+  /* ===== PAGE ===== */
+  @page {
+    size: A4;
+    margin: 16mm 18mm 18mm 18mm;
+    @bottom-center { content: element(rfoot); vertical-align: bottom; }
+  }
+
+  body { font-size: 12.5px; line-height: 1.55; }
+
+  /* ===== PIED DE PAGE COURANT ===== */
+  .rfoot {
+    position: running(rfoot);
+    width: 174mm;                       /* 210mm - 18mm - 18mm */
+    padding-top: 9px;
+    border-top: 1px solid #e5e3df;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: #a09f9a;
+  }
+  .rfoot table { width: 100%; border-collapse: collapse; }
+  .rfoot td { padding: 0; vertical-align: middle; }
+  .rfoot .nm { font-weight: 700; color: {{ brand_strong | default('#c1301c') }}; }
+  .rfoot .right { text-align: right; }
+  .rfoot .c { color: {{ brand_strong | default('#c1301c') }}; }
+
+  /* ===== EN-TÊTE ===== */
+  .po-head { width: 100%; border-collapse: collapse; }
+  .po-head td { padding: 0; vertical-align: top; }
+  .po-hr {
+    font-family: 'Space Grotesk', sans-serif; font-size: 11px; letter-spacing: .06em;
+    text-transform: uppercase; color: #8a8984; text-align: right; line-height: 1.6;
+  }
+  .po-hr b { color: {{ brand_strong | default('#c1301c') }}; font-weight: 700; }
+  .po-eyebrow {
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px; letter-spacing: .14em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }};
+    font-weight: 600; margin: 26px 0 0;
+  }
+  .po-title {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px;
+    line-height: 1; letter-spacing: -.03em; color: #201f1e; margin: 12px 0 0;
+  }
+
+  /* ===== PARTIES ===== */
+  /* Deux cartes de même hauteur : bordure portée par le <td>, flex n'égalisant
+     pas les hauteurs sous WeasyPrint. */
+  .po-parties { width: 100%; border-collapse: separate; border-spacing: 8px 0; margin: 20px -8px 0; }
+  .po-parties td { width: 50%; vertical-align: top; border: 1px solid #e5e3df; border-radius: 12px; padding: 14px 17px; }
+  .po-parties .pr {
+    font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: .08em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }};
+    font-weight: 700; margin-bottom: 8px;
+  }
+  .po-parties .lines { font-size: 12.5px; line-height: 1.6; color: #33322f; }
+  .po-parties .lines b { font-family: 'Space Grotesk', sans-serif; font-weight: 600; color: #201f1e; }
+
+  /* ===== BANDEAU DE MÉTADONNÉES ===== */
+  .po-meta { border-top: 1px solid #e5e3df; border-bottom: 1px solid #e5e3df; padding: 14px 0; margin-top: 18px; }
+  .po-meta table { width: 100%; border-collapse: collapse; }
+  .po-meta td { vertical-align: top; padding-right: 16px; }
+  .po-meta td:last-child { padding-right: 0; }
+  .po-meta .k {
+    font-family: 'Space Grotesk', sans-serif; font-size: 10px; letter-spacing: .07em;
+    text-transform: uppercase; color: #9a9994; font-weight: 600;
+  }
+  .po-meta .v { font-size: 13px; color: #201f1e; font-weight: 600; margin-top: 5px; line-height: 1.35; }
+  .po-period { padding: 16px 0 0; border-top: none; border-bottom: none; margin-top: 0; }
+
+  /* ===== SOUS-TITRES ===== */
+  .h3 {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; letter-spacing: .02em;
+    text-transform: uppercase; color: {{ brand_strong | default('#c1301c') }}; margin: 18px 0 8px;
+  }
+  .p { font-size: 12.5px; line-height: 1.6; color: #33322f; margin: 0 0 9px; }
+  .p b { font-weight: 600; color: #201f1e; }
+  .li li { padding-left: 18px; font-size: 12.5px; line-height: 1.55; margin-bottom: 5px; }
+  .li li::before { width: 5px; height: 5px; top: 8px; }
+
+  /* ===== DÉTAIL DE LA COMMANDE ===== */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 2px; }
+  .tbl th {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 9.5px; letter-spacing: .04em;
+    text-transform: uppercase; color: #8a8984; text-align: left;
+    padding: 0 10px 8px; border-bottom: 2px solid {{ brand | default('#e24a1a') }};
+  }
+  .tbl th:first-child, .tbl td:first-child { padding-left: 0; }
+  .tbl th.r, .tbl td.r { text-align: right; }
+  .tbl td { border-bottom: 1px solid #e5e3df; padding: 9px 10px; color: #33322f; vertical-align: top; }
+  .tbl .desc { font-family: 'Space Grotesk', sans-serif; font-weight: 600; color: #201f1e; }
+  .tbl .sub { font-family: 'Hanken Grotesk', sans-serif; font-weight: 400; font-size: 11px; color: #6b6a66; line-height: 1.5; }
+
+  /* Totaux : table alignée à droite, WeasyPrint n'étirant pas un flex ici. */
+  .po-tot { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  .po-tot td { padding: 3px 0; }
+  .po-tot .l {
+    text-align: right; padding-right: 24px; color: #5c5b58;
+    font-family: 'Space Grotesk', sans-serif; font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+  }
+  .po-tot .v { text-align: right; width: 130px; font-family: 'Space Grotesk', sans-serif; font-weight: 600; }
+  .po-tot .ht .l { color: #201f1e; font-weight: 700; }
+  .po-tot .ht .v { font-weight: 700; }
+  .po-tot .ttc td { border-top: 2px solid #201f1e; padding-top: 7px; }
+  .po-tot .ttc .l { color: {{ brand_strong | default('#c1301c') }}; font-weight: 700; }
+  .po-tot .ttc .v { font-size: 16px; color: {{ brand_strong | default('#c1301c') }}; font-weight: 700; }
+  .po-tot .na { font-family: 'Hanken Grotesk', sans-serif; font-weight: 400; color: #5c5b58; font-size: 12px; }
+  .vat-note { margin-top: 8px; font-size: 11.5px; color: #5c5b58; text-align: right; }
+
+  /* ===== SIGNATURES ===== */
+  .sigblock { margin-top: 14px; }
+  .sigblock-hd { font-size: 18px; margin-bottom: 6px; }
+  .sig-lead { font-size: 11.5px; line-height: 1.5; color: #5c5b58; margin-bottom: 10px; }
+  .sigcard { width: 50%; }
+  .sigcard.hd { padding: 14px 16px 0; }
+  .sigcard.ft { padding: 0 16px 14px; }
+  .sigcard-id { margin-top: 7px; }
+  .sigzone { margin-top: 11px; height: 62px; }
+  .sigmeta { margin-top: 10px; font-size: 11.5px; }
+
+  /* ===== CONDITIONS DE FACTURATION (page 2) ===== */
+  .p2 { page-break-before: always; }
+  .sec { width: 100%; border-collapse: collapse; border-bottom: 1px solid #e5e3df; margin: 16px 0 10px; page-break-after: avoid; }
+  .sec td { padding: 0 0 9px; vertical-align: baseline; }
+  .sec .n {
+    width: 44px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px;
+    color: {{ brand | default('#e24a1a') }}; line-height: .9;
+  }
+  .sec .t {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px;
+    color: #201f1e; text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<!-- Pied de page courant -->
+<div class="rfoot">
+  <table><tr>
+    <td><span class="nm">{{ issuer_company_name | upper }}</span> · Bon de commande</td>
+    <td class="right">Réf. {{ reference }} · <span class="c">Confidentiel</span></td>
+  </tr></table>
+</div>
+
+<!-- ===== EN-TÊTE ===== -->
+<table class="po-head"><tr>
+  <td>
+    {% if logo_b64 %}
+      <img class="cov-logo" src="data:{{ logo_mime | default('image/png') }};base64,{{ logo_b64 }}" alt="{{ issuer_company_name }}">
+    {% elif logo_filename %}
+      <img class="cov-logo" src="{{ logo_filename }}" alt="{{ issuer_company_name }}">
+    {% endif %}
+  </td>
+  <td class="po-hr">
+    <b>Commande d'achat</b><br>
+    Réf. {{ reference }}<br>
+    Confidentiel
+  </td>
+</tr></table>
+<div class="cov-key"></div>
+
+<div class="po-eyebrow">Commande d'achat</div>
+<h1 class="po-title">Bon de commande</h1>
+
+<!-- ===== PARTIES ===== -->
+<table class="po-parties"><tr>
+  <td>
+    <div class="pr">Fournisseur — à l'attention de</div>
+    <div class="lines">
+      <b>{{ partner_company_name }}</b><br>
+      {% if partner_head_office %}{{ partner_head_office }}<br>{% endif %}
+      {% if partner_siren %}SIREN {{ partner_siren | siren }}<br>{% endif %}
+      {% if partner_signatory_name %}{{ partner_signatory_name | expand_civility }}{% endif %}
+    </div>
+  </td>
+  <td>
+    <div class="pr">Adresse de facturation</div>
+    <div class="lines">
+      <b>{{ issuer_company_name | upper }}</b><br>
+      {% if issuer_head_office %}{{ issuer_head_office }}<br>{% endif %}
+      {# Destination des factures : celle du contrat cadre, pas une règle du
+         bon de commande. #}
+      {% if invoice_submission_method == 'boondmanager' %}Dépôt sur la plateforme BoondManager
+      {%- elif invoice_address %}{{ invoice_address }}{% endif %}
+    </div>
+  </td>
+</tr></table>
+
+<!-- ===== MÉTADONNÉES ===== -->
+<div class="po-meta">
+  <table><tr>
+    <td><div class="k">Référence</div><div class="v">{{ reference }}</div></td>
+    <td><div class="k">Contrat cadre</div><div class="v">{{ framework_reference | default('—', true) }}</div></td>
+    <td><div class="k">Date de commande</div><div class="v">{{ order_date }}</div></td>
+    <td><div class="k">Conditions de paiement</div><div class="v">{% if payment_terms_label %}Paiement {{ payment_terms_label }}{% else %}Selon contrat cadre{% endif %}</div></td>
+  </tr></table>
+  <table class="po-period"><tr>
+    <td><div class="k">Période d'exécution</div><div class="v">Du {{ start_date }} au {{ end_date }}</div></td>
+  </tr></table>
+</div>
+
+<!-- ===== DÉTAIL DE LA COMMANDE ===== -->
+<div class="h3">Détail de la commande</div>
+<table class="tbl">
+  <thead><tr>
+    <th>Description</th>
+    <th class="r">Quantité</th>
+    <th class="r">Prix unit. HT</th>
+    <th class="r">TVA</th>
+    <th class="r">Total HT</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td>
+        <div class="desc">{{ mission_title }}</div>
+        <div class="sub">
+          {%- if consultant_name %}Consultant : {{ consultant_civility }} {{ consultant_name }}<br>{% endif -%}
+          {%- if client_name %}Client final : {{ client_name }}<br>{% endif -%}
+          {%- if mission_place %}Lieu d'exécution : {{ mission_place }}{% endif -%}
+        </div>
+      </td>
+      <td class="r">{{ billable_days }} j</td>
+      <td class="r">{{ purchase_daily_rate }} €</td>
+      <td class="r">{% if vat_liable %}{{ vat_rate }} %{% else %}—{% endif %}</td>
+      <td class="r">{{ total_amount }} €</td>
+    </tr>
+    {% if free_days and free_days != '0' %}
+    <tr>
+      <td>
+        <div class="desc">Jours de gratuité</div>
+        <div class="sub">Accordés à titre gracieux, non facturés</div>
+      </td>
+      <td class="r">{{ free_days }} j</td>
+      <td class="r">—</td>
+      <td class="r">—</td>
+      <td class="r">0 €</td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+<table class="po-tot">
+  <tr class="ht"><td class="l">Total HT</td><td class="v">{{ total_amount }} €</td></tr>
+  {% if vat_liable %}
+  <tr><td class="l">TVA ({{ vat_rate }} %)</td><td class="v">{{ vat_amount }} €</td></tr>
+  <tr class="ttc"><td class="l">Total TTC</td><td class="v">{{ total_amount_ttc }} €</td></tr>
+  {% else %}
+  {# Fournisseur non assujetti : pas de TVA à facturer, donc pas de TTC. #}
+  <tr><td class="l">TVA</td><td class="v na">non applicable</td></tr>
+  <tr class="ttc"><td class="l">Total à régler</td><td class="v">{{ total_amount }} €</td></tr>
+  {% endif %}
+</table>
+{% if not vat_liable %}
+<p class="p vat-note">Fournisseur non assujetti à la TVA : la facture est établie hors taxes, sans TVA.</p>
+{% endif %}
+
+<!-- ===== INTERLOCUTEURS ===== -->
+{% if commercial_email or invoices_company_mail or partner_contact_name or partner_contact_email %}
+<div class="h3">Interlocuteurs</div>
+<ul class="li">
+  {% if commercial_email %}
+  <li><b>Correspondant commercial</b> — {{ commercial_email }}</li>
+  {% endif %}
+  {% if invoices_company_mail %}
+  <li><b>Contact ADV / gestion</b> — {{ invoices_company_mail }}</li>
+  {% endif %}
+  {% if partner_contact_name or partner_contact_email %}
+  <li><b>Correspondant fournisseur</b> — {{ partner_contact_name | expand_civility }}{% if partner_contact_name and partner_contact_email %} · {% endif %}{{ partner_contact_email }}</li>
+  {% endif %}
+</ul>
+{% endif %}
+
+<!-- ===== SIGNATURES ===== -->
+<div class="sigblock">
+  <div class="sigblock-hd">Signatures</div>
+  <p class="sig-lead">
+    Bon de commande émis en application du contrat cadre de sous-traitance
+    {%- if framework_reference %} <b>{{ framework_reference }}</b>{% endif %}
+    {%- if framework_signed_date %}, signé le <b>{{ framework_signed_date }}</b>{% endif %}.
+    Document signé électroniquement via Yousign ; l'horodatage de la plateforme
+    vaut acceptation et fait foi de la date.
+  </p>
+  <table class="sigrow" style="width: 100%">
+    <tr>
+      <td class="sigcard hd">
+        <div class="sigcard-role">Pour {{ issuer_company_name | upper }}</div>
+        <div class="sigcard-id"><table>
+          <tr class="sl"><td class="k">Société</td><td class="v"><b>{{ issuer_company_name | upper }}</b></td></tr>
+          <tr class="sl"><td class="k">Représentée par</td><td class="v">
+            {%- if issuer_representative_is_entity -%}
+              {{ issuer_representative_name }}, elle-même représentée par <b>{{ issuer_signatory_name | expand_civility }}</b>
+            {%- else -%}
+              <b>{{ issuer_signatory_name | expand_civility }}</b>
+            {%- endif -%}
+          </td></tr>
+          <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ issuer_representative_sub_quality | default(issuer_representative_quality, true) }}</b></td></tr>
+        </table></div>
+      </td>
+      <td class="sigcard hd">
+        <div class="sigcard-role">Pour le Fournisseur</div>
+        <div class="sigcard-id"><table>
+          <tr class="sl"><td class="k">Société</td><td class="v"><b>{{ partner_company_name | upper }}</b></td></tr>
+          <tr class="sl"><td class="k">Représentée par</td><td class="v"><b>{% if partner_signatory_name %}{{ partner_signatory_name | expand_civility }}{% else %}{{ partner_representative_civility | civility }} {{ partner_representative_name }}{% endif %}</b></td></tr>
+          <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ partner_representative_title }}</b></td></tr>
+        </table></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="sigcard ft">
+        <div class="sigzone"></div>
+        <div class="sigmeta">Le <span class="fillin"></span></div>
+      </td>
+      <td class="sigcard ft">
+        <div class="sigzone"></div>
+        <div class="sigmeta">Le <span class="fillin"></span></div>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<!-- ===== PAGE 2 — CONDITIONS DE FACTURATION ===== -->
+<h2 class="po-title p2" style="font-size: 26px">Conditions de facturation et de paiement</h2>
+<p class="p" style="margin-top: 12px">Le règlement des factures est strictement conditionné au respect intégral des dispositions ci-dessous.</p>
+
+<table class="sec"><tr><td class="n">1</td><td class="t">Mentions obligatoires</td></tr></table>
+<p class="p">Conformément à l'article L.441-9 du Code de commerce, toute facture doit comporter l'ensemble des mentions légales obligatoires, et notamment : numéro de facture unique, date d'émission, identité complète du client, numéro de bon de commande, désignation précise de la prestation, montant HT, taux de TVA, montant TVA, montant TTC. Toute facture incomplète ou non conforme pourra être rejetée.</p>
+
+<table class="sec"><tr><td class="n">2</td><td class="t">Numérotation des factures</td></tr></table>
+<p class="p">Les factures doivent suivre une numérotation unique, continue et chronologique, sans rupture ni doublon. Un seul numéro est attribué par facture. Toute anomalie de numérotation entraîne le rejet automatique de la facture.</p>
+
+<table class="sec"><tr><td class="n">3</td><td class="t">Date de facture</td></tr></table>
+<p class="p">La facture doit impérativement être datée au dernier jour du mois correspondant à la période de facturation (exemple : période de janvier 2026 → date de facture 31/01/2026). Les factures établies à une autre date seront rejetées.</p>
+
+<table class="sec"><tr><td class="n">4</td><td class="t">Rejet et suspension du délai de paiement</td></tr></table>
+<p class="p">Toute facture non conforme pourra être rejetée sans préavis et suspendra automatiquement le délai de paiement. Un nouveau délai contractuel de paiement commencera à courir uniquement à compter de la réception d'une facture rectifiée et conforme.</p>
+
+<table class="sec"><tr><td class="n">5</td><td class="t">Pénalités et indemnité forfaitaire</td></tr></table>
+<p class="p">Conformément aux articles L.441-10 et D.441-5 du Code de commerce, des pénalités de retard sont exigibles de plein droit en cas de paiement tardif, et une indemnité forfaitaire de 40 € pour frais de recouvrement est due de plein droit.</p>
+
+{# Canal de facturation : celui du contrat cadre, pas une règle propre au bon
+   de commande. #}
+{% if invoice_submission_method == 'boondmanager' %}
+<p class="p">Les factures sont à déposer sur la plateforme BoondManager de {{ issuer_company_name }}, en rappelant la référence <b>{{ reference }}</b> du présent bon de commande.</p>
+{% elif invoice_address %}
+<p class="p">Les factures sont à adresser à <span class="mail">{{ invoice_address }}</span>, en rappelant la référence <b>{{ reference }}</b> du présent bon de commande.</p>
+{% endif %}
+
+<div class="callout">
+  Bon de commande régi par le contrat cadre de sous-traitance en vigueur. En cas
+  de contradiction, les stipulations du contrat cadre prévalent sur le présent
+  bon de commande.
+</div>
+
+</body>
+</html>

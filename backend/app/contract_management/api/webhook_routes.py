@@ -11,13 +11,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.contract_management.api.schemas import WebhookResponse
-from app.contract_management.application.use_cases.create_contract_request import (
-    CreateContractRequestUseCase,
+from app.contract_management.application.boond_webhook_parsing import (
+    iter_events,
+    parse_positioning_event,
 )
-from app.contract_management.domain.exceptions import WebhookDuplicateError
+from app.contract_management.application.use_cases.create_purchase_order import (
+    CreatePurchaseOrderFromPositioningUseCase,
+)
+from app.contract_management.domain.exceptions import (
+    PositioningNotFoundError,
+    PositioningStateMismatchError,
+    PurchaseOrderAlreadyExistsError,
+)
 from app.contract_management.infrastructure.adapters.postgres_contract_repo import (
     ContractRequestRepository,
     WebhookEventRepository,
+)
+from app.contract_management.infrastructure.adapters.postgres_purchase_order_repo import (
+    PurchaseOrderRepository,
 )
 from app.dependencies import get_db
 from app.infrastructure.audit.logger import AuditAction, AuditResource, audit_logger
@@ -69,23 +80,68 @@ def _make_company_email_resolver(db):
     return resolver
 
 
+async def _notify_purchase_order_created(db: AsyncSession, purchase_order) -> None:
+    """Prévient les ADV qu'un bon de commande attend son fournisseur.
+
+    Le positionnement dit quel consultant travaille sur quel besoin, jamais par
+    quelle société il est porté : le bon de commande naît donc incomplet et
+    quelqu'un doit le reprendre. Best-effort — un email en échec ne remet pas
+    en cause la création.
+    """
+    from app.domain.value_objects.status import UserRole
+    from app.infrastructure.database.repositories.user_repository import UserRepository
+    from app.infrastructure.email.sender import EmailService
+
+    settings = get_settings()
+    link = f"{settings.frontend_url.rstrip('/')}/contracts/bdc/{purchase_order.id}"
+
+    try:
+        users = await UserRepository(db).list_by_roles([UserRole.ADV, UserRole.ADMIN])
+    except Exception as exc:
+        logger.warning("purchase_order_recipients_lookup_failed", error=str(exc))
+        return
+
+    email_service = EmailService(settings)
+    recipients = {str(u.email) for u in users if getattr(u, "email", None)}
+    for recipient in recipients:
+        try:
+            await email_service.send_purchase_order_created_notification(
+                to=recipient,
+                reference=purchase_order.display_reference,
+                consultant_name=purchase_order.consultant_name or "Consultant à préciser",
+                client_name=purchase_order.client_name or "Client à préciser",
+                link=link,
+            )
+        except Exception as exc:
+            logger.warning(
+                "purchase_order_notification_failed",
+                recipient=recipient,
+                reference=purchase_order.display_reference,
+                error=str(exc),
+            )
+
+
 @router.post(
     "/boondmanager/positioning-update",
     response_model=WebhookResponse,
-    summary="Handle BoondManager positioning update webhook",
+    summary="Créer le bon de commande d'une mission depuis un positionnement Boond",
 )
 async def handle_boond_positioning_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Handle positioning update from BoondManager.
+    """Ouvre le premier bon de commande d'une mission.
 
-    Always returns 200 OK to prevent retries from Boond.
+    Seul webhook de création conservé. Il ne crée plus de demande de contrat
+    cadre : celle-ci est désormais ouverte à la main dans Bobby, indépendamment
+    des missions. Le bon de commande naît en brouillon, sans fournisseur, et
+    l'ADV le complète.
+
+    Répond toujours 200 pour que Boond ne rejoue pas l'événement.
     """
     settings = get_settings()
     _verify_boond_webhook_token(request, settings)
 
-    # Log raw body for debugging
     raw_body = await request.body()
     logger.info(
         "webhook_boond_received",
@@ -100,280 +156,98 @@ async def handle_boond_positioning_webhook(
         logger.warning("webhook_invalid_json", raw=raw_body[:200].decode("utf-8", errors="replace"))
         return WebhookResponse(status="ok", message="Invalid JSON")
 
-    logger.info(
-        "webhook_boond_payload_parsed",
-        payload_type=type(payload).__name__,
-        payload_keys=list(payload.keys()) if isinstance(payload, dict) else f"list[{len(payload)}]",
-    )
-
     audit_logger.log(
         AuditAction.WEBHOOK_RECEIVED,
         AuditResource.CONTRACT_REQUEST,
         details={"source": "boondmanager", "type": "positioning_update"},
     )
 
-    cr_repo = ContractRequestRepository(db)
-    webhook_repo = WebhookEventRepository(db)
-
-    from app.infrastructure.email.sender import EmailService
-
-    email_service = EmailService(settings)
-
     from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
         BoondCrmAdapter,
     )
     from app.infrastructure.boond.client import BoondClient
     from app.infrastructure.database.repositories.user_repository import UserRepository
+    from app.infrastructure.settings.app_settings_service import AppSettingsService
 
-    boond_client = BoondClient(settings)
-    crm_service = BoondCrmAdapter(boond_client)
-    user_repo = UserRepository(db)
-
-    use_case = CreateContractRequestUseCase(
-        contract_request_repository=cr_repo,
-        webhook_event_repository=webhook_repo,
-        crm_service=crm_service,
-        email_service=email_service,
-        user_repository=user_repo,
-        frontend_url=settings.frontend_url,
-        company_repository=cr_repo,
-        company_email_resolver=_make_company_email_resolver(db),
-    )
-
-    try:
-        result = await use_case.execute(payload)
-        if result:
-            # Explicit commit to ensure data is persisted
-            await db.commit()
-            logger.info(
-                "webhook_boond_contract_created",
-                reference=result.reference,
-                cr_id=str(result.id),
-                status=result.status.value,
-                commercial_email=result.commercial_email,
-                frontend_url=settings.frontend_url,
-            )
-            return WebhookResponse(
-                status="ok",
-                message=f"Contract request {result.reference} created",
-            )
-        logger.info("webhook_boond_no_action", reason="filtered_or_empty")
-        return WebhookResponse(status="ok", message="No action taken")
-    except WebhookDuplicateError as exc:
-        logger.info("webhook_boond_duplicate", event_id=str(exc))
-        return WebhookResponse(status="ok", message="Duplicate event")
-    except Exception as exc:
-        await db.rollback()
-        logger.error(
-            "webhook_processing_error",
-            error=str(exc),
-            traceback=traceback.format_exc(),
-        )
-        return WebhookResponse(status="ok", message="Processing error")
-
-
-@router.post(
-    "/boondmanager/candidate-state-update",
-    response_model=WebhookResponse,
-    summary="Handle BoondManager candidate state update webhook",
-)
-async def handle_boond_candidate_webhook(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    """Handle candidate state update from BoondManager.
-
-    Triggers contract request creation when candidate moves to state 11
-    (En attente de contrat).
-
-    Always returns 200 OK to prevent retries from Boond.
-    """
-    settings = get_settings()
-    _verify_boond_webhook_token(request, settings)
-
-    raw_body = await request.body()
-    logger.info(
-        "webhook_boond_candidate_received",
-        body_length=len(raw_body),
-        body_preview=raw_body[:500].decode("utf-8", errors="replace"),
-    )
-
-    try:
-        payload = json.loads(raw_body)
-    except Exception:
-        logger.warning("webhook_invalid_json")
-        return WebhookResponse(status="ok", message="Invalid JSON")
-
-    audit_logger.log(
-        AuditAction.WEBHOOK_RECEIVED,
-        AuditResource.CONTRACT_REQUEST,
-        details={"source": "boondmanager", "type": "candidate_state_update"},
-    )
-
-    cr_repo = ContractRequestRepository(db)
     webhook_repo = WebhookEventRepository(db)
-
-    from app.contract_management.application.use_cases.create_contract_request_from_entity import (
-        BOOND_CANDIDATE_STATE_AWAITING_CONTRACT,
-        CreateContractRequestFromEntityUseCase,
-    )
-    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
-        BoondCrmAdapter,
-    )
-    from app.infrastructure.boond.client import BoondClient
-    from app.infrastructure.database.repositories.user_repository import UserRepository
-    from app.infrastructure.email.sender import EmailService
-
-    boond_client = BoondClient(settings)
-    crm_service = BoondCrmAdapter(boond_client)
-    email_service = EmailService(settings)
-    user_repo = UserRepository(db)
-
-    use_case = CreateContractRequestFromEntityUseCase(
-        contract_request_repository=cr_repo,
-        webhook_event_repository=webhook_repo,
-        crm_service=crm_service,
-        email_service=email_service,
-        user_repository=user_repo,
-        frontend_url=settings.frontend_url,
-        company_repository=cr_repo,
-        company_email_resolver=_make_company_email_resolver(db),
+    use_case = CreatePurchaseOrderFromPositioningUseCase(
+        purchase_order_repository=PurchaseOrderRepository(db),
+        crm_service=BoondCrmAdapter(BoondClient(settings)),
+        company_repository=ContractRequestRepository(db),
+        user_repository=UserRepository(db),
+        settings_service=AppSettingsService(db),
     )
 
-    try:
-        result = await use_case.execute(
-            payload=payload,
-            entity_type="candidate",
-            expected_states=[BOOND_CANDIDATE_STATE_AWAITING_CONTRACT],
-        )
-        if result:
-            await db.commit()
+    for data in iter_events(payload):
+        positioning_id, new_state = parse_positioning_event(data)
+        if not positioning_id:
+            logger.info("webhook_no_positioning_id", data_type=data.get("type", ""))
+            continue
+
+        logger.info("webhook_parsed", positioning_id=positioning_id, new_state=new_state)
+
+        try:
+            purchase_order = await use_case.execute(positioning_id)
+        except PositioningStateMismatchError as exc:
+            # Cas nominal : Boond notifie tous les changements d'état, seul
+            # l'état déclencheur ouvre un bon de commande.
             logger.info(
-                "webhook_candidate_contract_created",
-                cr_id=str(result.id),
-                reference=result.display_reference,
+                "webhook_positioning_state_filtered",
+                positioning_id=positioning_id,
+                state=exc.state,
+                expected=exc.expected,
             )
-            return WebhookResponse(
-                status="ok",
-                message=f"Contract request {result.display_reference} created from candidate",
-            )
-        return WebhookResponse(status="ok", message="No action taken")
-    except WebhookDuplicateError as exc:
-        logger.info("webhook_candidate_duplicate", event_id=str(exc))
-        return WebhookResponse(status="ok", message="Duplicate event")
-    except Exception as exc:
-        await db.rollback()
-        logger.error(
-            "webhook_candidate_processing_error",
-            error=str(exc),
-            traceback=traceback.format_exc(),
-        )
-        return WebhookResponse(status="ok", message="Processing error")
-
-
-@router.post(
-    "/boondmanager/resource-state-update",
-    response_model=WebhookResponse,
-    summary="Handle BoondManager resource state update webhook",
-)
-async def handle_boond_resource_webhook(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    """Handle resource state update from BoondManager.
-
-    Triggers contract request creation when resource moves to:
-    - State 4 (Attente nouveau contrat): re-contractualization (expired contract)
-    - State 5 (Changement de contrat): new company, full workflow
-
-    Always returns 200 OK to prevent retries from Boond.
-    """
-    settings = get_settings()
-    _verify_boond_webhook_token(request, settings)
-
-    raw_body = await request.body()
-    logger.info(
-        "webhook_boond_resource_received",
-        body_length=len(raw_body),
-        body_preview=raw_body[:500].decode("utf-8", errors="replace"),
-    )
-
-    try:
-        payload = json.loads(raw_body)
-    except Exception:
-        logger.warning("webhook_invalid_json")
-        return WebhookResponse(status="ok", message="Invalid JSON")
-
-    audit_logger.log(
-        AuditAction.WEBHOOK_RECEIVED,
-        AuditResource.CONTRACT_REQUEST,
-        details={"source": "boondmanager", "type": "resource_state_update"},
-    )
-
-    cr_repo = ContractRequestRepository(db)
-    webhook_repo = WebhookEventRepository(db)
-
-    from app.contract_management.application.use_cases.create_contract_request_from_entity import (
-        BOOND_RESOURCE_STATE_AWAITING_NEW_CONTRACT,
-        BOOND_RESOURCE_STATE_CONTRACT_CHANGE,
-        CreateContractRequestFromEntityUseCase,
-    )
-    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
-        BoondCrmAdapter,
-    )
-    from app.infrastructure.boond.client import BoondClient
-    from app.infrastructure.database.repositories.user_repository import UserRepository
-    from app.infrastructure.email.sender import EmailService
-
-    boond_client = BoondClient(settings)
-    crm_service = BoondCrmAdapter(boond_client)
-    email_service = EmailService(settings)
-    user_repo = UserRepository(db)
-
-    use_case = CreateContractRequestFromEntityUseCase(
-        contract_request_repository=cr_repo,
-        webhook_event_repository=webhook_repo,
-        crm_service=crm_service,
-        email_service=email_service,
-        user_repository=user_repo,
-        frontend_url=settings.frontend_url,
-        company_repository=cr_repo,
-        company_email_resolver=_make_company_email_resolver(db),
-    )
-
-    try:
-        result = await use_case.execute(
-            payload=payload,
-            entity_type="resource",
-            expected_states=[
-                BOOND_RESOURCE_STATE_AWAITING_NEW_CONTRACT,
-                BOOND_RESOURCE_STATE_CONTRACT_CHANGE,
-            ],
-        )
-        if result:
-            await db.commit()
+            continue
+        except PurchaseOrderAlreadyExistsError as exc:
             logger.info(
-                "webhook_resource_contract_created",
-                cr_id=str(result.id),
-                reference=result.display_reference,
-                trigger_type=result.trigger_type,
+                "webhook_purchase_order_duplicate",
+                positioning_id=positioning_id,
+                reference=exc.reference,
             )
-            return WebhookResponse(
-                status="ok",
-                message=f"Contract request {result.display_reference} created from resource",
+            return WebhookResponse(status="ok", message="Duplicate event")
+        except PositioningNotFoundError:
+            logger.warning("webhook_positioning_not_found", positioning_id=positioning_id)
+            continue
+        except Exception as exc:
+            await db.rollback()
+            logger.error(
+                "webhook_processing_error",
+                positioning_id=positioning_id,
+                error=str(exc),
+                traceback=traceback.format_exc(),
             )
-        return WebhookResponse(status="ok", message="No action taken")
-    except WebhookDuplicateError as exc:
-        logger.info("webhook_resource_duplicate", event_id=str(exc))
-        return WebhookResponse(status="ok", message="Duplicate event")
-    except Exception as exc:
-        await db.rollback()
-        logger.error(
-            "webhook_resource_processing_error",
-            error=str(exc),
-            traceback=traceback.format_exc(),
+            return WebhookResponse(status="ok", message="Processing error")
+
+        # Trace de l'événement traité, à titre d'historique : l'idempotence
+        # repose sur le bon de commande lui-même, pas sur cette table.
+        event_id = f"positioning_update_{positioning_id}_{new_state}"
+        try:
+            if not await webhook_repo.exists(event_id):
+                await webhook_repo.save(
+                    event_id=event_id,
+                    event_type="positioning_update",
+                    payload=data if isinstance(data, dict) else {"data": data},
+                )
+        except Exception as exc:
+            logger.warning("webhook_event_trace_failed", event_id=event_id, error=str(exc))
+
+        await db.commit()
+
+        logger.info(
+            "webhook_purchase_order_created",
+            purchase_order_id=str(purchase_order.id),
+            reference=purchase_order.display_reference,
+            positioning_id=positioning_id,
         )
-        return WebhookResponse(status="ok", message="Processing error")
+
+        await _notify_purchase_order_created(db, purchase_order)
+
+        return WebhookResponse(
+            status="ok",
+            message=f"Purchase order {purchase_order.display_reference} created",
+        )
+
+    return WebhookResponse(status="ok", message="No action taken")
 
 
 @router.post(

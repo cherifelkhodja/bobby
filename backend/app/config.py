@@ -47,7 +47,11 @@ class Settings(BaseSettings):
     BOOND_USERNAME: str = ""
     BOOND_PASSWORD: str = ""
     BOOND_CANDIDATE_STATE_ID: int = 1
-    BOOND_POSITIONING_STATE_ID: int = 1
+    # État du positionnement créé par une cooptation. **0 = « Positionné »**,
+    # l'état d'entrée du CRM. Chaque entité Boond a sa propre échelle : sur un
+    # positionnement, 1 vaut « Refus Client » — une cooptation naissait donc
+    # refusée. Sur une opportunité, ce même 1 vaut « Gagné ».
+    BOOND_POSITIONING_STATE_ID: int = 0
     # Secret partagé des webhooks BoondManager (header X-Webhook-Token).
     # Vide = pas de vérification (rétrocompatibilité).
     BOOND_WEBHOOK_SECRET: str = ""

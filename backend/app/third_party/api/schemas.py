@@ -52,6 +52,7 @@ class ThirdPartyPortalResponse(BaseModel):
     capital: str | None = None
     siret: str | None = None
     vat_number: str | None = None
+    vat_liable: bool = True
     ape_code: str | None = None
     rcs_city: str | None = None
     head_office_street: str | None = None
@@ -105,6 +106,7 @@ class ThirdPartyResponse(BaseModel):
     siren: str | None = None
     siret: str | None = None
     vat_number: str | None = None
+    vat_liable: bool = True
     ape_code: str | None = None
     rcs_city: str | None = None
     rcs_number: str | None = None
@@ -284,6 +286,10 @@ class CompanyInfoRequest(BlankToNoneModel):
     vat_number: str | None = Field(
         None, max_length=50, description="Numéro de TVA intracommunautaire"
     )
+    vat_liable: bool = Field(
+        True,
+        description="Le tiers facture-t-il la TVA ? Faux en franchise en base ou autoliquidation",
+    )
     ape_code: str | None = Field(None, max_length=10, description="Code APE/NAF")
     head_office_street: str = Field(..., max_length=255)
     head_office_postal_code: str = Field(..., min_length=5, max_length=5, pattern=r"^\d{5}$")
@@ -329,6 +335,7 @@ class CompanyInfoDraftRequest(BlankToNoneModel):
     capital: str | None = Field(None, max_length=50)
     siret: str | None = Field(None, max_length=14)
     vat_number: str | None = Field(None, max_length=50)
+    vat_liable: bool | None = None
     ape_code: str | None = Field(None, max_length=10)
     head_office_street: str | None = Field(None, max_length=255)
     head_office_postal_code: str | None = Field(None, max_length=10)

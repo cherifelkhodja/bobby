@@ -64,9 +64,10 @@ class BoondCrmAdapter:
                 or self._extract_relationship_id(relationships, "resource")
                 or self._extract_relationship_id(relationships, "candidate")
             )
-            need_id = self._extract_relationship_id(
-                relationships, "opportunity"
-            ) or self._extract_relationship_id(relationships, "delivery")
+            delivery_id = self._extract_relationship_id(relationships, "delivery")
+            # Le besoin reste la référence ; sur certains positionnements Boond
+            # ne renvoie que la prestation, d'où le repli historique.
+            need_id = self._extract_relationship_id(relationships, "opportunity") or delivery_id
 
             # Detect consultant type and extract name from included data.
             # Boond can include the consultant as type "resource" (already a
@@ -100,6 +101,7 @@ class BoondCrmAdapter:
                 candidate_id=candidate_id,
                 consultant_type=consultant_type,
                 need_id=need_id,
+                delivery_id=delivery_id,
                 consultant_name=f"{consultant_first_name} {consultant_last_name}".strip(),
                 relationship_keys=list(relationships.keys()),
             )
@@ -110,8 +112,16 @@ class BoondCrmAdapter:
                 "candidate_id": candidate_id,
                 "consultant_type": consultant_type,
                 "need_id": need_id,
+                # Prestation Boond : support du renouvellement natif
+                # (POST /deliveries/{id}/renew).
+                "delivery_id": delivery_id,
+                # Deux taux distincts, comme sur le bon de commande : le coût
+                # journalier moyen préremplit le CJM d'achat, le tarif de vente
+                # journalier le TJM — interne, jamais imprimé.
                 "daily_rate": attributes.get("averageDailyCost"),
+                "sale_daily_rate": attributes.get("averageDailyPriceExcludingTax"),
                 "quantity": attributes.get("numberOfDaysInvoicedOrQuantity"),
+                "free_days": attributes.get("numberOfDaysFree"),
                 "start_date": attributes.get("startDate"),
                 "end_date": attributes.get("endDate"),
                 "consultant_first_name": consultant_first_name,
@@ -124,6 +134,215 @@ class BoondCrmAdapter:
                 error=str(exc),
             )
             return None
+
+    async def positioning_states(self) -> dict[int, str]:
+        """États de positionnement configurés dans le CRM, du dictionnaire Boond.
+
+        Chaque entité a **sa propre échelle** : l'état 1 d'un positionnement
+        n'est pas celui d'une opportunité. Les libellés étant définis par
+        l'administrateur du CRM, les lire vaut mieux que les supposer.
+
+        Returns:
+            ``{valeur: libellé}``, vide si le dictionnaire est illisible.
+        """
+        try:
+            response = await self._boond._make_request(
+                "GET", "/application/dictionary/setting.state.positioning"
+            )
+        except Exception as exc:
+            logger.warning("boond_positioning_states_unreadable", error=str(exc)[:200])
+            return {}
+
+        states: dict[int, str] = {}
+        for entry in (response or {}).get("data", []):
+            try:
+                states[int(entry["id"])] = entry.get("attributes", {}).get("value", "")
+            except (KeyError, TypeError, ValueError):
+                continue
+        logger.info("boond_positioning_states_fetched", states=states)
+        return states
+
+    async def update_positioning_state(self, positioning_id: int, state: int) -> int | None:
+        """Change l'état d'un positionnement BoondManager.
+
+        C'est ainsi que naît une prestation : passer le positionnement à
+        « Gagné » la fait créer par Boond à partir du positionnement. Bobby n'a
+        pas d'autre moyen de la produire — l'API ne crée pas de prestation.
+
+        Returns:
+            L'état que BoondManager renvoie dans sa réponse, quand il en
+            renvoie un. Il dit s'il a pris le changement en compte : une
+            réponse en 200 ne le garantit pas, et un état inchangé dès cette
+            réponse distingue une écriture ignorée d'un changement défait
+            ensuite par une règle du CRM.
+        """
+        # Un positionnement s'écrit à son adresse propre : il n'a pas d'onglet
+        # « information », contrairement aux candidats, sociétés et besoins —
+        # `/positionings/{id}/information` répond 404. Sa lecture le disait
+        # déjà : elle se fait sur `/positionings/{id}`, comme pour les
+        # prestations.
+        #
+        # Seul l'état est envoyé : les données du positionnement — dates,
+        # tarif de vente, jours — restent celles du commercial.
+        payload = {
+            "data": {
+                "type": "positioning",
+                "id": str(positioning_id),
+                "attributes": {"state": state},
+            }
+        }
+        response = await self._boond._make_request(
+            "PUT", f"/positionings/{positioning_id}", json=payload
+        )
+        echoed = ((response or {}).get("data") or {}).get("attributes", {}).get("state")
+        logger.info(
+            "boond_positioning_state_updated",
+            positioning_id=positioning_id,
+            state=state,
+            echoed_state=echoed,
+        )
+        try:
+            return int(echoed)
+        except (TypeError, ValueError):
+            return None
+
+    async def get_delivery(self, delivery_id: int) -> dict[str, Any] | None:
+        """Fetch a delivery (prestation) from BoondManager.
+
+        La prestation est l'équivalent natif du bon de commande côté Boond :
+        elle porte la période, le prix de vente, le coût, les jours vendus et
+        les jours de gratuité, tous renégociés à la signature. C'est donc la
+        meilleure source de préremplissage d'un BDC, meilleure que le
+        positionnement, qui porte les mêmes conditions mais telles qu'elles
+        étaient à la proposition, et qui ignore le contrat déjà rattaché.
+
+        Returns:
+            Les données de la prestation, ou None si elle est illisible.
+        """
+        try:
+            response = await self._boond._make_request("GET", f"/deliveries/{delivery_id}")
+            return self._parse_delivery(response)
+        except Exception as exc:
+            logger.error("boond_get_delivery_failed", delivery_id=delivery_id, error=str(exc))
+            return None
+
+    async def renew_delivery(self, delivery_id: int) -> dict[str, Any] | None:
+        """Renouvelle une prestation dans BoondManager.
+
+        Action REST sans corps de requête : Boond duplique la prestation (mêmes
+        projet, ressource et contrat) et crée, selon la configuration du
+        dossier, l'achat fournisseur et la commande client associés.
+
+        La prestation créée reprend la période de l'originale : c'est à
+        l'appelant de la recaler sur les dates du nouveau bon de commande.
+
+        Args:
+            delivery_id: Prestation à renouveler.
+
+        Returns:
+            La prestation créée, ou None si l'appel échoue.
+        """
+        response = await self._boond._make_request("POST", f"/deliveries/{delivery_id}/renew")
+        renewed = self._parse_delivery(response)
+        logger.info(
+            "boond_delivery_renewed",
+            source_delivery_id=delivery_id,
+            new_delivery_id=renewed.get("id") if renewed else None,
+            purchase_id=renewed.get("purchase_id") if renewed else None,
+        )
+        return renewed
+
+    async def update_delivery(  # noqa: PLR0913
+        self,
+        delivery_id: int,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        days_sold: float | None = None,
+        free_days: float | None = None,
+        purchase_daily_rate: float | None = None,
+        sale_daily_rate: float | None = None,
+    ) -> None:
+        """Recale une prestation sur la période et les conditions d'un BDC.
+
+        Sert après un renouvellement, la prestation créée héritant des dates de
+        l'originale. Seuls les champs fournis sont envoyés.
+        """
+        attributes: dict[str, Any] = {}
+        if start_date:
+            attributes["startDate"] = start_date
+        if end_date:
+            attributes["endDate"] = end_date
+        if days_sold is not None:
+            attributes["numberOfDaysInvoicedOrQuantity"] = days_sold
+        if free_days is not None:
+            attributes["numberOfDaysFree"] = free_days
+        if purchase_daily_rate is not None:
+            attributes["averageDailyContractCost"] = purchase_daily_rate
+        if sale_daily_rate is not None:
+            # Le prix de vente est imposé, sinon Boond le recalcule depuis la
+            # grille du projet et écraserait la valeur du bon de commande.
+            attributes["averageDailyPriceExcludingTax"] = sale_daily_rate
+            attributes["forceAverageDailyPriceExcludingTax"] = True
+
+        if not attributes:
+            return
+
+        payload = {"data": {"id": str(delivery_id), "type": "delivery", "attributes": attributes}}
+        await self._boond._make_request("PUT", f"/deliveries/{delivery_id}", json=payload)
+        logger.info(
+            "boond_delivery_updated",
+            delivery_id=delivery_id,
+            fields=sorted(attributes),
+        )
+
+    def _parse_delivery(self, response: dict[str, Any]) -> dict[str, Any] | None:
+        """Traduit une réponse « prestation » de Boond en données exploitables."""
+        data = response.get("data") or {}
+        if not data:
+            return None
+        attributes = data.get("attributes", {})
+        relationships = data.get("relationships", {})
+        included = response.get("included", [])
+
+        # Le projet de la prestation porte le client final, le besoin et le
+        # commercial. Les trois sont dans `included` : les lire ici évite trois
+        # appels et reste juste même quand le besoin n'est plus lisible.
+        project_id = self._extract_relationship_id(relationships, "project")
+        project = self._find_included(included, "project", project_id)
+        project_rels = project.get("relationships", {}) if project else {}
+        client_id = self._extract_relationship_id(project_rels, "company")
+        client = self._find_included(included, "company", client_id)
+
+        try:
+            parsed_id = int(data.get("id"))
+        except (TypeError, ValueError):
+            parsed_id = None
+
+        return {
+            "id": parsed_id,
+            "state": attributes.get("state"),
+            "title": attributes.get("title") or "",
+            "start_date": attributes.get("startDate") or None,
+            "end_date": attributes.get("endDate") or None,
+            # Prix de vente au client et coût d'achat : deux notions distinctes,
+            # comme le TJM et le CJM d'un bon de commande.
+            "sale_daily_rate": attributes.get("averageDailyPriceExcludingTax"),
+            "purchase_daily_rate": (
+                attributes.get("averageDailyContractCost") or attributes.get("averageDailyCost")
+            ),
+            "days_sold": attributes.get("numberOfDaysInvoicedOrQuantity"),
+            "free_days": attributes.get("numberOfDaysFree"),
+            "resource_id": self._extract_relationship_id(relationships, "dependsOn"),
+            "project_id": project_id,
+            "client_id": client_id,
+            "client_name": (client.get("attributes", {}).get("name") if client else None),
+            "need_id": self._extract_relationship_id(project_rels, "opportunity"),
+            "main_manager_id": self._extract_relationship_id(project_rels, "mainManager"),
+            # Contrat déjà rattaché à la prestation : sa présence évite d'en
+            # créer un second sur la même ressource.
+            "contract_id": self._extract_relationship_id(relationships, "contract"),
+            "purchase_id": self._extract_relationship_id(relationships, "purchase"),
+        }
 
     async def get_need(self, need_id: int) -> dict[str, Any] | None:
         """Fetch a need/opportunity from BoondManager.
@@ -353,6 +572,106 @@ class BoondCrmAdapter:
         )
         return provider_id
 
+    async def create_supplier_purchase(
+        self,
+        delivery_id: int,
+        title: str,
+        provider_id: int | None = None,
+        provider_contact_id: int | None = None,
+        reference: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        quantity: float | None = None,
+        amount: float | None = None,
+    ) -> int:
+        """Crée l'achat fournisseur rattaché à une prestation Boond.
+
+        Le rattachement se fait **à la création seulement** : `PUT
+        /purchases/{id}/information` n'expose ni `delivery` ni `project`. Un
+        achat posé sur la mauvaise prestation se supprime et se recrée.
+
+        Le corps part du pré-remplissage Boond (`GET /purchases/default`)
+        plutôt que d'une composition à la main : c'est lui qui accorde
+        prestation, projet, société et agence entre eux, désaccord qui est la
+        cause classique des 422.
+
+        Args:
+            delivery_id: Prestation Boond qui porte la mission.
+            title: Intitulé de l'achat, seul attribut obligatoire.
+            provider_id: Société fournisseur, si elle diffère du pré-remplissage.
+            provider_contact_id: Contact facturation du fournisseur.
+            reference: Référence du bon de commande Bobby.
+            start_date: Début de la période achetée (YYYY-MM-DD).
+            end_date: Fin de la période achetée (YYYY-MM-DD).
+            quantity: Jours achetés (jours vendus moins gratuité).
+            amount: Montant d'achat HT total de la période.
+
+        Returns:
+            Identifiant Boond de l'achat créé.
+        """
+        attributes, relationships = await self._purchase_defaults(delivery_id)
+
+        attributes["title"] = title
+        # `date` est la date de l'achat : celle de son point de départ, pour
+        # qu'il se range dans le bon exercice.
+        for key, value in (
+            ("reference", reference),
+            ("date", start_date),
+            ("startDate", start_date),
+            ("endDate", end_date),
+            ("quantity", quantity),
+            ("amountExcludingTax", amount),
+        ):
+            if value is not None:
+                attributes[key] = value
+
+        # La doc décrit cette relation avec `type: "project"` — coquille de
+        # copier-coller du bloc voisin. Le type attendu est bien `delivery`.
+        relationships["delivery"] = {"data": {"type": "delivery", "id": str(delivery_id)}}
+
+        if provider_id and self._extract_relationship_id(relationships, "company") != provider_id:
+            # Le pré-remplissage vient de la prestation : sa société est celle
+            # du client. Sur un achat, c'est le fournisseur que l'on paie — et
+            # le contact du client n'a alors plus rien à y faire.
+            relationships["company"] = {"data": {"type": "company", "id": str(provider_id)}}
+            relationships.pop("contact", None)
+        if provider_contact_id:
+            relationships["contact"] = {"data": {"type": "contact", "id": str(provider_contact_id)}}
+
+        payload = {"data": {"type": "purchase", "attributes": attributes}}
+        if relationships:
+            payload["data"]["relationships"] = relationships
+
+        response = await self._boond._make_request("POST", "/purchases", json=payload)
+        purchase_id = self._require_created_id(response, "achat fournisseur")
+        logger.info(
+            "boond_supplier_purchase_created",
+            purchase_id=purchase_id,
+            delivery_id=delivery_id,
+            reference=reference,
+        )
+        return purchase_id
+
+    async def _purchase_defaults(self, delivery_id: int) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Pré-remplissage Boond d'un achat rattaché à une prestation.
+
+        Renvoie les attributs et les relations de l'achat vide que Boond
+        compose pour cette prestation : responsable, agence, pôle, société,
+        contact, projet. Les relations vides sont écartées — les renvoyer à
+        `null` ferait échouer la création.
+        """
+        response = await self._boond._make_request(
+            "GET", "/purchases/default", params={"delivery": str(delivery_id)}
+        )
+        data = (response or {}).get("data") or {}
+        attributes = dict(data.get("attributes") or {})
+        relationships = {
+            name: value
+            for name, value in (data.get("relationships") or {}).items()
+            if isinstance(value, dict) and value.get("data")
+        }
+        return attributes, relationships
+
     async def create_purchase_order(
         self,
         provider_id: int,
@@ -362,27 +681,35 @@ class BoondCrmAdapter:
     ) -> int:
         """Create a purchase order in BoondManager.
 
+        .. deprecated::
+            Chemin de l'ancienne méthode, où l'achat pendait au contrat cadre.
+            L'achat fournisseur naît désormais du bon de commande, rattaché à
+            la prestation (`create_supplier_purchase`) — seule forme confirmée
+            contre l'API.
+
         Args:
             provider_id: Boond provider ID.
             positioning_id: Boond positioning ID.
             reference: Contract reference.
-            amount: Order amount (voir NEEDS-CONFIRMATION ci-dessous).
+            amount: Montant d'achat HT total de la mission.
 
         Returns:
             Boond purchase order ID.
         """
+        # L'objet Boond est un **achat** (`purchase`), pas un « purchase order » :
+        # `/purchase-orders` n'existe pas et répondait 404. C'est le même objet
+        # que celui produit par le renouvellement natif d'une prestation, qui le
+        # renvoie dans `relationships.purchase` — les deux chemins créent donc
+        # bien la même chose.
         payload = {
             "data": {
-                "type": "purchaseorder",
+                "type": "purchase",
                 "attributes": {
                     "reference": reference,
-                    # NEEDS-CONFIRMATION: `amount` reçu = TJM (prix unitaire) des
-                    # appelants. Dans le schéma Boond des devis, `amountExcludingTax`
-                    # est le prix UNITAIRE (cf. quotation_line.to_boond_record), le
-                    # total étant `turnoverExcludingTax` = TJM × quantité. Ce BDC
-                    # n'envoie ni quantité ni total : à confirmer si Boond attend ici
-                    # un TOTAL (TJM × quantity_sold) ou le TJM seul. Maths d'argent
-                    # laissées inchangées faute de certitude.
+                    # Montant d'achat total de la mission, soit
+                    # (jours vendus - jours de gratuité) x CJM. L'achat Boond
+                    # matérialise un engagement sur une période : c'est bien un
+                    # total, pas un prix unitaire.
                     "amountExcludingTax": amount,
                 },
                 "relationships": {
@@ -392,7 +719,7 @@ class BoondCrmAdapter:
             }
         }
 
-        response = await self._boond._make_request("POST", "/purchase-orders", json=payload)
+        response = await self._boond._make_request("POST", "/purchases", json=payload)
         purchase_order_id = self._require_created_id(response, "bon de commande")
         logger.info(
             "boond_purchase_order_created",
@@ -488,6 +815,68 @@ class BoondCrmAdapter:
                 error=str(exc),
             )
             raise
+
+    async def _entity_exists(self, path: str, kind: str, entity_id: int) -> bool:
+        """Une fiche Boond existe-t-elle ? Seul un vrai 404 vaut « non ».
+
+        Toute autre erreur est propagée : conclure à l'absence sur un timeout
+        ferait convertir un candidat qui n'en est pas un, ou recréer un
+        doublon.
+        """
+        try:
+            await self._boond._make_request("GET", path)
+            return True
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                logger.info("boond_entity_not_found", kind=kind, entity_id=entity_id)
+                return False
+            raise
+
+    async def _delete_entity(self, path: str, kind: str, entity_id: int) -> bool:
+        """Supprime une fiche Boond. Un 404 vaut suppression : elle n'est plus là.
+
+        Toute autre erreur est propagée : l'appelant doit savoir que l'objet
+        subsiste dans le CRM, sous peine d'en créer un doublon au report
+        suivant.
+        """
+        try:
+            await self._boond._make_request("DELETE", path)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 404:
+                raise
+            logger.info("boond_entity_already_absent", kind=kind, entity_id=entity_id)
+            return True
+        logger.info("boond_entity_deleted", kind=kind, entity_id=entity_id)
+        return True
+
+    async def delete_supplier_purchase(self, purchase_id: int) -> bool:
+        """Supprime un achat fournisseur.
+
+        Seule façon de le déplacer : sa prestation ne se change pas après coup
+        (`PUT /purchases/{id}/information` ne l'expose pas).
+        """
+        return await self._delete_entity(f"/purchases/{purchase_id}", "purchase", purchase_id)
+
+    async def delete_boond_contract(self, contract_id: int) -> bool:
+        """Supprime un contrat Boond."""
+        return await self._delete_entity(f"/contracts/{contract_id}", "contract", contract_id)
+
+    async def delete_delivery(self, delivery_id: int) -> bool:
+        """Supprime une prestation Boond."""
+        return await self._delete_entity(f"/deliveries/{delivery_id}", "delivery", delivery_id)
+
+    async def candidate_exists(self, candidate_id: int) -> bool:
+        """Cet identifiant est-il celui d'un candidat Boond ?"""
+        return await self._entity_exists(f"/candidates/{candidate_id}", "candidate", candidate_id)
+
+    async def resource_exists(self, resource_id: int) -> bool:
+        """Cet identifiant est-il celui d'une ressource Boond ?
+
+        Les identifiants de candidats et de ressources vivent dans deux séries
+        distinctes : le même numéro peut désigner deux personnes. À n'appeler
+        qu'une fois établi que le numéro n'est pas celui d'un candidat.
+        """
+        return await self._entity_exists(f"/resources/{resource_id}", "resource", resource_id)
 
     async def verify_company_exists(self, company_id: int) -> bool:
         """Check if a company exists in BoondManager.
@@ -905,6 +1294,21 @@ class BoondCrmAdapter:
             company_id=company_id,
             iban_last4=clean_iban[-4:] if len(clean_iban) >= 4 else "****",
         )
+
+    @staticmethod
+    def _find_included(included: list, entity_type: str, entity_id: object) -> dict | None:
+        """Retrouve une entité du bloc `included` par type et identifiant.
+
+        Boond renvoie les identifiants en chaîne dans `included` et parfois en
+        entier dans les relations : la comparaison se fait donc sur le texte.
+        """
+        if entity_id is None:
+            return None
+        wanted = str(entity_id)
+        for entry in included:
+            if entry.get("type") == entity_type and str(entry.get("id", "")) == wanted:
+                return entry
+        return None
 
     @staticmethod
     def _extract_relationship_id(relationships: dict, key: str) -> int | None:

@@ -781,6 +781,8 @@ export interface ContractRequest {
   contractualization_contact_email: string | null;
   third_party_id: string | null;
   third_party_name: string | null;
+  /** Société fournisseur dans BoondManager : renseigné dès le report, signature ou pas. */
+  third_party_boond_provider_id: number | null;
   portal_url: string | null;
   compliance_override: boolean;
   /** Justification de la dérogation, ou motif de blocage si compliance_override est false. */
@@ -788,6 +790,9 @@ export interface ContractRequest {
   /** Dépôt des documents de vigilance volontairement ignoré (saisie manuelle ADV). */
   documents_skipped: boolean;
   company_id: string | null;
+  company_name: string | null;
+  /** Nombre de bons de commande vivants sous ce contrat cadre. */
+  purchase_orders_count: number;
   contract_config: Record<string, unknown> | null;
   status_history: Array<{ status: ContractRequestStatus; entered_at: string; comment?: string }>;
   created_at: string;
@@ -879,6 +884,8 @@ export interface ThirdPartyWithDocuments {
   siren: string;
   siret: string | null;
   vat_number: string | null;
+  /** Le tiers facture-t-il la TVA ? Faux en franchise en base ou autoliquidation. */
+  vat_liable: boolean;
   ape_code: string | null;
   rcs_city: string | null;
   rcs_number: string | null;
@@ -970,6 +977,7 @@ export interface PortalInfo {
     capital: string | null;
     siret: string | null;
     vat_number: string | null;
+    vat_liable: boolean;
     ape_code: string | null;
     rcs_city: string | null;
     head_office_street: string | null;
@@ -1020,4 +1028,176 @@ export interface PortalDocument {
   // Third-party declared unavailability
   is_unavailable: boolean;
   unavailability_reason: string | null;
+}
+
+// ─── Bons de commande (missions) ──────────────────────────────────────────
+
+export type PurchaseOrderStatus =
+  | 'draft'
+  | 'generated'
+  | 'sent_for_signature'
+  | 'signed'
+  | 'active'
+  | 'closed'
+  | 'cancelled';
+
+export const PURCHASE_ORDER_STATUS_CONFIG: Record<
+  PurchaseOrderStatus,
+  { label: string; color: string; group: 'active' | 'waiting' | 'done'; stage: 0 | 1 | 2 | 3 | 4 }
+> = {
+  draft: { label: 'Brouillon', color: 'bg-sla-bg text-sla-fg', group: 'active', stage: 1 },
+  generated: { label: 'Généré', color: 'bg-blu-bg text-blu-fg', group: 'active', stage: 2 },
+  sent_for_signature: {
+    label: 'Envoyé en signature',
+    color: 'bg-amb-bg text-amb-fg',
+    group: 'waiting',
+    stage: 3,
+  },
+  signed: { label: 'Signé', color: 'bg-ind-bg text-ind-fg', group: 'active', stage: 4 },
+  active: { label: 'Actif', color: 'bg-grn-bg text-grn-fg', group: 'done', stage: 4 },
+  closed: { label: 'Clôturé', color: 'bg-sla-bg text-sla-fg', group: 'done', stage: 4 },
+  cancelled: { label: 'Annulé', color: 'bg-red-bg text-red-fg', group: 'done', stage: 0 },
+};
+
+export interface PurchaseOrder {
+  id: string;
+  /** Numéro provisoire (PROV-BC-AAAA-NNN), porté dès la création. */
+  provisional_reference: string;
+  /** Numéro définitif (XXX-BC-NNN), attribué à la génération du document. */
+  reference: string | null;
+  /** Numéro à afficher : définitif s'il existe, provisoire sinon. */
+  display_reference: string;
+  status: PurchaseOrderStatus;
+  status_display: string;
+  is_editable: boolean;
+
+  // Fournisseur et contrat cadre
+  third_party_id: string | null;
+  third_party_name: string | null;
+  needs_third_party: boolean;
+  contract_request_id: string | null;
+  framework_contract_reference: string | null;
+  framework_contract_status: ContractRequestStatus | null;
+  framework_contract_signed: boolean;
+  can_send_for_signature: boolean;
+
+  // Société émettrice : deux missions d'un même fournisseur peuvent relever de
+  // deux sociétés du groupe, sous deux contrats cadres différents.
+  company_id: string | null;
+  company_name: string | null;
+
+  // Consultant
+  boond_consultant_id: number | null;
+  boond_consultant_type: 'candidate' | 'resource' | null;
+  consultant_civility: string | null;
+  consultant_first_name: string | null;
+  consultant_last_name: string | null;
+  consultant_name: string | null;
+  consultant_email: string | null;
+  consultant_phone: string | null;
+
+  // Origine Boond
+  boond_positioning_id: number | null;
+  boond_need_id: number | null;
+  boond_delivery_id: number | null;
+
+  // Mission
+  client_name: string | null;
+  mission_title: string | null;
+  mission_description: string | null;
+  mission_site_name: string | null;
+  mission_address: string | null;
+  mission_postal_code: string | null;
+  mission_city: string | null;
+
+  // Conditions financières — sale_daily_rate est interne, jamais exposé au tiers
+  sale_daily_rate: number | null;
+  purchase_daily_rate: number | null;
+  days_sold: number | null;
+  free_days: number;
+  billable_days: number;
+  total_amount: number;
+  estimated_margin: number | null;
+  start_date: string | null;
+  end_date: string | null;
+
+  // Documents et signature
+  has_draft: boolean;
+  has_signed_document: boolean;
+  sent_for_signature_at: string | null;
+  signed_at: string | null;
+
+  // Synchronisation Boond
+  boond_contract_id: number | null;
+  boond_purchase_order_id: number | null;
+  boond_sync_error: string | null;
+
+  parent_purchase_order_id: string | null;
+  commercial_email: string | null;
+  missing_fields: string[];
+  status_history: Array<{ status: PurchaseOrderStatus; entered_at: string }>;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Compte rendu d'une suppression dans BoondManager (outil de test). */
+export interface BoondDeletion {
+  purchase_order: PurchaseOrder;
+  // Une ligne par objet traité : ce qui a été supprimé, ce qui a résisté.
+  report: string[];
+}
+
+/**
+ * Un fournisseur du panel d'une société émettrice : le contrat cadre qui l'y
+ * fait entrer l'identifie mieux que son SIREN.
+ */
+export interface PanelSupplier {
+  third_party_id: string;
+  /** Libellé prêt à afficher : raison sociale, à défaut signataire ou contact. */
+  label: string;
+  company_name: string | null;
+  third_party_type: string | null;
+  contract_request_id: string;
+  framework_reference: string;
+  framework_status: ContractRequestStatus;
+  framework_signed: boolean;
+}
+
+export interface PanelSupplierListResponse {
+  items: PanelSupplier[];
+  total: number;
+}
+
+export interface PurchaseOrderListResponse {
+  items: PurchaseOrder[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface SupplierFrameworkSummary {
+  contract_request_id: string;
+  reference: string;
+  status: ContractRequestStatus;
+  issuer_company_id: string | null;
+  issuer_company_name: string | null;
+}
+
+/**
+ * Un contrat cadre lie le fournisseur à UNE société émettrice.
+ * `has_framework_contract` répond pour la société interrogée ;
+ * `framework_contracts` liste ceux qu'il a avec les autres sociétés du groupe.
+ */
+export interface SupplierLookupResult {
+  exists: boolean;
+  third_party_id: string | null;
+  company_name: string | null;
+  siren: string | null;
+  compliance_status: string | null;
+  has_framework_contract: boolean;
+  framework_contract_id: string | null;
+  framework_contract_reference: string | null;
+  framework_contracts: SupplierFrameworkSummary[];
+  open_contract_request_id: string | null;
+  open_contract_request_status: ContractRequestStatus | null;
 }

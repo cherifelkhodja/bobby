@@ -18,6 +18,15 @@ DEFAULT_SETTINGS = {
     "cv_ai_provider": "gemini",
     "cv_ai_model_claude": "claude-sonnet-4-5-20250929",
     "cv_generator_beta_model": "claude-sonnet-4-5-20250929",
+    # État du positionnement Boond qui ouvre un bon de commande. Configurable
+    # car les états sont définis par l'administrateur du CRM : 7 = « Gagné
+    # attente contrat ».
+    "bdc_trigger_positioning_state": "7",
+    # État « Gagné » d'un positionnement : c'est lui qui fait naître la
+    # prestation. Laissé vide, il est lu dans le dictionnaire du CRM ; le
+    # renseigner passe outre. Attention, chaque entité Boond a sa propre
+    # échelle — 2 pour un positionnement, quand 1 y vaut « Refus Client ».
+    "bdc_won_positioning_state": "",
 }
 
 # Available Gemini models

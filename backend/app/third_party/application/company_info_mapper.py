@@ -34,8 +34,10 @@ def apply_company_info(tp: ThirdParty, body) -> None:
     # Derive SIREN from first 9 digits of SIRET
     siren = body.siret[:9]
 
-    # Auto-compute VAT number from SIREN if not provided
-    vat_number = body.vat_number or compute_vat_number(siren)
+    # Numéro de TVA calculé depuis le SIREN à défaut d'être fourni — mais
+    # seulement pour un tiers assujetti : en franchise en base, il n'en a pas.
+    vat_liable = getattr(body, "vat_liable", True)
+    vat_number = body.vat_number or (compute_vat_number(siren) if vat_liable else None)
 
     tp.entity_category = body.entity_category
     tp.company_info_submitted = True
@@ -45,6 +47,7 @@ def apply_company_info(tp: ThirdParty, body) -> None:
     tp.siren = siren
     tp.siret = body.siret
     tp.vat_number = vat_number
+    tp.vat_liable = vat_liable
     tp.ape_code = body.ape_code
     tp.rcs_city = body.rcs_city or body.head_office_city
     tp.rcs_number = siren  # In France, RCS registration number = SIREN

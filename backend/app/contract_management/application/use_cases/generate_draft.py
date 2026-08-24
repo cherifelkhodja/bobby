@@ -362,7 +362,10 @@ class GenerateDraftUseCase:
 
         invoice_method_raw = context.get("invoice_submission_method", "email")
         _issuer = context.get("issuer_company_name", "")
-        _mail = context.get("invoices_company_mail", "")
+        # L'adresse saisie à la configuration prime sur celle de la société
+        # émettrice : sans cela, `invoice_email` n'aurait aucun effet et le
+        # contrat annoncerait une autre adresse que le bon de commande.
+        _mail = context.get("invoice_email") or context.get("invoices_company_mail", "")
         _invoice_display_map = {
             "boondmanager": f"Les factures seront à déposer sur la plateforme Boondmanager de la société {_issuer}",
             "email": f"Les factures seront à envoyer exclusivement à l'adresse suivante {_mail}",

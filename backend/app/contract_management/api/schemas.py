@@ -44,11 +44,17 @@ class ContractRequestResponse(BaseModel):
     contractualization_contact_email: str | None = None
     third_party_id: UUID | None = None
     third_party_name: str | None = None
+    # Société fournisseur déjà créée dans BoondManager : renseigné dès le
+    # report, signature ou pas. Sa présence interdit un second report.
+    third_party_boond_provider_id: int | None = None
     portal_url: str | None = None
     compliance_override: bool
     compliance_override_reason: str | None = None
     documents_skipped: bool = False
     company_id: UUID | None = None
+    company_name: str | None = None
+    # Nombre de bons de commande rattachés : ce qui vit sous ce contrat cadre.
+    purchase_orders_count: int = 0
     contract_config: dict | None = None
     status_history: list[dict] = []
     created_at: datetime
@@ -72,7 +78,7 @@ class CommercialValidationRequest(BaseModel):
     """
 
     third_party_type: str = Field(
-        ..., pattern=r"^(freelance|sous_traitant|salarie|portage_salarial)$"
+        ..., pattern=r"^(freelance|sous_traitant|salarie|portage_salarial|portage_commercial)$"
     )
     contact_email: EmailStr
     company_id: UUID | None = None
@@ -136,6 +142,79 @@ class ManualContractRequestCreate(BaseModel):
     consultant_last_name: str | None = Field(None, max_length=255)
     consultant_email: str | None = Field(None, max_length=255)
     consultant_phone: str | None = Field(None, max_length=50)
+
+
+class SupplierDossierCreate(BaseModel):
+    """Ouvrir un dossier de contractualisation pour un fournisseur.
+
+    Point d'entrée manuel du contrat cadre : aucun consultant, aucun
+    positionnement. Le mode de collecte des documents est choisi ici, dès la
+    création, et non plus lors d'une étape de validation séparée.
+    """
+
+    third_party_type: str = Field(
+        ..., pattern=r"^(freelance|sous_traitant|salarie|portage_salarial|portage_commercial)$"
+    )
+    contact_email: EmailStr = Field(..., description="Contact contractualisation du fournisseur")
+    company_id: UUID | None = Field(None, description="Société émettrice du contrat")
+    siret: str | None = Field(
+        None,
+        max_length=20,
+        description="SIRET du fournisseur — sert à retrouver une fiche existante",
+    )
+    reuse_third_party_id: UUID | None = Field(
+        None, description="Rattacher explicitement à une fiche fournisseur existante"
+    )
+    notify_third_party: bool = Field(
+        True,
+        description="False = saisie en personne : aucun lien de collecte n'est envoyé au fournisseur",
+    )
+    skip_documents: bool = Field(
+        False,
+        description="True = aucune vigilance documentaire dans Bobby (dérogation tracée)",
+    )
+
+    @model_validator(mode="after")
+    def _skip_requires_manual_entry(self) -> "SupplierDossierCreate":
+        """Ignorer le dépôt n'a de sens que si le fournisseur n'est pas sollicité."""
+        if self.skip_documents and self.notify_third_party:
+            raise ValueError(
+                "skip_documents ne peut être utilisé qu'avec notify_third_party=false "
+                "(saisie en personne)."
+            )
+        return self
+
+
+class SupplierFrameworkSummary(BaseModel):
+    """Un contrat cadre signé d'un fournisseur, avec la société qui l'a émis."""
+
+    contract_request_id: UUID
+    reference: str
+    status: str
+    issuer_company_id: UUID | None = None
+    issuer_company_name: str | None = None
+
+
+class SupplierLookupResponse(BaseModel):
+    """Résultat de la recherche d'un fournisseur par SIRET.
+
+    Un contrat cadre lie le fournisseur à **une** société émettrice : les
+    champs `has_framework_contract` et `framework_contract_*` répondent pour la
+    société interrogée, tandis que `framework_contracts` liste tous ses cadres,
+    toutes sociétés du groupe confondues.
+    """
+
+    exists: bool
+    third_party_id: UUID | None = None
+    company_name: str | None = None
+    siren: str | None = None
+    compliance_status: str | None = None
+    has_framework_contract: bool = False
+    framework_contract_id: UUID | None = None
+    framework_contract_reference: str | None = None
+    framework_contracts: list[SupplierFrameworkSummary] = []
+    open_contract_request_id: UUID | None = None
+    open_contract_request_status: str | None = None
 
 
 class ContractConfigRequest(BaseModel):

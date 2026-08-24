@@ -48,7 +48,7 @@ class ThirdPartyRepository:
             model.boond_resource_id = third_party.boond_resource_id
             model.boond_signatory_contact_id = third_party.boond_signatory_contact_id
             model.boond_adv_contact_id = third_party.boond_adv_contact_id
-            model.boond_commercial_contact_id = third_party.boond_commercial_contact_id
+            model.boond_billing_contact_id = third_party.boond_billing_contact_id
             model.type = third_party.type.value
             model.company_name = third_party.company_name
             model.legal_form = third_party.legal_form
@@ -85,6 +85,7 @@ class ThirdPartyRepository:
             model.billing_contact_email = third_party.billing_contact_email
             model.billing_contact_phone = third_party.billing_contact_phone
             model.vat_number = third_party.vat_number
+            model.vat_liable = third_party.vat_liable
             model.ape_code = third_party.ape_code
             model.entity_category = third_party.entity_category
             model.company_info_submitted = third_party.company_info_submitted
@@ -183,7 +184,7 @@ class ThirdPartyRepository:
             boond_resource_id=model.boond_resource_id,
             boond_signatory_contact_id=model.boond_signatory_contact_id,
             boond_adv_contact_id=model.boond_adv_contact_id,
-            boond_commercial_contact_id=model.boond_commercial_contact_id,
+            boond_billing_contact_id=model.boond_billing_contact_id,
             type=ThirdPartyType(model.type),
             company_name=model.company_name,
             legal_form=model.legal_form,
@@ -220,6 +221,7 @@ class ThirdPartyRepository:
             billing_contact_email=model.billing_contact_email,
             billing_contact_phone=model.billing_contact_phone,
             vat_number=model.vat_number,
+            vat_liable=model.vat_liable,
             ape_code=model.ape_code,
             entity_category=model.entity_category,
             company_info_submitted=model.company_info_submitted,
@@ -238,7 +240,7 @@ class ThirdPartyRepository:
             boond_resource_id=entity.boond_resource_id,
             boond_signatory_contact_id=entity.boond_signatory_contact_id,
             boond_adv_contact_id=entity.boond_adv_contact_id,
-            boond_commercial_contact_id=entity.boond_commercial_contact_id,
+            boond_billing_contact_id=entity.boond_billing_contact_id,
             type=entity.type.value,
             company_name=entity.company_name,
             legal_form=entity.legal_form,
@@ -275,6 +277,7 @@ class ThirdPartyRepository:
             billing_contact_email=entity.billing_contact_email,
             billing_contact_phone=entity.billing_contact_phone,
             vat_number=entity.vat_number,
+            vat_liable=entity.vat_liable,
             ape_code=entity.ape_code,
             entity_category=entity.entity_category,
             company_info_submitted=entity.company_info_submitted,
