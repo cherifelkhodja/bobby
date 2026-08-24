@@ -257,7 +257,7 @@ Le report d'un bon de commande fait naître la prestation en passant le position
 - L'avertissement du report est effacé au rattachement : le laisser afficherait un blocage levé. Rien n'est régénéré — la prestation est un lien de CRM, elle ne s'imprime pas.
 - Saisie dans la carte BoondManager du bon de commande, à la place du tiret de la prestation manquante.
 
-> **Contournement, pas correctif.** La cause reste ouverte : Bobby cherche `relationships.delivery` sur le positionnement, clé absente de la réponse de BoondManager — dont les relations sont `opportunity`, `project`, `files`, `dependsOn`, `createdBy`. Une prestation pend à un **projet** (`_parse_delivery` lit `relationships.project`) et dépend d'une ressource ; le chemin est donc `positionnement → projet → prestations du projet → celle de notre ressource`. Reste à confirmer contre l'API l'appel qui liste les prestations d'un projet, et à vérifier si l'écriture minimale `{"state": 2}` suffit à faire naître la prestation là où l'interface Boond sauvegarde l'onglet entier.
+> **Contournement, pas correctif** — la cause a été traitée depuis, dans les deux entrées suivantes : Bobby cherchait `relationships.delivery` sur le positionnement, clé absente de sa réponse. Le rattachement manuel reste le recours quand la sélection ne peut pas trancher. **L'écriture, elle, n'était pas en cause** : `{"state": 2}` seul fait bien naître la prestation, l'onglet entier de l'interface Boond n'est pas nécessaire.
 
 7 tests sur le rattachement. 476 tests contractualisation verts.
 

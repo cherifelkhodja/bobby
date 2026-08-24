@@ -760,9 +760,11 @@ créée.
 > `/opportunities/{id}/information`), plus l'onglet `administrative` des ressources.
 
 > Seul l'état est envoyé : les données du positionnement — dates, tarif de
-> vente, jours — restent celles du commercial. Une réponse en 200 ne prouvant
-> pas que le changement a été pris, l'état renvoyé par Boond est comparé à
-> celui demandé, puis relu.
+> vente, jours — restent celles du commercial. **Ce corps minimal suffit à faire
+> naître la prestation**, vérifié contre le CRM ; l'onglet entier que sauvegarde
+> l'interface Boond n'est pas nécessaire. Une réponse en 200 ne prouvant pas que
+> le changement a été pris, l'état renvoyé par Boond est comparé à celui
+> demandé, puis relu.
 
 ```python
 async def update_positioning_state(self, positioning_id: int, state: int) -> None
