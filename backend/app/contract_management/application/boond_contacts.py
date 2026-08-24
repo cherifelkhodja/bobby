@@ -44,9 +44,7 @@ class SupplierContact:
 
 def _identity_key(first_name: str | None, last_name: str | None, email: str | None) -> str:
     """Clé d'identité d'un contact : deux rôles tenus par la même personne fusionnent."""
-    return "|".join(
-        (part or "").strip().lower() for part in (first_name, last_name, email)
-    )
+    return "|".join((part or "").strip().lower() for part in (first_name, last_name, email))
 
 
 def supplier_contacts(third_party) -> list[SupplierContact]:
@@ -146,8 +144,7 @@ ROLE_CONTACT_ID_FIELDS = {
 def persisted_contact_ids(third_party) -> dict[str, int | None]:
     """Identifiants Boond des contacts déjà reportés, par rôle."""
     return {
-        role: getattr(third_party, field, None)
-        for role, field in ROLE_CONTACT_ID_FIELDS.items()
+        role: getattr(third_party, field, None) for role, field in ROLE_CONTACT_ID_FIELDS.items()
     }
 
 

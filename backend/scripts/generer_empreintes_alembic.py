@@ -36,8 +36,16 @@ DSN = os.environ.get("EMPREINTES_DSN", "postgresql://postgres@localhost:5432")
 BASE = os.environ.get("EMPREINTES_DB", "bobby_empreintes")
 
 # Ordre de préférence des empreintes : le plus simple à sonder d'abord.
-RANG = {"table": 0, "column": 1, "index": 2, "constraint": 3,
-        "policy": 4, "rls": 5, "coltype": 6, "colnull": 7}
+RANG = {
+    "table": 0,
+    "column": 1,
+    "index": 2,
+    "constraint": 3,
+    "policy": 4,
+    "rls": 5,
+    "coltype": 6,
+    "colnull": 7,
+}
 
 ENV = {
     **os.environ,
@@ -52,8 +60,10 @@ ENV = {
 def connexion(base: str):
     parts = urlsplit(DSN)
     return psycopg2.connect(
-        host=parts.hostname, port=parts.port or 5432,
-        user=parts.username or "postgres", password=parts.password,
+        host=parts.hostname,
+        port=parts.port or 5432,
+        user=parts.username or "postgres",
+        password=parts.password,
         dbname=base,
     )
 
@@ -123,7 +133,7 @@ def bascule(index: int, revs: list[str], releves: dict[str, set[str]]) -> tuple[
     avant = releves[revs[index - 1]] if index else set()
     apres = releves[revs[index]]
     tous_avant = [releves[r] for r in revs[:index]]
-    tous_apres = [releves[r] for r in revs[index + 1:]]
+    tous_apres = [releves[r] for r in revs[index + 1 :]]
 
     ajoutes = sorted(apres - avant, key=lambda o: (RANG.get(o.split(":", 1)[0], 9), o))
     for obj in ajoutes:
@@ -144,8 +154,9 @@ def main() -> int:
 
     releves: dict[str, set[str]] = {}
     for rev in revs:
-        subprocess.run(["alembic", "upgrade", rev], cwd=BACKEND, check=True,
-                       capture_output=True, env=ENV)
+        subprocess.run(
+            ["alembic", "upgrade", rev], cwd=BACKEND, check=True, capture_output=True, env=ENV
+        )
         releves[rev] = catalogue()
 
     empreintes: dict[str, tuple[str, bool]] = {}
@@ -158,13 +169,18 @@ def main() -> int:
             donnees_seules.append(rev)
 
     CIBLE.write_text(rendre(empreintes, donnees_seules))
+    # Le fichier produit passe sous le formateur du dépôt : sans cela, chaque
+    # régénération ferait rougir `ruff format --check` en intégration.
+    subprocess.run(["ruff", "format", str(CIBLE)], cwd=BACKEND, check=False, capture_output=True)
     print(f"{len(empreintes)} empreintes, {len(donnees_seules)} migrations de données")
     print(f"écrit dans {CIBLE.relative_to(BACKEND)}")
     return 0
 
 
 def rendre(empreintes: dict[str, tuple[str, bool]], donnees_seules: list[str]) -> str:
-    lignes = "\n".join(f"    {rev!r}: ({obj!r}, {present})," for rev, (obj, present) in empreintes.items())
+    lignes = "\n".join(
+        f"    {rev!r}: ({obj!r}, {present})," for rev, (obj, present) in empreintes.items()
+    )
     autres = "\n".join(f"    {rev!r}," for rev in donnees_seules)
     return f'''"""Empreintes de schéma : à quoi reconnaître qu'une migration est appliquée.
 

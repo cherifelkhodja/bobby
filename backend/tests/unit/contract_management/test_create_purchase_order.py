@@ -182,7 +182,11 @@ class TestIdempotence:
     @pytest.mark.asyncio
     async def test_refuses_a_second_purchase_order(self):
         """Rejouer le webhook ne crée pas de doublon."""
-        existing = PurchaseOrder(provisional_reference="PROV-BC-2026-001", reference="GEM-BC-001", boond_positioning_id=41)
+        existing = PurchaseOrder(
+            provisional_reference="PROV-BC-2026-001",
+            reference="GEM-BC-001",
+            boond_positioning_id=41,
+        )
         use_case, po_repo, _, _ = _make_use_case(existing=existing)
 
         with pytest.raises(PurchaseOrderAlreadyExistsError) as exc:

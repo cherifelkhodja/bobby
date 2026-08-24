@@ -1690,9 +1690,7 @@ async def purge_contract_request(
                 )
             )
             await db.execute(
-                sa_delete(MagicLinkModel).where(
-                    MagicLinkModel.third_party_id == cr.third_party_id
-                )
+                sa_delete(MagicLinkModel).where(MagicLinkModel.third_party_id == cr.third_party_id)
             )
             await db.execute(
                 sa_delete(ThirdPartyModel).where(ThirdPartyModel.id == cr.third_party_id)

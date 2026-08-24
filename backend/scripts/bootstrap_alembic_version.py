@@ -133,7 +133,7 @@ def pick(revisions: list[str], holds: dict[str, bool]) -> tuple[str | None, str]
             f"{', '.join(incoherentes[:5])} — à examiner à la main"
         )
 
-    suivantes = revisions[rang + 1:]
+    suivantes = revisions[rang + 1 :]
     if suivantes and suivantes[0] not in FINGERPRINTS:
         return None, (
             f"impossible de trancher entre {trouvee} et {suivantes[0]} : cette dernière ne "
@@ -157,14 +157,14 @@ async def main() -> int:
                 await conn.execute(text("SELECT to_regclass('public.alembic_version')"))
             ).scalar()
             if suivi is not None:
-                deja = (
-                    await conn.execute(text("SELECT count(*) FROM alembic_version"))
-                ).scalar()
+                deja = (await conn.execute(text("SELECT count(*) FROM alembic_version"))).scalar()
                 if deja:
                     return 0  # Cas normal : rien à faire, on ne dit rien.
 
             temoin = (
-                await conn.execute(text("SELECT to_regclass('public.' || :t)"), {"t": SCHEMA_WITNESS})
+                await conn.execute(
+                    text("SELECT to_regclass('public.' || :t)"), {"t": SCHEMA_WITNESS}
+                )
             ).scalar()
             if temoin is None:
                 dire("base vierge : Alembic va créer le schéma normalement")
@@ -215,11 +215,14 @@ async def main() -> int:
                 {"v": trouvee},
             )
             await conn.commit()
-            reste = revisions[revisions.index(trouvee) + 1:]
+            reste = revisions[revisions.index(trouvee) + 1 :]
             dire(
                 f"révision {trouvee} inscrite. "
-                + (f"Migrations à appliquer : {', '.join(reste)}" if reste
-                   else "Le schéma est déjà à jour.")
+                + (
+                    f"Migrations à appliquer : {', '.join(reste)}"
+                    if reste
+                    else "Le schéma est déjà à jour."
+                )
             )
             return 0
     except Exception as exc:  # pragma: no cover - dépend de l'environnement

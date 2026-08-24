@@ -203,9 +203,7 @@ class GeneratePurchaseOrderDocumentUseCase:
                     "issuer_representative_is_entity": company.representative_is_entity,
                     "issuer_representative_name": company.representative_name,
                     "issuer_representative_quality": company.representative_quality,
-                    "issuer_representative_sub_quality": (
-                        company.representative_sub_quality or ""
-                    ),
+                    "issuer_representative_sub_quality": (company.representative_sub_quality or ""),
                     "issuer_signatory_name": company.signatory_name,
                     "issuer_color_code": company.color_code,
                     "issuer_tva_number": company.tva_number or "",

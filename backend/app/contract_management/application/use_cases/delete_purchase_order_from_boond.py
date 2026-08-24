@@ -88,8 +88,7 @@ class DeletePurchaseOrderFromBoondUseCase:
                     po.boond_positioning_id, POSITIONING_STATE_BEFORE_PUSH
                 )
                 report.append(
-                    f"Positionnement {po.boond_positioning_id} ramené à "
-                    "« Gagné attente contrat »."
+                    f"Positionnement {po.boond_positioning_id} ramené à « Gagné attente contrat »."
                 )
             except Exception as exc:
                 logger.warning(

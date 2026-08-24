@@ -276,9 +276,7 @@ class TestTemplateRendering:
         third_party = _third_party()
         third_party.vat_liable = False
         use_case, _ = _make_use_case(_purchase_order(), third_party=third_party)
-        context = use_case._build_context(
-            _purchase_order(), third_party, _framework(), _company()
-        )
+        context = use_case._build_context(_purchase_order(), third_party, _framework(), _company())
         apply_brand_theme(context)
         html = build_environment().get_template("bon_de_commande.html").render(**context)
 
@@ -295,9 +293,7 @@ class TestTemplateRendering:
             "invoice_submission_method": "boondmanager",
         }
         use_case, _ = _make_use_case(_purchase_order(), framework=framework)
-        context = use_case._build_context(
-            _purchase_order(), _third_party(), framework, _company()
-        )
+        context = use_case._build_context(_purchase_order(), _third_party(), framework, _company())
         apply_brand_theme(context)
         html = build_environment().get_template("bon_de_commande.html").render(**context)
 
@@ -313,9 +309,7 @@ class TestTemplateRendering:
         framework = _framework()
         framework.contract_config = {"invoice_email": "compta-leonum@akema-tech.fr"}
         use_case, _ = _make_use_case(_purchase_order(), framework=framework)
-        context = use_case._build_context(
-            _purchase_order(), _third_party(), framework, _company()
-        )
+        context = use_case._build_context(_purchase_order(), _third_party(), framework, _company())
 
         assert context["invoice_address"] == "compta-leonum@akema-tech.fr"
 
@@ -324,9 +318,7 @@ class TestTemplateRendering:
         framework = _framework()
         framework.contract_config = {}
         use_case, _ = _make_use_case(_purchase_order(), framework=framework)
-        context = use_case._build_context(
-            _purchase_order(), _third_party(), framework, _company()
-        )
+        context = use_case._build_context(_purchase_order(), _third_party(), framework, _company())
 
         assert context["invoice_address"] == "factures@leonum.fr"
         assert context["invoice_submission_method"] == "email"

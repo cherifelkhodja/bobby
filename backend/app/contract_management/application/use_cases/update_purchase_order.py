@@ -217,4 +217,3 @@ class UpdatePurchaseOrderUseCase:
             raise InvalidPurchaseOrderDataError(
                 "La date de fin ne peut pas précéder la date de début."
             )
-

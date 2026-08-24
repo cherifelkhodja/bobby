@@ -636,9 +636,7 @@ class BoondCrmAdapter:
             relationships["company"] = {"data": {"type": "company", "id": str(provider_id)}}
             relationships.pop("contact", None)
         if provider_contact_id:
-            relationships["contact"] = {
-                "data": {"type": "contact", "id": str(provider_contact_id)}
-            }
+            relationships["contact"] = {"data": {"type": "contact", "id": str(provider_contact_id)}}
 
         payload = {"data": {"type": "purchase", "attributes": attributes}}
         if relationships:
@@ -869,9 +867,7 @@ class BoondCrmAdapter:
 
     async def candidate_exists(self, candidate_id: int) -> bool:
         """Cet identifiant est-il celui d'un candidat Boond ?"""
-        return await self._entity_exists(
-            f"/candidates/{candidate_id}", "candidate", candidate_id
-        )
+        return await self._entity_exists(f"/candidates/{candidate_id}", "candidate", candidate_id)
 
     async def resource_exists(self, resource_id: int) -> bool:
         """Cet identifiant est-il celui d'une ressource Boond ?

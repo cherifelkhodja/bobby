@@ -887,9 +887,7 @@ async def delete_purchase_order_from_boond(
             "report": report,
         },
     )
-    return BoondDeletionResponse(
-        purchase_order=await _respond(db, cr_repo, po), report=report
-    )
+    return BoondDeletionResponse(purchase_order=await _respond(db, cr_repo, po), report=report)
 
 
 @router.post(

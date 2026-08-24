@@ -104,9 +104,7 @@ class SyncPurchaseOrderToBoondUseCase:
         # commande circule. Il exige en revanche une mission complète — c'est
         # elle qui alimente le contrat et l'achat Boond.
         if po.status == PurchaseOrderStatus.CANCELLED:
-            raise PurchaseOrderBoondSyncError(
-                po.display_reference, "le bon de commande est annulé"
-            )
+            raise PurchaseOrderBoondSyncError(po.display_reference, "le bon de commande est annulé")
         missing = [label for attr, label in REQUIRED_FOR_BOOND if getattr(po, attr) is None]
         if missing:
             raise PurchaseOrderBoondSyncError(
@@ -176,7 +174,9 @@ class SyncPurchaseOrderToBoondUseCase:
         commande : c'est ce document qui acte sa mission.
         """
         if not po.boond_consultant_id:
-            raise PurchaseOrderBoondSyncError(po.display_reference, "aucun consultant Boond rattaché")
+            raise PurchaseOrderBoondSyncError(
+                po.display_reference, "aucun consultant Boond rattaché"
+            )
 
         if po.boond_consultant_type == "resource":
             return po.boond_consultant_id

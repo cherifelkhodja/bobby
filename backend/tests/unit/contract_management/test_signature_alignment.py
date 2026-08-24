@@ -18,9 +18,7 @@ from app.contract_management.infrastructure.adapters.pdf_rendering import (
 
 def _signature_zones(template_name: str, context: dict) -> list[tuple[float, float]]:
     """Positions (x, y) des zones de signature, dans l'ordre du document."""
-    weasyprint = pytest.importorskip(
-        "weasyprint", reason="WeasyPrint absent de cet environnement"
-    )
+    weasyprint = pytest.importorskip("weasyprint", reason="WeasyPrint absent de cet environnement")
     apply_brand_theme(context)
     html = build_environment(TEMPLATE_DIR).get_template(template_name).render(**context)
     document = weasyprint.HTML(string=html, base_url=str(TEMPLATE_DIR)).render()
@@ -57,9 +55,7 @@ class TestPurchaseOrder:
 
         purchase_order = _purchase_order()
         use_case, _ = _make_use_case(purchase_order)
-        context = use_case._build_context(
-            purchase_order, _third_party(), _framework(), _company()
-        )
+        context = use_case._build_context(purchase_order, _third_party(), _framework(), _company())
 
         zones = _signature_zones("bon_de_commande.html", context)
 

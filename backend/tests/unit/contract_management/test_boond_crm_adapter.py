@@ -197,9 +197,7 @@ class TestSupplierPurchaseCreation:
     @pytest.mark.asyncio
     async def test_the_purchase_is_prefilled_from_its_delivery(self):
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            side_effect=[_purchase_defaults(), {"data": {"id": "666"}}]
-        )
+        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
 
         purchase_id = await adapter.create_supplier_purchase(
             delivery_id=1234, title="GEM-BC-001 - Développeur Python"
@@ -218,24 +216,18 @@ class TestSupplierPurchaseCreation:
     async def test_the_delivery_relationship_carries_the_delivery_type(self):
         """La doc décrit cette relation avec `type: "project"` : c'est une coquille."""
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            side_effect=[_purchase_defaults(), {"data": {"id": "666"}}]
-        )
+        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
 
         await adapter.create_supplier_purchase(delivery_id=797, title="GEM-BC-001")
 
         _, data = _purchase_calls(boond)
-        assert data["relationships"]["delivery"] == {
-            "data": {"type": "delivery", "id": "797"}
-        }
+        assert data["relationships"]["delivery"] == {"data": {"type": "delivery", "id": "797"}}
 
     @pytest.mark.asyncio
     async def test_empty_relationships_are_dropped(self):
         """Renvoyer une relation à `null` ferait échouer la création."""
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            side_effect=[_purchase_defaults(), {"data": {"id": "666"}}]
-        )
+        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
 
         await adapter.create_supplier_purchase(delivery_id=1234, title="GEM-BC-001")
 
@@ -245,9 +237,7 @@ class TestSupplierPurchaseCreation:
     @pytest.mark.asyncio
     async def test_the_mission_conditions_are_written_on_the_purchase(self):
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            side_effect=[_purchase_defaults(), {"data": {"id": "666"}}]
-        )
+        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
 
         await adapter.create_supplier_purchase(
             delivery_id=1234,
@@ -272,9 +262,7 @@ class TestSupplierPurchaseCreation:
     async def test_the_supplier_replaces_the_client_company_and_its_contact(self):
         """Un achat se paie au fournisseur : le contact du client n'y a plus sa place."""
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            side_effect=[_purchase_defaults(), {"data": {"id": "666"}}]
-        )
+        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
 
         await adapter.create_supplier_purchase(
             delivery_id=1234, title="GEM-BC-001", provider_id=777
@@ -287,9 +275,7 @@ class TestSupplierPurchaseCreation:
     @pytest.mark.asyncio
     async def test_the_supplier_contact_is_used_when_known(self):
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            side_effect=[_purchase_defaults(), {"data": {"id": "666"}}]
-        )
+        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
 
         await adapter.create_supplier_purchase(
             delivery_id=1234,
