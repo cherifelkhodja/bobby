@@ -135,6 +135,25 @@ class BoondCrmAdapter:
             )
             return None
 
+    async def update_positioning_state(self, positioning_id: int, state: int) -> None:
+        """Change l'état d'un positionnement BoondManager.
+
+        C'est ainsi que naît une prestation : passer le positionnement à
+        « Gagné » la fait créer par Boond à partir du positionnement. Bobby n'a
+        pas d'autre moyen de la produire — l'API ne crée pas de prestation.
+        """
+        payload = {
+            "data": {
+                "type": "positioning",
+                "id": str(positioning_id),
+                "attributes": {"state": state},
+            }
+        }
+        await self._boond._make_request(
+            "PUT", f"/positionings/{positioning_id}/information", json=payload
+        )
+        logger.info("boond_positioning_state_updated", positioning_id=positioning_id, state=state)
+
     async def get_delivery(self, delivery_id: int) -> dict[str, Any] | None:
         """Fetch a delivery (prestation) from BoondManager.
 

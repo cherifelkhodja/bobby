@@ -28,6 +28,10 @@ class CrmServicePort(Protocol):
         """
         ...
 
+    async def update_positioning_state(self, positioning_id: int, state: int) -> None:
+        """Change l'état d'un positionnement (« Gagné » crée la prestation)."""
+        ...
+
     async def resolve_resource_id(self, candidate_id: int) -> int | None:
         """Resolve the Boond resource ID linked to a candidate ID (or None)."""
         ...

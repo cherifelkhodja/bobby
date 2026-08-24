@@ -49,6 +49,22 @@ def _http_status_error(status_code: int) -> httpx.HTTPStatusError:
     return httpx.HTTPStatusError(f"HTTP {status_code}", request=request, response=response)
 
 
+class TestPositioningState:
+    """Le passage à « Gagné » est ce qui fait naître la prestation."""
+
+    @pytest.mark.asyncio
+    async def test_the_state_is_written_on_the_information_endpoint(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value={"data": {"id": "41"}})
+
+        await adapter.update_positioning_state(41, 1)
+
+        method, path = boond._make_request.await_args.args[:2]
+        assert (method, path) == ("PUT", "/positionings/41/information")
+        data = boond._make_request.await_args.kwargs["json"]["data"]
+        assert data == {"type": "positioning", "id": "41", "attributes": {"state": 1}}
+
+
 class TestPurchaseCreation:
     """L'achat fournisseur : `POST /purchases`, type `purchase`.
 

@@ -637,6 +637,18 @@ dans l'API et répondait 404.
 > `/orders` (staffing) la **commande client**. Le catalogue de l'API ne connaît
 > aucun `/purchase-orders`.
 
+#### PUT /positionings/{id}/information — faire naître la prestation
+
+L'API ne crée pas de prestation. C'est le passage du positionnement à l'état
+**1 (« Gagné »)** qui la fait produire par BoondManager, à partir du
+positionnement. Le report d'un bon de commande sans prestation passe donc par
+là, puis relit le positionnement pour récupérer l'identifiant de la prestation
+créée.
+
+```python
+async def update_positioning_state(self, positioning_id: int, state: int) -> None
+```
+
 ```python
 async def create_purchase_order(
     self, provider_id: int, positioning_id: int,
@@ -658,7 +670,7 @@ async def create_purchase_order(
 | 2 | Créer contacts (signataire, ADV, facturation) | `POST /contacts` | `tp.boond_signatory_contact_id`, `tp.boond_adv_contact_id`, `tp.boond_billing_contact_id` |
 | 3 | Convertir candidat → ressource | `PUT /candidates/{id}/information` | `cr.boond_candidate_id` (nouvel ID), `cr.boond_consultant_type = "resource"` |
 | 4 | Créer contrat Boond | `POST /contracts` | `cr.boond_contract_id` |
-| 5 | Créer l'achat fournisseur | `POST /purchases` | `cr.boond_purchase_order_id` |
+| 5 | Créer l'achat fournisseur | `POST /purchases` | `contract.boond_purchase_order_id` |
 | 6 | Archiver positionnement | `PATCH /positionings/{id}` | — |
 
 > **Pré-requis étape 3** : `manager_id` récupéré via `get_need()` (mainManager du besoin).

@@ -233,6 +233,17 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (feat: le report du bon de commande fait naître la prestation)
+
+L'API BoondManager ne crée pas de prestation : c'est le passage du positionnement à l'état **1 (« Gagné »)** qui la fait produire, à partir du positionnement. Le report d'un bon de commande sans prestation se contentait donc de ne rien faire.
+
+- Nouvelle étape : quand le bon de commande n'a pas de prestation, Bobby passe le positionnement à « Gagné », relit le positionnement et retient la prestation créée — puis la recale sur la période et les conditions du document, comme avant.
+- Un positionnement déjà pourvu d'une prestation n'est pas touché : le rattrapage ne rejoue pas un état déjà acquis.
+- Deux échecs possibles, tous deux en avertissement plutôt qu'en blocage : le passage à « Gagné » qui échoue, et le positionnement gagné dont Boond ne rattache aucune prestation. Le contrat et l'achat restent créés, l'ADV reprend la prestation à la main.
+- `PUT /positionings/{id}/information` suit la forme déjà validée pour les candidats et les sociétés.
+
+7 tests sur la prestation. 671 tests backend verts.
+
 ### 2026-08-24 (fix: l'achat fournisseur se crée sur /purchases, pas /purchase-orders)
 
 Le report d'un bon de commande échouait sur `404 Not Found` pour `POST /purchase-orders` : **cet endpoint n'existe pas** dans l'API BoondManager. L'objet est un **achat** (`purchase`) — c'est celui que le renouvellement natif d'une prestation renvoie dans `relationships.purchase`, donc les deux chemins créent bien la même chose.

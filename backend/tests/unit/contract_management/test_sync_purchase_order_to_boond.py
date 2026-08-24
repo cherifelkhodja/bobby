@@ -68,6 +68,8 @@ def _make_use_case(po, *, provider_id=777, third_party_type="sous_traitant"):
     crm.resource_exists = AsyncMock(return_value=False)
     crm.convert_candidate_to_resource = AsyncMock(return_value=9001)
     crm.update_resource_administrative = AsyncMock()
+    crm.update_positioning_state = AsyncMock()
+    crm.get_positioning = AsyncMock(return_value={"delivery_id": 797})
     crm.create_boond_contract = AsyncMock(return_value=555)
     crm.create_purchase_order = AsyncMock(return_value=666)
     crm.renew_delivery = AsyncMock(return_value={"id": 798, "purchase_id": 900, "contract_id": 264})
@@ -248,13 +250,50 @@ class TestDelivery:
         assert "sale_daily_rate" not in crm.update_delivery.await_args.kwargs
 
     @pytest.mark.asyncio
-    async def test_an_order_without_delivery_touches_nothing(self):
+    async def test_a_missing_delivery_is_created_by_winning_the_positioning(self):
+        """Bobby ne crée pas de prestation : il fait gagner le positionnement, Boond la crée."""
         po = _signed_po(boond_delivery_id=None)
+        use_case, crm, _ = _make_use_case(po)
+
+        result = await use_case.execute(po.id)
+
+        crm.update_positioning_state.assert_awaited_once_with(41, 1)
+        assert result.boond_delivery_id == 797
+        # Et la prestation ainsi créée est aussitôt recalée sur le bon de commande.
+        assert crm.update_delivery.await_args.kwargs["delivery_id"] == 797
+
+    @pytest.mark.asyncio
+    async def test_an_existing_delivery_leaves_the_positioning_alone(self):
+        """Le positionnement est déjà gagné : rien à changer de ce côté."""
+        po = _signed_po(boond_delivery_id=797)
         use_case, crm, _ = _make_use_case(po)
 
         await use_case.execute(po.id)
 
+        crm.update_positioning_state.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_positioning_without_delivery_warns(self):
+        """Gagné, mais aucune prestation rattachée : l'ADV doit le savoir."""
+        po = _signed_po(boond_delivery_id=None)
+        use_case, crm, _ = _make_use_case(po)
+        crm.get_positioning = AsyncMock(return_value={"delivery_id": None})
+
+        result = await use_case.execute(po.id)
+
+        assert "n'a pas rattaché de prestation" in result.boond_sync_error
         crm.update_delivery.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_failed_win_warns_without_failing_the_push(self):
+        po = _signed_po(boond_delivery_id=None)
+        use_case, crm, _ = _make_use_case(po)
+        crm.update_positioning_state = AsyncMock(side_effect=RuntimeError("Boond 500"))
+
+        result = await use_case.execute(po.id)
+
+        assert result.boond_purchase_order_id == 666
+        assert "non passé à « Gagné »" in result.boond_sync_error
 
     @pytest.mark.asyncio
     async def test_a_failed_alignment_warns_without_failing_the_push(self):

@@ -24,6 +24,11 @@ logger = structlog.get_logger()
 # État Boond « Arrivée prochaine » d'une ressource fraîchement convertie.
 RESOURCE_STATE_ARRIVING = 3
 
+# État Boond « Gagné » d'un positionnement. C'est lui qui fait naître la
+# prestation : Boond la crée à partir du positionnement au passage à cet état,
+# l'API n'offrant aucun moyen de la créer directement.
+POSITIONING_STATE_WON = 1
+
 # Ce que BoondManager exige pour porter la mission : le contrat vit du CJM et
 # des dates, l'achat du montant qui en découle. Le reste du bon de commande —
 # client final, société émettrice, intitulé — ne monte pas dans le CRM et ne
@@ -109,7 +114,7 @@ class SyncPurchaseOrderToBoondUseCase:
             resource_id = await self._resolve_resource(po)
             await self._link_provider(po, resource_id, third_party.boond_provider_id)
             await self._create_contract(po, resource_id)
-            await self._align_delivery(po, warnings)
+            await self._ensure_delivery(po, warnings)
             await self._create_purchase_order(po, third_party.boond_provider_id, warnings)
         except PurchaseOrderBoondSyncError:
             raise
@@ -298,21 +303,65 @@ class SyncPurchaseOrderToBoondUseCase:
         )
         po.boond_purchase_order_id = boond_po_id
 
+    async def _ensure_delivery(self, po: PurchaseOrder, warnings: list[str]) -> None:
+        """Fait exister la prestation Boond, puis la met d'accord avec le bon de commande.
+
+        Bobby ne crée pas de prestation — l'API ne le permet pas. Il fait
+        passer le positionnement à « Gagné », et Boond la produit à partir de
+        lui. Une reconduction ne passe pas ici : sa prestation vient du
+        renouvellement natif, qui la recale lui-même (`_renew_delivery`).
+        """
+        if po.parent_purchase_order_id:
+            return
+
+        if not po.boond_delivery_id:
+            await self._win_positioning(po, warnings)
+
+        if po.boond_delivery_id:
+            await self._align_delivery(po, warnings)
+
+    async def _win_positioning(self, po: PurchaseOrder, warnings: list[str]) -> None:
+        """Passe le positionnement à « Gagné » et retient la prestation qui en naît."""
+        try:
+            await self._crm.update_positioning_state(
+                po.boond_positioning_id, POSITIONING_STATE_WON
+            )
+            positioning = await self._crm.get_positioning(po.boond_positioning_id) or {}
+            delivery_id = positioning.get("delivery_id")
+            if delivery_id:
+                po.boond_delivery_id = delivery_id
+                logger.info(
+                    "purchase_order_delivery_created",
+                    purchase_order_id=str(po.id),
+                    positioning_id=po.boond_positioning_id,
+                    delivery_id=delivery_id,
+                )
+                return
+            warnings.append(
+                f"Positionnement {po.boond_positioning_id} passé à « Gagné », mais "
+                "BoondManager n'a pas rattaché de prestation : à vérifier dans le CRM."
+            )
+        except Exception as exc:
+            # Le contrat et l'achat restent créables : l'ADV reprendra la
+            # prestation à la main plutôt que de tout rejouer.
+            logger.warning(
+                "purchase_order_positioning_win_failed",
+                purchase_order_id=str(po.id),
+                positioning_id=po.boond_positioning_id,
+                error=_readable_error(exc),
+            )
+            warnings.append(
+                f"Positionnement {po.boond_positioning_id} non passé à « Gagné » : "
+                "la prestation n'a pas été créée, à reprendre dans BoondManager."
+            )
+
     async def _align_delivery(self, po: PurchaseOrder, warnings: list[str]) -> None:
         """Recale la prestation Boond sur les conditions du bon de commande.
 
-        Boond crée la prestation depuis le positionnement gagné ; Bobby ne la
-        crée jamais, il la met d'accord avec le document que le fournisseur
-        signe : période, jours vendus, gratuité et CJM d'achat. Le **prix de
-        vente au client n'est pas touché** : il relève du commercial, pas d'un
-        document d'achat.
-
-        Une reconduction ne passe pas ici : sa prestation est produite par le
-        renouvellement natif, qui la recale lui-même (`_renew_delivery`).
+        Période, jours vendus, gratuité et CJM d'achat viennent du document que
+        le fournisseur signe. Le **prix de vente au client n'est pas touché** :
+        il relève du commercial, pas d'un document d'achat.
         """
-        if po.parent_purchase_order_id or not po.boond_delivery_id:
-            return
-
         try:
             await self._crm.update_delivery(
                 delivery_id=po.boond_delivery_id,
