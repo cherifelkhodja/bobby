@@ -159,8 +159,20 @@ export function PurchaseOrderDetail() {
       if (action === 'push') return purchaseOrdersApi.pushToBoond(id!);
       return purchaseOrdersApi.cancel(id!);
     },
-    onSuccess: () => {
-      toast.success('Action effectuée.');
+    onSuccess: (updated, action) => {
+      if (action === 'push') {
+        // Le report est muet sur ce qu'il a fait : nommer les objets créés
+        // évite d'aller les chercher dans BoondManager pour le savoir.
+        const done = [
+          updated.boond_consultant_type === 'resource' ? 'ressource' : null,
+          updated.boond_delivery_id ? 'prestation' : null,
+          updated.boond_contract_id ? 'contrat' : null,
+          updated.boond_purchase_order_id ? 'achat' : null,
+        ].filter(Boolean);
+        toast.success(`Reporté dans Boond : ${done.join(', ')}.`);
+      } else {
+        toast.success('Action effectuée.');
+      }
       invalidate();
     },
     onError: (error) => toast.error(getErrorMessage(error)),
@@ -222,6 +234,14 @@ export function PurchaseOrderDetail() {
 
   const config = PURCHASE_ORDER_STATUS_CONFIG[po.status];
   const editable = isAdv && po.is_editable;
+  // Le report dans Boond n'attend pas la signature, mais le contrat et l'achat
+  // Boond vivent du CJM, des jours et des dates.
+  const boondReady =
+    po.purchase_daily_rate !== null &&
+    po.days_sold !== null &&
+    Boolean(po.start_date) &&
+    Boolean(po.end_date);
+  const pushedToBoond = po.boond_purchase_order_id !== null;
   const panelSuppliers = suppliers?.items ?? [];
   const attachmentChanged =
     supplierId !== (po.third_party_id ?? '') || companyId !== (po.company_id ?? '');
@@ -345,14 +365,29 @@ export function PurchaseOrderDetail() {
               </Button>
             </>
           )}
-          {isAdv && po.status === 'signed' && (
+          {isAdv && po.status !== 'cancelled' && !pushedToBoond && (
             <Button
               onClick={() => actionMutation.mutate('push')}
               isLoading={actionMutation.isPending}
+              disabled={!boondReady}
+              title={
+                boondReady
+                  ? 'Ressource, prestation, contrat et achat dans BoondManager, sans attendre la signature'
+                  : 'Complétez le CJM, les jours vendus et la période avant de reporter'
+              }
               leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
             >
-              Reporter dans BoondManager
+              Pousser dans Boond
             </Button>
+          )}
+          {isAdv && pushedToBoond && (
+            <span
+              className="st bg-grn-bg text-grn-fg"
+              title={`Achat #${po.boond_purchase_order_id} dans BoondManager`}
+            >
+              <span className="dot" />
+              Dans Boond
+            </span>
           )}
           {isAdv && (po.status === 'active' || po.status === 'closed') && (
             <Button
@@ -775,6 +810,10 @@ export function PurchaseOrderDetail() {
               {po.boond_consultant_id ?? '—'}
               {po.boond_consultant_type ? ` (${po.boond_consultant_type})` : ''}
             </p>
+          </div>
+          <div>
+            <p className="ml">Prestation</p>
+            <p className="mv font-mono">{po.boond_delivery_id ?? '—'}</p>
           </div>
           <div>
             <p className="ml">Contrat Boond</p>

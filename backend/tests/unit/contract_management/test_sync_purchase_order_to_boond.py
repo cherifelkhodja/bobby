@@ -85,14 +85,48 @@ class TestPrerequisites:
     """Ce qu'il faut avant de pouvoir pousser dans Boond."""
 
     @pytest.mark.asyncio
-    async def test_an_unsigned_order_is_refused(self):
+    async def test_an_unsigned_order_can_be_pushed(self):
+        """Le report n'attend pas la signature : le CRM sert pendant qu'elle circule."""
         po = _signed_po(status=PurchaseOrderStatus.GENERATED)
         use_case, crm, _ = _make_use_case(po)
 
-        with pytest.raises(PurchaseOrderBoondSyncError, match="signé"):
+        result = await use_case.execute(po.id)
+
+        crm.create_boond_contract.assert_awaited_once()
+        crm.create_purchase_order.assert_awaited_once()
+        # Rien n'est signé : le bon de commande reste où il en est.
+        assert result.status == PurchaseOrderStatus.GENERATED
+
+    @pytest.mark.asyncio
+    async def test_a_cancelled_order_is_refused(self):
+        po = _signed_po(status=PurchaseOrderStatus.CANCELLED)
+        use_case, crm, _ = _make_use_case(po)
+
+        with pytest.raises(PurchaseOrderBoondSyncError, match="annulé"):
             await use_case.execute(po.id)
 
         crm.create_boond_contract.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_incomplete_conditions_are_refused(self):
+        """Sans CJM ni dates, le contrat Boond n'aurait rien à porter."""
+        po = _signed_po(status=PurchaseOrderStatus.DRAFT, purchase_daily_rate=None, end_date=None)
+        use_case, crm, _ = _make_use_case(po)
+
+        with pytest.raises(PurchaseOrderBoondSyncError, match="CJM"):
+            await use_case.execute(po.id)
+
+        crm.create_boond_contract.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_the_client_side_data_does_not_hold_the_push_back(self):
+        """Client final, société émettrice et intitulé ne montent pas dans Boond."""
+        po = _signed_po(status=PurchaseOrderStatus.DRAFT, client_name=None, mission_title=None)
+        use_case, crm, _ = _make_use_case(po)
+
+        await use_case.execute(po.id)
+
+        crm.create_purchase_order.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_a_supplier_absent_from_boond_is_refused(self):
@@ -179,6 +213,82 @@ class TestResourceResolution:
 
         assert result.status == PurchaseOrderStatus.ACTIVE
         crm.create_purchase_order.assert_awaited_once()
+
+
+class TestDelivery:
+    """La prestation Boond est mise d'accord avec le bon de commande."""
+
+    @pytest.mark.asyncio
+    async def test_the_delivery_is_realigned_on_the_order(self):
+        """Boond crée la prestation depuis le positionnement ; le BDC en fixe les conditions."""
+        po = _signed_po(boond_delivery_id=797)
+        use_case, crm, _ = _make_use_case(po)
+
+        await use_case.execute(po.id)
+
+        crm.update_delivery.assert_awaited_once()
+        kwargs = crm.update_delivery.await_args.kwargs
+        assert kwargs["delivery_id"] == 797
+        assert kwargs["start_date"] == "2026-09-01"
+        assert kwargs["end_date"] == "2027-02-28"
+        assert kwargs["days_sold"] == 20
+        assert kwargs["free_days"] == 2
+        assert kwargs["purchase_daily_rate"] == 500
+
+    @pytest.mark.asyncio
+    async def test_the_client_sale_price_is_left_alone(self):
+        """Le prix de vente relève du commercial : un document d'achat n'y touche pas."""
+        po = _signed_po(boond_delivery_id=797, sale_daily_rate=Decimal("800"))
+        use_case, crm, _ = _make_use_case(po)
+
+        await use_case.execute(po.id)
+
+        assert "sale_daily_rate" not in crm.update_delivery.await_args.kwargs
+
+    @pytest.mark.asyncio
+    async def test_an_order_without_delivery_touches_nothing(self):
+        po = _signed_po(boond_delivery_id=None)
+        use_case, crm, _ = _make_use_case(po)
+
+        await use_case.execute(po.id)
+
+        crm.update_delivery.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_failed_alignment_warns_without_failing_the_push(self):
+        po = _signed_po(boond_delivery_id=797)
+        use_case, crm, _ = _make_use_case(po)
+        crm.update_delivery = AsyncMock(side_effect=RuntimeError("Boond 500"))
+
+        result = await use_case.execute(po.id)
+
+        assert result.boond_purchase_order_id == 666
+        assert "Prestation 797 non recalée" in result.boond_sync_error
+
+
+class TestResourceMemory:
+    """La ressource résolue est retenue sur le bon de commande."""
+
+    @pytest.mark.asyncio
+    async def test_a_converted_candidate_becomes_a_resource_on_the_order(self):
+        po = _signed_po()
+        use_case, _, _ = _make_use_case(po)
+
+        result = await use_case.execute(po.id)
+
+        assert result.boond_consultant_id == 9001
+        assert result.boond_consultant_type == "resource"
+
+    @pytest.mark.asyncio
+    async def test_a_second_push_does_not_ask_boond_again(self):
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po)
+
+        await use_case.execute(po.id)
+        await use_case.execute(po.id)
+
+        crm.convert_candidate_to_resource.assert_awaited_once()
+        crm.resolve_resource_id.assert_awaited_once()
 
 
 class TestBoondWrites:

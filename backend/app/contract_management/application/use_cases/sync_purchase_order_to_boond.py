@@ -24,6 +24,17 @@ logger = structlog.get_logger()
 # État Boond « Arrivée prochaine » d'une ressource fraîchement convertie.
 RESOURCE_STATE_ARRIVING = 3
 
+# Ce que BoondManager exige pour porter la mission : le contrat vit du CJM et
+# des dates, l'achat du montant qui en découle. Le reste du bon de commande —
+# client final, société émettrice, intitulé — ne monte pas dans le CRM et ne
+# doit donc pas retenir le report.
+REQUIRED_FOR_BOOND: tuple[tuple[str, str], ...] = (
+    ("purchase_daily_rate", "le CJM (coût journalier d'achat)"),
+    ("days_sold", "le nombre de jours vendus"),
+    ("start_date", "la date de début"),
+    ("end_date", "la date de fin"),
+)
+
 
 class SyncPurchaseOrderToBoondUseCase:
     """Reporte un bon de commande signé dans BoondManager.
@@ -64,10 +75,19 @@ class SyncPurchaseOrderToBoondUseCase:
         if not po:
             raise PurchaseOrderNotFoundError(str(purchase_order_id))
 
-        if po.status not in (PurchaseOrderStatus.SIGNED, PurchaseOrderStatus.ACTIVE):
+        # Le report n'attend pas la signature : l'ADV a souvent besoin de la
+        # ressource et de la prestation dans le CRM pendant que le bon de
+        # commande circule. Il exige en revanche une mission complète — c'est
+        # elle qui alimente le contrat et l'achat Boond.
+        if po.status == PurchaseOrderStatus.CANCELLED:
+            raise PurchaseOrderBoondSyncError(
+                po.display_reference, "le bon de commande est annulé"
+            )
+        missing = [label for attr, label in REQUIRED_FOR_BOOND if getattr(po, attr) is None]
+        if missing:
             raise PurchaseOrderBoondSyncError(
                 po.display_reference,
-                f"le bon de commande doit être signé (état actuel : {po.status.display_name})",
+                "les conditions de la mission sont incomplètes : il manque " + ", ".join(missing),
             )
 
         third_party = (
@@ -89,6 +109,7 @@ class SyncPurchaseOrderToBoondUseCase:
             resource_id = await self._resolve_resource(po)
             await self._link_provider(po, resource_id, third_party.boond_provider_id)
             await self._create_contract(po, resource_id)
+            await self._align_delivery(po, warnings)
             await self._create_purchase_order(po, third_party.boond_provider_id, warnings)
         except PurchaseOrderBoondSyncError:
             raise
@@ -138,6 +159,7 @@ class SyncPurchaseOrderToBoondUseCase:
 
         existing = await self._crm.resolve_resource_id(po.boond_consultant_id)
         if existing:
+            self._remember_resource(po, existing)
             return existing
 
         # Le type de tiers du fournisseur classe la ressource dans Boond :
@@ -160,7 +182,18 @@ class SyncPurchaseOrderToBoondUseCase:
             candidate_id=po.boond_consultant_id,
             resource_id=resource_id,
         )
+        self._remember_resource(po, resource_id)
         return resource_id
+
+    @staticmethod
+    def _remember_resource(po: PurchaseOrder, resource_id: int) -> None:
+        """Retient la ressource : un second report ne repasse pas par Boond.
+
+        C'est aussi ce qui fait apparaître « ressource » à l'écran, là où le
+        consultant s'affichait encore comme candidat après sa conversion.
+        """
+        po.boond_consultant_id = resource_id
+        po.boond_consultant_type = "resource"
 
     async def _link_provider(self, po: PurchaseOrder, resource_id: int, provider_id: int) -> None:
         """Rattache la ressource à sa société fournisseur (best-effort).
@@ -243,6 +276,51 @@ class SyncPurchaseOrderToBoondUseCase:
             amount=float(po.total_amount),
         )
         po.boond_purchase_order_id = boond_po_id
+
+    async def _align_delivery(self, po: PurchaseOrder, warnings: list[str]) -> None:
+        """Recale la prestation Boond sur les conditions du bon de commande.
+
+        Boond crée la prestation depuis le positionnement gagné ; Bobby ne la
+        crée jamais, il la met d'accord avec le document que le fournisseur
+        signe : période, jours vendus, gratuité et CJM d'achat. Le **prix de
+        vente au client n'est pas touché** : il relève du commercial, pas d'un
+        document d'achat.
+
+        Une reconduction ne passe pas ici : sa prestation est produite par le
+        renouvellement natif, qui la recale lui-même (`_renew_delivery`).
+        """
+        if po.parent_purchase_order_id or not po.boond_delivery_id:
+            return
+
+        try:
+            await self._crm.update_delivery(
+                delivery_id=po.boond_delivery_id,
+                start_date=_iso(po.start_date),
+                end_date=_iso(po.end_date),
+                days_sold=float(po.days_sold) if po.days_sold is not None else None,
+                free_days=float(po.free_days or 0),
+                purchase_daily_rate=(
+                    float(po.purchase_daily_rate) if po.purchase_daily_rate is not None else None
+                ),
+            )
+            logger.info(
+                "purchase_order_delivery_aligned",
+                purchase_order_id=str(po.id),
+                delivery_id=po.boond_delivery_id,
+            )
+        except Exception as exc:
+            # Le contrat et l'achat restent créables : l'ADV recalera la
+            # prestation à la main plutôt que de tout rejouer.
+            logger.warning(
+                "purchase_order_delivery_alignment_failed",
+                purchase_order_id=str(po.id),
+                delivery_id=po.boond_delivery_id,
+                error=_readable_error(exc),
+            )
+            warnings.append(
+                f"Prestation {po.boond_delivery_id} non recalée sur la période et les "
+                "conditions du bon de commande : à reprendre dans BoondManager."
+            )
 
     async def _renew_delivery(self, po: PurchaseOrder, warnings: list[str]) -> None:
         """Renouvelle la prestation Boond et la recale sur la nouvelle période.

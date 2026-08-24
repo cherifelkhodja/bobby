@@ -233,6 +233,19 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (feat: reporter la mission dans Boond sans attendre la signature)
+
+Même geste que pour le fournisseur, appliqué à la suite du workflow : ressource, prestation, contrat, achat.
+
+- **Le report n'attend plus la signature.** Le bouton « Pousser dans Boond » apparaît dès que les conditions de la mission sont complètes, et cède la place à un état « Dans Boond » une fois l'achat créé. Un bon de commande annulé est refusé.
+- **Les prérequis sont ceux de Boond, pas ceux du document** : CJM, jours vendus et période. Le client final, la société émettrice et l'intitulé ne montent pas dans le CRM et ne retiennent donc plus le report — ils restent exigés pour générer le PDF.
+- **Nouvelle étape « prestation »** : Bobby ne crée jamais la prestation (Boond la produit depuis le positionnement gagné), mais il la met d'accord avec le bon de commande — période, jours vendus, gratuité, CJM. **Le prix de vente au client n'est pas touché** : il relève du commercial, pas d'un document d'achat. Un échec ici n'invalide pas le report, il laisse un avertissement à l'écran. Une reconduction ne passe pas par là : sa prestation vient du renouvellement natif, qui la recale lui-même.
+- **La ressource résolue est retenue** sur le bon de commande (`boond_consultant_id` + type « resource »). Elle ne l'était pas : un second report réinterrogeait Boond, et l'écran continuait d'afficher un candidat après sa conversion.
+- Le report reste idempotent étape par étape, et la mise en actif du bon de commande reste réservée à un document signé.
+- L'écran montre désormais la prestation à côté du positionnement, du besoin, du contrat et de l'achat ; le message de confirmation nomme ce qui a été créé.
+
+10 tests ajoutés (prestation, mémoire de la ressource, prérequis). 651 tests backend verts, front `tsc`/`eslint`/282 tests OK.
+
 ### 2026-08-24 (feat: reporter le fournisseur dans Boond sans attendre la signature)
 
 L'ADV a souvent besoin de la fiche fournisseur dans le CRM pendant que le contrat circule ; le report n'existait qu'à la signature, et n'était exposé nulle part dans l'interface.
