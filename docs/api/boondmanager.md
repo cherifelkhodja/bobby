@@ -633,6 +633,10 @@ renouvellement natif d'une prestation, qui le renvoie dans
 `relationships.purchase`. `/purchase-orders`, longtemps écrit ici, n'existe pas
 dans l'API et répondait 404.
 
+> Ne pas confondre : `/purchases` (finance) est l'**achat fournisseur**,
+> `/orders` (staffing) la **commande client**. Le catalogue de l'API ne connaît
+> aucun `/purchase-orders`.
+
 ```python
 async def create_purchase_order(
     self, provider_id: int, positioning_id: int,
