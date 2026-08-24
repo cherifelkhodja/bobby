@@ -273,14 +273,41 @@ class TestDelivery:
         assert crm.update_delivery.await_args.kwargs["delivery_id"] == 797
 
     @pytest.mark.asyncio
-    async def test_an_existing_delivery_leaves_the_positioning_alone(self):
-        """Le positionnement est déjà gagné : rien à changer de ce côté."""
+    async def test_the_positioning_is_won_even_with_a_delivery_in_place(self):
+        """Une prestation existe dès « Gagné attente contrat » : elle ne prouve rien.
+
+        S'en remettre à son absence laissait la mission en attente dans le CRM
+        une fois le report passé.
+        """
         po = _signed_po(boond_delivery_id=797)
         use_case, crm, _ = _make_use_case(po)
 
-        await use_case.execute(po.id)
+        result = await use_case.execute(po.id)
 
-        crm.update_positioning_state.assert_not_awaited()
+        crm.update_positioning_state.assert_awaited_once_with(41, 1)
+        # La prestation connue reste la sienne : rien n'est créé par-dessus.
+        assert result.boond_delivery_id == 797
+
+    @pytest.mark.asyncio
+    async def test_a_state_that_did_not_take_is_reported(self):
+        """Boond peut accepter la demande sans l'appliquer : cela doit se voir."""
+        po = _signed_po(boond_delivery_id=797)
+        use_case, crm, _ = _make_use_case(po)
+        crm.get_positioning = AsyncMock(return_value={"delivery_id": 797, "state": 7})
+
+        result = await use_case.execute(po.id)
+
+        assert "l'état est resté à 7" in result.boond_sync_error
+
+    @pytest.mark.asyncio
+    async def test_a_state_that_took_says_nothing(self):
+        po = _signed_po(boond_delivery_id=797)
+        use_case, crm, _ = _make_use_case(po)
+        crm.get_positioning = AsyncMock(return_value={"delivery_id": 797, "state": 1})
+
+        result = await use_case.execute(po.id)
+
+        assert result.boond_sync_error is None
 
     @pytest.mark.asyncio
     async def test_a_positioning_without_delivery_warns(self):

@@ -233,6 +233,16 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (fix: le report passe le positionnement à « Gagné »)
+
+Le report ne touchait au positionnement que s'il n'y avait **pas** de prestation rattachée. Or le bon de commande en enregistre une dès sa création : un positionnement en porte une à « Gagné attente contrat », l'état où le bon de commande s'ouvre. Le report ne changeait donc jamais rien, et la mission restait en attente dans le CRM.
+
+- Le passage à « Gagné » devient une **étape à part entière**, jouée même quand la prestation existe déjà : c'est l'état de la mission, pas seulement le moyen d'en produire une. Une prestation connue n'est pas recréée pour autant.
+- **L'état est relu après coup** : BoondManager peut accepter la demande sans l'appliquer. Le cas était jusqu'ici indiscernable d'un succès ; il ressort désormais en avertissement — « l'état est resté à 7 ».
+- Une reconduction ne passe toujours pas par là : son positionnement est gagné de longue date, sa prestation vient du renouvellement natif.
+
+3 tests sur l'état du positionnement. 776 tests backend verts.
+
 ### 2026-08-24 (feat: rejouer un report Boond, et le défaire)
 
 Le badge « Dans Boond » fermait la porte : une fois le premier objet créé, le bouton disparaissait et l'ADV ne pouvait plus rien reporter — ni compléter ce qui avait manqué, ni recommencer après un essai.

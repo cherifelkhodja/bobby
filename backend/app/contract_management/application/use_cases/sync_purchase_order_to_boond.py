@@ -342,13 +342,18 @@ class SyncPurchaseOrderToBoondUseCase:
         Une reconduction sans prestation connue — mission dont le premier bon
         de commande n'a jamais été reporté — n'a rien à renouveler et repasse
         donc par le positionnement.
+
+        Le positionnement est gagné **même si une prestation existe déjà** :
+        c'est l'état de la mission, pas seulement le moyen d'en produire une.
+        Un positionnement en porte une dès « Gagné attente contrat », l'état
+        où s'ouvre le bon de commande — s'en remettre à son absence laissait
+        la mission en attente dans le CRM une fois le report passé.
         """
         if po.parent_purchase_order_id and po.boond_delivery_id:
             await self._renew_delivery(po, warnings)
             return
 
-        if not po.boond_delivery_id:
-            await self._win_positioning(po, warnings)
+        await self._win_positioning(po, warnings)
 
         if po.boond_delivery_id:
             await self._align_delivery(po, warnings)
@@ -360,25 +365,13 @@ class SyncPurchaseOrderToBoondUseCase:
         vente, jours — restent celles du commercial. Les conditions du bon de
         commande sont portées à la prestation ensuite (`_align_delivery`), pas
         au positionnement.
+
+        L'état est relu ensuite : BoondManager peut accepter la demande sans
+        l'appliquer, et un report qui n'aurait rien changé doit se voir.
         """
         try:
             await self._crm.update_positioning_state(
                 po.boond_positioning_id, POSITIONING_STATE_WON
-            )
-            positioning = await self._crm.get_positioning(po.boond_positioning_id) or {}
-            delivery_id = positioning.get("delivery_id")
-            if delivery_id:
-                po.boond_delivery_id = delivery_id
-                logger.info(
-                    "purchase_order_delivery_created",
-                    purchase_order_id=str(po.id),
-                    positioning_id=po.boond_positioning_id,
-                    delivery_id=delivery_id,
-                )
-                return
-            warnings.append(
-                f"Positionnement {po.boond_positioning_id} passé à « Gagné », mais "
-                "BoondManager n'a pas rattaché de prestation : à vérifier dans le CRM."
             )
         except Exception as exc:
             # Le contrat et l'achat restent créables : l'ADV reprendra la
@@ -392,6 +385,37 @@ class SyncPurchaseOrderToBoondUseCase:
             warnings.append(
                 f"Positionnement {po.boond_positioning_id} non passé à « Gagné » : "
                 "la prestation n'a pas été créée, à reprendre dans BoondManager."
+            )
+            return
+
+        positioning = await self._crm.get_positioning(po.boond_positioning_id) or {}
+
+        state = positioning.get("state")
+        if state is not None and int(state) != POSITIONING_STATE_WON:
+            logger.warning(
+                "purchase_order_positioning_state_unchanged",
+                purchase_order_id=str(po.id),
+                positioning_id=po.boond_positioning_id,
+                state=state,
+            )
+            warnings.append(
+                f"Positionnement {po.boond_positioning_id} : BoondManager a accepté la "
+                f"demande mais l'état est resté à {state} — à passer à « Gagné » à la main."
+            )
+
+        delivery_id = positioning.get("delivery_id")
+        if delivery_id and not po.boond_delivery_id:
+            po.boond_delivery_id = delivery_id
+            logger.info(
+                "purchase_order_delivery_created",
+                purchase_order_id=str(po.id),
+                positioning_id=po.boond_positioning_id,
+                delivery_id=delivery_id,
+            )
+        elif not po.boond_delivery_id:
+            warnings.append(
+                f"Positionnement {po.boond_positioning_id} passé à « Gagné », mais "
+                "BoondManager n'a pas rattaché de prestation : à vérifier dans le CRM."
             )
 
     async def _align_delivery(self, po: PurchaseOrder, warnings: list[str]) -> None:
