@@ -233,6 +233,17 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (fix: le déploiement rétablit lui-même `alembic_version`)
+
+Trois déploiements de suite mouraient au démarrage sur `DuplicateTableError: relation "users" already exists` : la table `alembic_version` a disparu de la base de prod, Alembic croyait donc la base vierge et rejouait `001_initial_schema`. Rien à corriger côté code — la chaîne des 82 migrations est saine (racine unique, tête unique, aucune branche) et rien dans l'application ne crée de table hors Alembic.
+
+- **Réparation automatique** : `scripts/bootstrap_alembic_version.py` tourne avant `alembic upgrade head`. Il ne fait rien dans le cas normal ; si la table de suivi est vide ou absente alors que le schéma existe, il reconnaît la révision réellement appliquée et l'inscrit — un `alembic stamp` sans intervention humaine sur la base.
+- **Reconnaissance par empreintes** : `scripts/alembic_schema_fingerprints.py` associe à chaque migration un objet du schéma qui **bascule exactement là** — absent partout avant, présent partout après. Table *générée* en déroulant la chaîne sur un PostgreSQL réel (`scripts/generer_empreintes_alembic.py`), pas écrite à la main : 62 migrations reconnaissables, 20 sans trace (données seules). Un test échoue si une migration ajoutée n'y figure pas.
+- **Trois refus plutôt qu'une devinette** : schéma incohérent (une empreinte ancienne fausse sous une récente vraie), incertitude portant sur une migration de données (les rejouer effacerait des données), schéma étranger. Dans tous les cas, rien n'est écrit et le motif part dans les logs.
+- Le `CMD` enchaîne avec `||` et non `&&` : même un plantage de l'amorçage ne peut retenir un déploiement qui passerait sans lui.
+
+Vérifié en rejouant le `CMD` du conteneur sur sept états de base, dont la panne reproduite à l'identique. 74 tests d'amorçage. 760 tests backend verts.
+
 ### 2026-08-24 (feat: l'achat fournisseur naît de la prestation)
 
 Le corps attendu par `POST /purchases` est confirmé, et il ne ressemble pas à celui qui était posté : l'achat ne se rattache pas à un **positionnement** mais à une **prestation**, et ce rattachement ne se fait **qu'à la création** (`PUT /purchases/{id}/information` n'expose ni `delivery` ni `project` — un achat posé sur la mauvaise prestation se supprime et se recrée).

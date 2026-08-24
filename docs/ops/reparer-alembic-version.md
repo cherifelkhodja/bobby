@@ -1,4 +1,11 @@
-# Réparer `alembic_version` (déploiement qui recrée la table `users`)
+# `alembic_version` perdue : réparation automatique au démarrage
+
+> **Depuis le 2026-08-24, il n'y a plus rien à faire à la main** : le conteneur
+> répare la situation lui-même au démarrage
+> (`scripts/bootstrap_alembic_version.py`, lancé avant `alembic upgrade head`).
+> Ce document explique ce qu'il fait, et ce qui reste à faire dans les cas où
+> il refuse d'agir.
+
 
 ## Le symptôme
 
@@ -21,9 +28,40 @@ l'application ne crée de table hors Alembic (`create_all` n'existe nulle part),
 donc la table de suivi a été perdue côté base : suppression manuelle, ou
 restauration d'un dump qui ne l'emportait pas.
 
-Aucune correction de fichier ne peut y remédier : il faut écrire dans la base.
+## Ce que fait l'amorçage
 
-## 1. Diagnostic
+`scripts/bootstrap_alembic_version.py` tourne juste avant `alembic upgrade head`.
+
+Dans le cas normal — la table de suivi porte une révision — il ne dit rien et
+rend la main. Il n'agit que si elle est vide ou absente **et** que le schéma
+existe : il reconnaît alors où en est la base et inscrit la révision
+correspondante, l'équivalent d'un `alembic stamp`.
+
+La reconnaissance s'appuie sur `scripts/alembic_schema_fingerprints.py` : pour
+chaque migration, un objet du schéma qui **bascule exactement là** — absent
+partout avant, présent partout après. Cette table est *générée* en déroulant la
+chaîne sur un PostgreSQL réel (`scripts/generer_empreintes_alembic.py`) ; un
+test échoue si une migration ajoutée n'y figure pas.
+
+Trois règles gouvernent l'écriture :
+
+- **Ne jamais aggraver.** Toute situation non traitée ressort sans rien écrire,
+  après l'avoir dit dans les logs (préfixe `[MIGRATIONS]`). Alembic reste
+  l'autorité et produit son erreur habituelle. Le `CMD` utilise d'ailleurs `||`
+  et non `&&` : même un plantage de l'amorçage ne retient pas le déploiement.
+- **Ne jamais deviner.** Une révision n'est inscrite que si toutes les
+  empreintes antérieures sont vraies (schéma cohérent) et que la suivante est
+  reconnaissable et fausse.
+- **Ne rien rejouer de destructeur.** Les migrations de données — remises à
+  zéro, réécritures d'articles — ne laissent pas de trace dans le schéma. Si
+  l'incertitude porte sur l'une d'elles, l'amorçage refuse.
+
+## S'il refuse
+
+Le message dit lequel des trois cas s'applique. La réparation manuelle
+ci-dessous reste alors valable.
+
+## 1. Diagnostic manuel
 
 Sur la base de production (`railway connect Postgres`) :
 
@@ -63,7 +101,7 @@ SELECT
 **La révision à inscrire est la dernière colonne à `t`** : tout à `t` → `082` ;
 `m078` à `t` et le reste à `f` → `078` ; etc.
 
-## 2. Réparation
+## 2. Réparation manuelle
 
 Même effet qu'un `alembic stamp`, sans avoir à lancer l'outil contre la
 production. Remplacer `082` par la révision trouvée ci-dessus.
@@ -89,8 +127,16 @@ elle vaut `082`, sinon seules les migrations suivantes s'appliquent.
 
 ## Vérifié
 
-La panne a été reproduite à l'identique sur un PostgreSQL 16 local, schéma
-complet et `alembic_version` vidée, puis réparée par le SQL ci-dessus :
-`alembic upgrade head` redevient muet et `alembic current` répond `082 (head)`.
-Le cas d'une base restée à `078` a été vérifié aussi : le diagnostic la désigne
-correctement, et le redéploiement applique `079` à `082`.
+Sur un PostgreSQL 16 local, la panne a d'abord été reproduite à l'identique
+(schéma complet, `alembic_version` vidée). Le `CMD` du conteneur a ensuite été
+rejoué tel quel sur sept états de base :
+
+| État de départ | Résultat |
+|---|---|
+| Schéma à jour, suivi vidé (le cas de la prod) | `082` inscrite, aucune migration rejouée |
+| Schéma à jour, table de suivi supprimée | idem |
+| Schéma arrêté à `078`, suivi supprimé | `078` inscrite, `079` à `082` appliquées |
+| Base vierge | rien inscrit, Alembic crée le schéma |
+| Déploiement normal (suivi renseigné) | muet, aucune écriture |
+| Base arrêtée sur une migration de données (`063`) | refus motivé, base intacte |
+| Schéma étranger, ou incohérent (une table ancienne manquante) | refus motivé, base intacte |

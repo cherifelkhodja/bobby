@@ -77,5 +77,9 @@ USER appuser
 ENV PORT=8000
 EXPOSE $PORT
 
-# Production command - run migrations then start server
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]
+# Production command - rétablir le suivi des migrations si besoin, migrer, servir.
+# L'amorçage ne fait rien dans le cas normal ; il n'agit que si `alembic_version`
+# a disparu de la base, auquel cas Alembic rejouerait la création du schéma.
+# Son échec éventuel ne doit jamais retenir un déploiement : Alembic reste
+# l'autorité, d'où le `||` plutôt qu'un `&&`.
+CMD ["sh", "-c", "python scripts/bootstrap_alembic_version.py || echo '[MIGRATIONS] amorçage indisponible, on poursuit'; alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]
