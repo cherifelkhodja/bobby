@@ -42,7 +42,19 @@ def _signed_po(**overrides) -> PurchaseOrder:
     return PurchaseOrder(**defaults)
 
 
-def _make_use_case(po, *, provider_id=777, third_party_type="sous_traitant"):
+def _third_party(**overrides) -> SimpleNamespace:
+    defaults = {
+        "boond_provider_id": 777,
+        "company_name": "AKEMA TECH",
+        "boond_billing_contact_id": 2864,
+        "boond_adv_contact_id": 2865,
+        "boond_signatory_contact_id": 2866,
+    }
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
+
+
+def _make_use_case(po, *, provider_id=777, third_party_type="sous_traitant", third_party=None):
     po_repo = AsyncMock()
     po_repo.get_by_id = AsyncMock(return_value=po)
     po_repo.save = AsyncMock(side_effect=lambda entity: entity)
@@ -57,9 +69,7 @@ def _make_use_case(po, *, provider_id=777, third_party_type="sous_traitant"):
 
     tp_repo = AsyncMock()
     tp_repo.get_by_id = AsyncMock(
-        return_value=SimpleNamespace(boond_provider_id=provider_id, company_name="AKEMA TECH")
-        if provider_id
-        else SimpleNamespace(boond_provider_id=None, company_name="AKEMA TECH")
+        return_value=third_party or _third_party(boond_provider_id=provider_id)
     )
 
     crm = AsyncMock()
@@ -305,6 +315,51 @@ class TestDelivery:
 
         assert result.boond_purchase_order_id == 666
         assert "Prestation 797 non recalée" in result.boond_sync_error
+
+
+class TestProviderLink:
+    """La ressource porte sa société fournisseur et son interlocuteur."""
+
+    @pytest.mark.asyncio
+    async def test_the_billing_contact_is_attached_to_the_resource(self):
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po)
+
+        await use_case.execute(po.id)
+
+        kwargs = crm.update_resource_administrative.await_args.kwargs
+        assert kwargs["provider_company_id"] == 777
+        assert kwargs["provider_contact_id"] == 2864
+
+    @pytest.mark.asyncio
+    async def test_the_adv_contact_takes_over_without_a_billing_one(self):
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(
+            po, third_party=_third_party(boond_billing_contact_id=None)
+        )
+
+        await use_case.execute(po.id)
+
+        assert crm.update_resource_administrative.await_args.kwargs["provider_contact_id"] == 2865
+
+    @pytest.mark.asyncio
+    async def test_a_supplier_without_any_contact_is_still_linked(self):
+        """La société seule vaut mieux qu'un rattachement refusé."""
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(
+            po,
+            third_party=_third_party(
+                boond_billing_contact_id=None,
+                boond_adv_contact_id=None,
+                boond_signatory_contact_id=None,
+            ),
+        )
+
+        await use_case.execute(po.id)
+
+        kwargs = crm.update_resource_administrative.await_args.kwargs
+        assert kwargs["provider_company_id"] == 777
+        assert kwargs["provider_contact_id"] is None
 
 
 class TestAlreadyAResource:

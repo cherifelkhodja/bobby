@@ -112,7 +112,7 @@ class SyncPurchaseOrderToBoondUseCase:
         warnings: list[str] = []
         try:
             resource_id = await self._resolve_resource(po)
-            await self._link_provider(po, resource_id, third_party.boond_provider_id)
+            await self._link_provider(po, resource_id, third_party)
             await self._create_contract(po, resource_id)
             await self._ensure_delivery(po, warnings)
             await self._create_purchase_order(po, third_party.boond_provider_id, warnings)
@@ -221,17 +221,22 @@ class SyncPurchaseOrderToBoondUseCase:
         po.boond_consultant_id = resource_id
         po.boond_consultant_type = "resource"
 
-    async def _link_provider(self, po: PurchaseOrder, resource_id: int, provider_id: int) -> None:
-        """Rattache la ressource à sa société fournisseur (best-effort).
+    async def _link_provider(self, po: PurchaseOrder, resource_id: int, third_party) -> None:
+        """Rattache la ressource à sa société fournisseur et à son contact.
 
-        Un échec ici ne doit pas empêcher la création du contrat et du bon de
-        commande : le lien est corrigeable à la main dans Boond.
+        Boond attend un contact autant qu'une société : c'est l'interlocuteur
+        du fournisseur pour ce consultant. Celui de la facturation est retenu,
+        comme au report du contrat cadre ; à défaut, l'ADV, puis le signataire —
+        mieux vaut un contact approchant que pas de contact du tout.
+
+        Best-effort : un échec ici ne doit pas empêcher la création du contrat
+        et de l'achat, le lien restant corrigeable à la main dans Boond.
         """
         try:
             await self._crm.update_resource_administrative(
                 resource_id=resource_id,
-                provider_company_id=provider_id,
-                provider_contact_id=None,
+                provider_company_id=third_party.boond_provider_id,
+                provider_contact_id=_provider_contact_id(third_party),
             )
         except Exception as exc:
             logger.warning(
@@ -321,7 +326,13 @@ class SyncPurchaseOrderToBoondUseCase:
             await self._align_delivery(po, warnings)
 
     async def _win_positioning(self, po: PurchaseOrder, warnings: list[str]) -> None:
-        """Passe le positionnement à « Gagné » et retient la prestation qui en naît."""
+        """Passe le positionnement à « Gagné » et retient la prestation qui en naît.
+
+        Seul l'état change : les données du positionnement — dates, tarif de
+        vente, jours — restent celles du commercial. Les conditions du bon de
+        commande sont portées à la prestation ensuite (`_align_delivery`), pas
+        au positionnement.
+        """
         try:
             await self._crm.update_positioning_state(
                 po.boond_positioning_id, POSITIONING_STATE_WON
@@ -470,6 +481,15 @@ class SyncPurchaseOrderToBoondUseCase:
             )
         )
         return result.scalar_one_or_none()
+
+
+def _provider_contact_id(third_party) -> int | None:
+    """Contact du fournisseur à rattacher à la ressource : facturation, ADV, signataire."""
+    for field in ("boond_billing_contact_id", "boond_adv_contact_id", "boond_signatory_contact_id"):
+        contact_id = getattr(third_party, field, None)
+        if contact_id:
+            return contact_id
+    return None
 
 
 def _iso(value: date | None) -> str | None:

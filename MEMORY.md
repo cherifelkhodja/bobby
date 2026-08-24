@@ -233,6 +233,15 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (feat: la ressource Boond porte le contact du fournisseur)
+
+Le report d'un bon de commande rattachait la ressource à la société fournisseur, sans contact — Boond en attend un : l'interlocuteur du fournisseur pour ce consultant (`providerContact`, à côté de `providerCompany`).
+
+- Contact retenu : celui de la **facturation**, comme au report du contrat cadre ; à défaut l'ADV, puis le signataire. Un fournisseur sans aucun contact reste rattaché à sa société seule.
+- **Décision (positionnement)** : le report ne réécrit jamais les données du positionnement — dates, tarif de vente, jours restent celles du commercial. Seul son état passe à « Gagné », ce qui fait naître la prestation ; les conditions du bon de commande sont ensuite portées à la prestation, pas au positionnement.
+
+3 tests sur le rattachement. 674 tests backend verts.
+
 ### 2026-08-24 (feat: le report du bon de commande fait naître la prestation)
 
 L'API BoondManager ne crée pas de prestation : c'est le passage du positionnement à l'état **1 (« Gagné »)** qui la fait produire, à partir du positionnement. Le report d'un bon de commande sans prestation se contentait donc de ne rien faire.
