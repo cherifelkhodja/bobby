@@ -634,6 +634,37 @@ class BoondCrmAdapter:
             )
             raise
 
+    async def _entity_exists(self, path: str, kind: str, entity_id: int) -> bool:
+        """Une fiche Boond existe-t-elle ? Seul un vrai 404 vaut « non ».
+
+        Toute autre erreur est propagée : conclure à l'absence sur un timeout
+        ferait convertir un candidat qui n'en est pas un, ou recréer un
+        doublon.
+        """
+        try:
+            await self._boond._make_request("GET", path)
+            return True
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                logger.info("boond_entity_not_found", kind=kind, entity_id=entity_id)
+                return False
+            raise
+
+    async def candidate_exists(self, candidate_id: int) -> bool:
+        """Cet identifiant est-il celui d'un candidat Boond ?"""
+        return await self._entity_exists(
+            f"/candidates/{candidate_id}", "candidate", candidate_id
+        )
+
+    async def resource_exists(self, resource_id: int) -> bool:
+        """Cet identifiant est-il celui d'une ressource Boond ?
+
+        Les identifiants de candidats et de ressources vivent dans deux séries
+        distinctes : le même numéro peut désigner deux personnes. À n'appeler
+        qu'une fois établi que le numéro n'est pas celui d'un candidat.
+        """
+        return await self._entity_exists(f"/resources/{resource_id}", "resource", resource_id)
+
     async def verify_company_exists(self, company_id: int) -> bool:
         """Check if a company exists in BoondManager.
 

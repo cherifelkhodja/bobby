@@ -49,6 +49,47 @@ def _http_status_error(status_code: int) -> httpx.HTTPStatusError:
     return httpx.HTTPStatusError(f"HTTP {status_code}", request=request, response=response)
 
 
+class TestConsultantExistence:
+    """``candidate_exists`` / ``resource_exists`` : mêmes règles que pour une société.
+
+    Elles décident si un consultant doit être converti ou pris tel quel :
+    conclure à l'absence sur une panne ferait convertir une ressource, ce que
+    BoondManager refuse.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_candidate_is_looked_up_on_its_own_endpoint(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value={"data": {"id": "4242"}})
+
+        assert await adapter.candidate_exists(4242) is True
+        assert boond._make_request.await_args.args[1] == "/candidates/4242"
+
+    @pytest.mark.asyncio
+    async def test_a_resource_is_looked_up_on_its_own_endpoint(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value={"data": {"id": "9001"}})
+
+        assert await adapter.resource_exists(9001) is True
+        assert boond._make_request.await_args.args[1] == "/resources/9001"
+
+    @pytest.mark.asyncio
+    async def test_only_a_404_means_absent(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=_http_status_error(404))
+
+        assert await adapter.candidate_exists(4242) is False
+        assert await adapter.resource_exists(4242) is False
+
+    @pytest.mark.asyncio
+    async def test_a_server_failure_is_propagated(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=_http_status_error(500))
+
+        with pytest.raises(httpx.HTTPStatusError):
+            await adapter.candidate_exists(4242)
+
+
 class TestVerifyCompanyExists:
     """``verify_company_exists`` : False seulement sur 404, propage sinon."""
 

@@ -233,6 +233,18 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (fix: le consultant d'un bon de commande peut déjà être une ressource)
+
+Le report d'un bon de commande convertissait le consultant en ressource dès que sa fiche ne le disait pas déjà ressource. Un identifiant de **ressource** pris pour un candidat faisait échouer tout le report : `PUT /candidates/{id}` sur un numéro qui n'est pas celui d'un candidat.
+
+- Avant toute conversion, Bobby cherche d'abord la ressource liée au candidat (inchangé), puis — **seulement si aucun candidat ne porte ce numéro** — vérifie s'il s'agit d'une ressource, auquel cas il la prend telle quelle. La sonde est conditionnée : candidats et ressources ont deux séries d'identifiants, et se rabattre sur la ressource du même numéro rattacherait une autre personne.
+- Un consultant introuvable des deux côtés donne désormais un message clair au lieu d'une erreur BoondManager brute.
+- `candidate_exists` / `resource_exists` suivent la règle de `verify_company_exists` : seul un vrai 404 vaut « absent », toute autre erreur est propagée — conclure à l'absence sur un timeout ferait convertir une ressource.
+
+Le contrat cadre garde son comportement : sa conversion est best-effort et une erreur y est déjà consignée sans bloquer le reste.
+
+9 tests ajoutés. 659 tests backend verts.
+
 ### 2026-08-24 (feat: reporter la mission dans Boond sans attendre la signature)
 
 Même geste que pour le fournisseur, appliqué à la suite du workflow : ressource, prestation, contrat, achat.

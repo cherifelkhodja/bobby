@@ -162,6 +162,27 @@ class SyncPurchaseOrderToBoondUseCase:
             self._remember_resource(po, existing)
             return existing
 
+        # Le consultant peut déjà être une ressource : identifiant saisi tel
+        # quel, ou positionnement dont Boond n'a pas dit la nature. Le convertir
+        # échouerait — `PUT /candidates/{id}` sur un numéro qui n'est pas celui
+        # d'un candidat. La sonde n'a lieu que si aucun candidat ne porte ce
+        # numéro : candidats et ressources ont deux séries d'identifiants, et le
+        # même numéro peut désigner deux personnes.
+        if not await self._crm.candidate_exists(po.boond_consultant_id):
+            if await self._crm.resource_exists(po.boond_consultant_id):
+                logger.info(
+                    "purchase_order_consultant_already_a_resource",
+                    purchase_order_id=str(po.id),
+                    resource_id=po.boond_consultant_id,
+                )
+                self._remember_resource(po, po.boond_consultant_id)
+                return po.boond_consultant_id
+            raise PurchaseOrderBoondSyncError(
+                po.display_reference,
+                f"le consultant {po.boond_consultant_id} est introuvable dans BoondManager, "
+                "ni comme candidat ni comme ressource",
+            )
+
         # Le type de tiers du fournisseur classe la ressource dans Boond :
         # externe pour la sous-traitance et le portage salarial, type dédié pour
         # le portage commercial. Sans lui, la ressource naîtrait mal classée.

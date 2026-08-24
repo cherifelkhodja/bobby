@@ -64,6 +64,8 @@ def _make_use_case(po, *, provider_id=777, third_party_type="sous_traitant"):
 
     crm = AsyncMock()
     crm.resolve_resource_id = AsyncMock(return_value=None)
+    crm.candidate_exists = AsyncMock(return_value=True)
+    crm.resource_exists = AsyncMock(return_value=False)
     crm.convert_candidate_to_resource = AsyncMock(return_value=9001)
     crm.update_resource_administrative = AsyncMock()
     crm.create_boond_contract = AsyncMock(return_value=555)
@@ -264,6 +266,62 @@ class TestDelivery:
 
         assert result.boond_purchase_order_id == 666
         assert "Prestation 797 non recalée" in result.boond_sync_error
+
+
+class TestAlreadyAResource:
+    """Le consultant est parfois déjà une ressource Boond."""
+
+    @pytest.mark.asyncio
+    async def test_a_consultant_declared_as_a_resource_is_used_as_is(self):
+        po = _signed_po(boond_consultant_type="resource")
+        use_case, crm, _ = _make_use_case(po)
+
+        await use_case.execute(po.id)
+
+        crm.convert_candidate_to_resource.assert_not_awaited()
+        crm.candidate_exists.assert_not_awaited()
+        assert crm.create_boond_contract.await_args.kwargs["resource_id"] == 4242
+
+    @pytest.mark.asyncio
+    async def test_an_id_that_is_not_a_candidate_but_a_resource_is_used_as_is(self):
+        """Identifiant de ressource pris pour un candidat : le convertir échouerait."""
+        po = _signed_po(boond_consultant_type="candidate")
+        use_case, crm, _ = _make_use_case(po)
+        crm.candidate_exists = AsyncMock(return_value=False)
+        crm.resource_exists = AsyncMock(return_value=True)
+
+        result = await use_case.execute(po.id)
+
+        crm.convert_candidate_to_resource.assert_not_awaited()
+        assert result.boond_consultant_id == 4242
+        assert result.boond_consultant_type == "resource"
+
+    @pytest.mark.asyncio
+    async def test_a_candidate_without_a_resource_is_still_converted(self):
+        """Un candidat existant est converti : le numéro d'une ressource homonyme ne vaut rien.
+
+        Candidats et ressources ont deux séries d'identifiants — se rabattre sur
+        la ressource du même numéro rattacherait une autre personne.
+        """
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po)
+
+        await use_case.execute(po.id)
+
+        crm.convert_candidate_to_resource.assert_awaited_once()
+        crm.resource_exists.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_an_unknown_consultant_is_reported(self):
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po)
+        crm.candidate_exists = AsyncMock(return_value=False)
+        crm.resource_exists = AsyncMock(return_value=False)
+
+        with pytest.raises(PurchaseOrderBoondSyncError, match="introuvable"):
+            await use_case.execute(po.id)
+
+        crm.convert_candidate_to_resource.assert_not_awaited()
 
 
 class TestResourceMemory:

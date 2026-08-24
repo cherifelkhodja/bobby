@@ -32,6 +32,19 @@ class CrmServicePort(Protocol):
         """Resolve the Boond resource ID linked to a candidate ID (or None)."""
         ...
 
+    async def candidate_exists(self, candidate_id: int) -> bool:
+        """Cet identifiant est-il celui d'un candidat ?"""
+        ...
+
+    async def resource_exists(self, resource_id: int) -> bool:
+        """Cet identifiant est-il celui d'une ressource ?
+
+        Candidats et ressources ont deux séries d'identifiants : le même numéro
+        peut désigner deux personnes. À n'interroger qu'une fois établi que le
+        numéro n'est pas celui d'un candidat.
+        """
+        ...
+
     async def create_provider(
         self,
         company_name: str,
