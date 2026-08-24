@@ -98,6 +98,10 @@ class CrmServicePort(Protocol):
         """Delete a CRM contract. True once it is gone."""
         ...
 
+    async def delete_resource(self, resource_id: int) -> bool:
+        """Delete a resource. True once it is gone."""
+        ...
+
     async def delete_delivery(self, delivery_id: int) -> bool:
         """Delete a delivery. True once it is gone."""
         ...

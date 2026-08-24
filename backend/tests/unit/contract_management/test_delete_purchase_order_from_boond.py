@@ -53,7 +53,12 @@ def _make_use_case(po):
     crm.delete_supplier_purchase = AsyncMock(return_value=True)
     crm.delete_boond_contract = AsyncMock(return_value=True)
     crm.delete_delivery = AsyncMock(return_value=True)
+    crm.delete_resource = AsyncMock(return_value=True)
     crm.update_positioning_state = AsyncMock()
+    # Le positionnement n'a jamais perdu de vue le candidat d'origine.
+    crm.get_positioning = AsyncMock(
+        return_value={"candidate_id": 2398, "consultant_type": "candidate"}
+    )
 
     use_case = DeletePurchaseOrderFromBoondUseCase(
         purchase_order_repository=po_repo, crm_service=crm
@@ -171,13 +176,61 @@ class TestComptesRendus:
         crm.update_positioning_state.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_la_ressource_est_annoncee_comme_irreversible(self):
+    async def test_la_ressource_est_supprimee(self):
+        """Elle ne se reconvertit pas en candidat, mais elle s'efface."""
         po = _pushed_po()
-        use_case, _ = _make_use_case(po)
+        use_case, crm = _make_use_case(po)
 
         _, report = await use_case.execute(po.id)
 
-        assert any("reconvertir en candidat" in ligne for ligne in report)
+        crm.delete_resource.assert_awaited_once_with(9001)
+        assert any("Ressource #" in ligne and "supprimée" in ligne for ligne in report)
+
+    @pytest.mark.asyncio
+    async def test_le_bon_de_commande_repointe_sur_le_candidat(self):
+        """Sans quoi il désignerait une ressource effacée."""
+        po = _pushed_po()
+        use_case, _ = _make_use_case(po)
+
+        result, _ = await use_case.execute(po.id)
+
+        assert result.boond_consultant_id == 2398
+        assert result.boond_consultant_type == "candidate"
+
+    @pytest.mark.asyncio
+    async def test_un_candidat_illisible_detache_le_consultant(self):
+        """Mieux vaut un consultant à ressaisir qu'un renvoi vers le vide."""
+        po = _pushed_po()
+        use_case, crm = _make_use_case(po)
+        crm.get_positioning = AsyncMock(return_value=None)
+
+        result, report = await use_case.execute(po.id)
+
+        assert result.boond_consultant_id is None
+        assert any("Consultant détaché" in ligne for ligne in report)
+
+    @pytest.mark.asyncio
+    async def test_l_ordre_est_celui_de_la_creation_a_l_envers(self):
+        """Chaque objet repose sur le précédent : achat, prestation, contrat, ressource."""
+        po = _pushed_po()
+        use_case, crm = _make_use_case(po)
+        appels: list[str] = []
+        for nom in (
+            "delete_supplier_purchase",
+            "delete_delivery",
+            "delete_boond_contract",
+            "delete_resource",
+        ):
+            setattr(crm, nom, AsyncMock(side_effect=lambda _id, n=nom: appels.append(n)))
+
+        await use_case.execute(po.id)
+
+        assert appels == [
+            "delete_supplier_purchase",
+            "delete_delivery",
+            "delete_boond_contract",
+            "delete_resource",
+        ]
 
     @pytest.mark.asyncio
     async def test_un_consultant_reste_candidat_ne_dit_rien(self):

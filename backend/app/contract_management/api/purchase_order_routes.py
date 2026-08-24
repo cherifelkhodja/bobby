@@ -118,6 +118,7 @@ def _po_to_response(
         boond_positioning_id=po.boond_positioning_id,
         boond_need_id=po.boond_need_id,
         boond_delivery_id=po.boond_delivery_id,
+        boond_project_id=po.boond_project_id,
         client_name=po.client_name,
         mission_title=po.mission_title,
         mission_description=po.mission_description,

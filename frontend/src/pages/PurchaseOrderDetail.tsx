@@ -898,6 +898,10 @@ export function PurchaseOrderDetail() {
             </p>
           </div>
           <div>
+            <p className="ml">Projet</p>
+            <p className="mv font-mono">{po.boond_project_id ?? '—'}</p>
+          </div>
+          <div>
             <p className="ml">Prestation</p>
             {po.boond_delivery_id ? (
               <p className="mv font-mono">{po.boond_delivery_id}</p>

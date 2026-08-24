@@ -233,6 +233,28 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (refacto: le report Boond, réduit à ce qu'il faut)
+
+Le workflow complet relu appel par appel. Onze appels supprimés, un payload d'achat divisé par dix.
+
+**Naissance du BDC : un seul appel.** `GET /positionings/{id}` porte tout dans son `included` — le besoin avec son commercial, son client et son agence, le projet, le consultant avec la ressource qui lui correspond déjà. Les lectures du besoin, de la prestation et du candidat n'y ajoutaient rien : supprimées. Seule perte, l'email Boond du responsable en repli — le commercial se résout par son compte Bobby, ce qui est le seul usage du champ.
+
+**La nature du consultant ne se sonde plus.** `dependsOn.type` dit candidat ou ressource ; candidat on convertit, ressource on continue. Trois appels de sonde (`resolve_resource_id`, `candidate_exists`, `resource_exists`) disparaissent. Et un candidat que Boond a déjà converti porte sa ressource dans l'`included` : le BDC pointe dessus dès sa création, ce qui évite d'en créer une seconde.
+
+**Le rattachement au fournisseur n'est plus best-effort** : une ressource sans société fournisseur est un consultant que Boond ne sait pas rattacher à qui le facture. Un échec arrête le report au lieu de laisser naître un contrat et un achat sur une ressource orpheline.
+
+**Le passage à « Gagné » se suffit à lui-même.** Le dictionnaire des états n'est plus interrogé — la valeur ne bouge pas, et le réglage `bdc_won_positioning_state` la couvre. Surtout, **la réponse du `PUT` porte le positionnement à jour** : son état, qui dit si l'écriture a été prise, et son projet. La relecture qui suivait n'apprenait rien.
+
+**L'achat se crée en douze lignes.** Plus de `GET /purchases/default` ni de recopie filtrée : le corps ne porte que le projet, la prestation, un intitulé et `createPayments: null`. Boond déduit le reste de la prestation — montants, période, société, agence, responsable. L'intitulé nomme le consultant, le fournisseur et la référence du BDC : `CHEBBI Rym - AKEMA TECH - GEM-BC-001`.
+
+**La suppression suit l'ordre de création inversé** : achat → prestation → positionnement → contrat → **ressource**. Elle s'arrêtait au contrat et laissait la ressource, faute de savoir la reconvertir en candidat ; elle la supprime désormais, le candidat lui survivant, et le BDC repointe sur lui — relu sur le positionnement, qui ne l'a jamais perdu de vue.
+
+Migration **083** : `boond_project_id` sur `cm_purchase_orders`. Le projet est la voie vers la prestation et l'achat s'y rattache : le retenir permet de reprendre un report interrompu sans redemander au CRM par où passer.
+
+Le workflow complet, appel par appel, est consigné dans `docs/api/boondmanager.md`.
+
+971 tests unitaires backend verts (les 9 échecs de `test_auth` préexistent), type-check et lint frontend verts.
+
 ### 2026-08-24 (fix: la prestation se retrouve par le projet du positionnement)
 
 Un positionnement n'expose **aucune** relation `delivery` — vérifié contre le CRM sur les positionnements 538 et 539, dont les relations sont `opportunity`, `project`, `files`, `dependsOn` et `createdBy`. Le report cherchait donc une clé qui n'existe pas : il ne pouvait structurellement jamais retrouver la prestation, sur aucune mission.

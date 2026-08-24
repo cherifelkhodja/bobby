@@ -624,6 +624,58 @@ async def update_resource_administrative(
 }
 ```
 
+### Workflow complet d'un bon de commande
+
+**Naissance** — webhook positionnement (« Gagné attente contrat ») :
+
+```http
+GET /positionings/{id}
+```
+
+Un seul appel. Son `included` porte le besoin avec son commercial, son client
+et son agence, le projet, et le consultant avec la ressource qui lui correspond
+déjà. Lire en plus le besoin, la prestation et le candidat n'y ajoutait rien.
+
+**Report** — `POST /purchase-orders/{id}/push-to-boond`, cinq étapes idempotentes :
+
+| # | Étape | Appel |
+|---|---|---|
+| a | Ressource | `PUT /candidates/{id}/information` — **seulement si candidat** ; le positionnement l'a dit dès la création, rien à sonder |
+| b | Fournisseur | `PUT /resources/{id}/administrative` — société + contact de facturation |
+| c | Contrat | `POST /contracts` — CJM, dates, type selon le tiers |
+| d | Prestation | `PUT /positionings/{id}` puis `GET /projects/{projectId}/deliveries-groupments` puis `PUT /deliveries/{id}` |
+| e | Achat | `POST /purchases` |
+
+L'étape **b n'est pas accessoire** : une ressource sans société fournisseur est
+un consultant que Boond ne sait pas rattacher à qui le facture. Un échec arrête
+le report.
+
+À l'étape **d**, le `PUT` fait naître la prestation et **renvoie le
+positionnement à jour** : son état, qui dit si l'écriture a été prise, et son
+projet. Le relire n'apprendrait rien. Le dictionnaire des états n'est pas
+interrogé non plus — « Gagné » vaut 2, et le réglage `bdc_won_positioning_state`
+le couvre si le CRM change.
+
+*Reconduction* : `POST /deliveries/{id}/renew` remplace d et e, produisant
+lui-même l'achat et la commande client.
+
+**Réparation** :
+
+```http
+POST /purchase-orders/{id}/attach-delivery   # la prestation, à la main
+POST /purchase-orders/{id}/push-to-boond     # rejeu, complète ce qui manque
+POST /purchase-orders/{id}/delete-from-boond # [test] défait tout, à l'envers
+```
+
+La suppression suit l'ordre de création inversé, chaque objet reposant sur le
+précédent : **achat → prestation → positionnement (ramené à « Gagné attente
+contrat ») → contrat → ressource**. La ressource ne se reconvertit pas en
+candidat mais s'efface, et le bon de commande repointe sur le candidat, relu
+sur le positionnement. Seule la société fournisseur survit : elle appartient au
+contrat cadre.
+
+---
+
 ### Bon de commande
 
 #### GET /purchases/default puis POST /purchases

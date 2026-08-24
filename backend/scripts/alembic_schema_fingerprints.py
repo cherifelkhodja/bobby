@@ -84,6 +84,7 @@ FINGERPRINTS: dict[str, tuple[str, bool]] = {
     "080": ("column:cm_purchase_orders.provisional_reference", True),
     "081": ("column:tp_third_parties.vat_liable", True),
     "082": ("column:tp_third_parties.boond_billing_contact_id", True),
+    "083": ("column:cm_purchase_orders.boond_project_id", True),
 }
 
 # Révisions qui ne touchent pas au schéma — contenu d'articles, remises à zéro,

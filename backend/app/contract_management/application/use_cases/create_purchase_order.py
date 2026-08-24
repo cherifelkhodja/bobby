@@ -6,7 +6,6 @@ from uuid import UUID
 import structlog
 
 from app.contract_management.application.boond_parsing import (
-    first_present,
     parse_date,
     to_decimal,
 )
@@ -88,13 +87,11 @@ class CreatePurchaseOrderFromPositioningUseCase:
         if existing:
             raise PurchaseOrderAlreadyExistsError(positioning_id, existing.reference)
 
-        need = await self._read_need(positioning.get("need_id"))
-        delivery = await self._read_delivery(positioning.get("delivery_id"))
-        consultant = await self._read_consultant(
-            positioning.get("candidate_id"), positioning.get("consultant_type")
-        )
-        company_id = await self._resolve_company(need.get("agency_id"))
-        commercial_email = await self._resolve_commercial(need)
+        # Le positionnement suffit : son bloc `included` porte le besoin avec
+        # son commercial, son client et son agence, le projet, et le consultant.
+        # Lire en plus le besoin, la prestation et le candidat n'y ajoutait rien.
+        company_id = await self._resolve_company(positioning.get("agency_id"))
+        commercial_email = await self._resolve_commercial(positioning)
 
         # Le numéro définitif n'est attribué qu'à la génération du document :
         # un brouillon abandonné ne doit pas trouer la séquence.
@@ -104,48 +101,30 @@ class CreatePurchaseOrderFromPositioningUseCase:
             provisional_reference=reference,
             company_id=company_id,
             boond_positioning_id=positioning_id,
-            boond_need_id=positioning.get("need_id") or delivery.get("need_id"),
-            boond_delivery_id=positioning.get("delivery_id"),
-            boond_consultant_id=positioning.get("candidate_id"),
-            boond_consultant_type=positioning.get("consultant_type"),
-            consultant_civility=consultant.get("civility"),
-            consultant_first_name=consultant.get("first_name")
-            or positioning.get("consultant_first_name")
-            or None,
-            consultant_last_name=consultant.get("last_name")
-            or positioning.get("consultant_last_name")
-            or None,
-            consultant_email=consultant.get("email"),
-            consultant_phone=consultant.get("phone"),
-            # Le client de la prestation est celui de la mission gagnée : il
-            # prime sur celui du besoin, qui peut avoir évolué depuis.
-            client_name=delivery.get("client_name") or need.get("client_name") or None,
-            mission_title=need.get("title") or delivery.get("title") or None,
-            mission_description=need.get("description") or None,
+            boond_need_id=positioning.get("need_id"),
+            boond_project_id=positioning.get("project_id"),
+            # Un candidat que Boond a déjà converti porte sa ressource : la
+            # retenir évite d'en créer une seconde au report.
+            boond_consultant_id=positioning.get("resource_id") or positioning.get("candidate_id"),
+            boond_consultant_type=(
+                "resource" if positioning.get("resource_id") else positioning.get("consultant_type")
+            ),
+            consultant_first_name=positioning.get("consultant_first_name") or None,
+            consultant_last_name=positioning.get("consultant_last_name") or None,
+            client_name=positioning.get("client_name") or None,
+            mission_title=positioning.get("need_title") or None,
             # La prestation prime sur le positionnement quand elle existe :
             # elle porte les conditions négociées. Le positionnement sert de
             # repli — il connaît lui aussi les deux taux, les jours vendus et
             # la gratuité. `averageDailyCost` est un coût : il préremplit le
             # CJM d'achat ; `averageDailyPriceExcludingTax` est le tarif de
             # vente : il préremplit le TJM, interne.
-            purchase_daily_rate=to_decimal(
-                delivery.get("purchase_daily_rate") or positioning.get("daily_rate")
-            ),
-            sale_daily_rate=to_decimal(
-                delivery.get("sale_daily_rate") or positioning.get("sale_daily_rate")
-            ),
-            days_sold=to_decimal(delivery.get("days_sold") or positioning.get("quantity")),
-            # Zéro jour de gratuité est une donnée : la prestation qui l'affirme
-            # prime sur le positionnement, elle ne lui laisse pas la main.
-            free_days=to_decimal(
-                first_present(delivery.get("free_days"), positioning.get("free_days"))
-            )
-            or Decimal("0"),
-            start_date=parse_date(delivery.get("start_date") or positioning.get("start_date")),
-            end_date=parse_date(delivery.get("end_date") or positioning.get("end_date")),
-            # Contrat déjà en place sur la prestation : le report Boond ne doit
-            # pas en superposer un second sur la même ressource.
-            boond_contract_id=delivery.get("contract_id"),
+            purchase_daily_rate=to_decimal(positioning.get("daily_rate")),
+            sale_daily_rate=to_decimal(positioning.get("sale_daily_rate")),
+            days_sold=to_decimal(positioning.get("quantity")),
+            free_days=to_decimal(positioning.get("free_days")) or Decimal("0"),
+            start_date=parse_date(positioning.get("start_date")),
+            end_date=parse_date(positioning.get("end_date")),
             commercial_email=commercial_email or None,
             created_by=created_by,
         )
@@ -173,44 +152,6 @@ class CreatePurchaseOrderFromPositioningUseCase:
             logger.warning("bdc_trigger_state_invalid", value=raw)
             return DEFAULT_TRIGGER_STATE
 
-    async def _read_need(self, need_id: object) -> dict:
-        """Lit le besoin Boond ; son absence ne bloque pas la création."""
-        if not need_id:
-            return {}
-        try:
-            return await self._crm.get_need(need_id) or {}
-        except Exception as exc:
-            logger.warning("purchase_order_need_lookup_failed", need_id=need_id, error=str(exc))
-            return {}
-
-    async def _read_delivery(self, delivery_id: object) -> dict:
-        """Lit la prestation Boond ; son absence ne bloque pas la création."""
-        if not delivery_id:
-            return {}
-        try:
-            return await self._crm.get_delivery(delivery_id) or {}
-        except Exception as exc:
-            logger.warning(
-                "purchase_order_delivery_lookup_failed",
-                delivery_id=delivery_id,
-                error=str(exc),
-            )
-            return {}
-
-    async def _read_consultant(self, consultant_id: object, consultant_type: object) -> dict:
-        """Lit l'identité du consultant ; son absence ne bloque pas la création."""
-        if not consultant_id:
-            return {}
-        try:
-            return await self._crm.get_candidate_info(consultant_id, consultant_type) or {}
-        except Exception as exc:
-            logger.warning(
-                "purchase_order_consultant_lookup_failed",
-                consultant_id=consultant_id,
-                error=str(exc),
-            )
-            return {}
-
     async def _resolve_company(self, agency_id: object) -> UUID | None:
         """Résout la société émettrice depuis l'agence Boond du besoin."""
         if not agency_id or not self._company_repo:
@@ -220,9 +161,15 @@ class CreatePurchaseOrderFromPositioningUseCase:
             logger.info("purchase_order_no_company_for_agency", agency_id=agency_id)
         return company_id
 
-    async def _resolve_commercial(self, need: dict) -> str:
-        """Email du commercial : utilisateur Bobby d'abord, Boond en repli."""
-        manager_id = need.get("manager_id")
+    async def _resolve_commercial(self, positioning: dict) -> str:
+        """Email du commercial, par son identifiant Boond de responsable.
+
+        Le positionnement ne porte que le nom du responsable, jamais son email :
+        c'est l'utilisateur Bobby correspondant qui le donne. Un responsable
+        sans compte Bobby laisse le champ vide — il ne sert qu'à montrer au
+        commercial ses propres missions.
+        """
+        manager_id = positioning.get("manager_id")
         if manager_id and self._user_repo:
             try:
                 user = await self._user_repo.get_by_boond_resource_id(str(manager_id))
@@ -230,4 +177,4 @@ class CreatePurchaseOrderFromPositioningUseCase:
                 user = None
             if user and getattr(user, "email", None):
                 return str(user.email)
-        return need.get("commercial_email") or ""
+        return ""

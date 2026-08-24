@@ -404,6 +404,11 @@ class PurchaseOrderModel(Base):
         nullable=True,
         comment="Prestation Boond, support du renouvellement (POST /deliveries/{id}/renew)",
     )
+    boond_project_id: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="Projet Boond : par lui se retrouve la prestation, et l'achat s'y rattache",
+    )
 
     # Mission
     client_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
