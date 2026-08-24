@@ -149,22 +149,23 @@ class BoondCrmAdapter:
             réponse distingue une écriture ignorée d'un changement défait
             ensuite par une règle du CRM.
         """
-        # L'onglet « information » se sauvegarde entier : on repart de ce que
-        # Boond y met, seul l'état change. Composer un corps réduit à l'état
-        # revenait à demander l'enregistrement d'un onglet amputé — même
-        # méthode que pour l'achat fournisseur, et même raison.
-        attributes, relationships = await self._positioning_information(positioning_id)
-        attributes["state"] = state
-        data: dict[str, Any] = {
-            "type": "positioning",
-            "id": str(positioning_id),
-            "attributes": attributes,
+        # Un positionnement s'écrit à son adresse propre : il n'a pas d'onglet
+        # « information », contrairement aux candidats, sociétés et besoins —
+        # `/positionings/{id}/information` répond 404. Sa lecture le disait
+        # déjà : elle se fait sur `/positionings/{id}`, comme pour les
+        # prestations.
+        #
+        # Seul l'état est envoyé : les données du positionnement — dates,
+        # tarif de vente, jours — restent celles du commercial.
+        payload = {
+            "data": {
+                "type": "positioning",
+                "id": str(positioning_id),
+                "attributes": {"state": state},
+            }
         }
-        if relationships:
-            data["relationships"] = relationships
-
         response = await self._boond._make_request(
-            "PUT", f"/positionings/{positioning_id}/information", json={"data": data}
+            "PUT", f"/positionings/{positioning_id}", json=payload
         )
         echoed = ((response or {}).get("data") or {}).get("attributes", {}).get("state")
         logger.info(
@@ -177,37 +178,6 @@ class BoondCrmAdapter:
             return int(echoed)
         except (TypeError, ValueError):
             return None
-
-    async def _positioning_information(
-        self, positioning_id: int
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Onglet « information » d'un positionnement, tel que Boond le rend.
-
-        Les relations vides sont écartées — les renvoyer à `null` reviendrait à
-        demander leur effacement. Si la lecture échoue, on rend un onglet vide :
-        l'écriture retombe sur le corps minimal, et son erreur, elle, sera
-        remontée.
-        """
-        try:
-            response = await self._boond._make_request(
-                "GET", f"/positionings/{positioning_id}/information"
-            )
-        except Exception as exc:
-            logger.warning(
-                "boond_positioning_information_unreadable",
-                positioning_id=positioning_id,
-                error=str(exc)[:200],
-            )
-            return {}, {}
-
-        data = (response or {}).get("data") or {}
-        attributes = dict(data.get("attributes") or {})
-        relationships = {
-            name: value
-            for name, value in (data.get("relationships") or {}).items()
-            if isinstance(value, dict) and value.get("data")
-        }
-        return attributes, relationships
 
     async def get_delivery(self, delivery_id: int) -> dict[str, Any] | None:
         """Fetch a delivery (prestation) from BoondManager.

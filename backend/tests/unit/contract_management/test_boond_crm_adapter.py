@@ -49,91 +49,51 @@ def _http_status_error(status_code: int) -> httpx.HTTPStatusError:
     return httpx.HTTPStatusError(f"HTTP {status_code}", request=request, response=response)
 
 
-def _positioning_information() -> dict:
-    """Onglet « information » d'un positionnement, tel que Boond le rend."""
-    return {
-        "data": {
-            "id": "41",
-            "type": "positioning",
-            "attributes": {
-                "state": 7,
-                "startDate": "2026-09-01",
-                "endDate": "2027-02-28",
-                "averageDailyPriceExcludingTax": 620,
-                "numberOfDaysFree": 2,
-            },
-            "relationships": {
-                "candidate": {"data": {"type": "candidate", "id": "2868"}},
-                "opportunity": {"data": {"type": "opportunity", "id": "1627"}},
-                "delivery": {"data": None},
-            },
-        }
-    }
-
-
 class TestPositioningState:
     """Le passage à « Gagné » est ce qui fait naître la prestation."""
 
     @pytest.mark.asyncio
-    async def test_the_whole_information_tab_is_written_back(self):
-        """L'onglet se sauvegarde entier : un corps réduit à l'état l'ampute."""
+    async def test_the_state_is_written_at_the_positioning_own_address(self):
+        """Un positionnement n'a pas d'onglet « information » : cette adresse répond 404.
+
+        Sa lecture le disait déjà — `GET /positionings/{id}` —, comme pour les
+        prestations. Les candidats, sociétés et besoins, eux, ont bien cet onglet.
+        """
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            side_effect=[_positioning_information(), {"data": {"id": "41"}}]
-        )
+        boond._make_request = AsyncMock(return_value={"data": {"id": "538"}})
 
-        await adapter.update_positioning_state(41, 1)
+        await adapter.update_positioning_state(538, 1)
 
-        lecture, ecriture = boond._make_request.await_args_list
-        assert lecture.args[:2] == ("GET", "/positionings/41/information")
-        assert ecriture.args[:2] == ("PUT", "/positionings/41/information")
-        data = ecriture.kwargs["json"]["data"]
-        assert data["type"] == "positioning"
-        assert data["id"] == "41"
-        # Seul l'état change : le reste de l'onglet repart tel quel.
-        assert data["attributes"]["state"] == 1
-        assert data["attributes"]["startDate"] == "2026-09-01"
-        assert data["attributes"]["averageDailyPriceExcludingTax"] == 620
-        assert data["relationships"]["candidate"]["data"]["id"] == "2868"
+        method, path = boond._make_request.await_args.args[:2]
+        assert (method, path) == ("PUT", "/positionings/538")
 
     @pytest.mark.asyncio
-    async def test_empty_relationships_are_dropped(self):
-        """Les renvoyer à `null` reviendrait à demander leur effacement."""
+    async def test_only_the_state_is_sent(self):
+        """Dates, tarif de vente et jours restent ceux du commercial."""
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            side_effect=[_positioning_information(), {"data": {"id": "41"}}]
-        )
+        boond._make_request = AsyncMock(return_value={"data": {"id": "538"}})
 
-        await adapter.update_positioning_state(41, 1)
+        await adapter.update_positioning_state(538, 1)
 
-        data = boond._make_request.await_args_list[1].kwargs["json"]["data"]
-        assert "delivery" not in data["relationships"]
-
-    @pytest.mark.asyncio
-    async def test_an_unreadable_tab_falls_back_to_the_state_alone(self):
-        """L'écriture est tentée quand même : c'est son erreur qui renseignera."""
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            side_effect=[_http_status_error(500), {"data": {"id": "41"}}]
-        )
-
-        await adapter.update_positioning_state(41, 1)
-
-        data = boond._make_request.await_args_list[1].kwargs["json"]["data"]
-        assert data == {"type": "positioning", "id": "41", "attributes": {"state": 1}}
+        data = boond._make_request.await_args.kwargs["json"]["data"]
+        assert data == {"type": "positioning", "id": "538", "attributes": {"state": 1}}
 
     @pytest.mark.asyncio
     async def test_the_state_boond_confirms_is_returned(self):
         """Une réponse en 200 ne dit pas que le changement a été pris."""
         adapter, boond = _make_adapter()
         boond._make_request = AsyncMock(
-            side_effect=[
-                _positioning_information(),
-                {"data": {"id": "41", "attributes": {"state": 7}}},
-            ]
+            return_value={"data": {"id": "538", "attributes": {"state": 7}}}
         )
 
-        assert await adapter.update_positioning_state(41, 1) == 7
+        assert await adapter.update_positioning_state(538, 1) == 7
+
+    @pytest.mark.asyncio
+    async def test_a_response_without_state_says_nothing(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value={"data": {"id": "538"}})
+
+        assert await adapter.update_positioning_state(538, 1) is None
 
 
 def _purchase_defaults(**relationship_overrides) -> dict:

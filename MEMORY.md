@@ -233,6 +233,16 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (fix: un positionnement s'écrit à son adresse propre)
+
+`PUT /positionings/{id}/information` répond **404** : un positionnement n'a pas d'onglet « information ». Il s'écrit à son adresse propre, `PUT /positionings/{id}`, comme les prestations.
+
+- **La règle, visible dans le code depuis toujours** : l'adresse d'écriture suit celle de lecture. Les entités lues sur `/{entité}/{id}/information` — candidats, sociétés, besoins — s'y écrivent ; celles lues sur `/{entité}/{id}` — positionnements, prestations — s'écrivent là. `update_delivery` faisait déjà `PUT /deliveries/{id}`.
+- Seul l'état est envoyé : dates, tarif de vente et jours restent ceux du commercial.
+- C'est le motif remonté à l'ADV au report précédent qui a donné la réponse — sans lui, l'erreur restait « non passé à « Gagné » », sans plus.
+
+4 tests sur l'écriture de l'état. 781 tests backend verts.
+
 ### 2026-08-24 (fix: l'onglet du positionnement se sauvegarde entier)
 
 Le passage à « Gagné » échouait en erreur HTTP, et le bon de commande n'en disait rien d'exploitable : « non passé à « Gagné » », sans le motif rendu par Boond. Deux corrections.

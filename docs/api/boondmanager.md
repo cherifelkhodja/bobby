@@ -696,13 +696,25 @@ prestation : même flux avec `?additionalTurnoverAndCosts={id}`.
 > `/orders` (staffing) la **commande client**. Le catalogue de l'API ne connaît
 > aucun `/purchase-orders`.
 
-#### PUT /positionings/{id}/information — faire naître la prestation
+#### PUT /positionings/{id} — faire naître la prestation
 
 L'API ne crée pas de prestation. C'est le passage du positionnement à l'état
 **1 (« Gagné »)** qui la fait produire par BoondManager, à partir du
 positionnement. Le report d'un bon de commande sans prestation passe donc par
 là, puis relit le positionnement pour récupérer l'identifiant de la prestation
 créée.
+
+> **L'adresse d'écriture suit celle de lecture.** Un positionnement n'a pas
+> d'onglet `/information` — `PUT /positionings/{id}/information` répond **404**.
+> Il s'écrit à son adresse propre, comme les prestations (`PUT /deliveries/{id}`).
+> Les entités qui ont cet onglet sont celles qu'on lit ainsi : candidats,
+> sociétés, besoins (`/candidates/{id}/information`, `/companies/{id}/information`,
+> `/opportunities/{id}/information`), plus l'onglet `administrative` des ressources.
+
+> Seul l'état est envoyé : les données du positionnement — dates, tarif de
+> vente, jours — restent celles du commercial. Une réponse en 200 ne prouvant
+> pas que le changement a été pris, l'état renvoyé par Boond est comparé à
+> celui demandé, puis relu.
 
 ```python
 async def update_positioning_state(self, positioning_id: int, state: int) -> None
