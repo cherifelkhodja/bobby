@@ -241,7 +241,7 @@ Une prestation pend à un **projet** (`_parse_delivery` lit `relationships.proje
 
 - `get_positioning()` rend désormais `project_id`.
 - `find_project_delivery(project_id, resource_id)` lit l'onglet des prestations du projet, **`GET /projects/{id}/deliveries-groupments`**, confirmé contre le CRM : `data` liste les prestations, chacune avec le `dependsOn` qui désigne son consultant. L'onglet mêle prestations et groupements ; seules les premières peuvent recevoir un achat.
-- **Plusieurs prestations sans correspondance de ressource ne donnent rien** : en prendre une au hasard poserait l'achat sur la mission d'un autre consultant, et un achat mal rattaché ne se corrige qu'en le supprimant.
+- **Un projet porte plusieurs prestations** : une par consultant, et une de plus à chaque reconduction du même. La sélection va du plus sûr au plus fin — le consultant filtre d'abord **fermement** (une prestation qui n'est pas la sienne n'est jamais retenue, fût-elle la seule du projet), la période sépare ses reconductions, les jours vendus tranchent le reste. Ce qui demeure ambigu ne donne rien : mieux vaut une prestation à rattacher à la main qu'un achat parti sur une autre mission, qui ne se corrige qu'en le supprimant et le recréant.
 - La recherche est best-effort : ce qu'elle ne trouve pas se rattrape par le rattachement manuel, et une lecture qui échoue ne retient pas la création du contrat.
 
 12 tests sur la recherche et le projet du positionnement. 488 tests contractualisation verts.

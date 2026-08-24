@@ -327,8 +327,8 @@ class TestDelivery:
         assert result.boond_sync_error is None
 
     @pytest.mark.asyncio
-    async def test_the_lookup_names_the_resource_of_the_mission(self):
-        """Un projet peut porter plusieurs prestations : celle du consultant est la bonne."""
+    async def test_the_lookup_is_given_the_data_of_the_mission(self):
+        """Un projet porte une prestation par consultant, et une par reconduction."""
         po = _signed_po(boond_consultant_id=2870, boond_consultant_type="resource")
         use_case, crm, _ = _make_use_case(po)
         crm.get_positioning = AsyncMock(return_value={"state": 2, "project_id": 224})
@@ -336,7 +336,13 @@ class TestDelivery:
 
         await use_case.execute(po.id)
 
-        crm.find_project_delivery.assert_awaited_once_with(224, resource_id=2870)
+        crm.find_project_delivery.assert_awaited_once_with(
+            224,
+            resource_id=2870,
+            start_date="2026-09-01",
+            end_date="2027-02-28",
+            days_sold=20.0,
+        )
 
     @pytest.mark.asyncio
     async def test_a_read_delivery_spares_the_lookup(self):

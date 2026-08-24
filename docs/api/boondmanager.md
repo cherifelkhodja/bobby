@@ -790,12 +790,25 @@ L'onglet mêle prestations (`type: "delivery"`) et groupements
 
 ```python
 async def find_project_delivery(
-    self, project_id: int, resource_id: int | None = None
+    self, project_id: int, resource_id: int | None = None,
+    start_date: str | None = None, end_date: str | None = None,
+    days_sold: float | None = None,
 ) -> int | None
 ```
 
-Plusieurs prestations sans correspondance de ressource ne donnent rien : en
-retenir une au hasard poserait l'achat sur la mission d'un autre consultant.
+**Un projet en porte plusieurs** : une par consultant, et une de plus à chaque
+reconduction du même. Le rattachement se fait sur les données de la mission,
+jamais sur la position dans la liste :
+
+1. **Le consultant filtre d'abord, fermement.** Une prestation qui n'est pas la
+   sienne n'est jamais retenue, fût-elle la seule du projet.
+2. **La période sépare ses reconductions.**
+3. **Les jours vendus tranchent** ce que la période laisse à égalité — avenant,
+   correction.
+
+Ce qui demeure ambigu ne donne rien : mieux vaut une prestation à rattacher à la
+main (`POST /purchase-orders/{id}/attach-delivery`) qu'un achat parti sur une
+autre mission, qui ne se corrige qu'en le supprimant et le recréant.
 
 ```python
 async def create_supplier_purchase(

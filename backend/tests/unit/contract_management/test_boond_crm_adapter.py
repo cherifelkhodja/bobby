@@ -227,48 +227,52 @@ def _purchase_calls(boond: AsyncMock) -> tuple[dict, dict]:
 
 
 class TestProjectDeliveryLookup:
-    """Retrouver la prestation d'un positionnement gagné, par son projet.
+    """Retrouver la prestation d'une mission parmi celles de son projet.
 
     Un positionnement n'expose **aucune** relation `delivery` — vérifié contre
     le CRM sur les positionnements 538 et 539, dont les relations sont
     `opportunity`, `project`, `files`, `dependsOn` et `createdBy`. Le lien passe
-    par l'onglet des prestations du projet, qui les liste avec la ressource dont
-    chacune dépend.
+    par l'onglet des prestations du projet.
+
+    Un projet en porte **plusieurs** : une par consultant, et une de plus à
+    chaque reconduction du même. Le rattachement se fait donc sur les données de
+    la mission — un achat posé sur la mauvaise prestation ne se corrige qu'en le
+    supprimant et le recréant.
     """
 
     @staticmethod
-    def _groupments(*deliveries, extra=()) -> dict:
-        """Réponse type de `GET /projects/{id}/deliveries-groupments`."""
+    def _delivery(did, rid, start="2026-07-06", end="2026-12-31", days=126) -> dict:
         return {
-            "meta": {"totals": {"rows": len(deliveries)}},
-            "data": [
-                {
-                    "id": str(did),
-                    "type": "delivery",
-                    "attributes": {"startDate": "2026-07-06", "endDate": "2026-12-31"},
-                    "relationships": {
-                        "dependsOn": {"data": {"id": str(rid), "type": "resource"}},
-                        "purchase": {"data": None},
-                        "project": {"data": {"id": "224", "type": "project"}},
-                    },
-                }
-                for did, rid in deliveries
-            ]
-            + list(extra),
-            "included": [],
+            "id": str(did),
+            "type": "delivery",
+            "attributes": {
+                "startDate": start,
+                "endDate": end,
+                "numberOfDaysInvoicedOrQuantity": days,
+            },
+            "relationships": {
+                "dependsOn": {"data": {"id": str(rid), "type": "resource"}},
+                "purchase": {"data": None},
+                "project": {"data": {"id": "224", "type": "project"}},
+            },
         }
 
-    @pytest.mark.asyncio
-    async def test_the_only_delivery_of_a_project_is_taken(self):
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(return_value=self._groupments((804, 2870)))
+    @classmethod
+    def _tab(cls, *entries) -> dict:
+        """Réponse type de `GET /projects/{id}/deliveries-groupments`."""
+        return {"meta": {"totals": {"rows": len(entries)}}, "data": list(entries), "included": []}
 
-        assert await adapter.find_project_delivery(224) == 804
+    @pytest.mark.asyncio
+    async def test_the_only_delivery_of_the_consultant_is_taken(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value=self._tab(self._delivery(804, 2870)))
+
+        assert await adapter.find_project_delivery(224, resource_id=2870) == 804
 
     @pytest.mark.asyncio
     async def test_the_deliveries_tab_of_the_project_is_read(self):
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(return_value=self._groupments((804, 2870)))
+        boond._make_request = AsyncMock(return_value=self._tab(self._delivery(804, 2870)))
 
         await adapter.find_project_delivery(224)
 
@@ -278,40 +282,125 @@ class TestProjectDeliveryLookup:
         )
 
     @pytest.mark.asyncio
-    async def test_the_delivery_of_our_consultant_is_singled_out(self):
-        """Un projet peut en porter plusieurs : une par consultant de la mission."""
+    async def test_the_delivery_of_another_consultant_is_never_taken(self):
+        """Même seule du projet : l'achat partirait sur la mission d'un autre."""
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(return_value=self._groupments((804, 2870), (805, 2999)))
+        boond._make_request = AsyncMock(return_value=self._tab(self._delivery(804, 2999)))
+
+        assert await adapter.find_project_delivery(224, resource_id=2870) is None
+
+    @pytest.mark.asyncio
+    async def test_the_consultant_singles_his_out(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value=self._tab(self._delivery(804, 2870), self._delivery(805, 2999))
+        )
 
         assert await adapter.find_project_delivery(224, resource_id=2999) == 805
 
     @pytest.mark.asyncio
-    async def test_several_deliveries_without_a_match_are_refused(self):
-        """En prendre une au hasard poserait l'achat sur la mission d'un autre."""
+    async def test_a_renewal_is_separated_by_its_period(self):
+        """Deux prestations du même consultant sur le même projet : la période tranche."""
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(return_value=self._groupments((804, 2870), (805, 2999)))
+        boond._make_request = AsyncMock(
+            return_value=self._tab(
+                self._delivery(804, 2870, start="2026-07-06", end="2026-12-31"),
+                self._delivery(806, 2870, start="2027-01-01", end="2027-06-30"),
+            )
+        )
 
-        assert await adapter.find_project_delivery(224, resource_id=1234) is None
+        found = await adapter.find_project_delivery(
+            224, resource_id=2870, start_date="2027-01-01", end_date="2027-06-30"
+        )
+
+        assert found == 806
+
+    @pytest.mark.asyncio
+    async def test_the_days_separate_what_the_period_leaves_tied(self):
+        """Deux prestations sur la même période, avenant ou correction."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value=self._tab(
+                self._delivery(804, 2870, days=126),
+                self._delivery(807, 2870, days=90),
+            )
+        )
+
+        found = await adapter.find_project_delivery(
+            224,
+            resource_id=2870,
+            start_date="2026-07-06",
+            end_date="2026-12-31",
+            days_sold=90,
+        )
+
+        assert found == 807
+
+    @pytest.mark.asyncio
+    async def test_an_ambiguous_choice_gives_nothing(self):
+        """Rien ne les distingue : l'ADV rattachera à la main."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value=self._tab(self._delivery(804, 2870), self._delivery(808, 2870))
+        )
+
+        found = await adapter.find_project_delivery(
+            224, resource_id=2870, start_date="2026-07-06", end_date="2026-12-31", days_sold=126
+        )
+
+        assert found is None
+
+    @pytest.mark.asyncio
+    async def test_a_period_matching_none_of_them_gives_nothing(self):
+        """Mieux vaut pas de prestation qu'une prestation approchante."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value=self._tab(
+                self._delivery(804, 2870, start="2026-07-06"),
+                self._delivery(806, 2870, start="2027-01-01"),
+            )
+        )
+
+        found = await adapter.find_project_delivery(
+            224, resource_id=2870, start_date="2028-03-01", end_date="2028-09-30"
+        )
+
+        assert found is None
 
     @pytest.mark.asyncio
     async def test_groupments_are_not_mistaken_for_deliveries(self):
         """L'onglet mêle les deux ; seule une prestation peut recevoir un achat."""
         adapter, boond = _make_adapter()
         boond._make_request = AsyncMock(
-            return_value=self._groupments(
-                (804, 2870), extra=[{"id": "12", "type": "groupment", "relationships": {}}]
+            return_value=self._tab(
+                self._delivery(804, 2870), {"id": "12", "type": "groupment", "relationships": {}}
             )
         )
 
-        assert await adapter.find_project_delivery(224) == 804
+        assert await adapter.find_project_delivery(224, resource_id=2870) == 804
 
     @pytest.mark.asyncio
     async def test_a_project_without_delivery_gives_nothing(self):
-        """L'ADV la rattachera à la main plutôt que de recevoir un faux numéro."""
         adapter, boond = _make_adapter()
         boond._make_request = AsyncMock(return_value={"data": [], "included": []})
 
-        assert await adapter.find_project_delivery(224) is None
+        assert await adapter.find_project_delivery(224, resource_id=2870) is None
+
+    @pytest.mark.asyncio
+    async def test_a_decimal_quantity_still_matches(self):
+        """Boond rend les jours tantôt entiers, tantôt décimaux."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value=self._tab(
+                self._delivery(804, 2870, days=126.0), self._delivery(807, 2870, days=90.5)
+            )
+        )
+
+        found = await adapter.find_project_delivery(
+            224, resource_id=2870, start_date="2026-07-06", end_date="2026-12-31", days_sold=90.5
+        )
+
+        assert found == 807
 
 
 class TestPositioningProject:

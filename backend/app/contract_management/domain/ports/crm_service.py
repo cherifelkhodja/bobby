@@ -10,6 +10,17 @@ class CrmServicePort(Protocol):
         """Fetch a positioning from the CRM."""
         ...
 
+    async def find_project_delivery(  # noqa: PLR0913
+        self,
+        project_id: int,
+        resource_id: int | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        days_sold: float | None = None,
+    ) -> int | None:
+        """Find the delivery of this mission among the project's. None if ambiguous."""
+        ...
+
     async def get_need(self, need_id: int) -> dict[str, Any] | None:
         """Fetch a need/opportunity from the CRM."""
         ...

@@ -1,6 +1,6 @@
 """BoondManager CRM adapter for contract management operations."""
 
-from typing import Any
+from typing import Any, NamedTuple
 
 import httpx
 import structlog
@@ -62,6 +62,28 @@ PURCHASE_RELATIONSHIPS: frozenset[str] = frozenset(
         "files",
     }
 )
+
+
+class _ProjectDelivery(NamedTuple):
+    """Une prestation de l'onglet d'un projet, réduite à ce qui l'identifie."""
+
+    id: int
+    resource_id: int | None
+    start_date: str | None
+    end_date: str | None
+    days_sold: float | None
+
+
+def _same_quantity(left: object, right: object) -> bool:
+    """Deux quantités de jours sont-elles la même ?
+
+    Boond les rend tantôt entières, tantôt décimales : la comparaison passe
+    par le flottant, et une valeur illisible ne vaut jamais correspondance.
+    """
+    try:
+        return abs(float(left) - float(right)) < 0.001  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False
 
 
 class BoondCrmError(RuntimeError):
@@ -271,25 +293,40 @@ class BoondCrmAdapter:
         except (TypeError, ValueError):
             return None
 
-    async def find_project_delivery(
-        self, project_id: int, resource_id: int | None = None
+    async def find_project_delivery(  # noqa: PLR0913
+        self,
+        project_id: int,
+        resource_id: int | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        days_sold: float | None = None,
     ) -> int | None:
-        """Retrouve la prestation d'un projet, celle du consultant si plusieurs.
+        """Retrouve la prestation d'un projet, celle de cette mission-ci.
 
         Un positionnement gagné ne dit pas quelle prestation Boond en a tirée :
         il n'expose aucune relation `delivery` — ses relations sont
         `opportunity`, `project`, `files`, `dependsOn` et `createdBy`. Le lien
-        passe par le projet, dont l'onglet des prestations les liste avec la
-        ressource dont chacune dépend.
+        passe par l'onglet des prestations du projet.
+
+        **Un projet en porte plusieurs** : une par consultant, et une de plus à
+        chaque reconduction du même consultant. Le rattachement se fait donc
+        sur les données de la mission, jamais sur la position dans la liste :
+        un achat posé sur la mauvaise prestation ne se corrige qu'en le
+        supprimant et le recréant.
 
         Args:
             project_id: Projet Boond issu du positionnement gagné.
-            resource_id: Consultant de la mission, quand le projet en porte
-                plusieurs. Sans lui, une prestation unique est retenue telle
-                quelle, plusieurs ne le sont jamais.
+            resource_id: Consultant de la mission. Filtre ferme : aucune
+                prestation d'un autre n'est retenue, même si le projet n'en
+                porte qu'une.
+            start_date: Début de la mission (YYYY-MM-DD), pour départager les
+                reconductions d'un même consultant.
+            end_date: Fin de la mission (YYYY-MM-DD).
+            days_sold: Jours vendus, dernier départage quand deux prestations
+                couvrent la même période.
 
         Returns:
-            L'identifiant de la prestation, ou None si elle reste introuvable.
+            L'identifiant de la prestation, ou None si le choix reste ambigu.
         """
         response = await self._boond._make_request(
             "GET", f"/projects/{project_id}/deliveries-groupments"
@@ -297,45 +334,66 @@ class BoondCrmAdapter:
         # L'onglet mêle prestations et groupements : seules les premières
         # portent une mission et peuvent recevoir un achat.
         deliveries = [
-            (
-                int(entry["id"]),
-                self._extract_relationship_id(entry.get("relationships") or {}, "dependsOn"),
+            _ProjectDelivery(
+                id=int(entry["id"]),
+                resource_id=self._extract_relationship_id(
+                    entry.get("relationships") or {}, "dependsOn"
+                ),
+                start_date=(entry.get("attributes") or {}).get("startDate"),
+                end_date=(entry.get("attributes") or {}).get("endDate"),
+                days_sold=(entry.get("attributes") or {}).get("numberOfDaysInvoicedOrQuantity"),
             )
             for entry in ((response or {}).get("data") or [])
             if entry.get("type") == "delivery" and str(entry.get("id", "")).isdigit()
         ]
 
-        found = self._pick_delivery(deliveries, resource_id)
+        found = self._pick_delivery(deliveries, resource_id, start_date, end_date, days_sold)
         logger.info(
             "boond_project_delivery_lookup",
             project_id=project_id,
             resource_id=resource_id,
             delivery_id=found,
             candidates=len(deliveries),
+            of_this_resource=sum(1 for d in deliveries if d.resource_id == resource_id),
         )
         return found
 
     @staticmethod
-    def _pick_delivery(
-        deliveries: list[tuple[int, int | None]], resource_id: int | None
+    def _pick_delivery(  # noqa: PLR0913
+        deliveries: list["_ProjectDelivery"],
+        resource_id: int | None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        days_sold: float | None = None,
     ) -> int | None:
-        """Choisit la prestation du consultant parmi celles d'un projet.
+        """Choisit la prestation de la mission parmi celles d'un projet.
 
-        Chaque entrée est un couple (prestation, ressource dont elle dépend).
-        Une prestation unique est retenue telle quelle ; plusieurs ne le sont
-        que si l'une désigne notre consultant — en prendre une au hasard
-        poserait l'achat sur la mission d'un autre, et un achat mal rattaché ne
-        se corrige qu'en le supprimant et le recréant.
+        Le consultant filtre d'abord, fermement : une prestation qui n'est pas
+        la sienne n'est jamais retenue, fût-elle la seule du projet. Restent les
+        reconductions du même consultant, que la période sépare, puis les jours
+        vendus. Ce qui demeure ambigu ne donne rien : l'ADV rattachera la
+        prestation à la main plutôt que de voir l'achat partir sur une autre.
         """
-        if not deliveries:
-            return None
+        candidates = deliveries
         if resource_id is not None:
-            matching = [did for did, rid in deliveries if rid == resource_id]
-            if len(matching) == 1:
-                return matching[0]
-            if matching:
+            candidates = [d for d in candidates if d.resource_id == resource_id]
+            if not candidates:
                 return None
-        return deliveries[0][0] if len(deliveries) == 1 else None
+        if len(candidates) == 1:
+            return candidates[0].id
+
+        # Chaque critère resserre, et seul un survivant unique tranche.
+        for criterion in (
+            lambda d: d.start_date == start_date if start_date else None,
+            lambda d: d.end_date == end_date if end_date else None,
+            lambda d: _same_quantity(d.days_sold, days_sold) if days_sold is not None else None,
+        ):
+            narrowed = [d for d in candidates if criterion(d)]
+            if len(narrowed) == 1:
+                return narrowed[0].id
+            if narrowed:
+                candidates = narrowed
+        return None
 
     async def get_delivery(self, delivery_id: int) -> dict[str, Any] | None:
         """Fetch a delivery (prestation) from BoondManager.

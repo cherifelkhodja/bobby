@@ -483,6 +483,12 @@ class SyncPurchaseOrderToBoondUseCase:
                 resource_id=po.boond_consultant_id
                 if po.boond_consultant_type == "resource"
                 else None,
+                # Un projet porte une prestation par consultant, et une de plus
+                # à chaque reconduction du même : la période et les jours les
+                # départagent.
+                start_date=_iso(po.start_date),
+                end_date=_iso(po.end_date),
+                days_sold=float(po.days_sold) if po.days_sold is not None else None,
             )
         except Exception as exc:
             logger.warning(
