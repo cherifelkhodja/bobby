@@ -197,6 +197,58 @@ class TestPositioning:
         assert await adapter.get_positioning(539) is None
 
 
+class TestCandidateConversion:
+    """La conversion d'un candidat en ressource, et le numéro qu'elle rend.
+
+    `data.id` reste **celui du candidat** après la conversion : la ressource
+    née de l'opération est dans `data.relationships.resource`. Retomber sur
+    `data.id` rendait un numéro de candidat déguisé en ressource, et la suite
+    du report échouait en 404 sur `/resources/{id}/administrative`.
+    """
+
+    @staticmethod
+    def _converted(resource_id: str | None = "2870") -> dict:
+        relationships = (
+            {"resource": {"data": {"id": resource_id, "type": "resource"}}} if resource_id else {}
+        )
+        return {"data": {"id": "2398", "type": "resource", "relationships": relationships}}
+
+    @pytest.mark.asyncio
+    async def test_the_new_resource_is_returned(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value=self._converted())
+
+        assert await adapter.convert_candidate_to_resource(2398) == 2870
+
+    @pytest.mark.asyncio
+    async def test_the_candidate_id_is_never_returned_as_a_resource(self):
+        """Le 404 sur `/resources/2398/administrative` venait de là."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            side_effect=[self._converted(resource_id=None), {"data": {"relationships": {}}}]
+        )
+
+        with pytest.raises(BoondCrmError):
+            await adapter.convert_candidate_to_resource(2398)
+
+    @pytest.mark.asyncio
+    async def test_the_candidate_sheet_is_read_when_the_write_stays_silent(self):
+        """Boond ne rend pas toujours la relation dans la réponse de l'écriture."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            side_effect=[
+                self._converted(resource_id=None),
+                {"data": {"relationships": {"resource": {"data": {"id": "2870"}}}}},
+            ]
+        )
+
+        assert await adapter.convert_candidate_to_resource(2398) == 2870
+        assert boond._make_request.await_args_list[1].args == (
+            "GET",
+            "/candidates/2398/information",
+        )
+
+
 class TestSupplierPurchase:
     """L'achat fournisseur : un corps minimal, Boond déduit le reste.
 

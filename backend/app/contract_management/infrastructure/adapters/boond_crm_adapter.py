@@ -829,17 +829,23 @@ class BoondCrmAdapter:
             response = await self._boond._make_request(
                 "PUT", f"/candidates/{candidate_id}/information", json=payload
             )
-            # After conversion, the new resource ID is in
-            # data.relationships.resource.data.id (NOT data.id which
-            # remains the candidate ID).
-            resource_rel = (
-                response.get("data", {}).get("relationships", {}).get("resource", {}).get("data")
+            # La ressource née de la conversion est dans
+            # data.relationships.resource.data.id — **jamais** dans data.id,
+            # qui reste celui du candidat. Retomber dessus rendait un numéro de
+            # candidat déguisé en ressource, et la suite échouait en 404 sur
+            # `/resources/{id}/administrative`.
+            new_resource_id = self._extract_relationship_id(
+                response.get("data", {}).get("relationships", {}), "resource"
             )
-            if resource_rel and resource_rel.get("id"):
-                new_resource_id = int(resource_rel["id"])
-            else:
-                # Fallback: use data.id (shouldn't happen for state=3)
-                new_resource_id = int(response.get("data", {}).get("id", candidate_id))
+            if not new_resource_id:
+                # Boond ne rend pas toujours la relation dans la réponse de
+                # l'écriture : la fiche du candidat, elle, la porte.
+                new_resource_id = await self.resolve_resource_id(candidate_id)
+            if not new_resource_id:
+                raise BoondCrmError(
+                    f"BoondManager a converti le candidat {candidate_id} sans indiquer "
+                    "la ressource créée."
+                )
             logger.info(
                 "boond_candidate_converted_to_resource",
                 candidate_id=candidate_id,

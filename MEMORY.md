@@ -233,6 +233,16 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (fix: la conversion rendait un candidat déguisé en ressource)
+
+Le report du BDC PROV-BC-2026-004 échouait en `404 Not Found` sur `/resources/2398/administrative` : 2398 est un **candidat**, pas une ressource.
+
+`data.id` reste celui du candidat après la conversion — la ressource née de l'opération est dans `data.relationships.resource`. La lecture retombait en silence sur `data.id` quand cette relation manquait, et rendait donc un numéro de candidat comme s'il s'agissait d'une ressource. Tout ce qui suivait s'adressait au mauvais objet.
+
+- **Plus de repli sur `data.id`.** Quand l'écriture ne rend pas la relation, la fiche du candidat est relue (`GET /candidates/{id}/information`), qui la porte. À défaut des deux, la conversion est déclarée en échec plutôt que de rendre un numéro faux.
+
+3 tests sur la conversion. 974 tests unitaires backend verts.
+
 ### 2026-08-24 (refacto: le report Boond, réduit à ce qu'il faut)
 
 Le workflow complet relu appel par appel. Onze appels supprimés, un payload d'achat divisé par dix.
