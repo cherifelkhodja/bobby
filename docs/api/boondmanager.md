@@ -776,10 +776,26 @@ async def update_positioning_state(self, positioning_id: int, state: int) -> Non
 > retrouve (`find_project_delivery`), en retenant celle dont le `dependsOn` est
 > la ressource de la mission.
 >
-> Les deux lectures tentées — `GET /projects/{id}` puis
-> `GET /purchases/default?project={id}` — ne sont **pas confirmées** par la
-> documentation comme portant les prestations d'un projet. Le journal
-> (`boond_project_delivery_found`, champ `source`) dira laquelle répond.
+
+#### GET /projects/{id}/deliveries-groupments
+
+L'onglet « Prestations » d'un projet, et **la seule voie connue du positionnement
+vers sa prestation**. `data` est une liste ; chaque entrée porte sa période, ses
+jours, son tarif de vente, et surtout `relationships.dependsOn` — la ressource
+dont elle dépend, qui désigne le consultant de la mission. `relationships.purchase`
+dit si un achat y pend déjà.
+
+L'onglet mêle prestations (`type: "delivery"`) et groupements
+(`type: "groupment"`) : seules les premières peuvent recevoir un achat.
+
+```python
+async def find_project_delivery(
+    self, project_id: int, resource_id: int | None = None
+) -> int | None
+```
+
+Plusieurs prestations sans correspondance de ressource ne donnent rien : en
+retenir une au hasard poserait l'achat sur la mission d'un autre consultant.
 
 ```python
 async def create_supplier_purchase(

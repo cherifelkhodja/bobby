@@ -240,7 +240,7 @@ Un positionnement n'expose **aucune** relation `delivery` — vérifié contre l
 Une prestation pend à un **projet** (`_parse_delivery` lit `relationships.project`) et dépend d'une ressource. Le projet, lui, est rempli par Boond sur le positionnement au passage à « Gagné ». C'est la voie retenue.
 
 - `get_positioning()` rend désormais `project_id`.
-- `find_project_delivery(project_id, resource_id)` cherche la prestation du projet. **Deux lectures, la seconde en repli** : le projet lui-même (`GET /projects/{id}`), puis le pré-remplissage d'achat (`GET /purchases/default?project=`), déjà utilisé par la création d'achat et qui accepte `project`. Aucune des deux n'est confirmée contre la documentation comme portant les prestations d'un projet ; ce sont des lectures, leur échec ne coûte que le repli sur la saisie manuelle, et le journal dit laquelle a répondu (`boond_project_delivery_found`, champ `source`).
+- `find_project_delivery(project_id, resource_id)` lit l'onglet des prestations du projet, **`GET /projects/{id}/deliveries-groupments`**, confirmé contre le CRM : `data` liste les prestations, chacune avec le `dependsOn` qui désigne son consultant. L'onglet mêle prestations et groupements ; seules les premières peuvent recevoir un achat.
 - **Plusieurs prestations sans correspondance de ressource ne donnent rien** : en prendre une au hasard poserait l'achat sur la mission d'un autre consultant, et un achat mal rattaché ne se corrige qu'en le supprimant.
 - La recherche est best-effort : ce qu'elle ne trouve pas se rattrape par le rattachement manuel, et une lecture qui échoue ne retient pas la création du contrat.
 

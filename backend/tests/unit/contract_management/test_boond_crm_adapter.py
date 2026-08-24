@@ -232,106 +232,84 @@ class TestProjectDeliveryLookup:
     Un positionnement n'expose **aucune** relation `delivery` — vérifié contre
     le CRM sur les positionnements 538 et 539, dont les relations sont
     `opportunity`, `project`, `files`, `dependsOn` et `createdBy`. Le lien passe
-    donc par le projet, auquel la prestation pend.
+    par l'onglet des prestations du projet, qui les liste avec la ressource dont
+    chacune dépend.
     """
 
     @staticmethod
-    def _project(*deliveries) -> dict:
+    def _groupments(*deliveries, extra=()) -> dict:
+        """Réponse type de `GET /projects/{id}/deliveries-groupments`."""
         return {
-            "data": {"id": "224", "type": "project", "relationships": {}},
-            "included": [
+            "meta": {"totals": {"rows": len(deliveries)}},
+            "data": [
                 {
                     "id": str(did),
                     "type": "delivery",
-                    "relationships": {"dependsOn": {"data": {"id": str(rid), "type": "resource"}}},
+                    "attributes": {"startDate": "2026-07-06", "endDate": "2026-12-31"},
+                    "relationships": {
+                        "dependsOn": {"data": {"id": str(rid), "type": "resource"}},
+                        "purchase": {"data": None},
+                        "project": {"data": {"id": "224", "type": "project"}},
+                    },
                 }
                 for did, rid in deliveries
-            ],
+            ]
+            + list(extra),
+            "included": [],
         }
 
     @pytest.mark.asyncio
     async def test_the_only_delivery_of_a_project_is_taken(self):
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(return_value=self._project((800, 2870)))
+        boond._make_request = AsyncMock(return_value=self._groupments((804, 2870)))
 
-        assert await adapter.find_project_delivery(224) == 800
+        assert await adapter.find_project_delivery(224) == 804
+
+    @pytest.mark.asyncio
+    async def test_the_deliveries_tab_of_the_project_is_read(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value=self._groupments((804, 2870)))
+
+        await adapter.find_project_delivery(224)
+
+        assert boond._make_request.await_args.args == (
+            "GET",
+            "/projects/224/deliveries-groupments",
+        )
 
     @pytest.mark.asyncio
     async def test_the_delivery_of_our_consultant_is_singled_out(self):
         """Un projet peut en porter plusieurs : une par consultant de la mission."""
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(return_value=self._project((800, 2870), (801, 2999)))
+        boond._make_request = AsyncMock(return_value=self._groupments((804, 2870), (805, 2999)))
 
-        assert await adapter.find_project_delivery(224, resource_id=2999) == 801
+        assert await adapter.find_project_delivery(224, resource_id=2999) == 805
 
     @pytest.mark.asyncio
     async def test_several_deliveries_without_a_match_are_refused(self):
         """En prendre une au hasard poserait l'achat sur la mission d'un autre."""
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(return_value=self._project((800, 2870), (801, 2999)))
+        boond._make_request = AsyncMock(return_value=self._groupments((804, 2870), (805, 2999)))
 
         assert await adapter.find_project_delivery(224, resource_id=1234) is None
 
     @pytest.mark.asyncio
-    async def test_deliveries_listed_only_as_relationships_are_read(self):
-        """Certaines réponses ne les détaillent pas dans `included`."""
+    async def test_groupments_are_not_mistaken_for_deliveries(self):
+        """L'onglet mêle les deux ; seule une prestation peut recevoir un achat."""
         adapter, boond = _make_adapter()
         boond._make_request = AsyncMock(
-            return_value={
-                "data": {
-                    "id": "224",
-                    "type": "project",
-                    "relationships": {
-                        "deliveries": {"data": [{"id": "800", "type": "delivery"}]},
-                    },
-                },
-                "included": [],
-            }
+            return_value=self._groupments(
+                (804, 2870), extra=[{"id": "12", "type": "groupment", "relationships": {}}]
+            )
         )
 
-        assert await adapter.find_project_delivery(224) == 800
+        assert await adapter.find_project_delivery(224) == 804
 
     @pytest.mark.asyncio
-    async def test_the_purchase_prefill_is_the_fallback(self):
-        """`GET /purchases/default` accepte `project` — endpoint déjà éprouvé."""
+    async def test_a_project_without_delivery_gives_nothing(self):
+        """L'ADV la rattachera à la main plutôt que de recevoir un faux numéro."""
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            side_effect=[
-                {"data": {"id": "224", "type": "project", "relationships": {}}, "included": []},
-                {
-                    "data": {
-                        "type": "purchase",
-                        "relationships": {"delivery": {"data": {"id": "800", "type": "delivery"}}},
-                    }
-                },
-            ]
-        )
-
-        assert await adapter.find_project_delivery(224) == 800
-
-    @pytest.mark.asyncio
-    async def test_an_unreadable_project_falls_through_to_the_prefill(self):
-        """Aucune des deux lectures n'est confirmée : l'échec de l'une n'arrête pas l'autre."""
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            side_effect=[
-                RuntimeError("404 Not Found"),
-                {
-                    "data": {
-                        "type": "purchase",
-                        "relationships": {"delivery": {"data": {"id": "800", "type": "delivery"}}},
-                    }
-                },
-            ]
-        )
-
-        assert await adapter.find_project_delivery(224) == 800
-
-    @pytest.mark.asyncio
-    async def test_two_dead_ends_give_nothing(self):
-        """L'ADV rattachera la prestation à la main plutôt que de recevoir un faux numéro."""
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(side_effect=[RuntimeError("404"), RuntimeError("404")])
+        boond._make_request = AsyncMock(return_value={"data": [], "included": []})
 
         assert await adapter.find_project_delivery(224) is None
 

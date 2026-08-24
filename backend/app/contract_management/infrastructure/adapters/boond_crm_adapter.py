@@ -277,15 +277,10 @@ class BoondCrmAdapter:
         """Retrouve la prestation d'un projet, celle du consultant si plusieurs.
 
         Un positionnement gagné ne dit pas quelle prestation Boond en a tirée :
-        il n'expose aucune relation `delivery`. Le lien passe par le projet,
-        auquel la prestation pend (`_parse_delivery` lit `relationships.project`).
-
-        Deux lectures sont tentées, la seconde en repli, car aucune n'est
-        confirmée contre l'API comme portant les prestations d'un projet :
-        le projet lui-même, puis le pré-remplissage d'achat — celui-là est
-        déjà utilisé par la création d'achat et accepte `project` en paramètre.
-        Toutes deux sont des lectures : leur échec ne coûte que le repli sur la
-        saisie manuelle, et le journal dit laquelle a répondu.
+        il n'expose aucune relation `delivery` — ses relations sont
+        `opportunity`, `project`, `files`, `dependsOn` et `createdBy`. Le lien
+        passe par le projet, dont l'onglet des prestations les liste avec la
+        ressource dont chacune dépend.
 
         Args:
             project_id: Projet Boond issu du positionnement gagné.
@@ -296,26 +291,29 @@ class BoondCrmAdapter:
         Returns:
             L'identifiant de la prestation, ou None si elle reste introuvable.
         """
-        for source, deliveries in (
-            ("project", await self._project_deliveries(project_id)),
-            ("purchase_default", await self._purchase_default_delivery(project_id)),
-        ):
-            found = self._pick_delivery(deliveries, resource_id)
-            if found:
-                logger.info(
-                    "boond_project_delivery_found",
-                    project_id=project_id,
-                    resource_id=resource_id,
-                    delivery_id=found,
-                    source=source,
-                    candidates=len(deliveries),
-                )
-                return found
-
-        logger.warning(
-            "boond_project_delivery_not_found", project_id=project_id, resource_id=resource_id
+        response = await self._boond._make_request(
+            "GET", f"/projects/{project_id}/deliveries-groupments"
         )
-        return None
+        # L'onglet mêle prestations et groupements : seules les premières
+        # portent une mission et peuvent recevoir un achat.
+        deliveries = [
+            (
+                int(entry["id"]),
+                self._extract_relationship_id(entry.get("relationships") or {}, "dependsOn"),
+            )
+            for entry in ((response or {}).get("data") or [])
+            if entry.get("type") == "delivery" and str(entry.get("id", "")).isdigit()
+        ]
+
+        found = self._pick_delivery(deliveries, resource_id)
+        logger.info(
+            "boond_project_delivery_lookup",
+            project_id=project_id,
+            resource_id=resource_id,
+            delivery_id=found,
+            candidates=len(deliveries),
+        )
+        return found
 
     @staticmethod
     def _pick_delivery(
@@ -326,7 +324,8 @@ class BoondCrmAdapter:
         Chaque entrée est un couple (prestation, ressource dont elle dépend).
         Une prestation unique est retenue telle quelle ; plusieurs ne le sont
         que si l'une désigne notre consultant — en prendre une au hasard
-        poserait l'achat sur la mission d'un autre.
+        poserait l'achat sur la mission d'un autre, et un achat mal rattaché ne
+        se corrige qu'en le supprimant et le recréant.
         """
         if not deliveries:
             return None
@@ -337,59 +336,6 @@ class BoondCrmAdapter:
             if matching:
                 return None
         return deliveries[0][0] if len(deliveries) == 1 else None
-
-    async def _project_deliveries(self, project_id: int) -> list[tuple[int, int | None]]:
-        """Prestations portées par un projet, lues sur le projet lui-même."""
-        try:
-            response = await self._boond._make_request("GET", f"/projects/{project_id}")
-        except Exception as exc:
-            logger.info("boond_project_read_failed", project_id=project_id, error=str(exc))
-            return []
-
-        included = (response or {}).get("included") or []
-        found = [
-            (
-                int(entry["id"]),
-                self._extract_relationship_id(entry.get("relationships") or {}, "dependsOn"),
-            )
-            for entry in included
-            if entry.get("type") == "delivery" and str(entry.get("id", "")).isdigit()
-        ]
-        if found:
-            return found
-
-        # Certaines réponses ne listent les prestations qu'en relation, sans
-        # les détailler dans `included` : on n'y lit alors que les numéros.
-        relationships = ((response or {}).get("data") or {}).get("relationships") or {}
-        for value in relationships.values():
-            data = value.get("data") if isinstance(value, dict) else None
-            if isinstance(data, list):
-                found.extend(
-                    (int(item["id"]), None)
-                    for item in data
-                    if item.get("type") == "delivery" and str(item.get("id", "")).isdigit()
-                )
-        return found
-
-    async def _purchase_default_delivery(self, project_id: int) -> list[tuple[int, int | None]]:
-        """Prestation que Boond associe au projet quand il pré-remplit un achat.
-
-        `GET /purchases/default` accepte `project` : le pré-remplissage désigne
-        alors la prestation du projet. Repli, car il n'en rend qu'une.
-        """
-        try:
-            response = await self._boond._make_request(
-                "GET", "/purchases/default", params={"project": str(project_id)}
-            )
-        except Exception as exc:
-            logger.info(
-                "boond_purchase_default_by_project_failed", project_id=project_id, error=str(exc)
-            )
-            return []
-
-        relationships = ((response or {}).get("data") or {}).get("relationships") or {}
-        delivery_id = self._extract_relationship_id(relationships, "delivery")
-        return [(delivery_id, None)] if delivery_id else []
 
     async def get_delivery(self, delivery_id: int) -> dict[str, Any] | None:
         """Fetch a delivery (prestation) from BoondManager.
