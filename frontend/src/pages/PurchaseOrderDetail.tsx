@@ -22,10 +22,23 @@ import { useAuthStore } from '../stores/authStore';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { PageSpinner } from '../components/ui/Spinner';
-import type { PurchaseOrder } from '../types';
+import type { PanelSupplier, PurchaseOrder } from '../types';
 import { PURCHASE_ORDER_STATUS_CONFIG } from '../types';
 
 const STEP_LABELS = ['Brouillon', 'Généré', 'Signature', 'Actif'];
+
+/**
+ * Où en est le contrat cadre d'un fournisseur du panel. Un cadre non signé
+ * n'interdit pas de préparer la mission, seulement de l'envoyer en signature :
+ * l'ADV a besoin de savoir s'il attend une signature ou toute une
+ * contractualisation.
+ */
+function frameworkStageLabel(supplier: PanelSupplier): string {
+  if (supplier.framework_signed) return '';
+  if (supplier.framework_status === 'sent_for_signature') return ' (cadre en cours de signature)';
+  if (supplier.framework_status === 'partner_approved') return ' (cadre à envoyer en signature)';
+  return ' (cadre en cours de contractualisation)';
+}
 
 interface MissionForm {
   client_name: string;
@@ -576,13 +589,13 @@ export function PurchaseOrderDetail() {
                 {panelSuppliers.map((supplier) => (
                   <option key={supplier.third_party_id} value={supplier.third_party_id}>
                     {supplier.label} · {supplier.framework_reference}
-                    {supplier.framework_signed ? '' : ' (cadre en cours)'}
+                    {frameworkStageLabel(supplier)}
                   </option>
                 ))}
               </select>
               <p className="ds mt-1">
                 {panelSuppliers.length
-                  ? 'Fournisseurs ayant un contrat cadre avec cette société.'
+                  ? 'Fournisseurs ayant un contrat cadre avec cette société, signé ou en cours.'
                   : "Aucun fournisseur du panel pour cette société : ouvrez d'abord un contrat cadre."}
               </p>
             </div>
