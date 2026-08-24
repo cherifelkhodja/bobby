@@ -7,7 +7,10 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.contract_management.application.boond_contacts import supplier_contacts
+from app.contract_management.application.boond_contacts import (
+    persisted_contact_ids,
+    split_supplier_contacts,
+)
 from app.contract_management.application.boond_mappings import (
     resource_type_of,
     state_reason_type_of,
@@ -205,20 +208,13 @@ class SyncToBoondAfterSigningUseCase:
         if tp and tp.boond_provider_id:
             # Idempotence : réutiliser les contacts déjà créés lors d'un run
             # précédent — un retry-boond-sync ne doit pas créer de doublons.
-            persisted_contact_ids: dict[str, int | None] = {
-                "signataire": tp.boond_signatory_contact_id,
-                "adv": tp.boond_adv_contact_id,
-                "facturation": tp.boond_billing_contact_id,
-            }
-            for role, contact_id in persisted_contact_ids.items():
+            for role, contact_id in persisted_contact_ids(tp).items():
                 if contact_id:
                     boond_contact_ids[role] = contact_id
 
             agency_id = company.boond_agency_id if company else None
-            for contact in supplier_contacts(tp):
-                # Sauter les contacts dont tous les rôles ont déjà un ID.
-                if all(persisted_contact_ids.get(role) for role in contact.roles):
-                    continue
+            to_create, _already_pushed = split_supplier_contacts(tp)
+            for contact in to_create:
                 try:
                     contact_id = await self._crm.create_contact(
                         company_id=tp.boond_provider_id,

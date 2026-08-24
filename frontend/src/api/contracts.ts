@@ -292,11 +292,17 @@ export const contractsApi = {
     return response.data;
   },
 
+  /**
+   * Reporte le fournisseur (société + contacts) dans BoondManager. N'attend pas
+   * la signature du contrat cadre, et ne recrée ni la société ni les contacts
+   * déjà reportés.
+   */
   boondCreateCompany: async (id: string): Promise<{
     ok: boolean;
     created_company: boolean;
     boond_provider_id: number;
     contacts_created: { label: string; boond_contact_id: number }[];
+    contacts_existing: { label: string; boond_contact_id: number }[];
   }> => {
     const response = await apiClient.post(`/contract-requests/${id}/boond/create-company`);
     return response.data;

@@ -132,3 +132,40 @@ def supplier_contacts(third_party) -> list[SupplierContact]:
         )
         for entry in merged.values()
     ]
+
+
+# Identifiant Boond déjà enregistré, par rôle : c'est lui qui dit si un contact
+# a déjà été reporté.
+ROLE_CONTACT_ID_FIELDS = {
+    "signataire": "boond_signatory_contact_id",
+    "adv": "boond_adv_contact_id",
+    "facturation": "boond_billing_contact_id",
+}
+
+
+def persisted_contact_ids(third_party) -> dict[str, int | None]:
+    """Identifiants Boond des contacts déjà reportés, par rôle."""
+    return {
+        role: getattr(third_party, field, None)
+        for role, field in ROLE_CONTACT_ID_FIELDS.items()
+    }
+
+
+def split_supplier_contacts(third_party) -> tuple[list[SupplierContact], list[SupplierContact]]:
+    """Sépare les contacts à créer de ceux déjà reportés dans BoondManager.
+
+    Un contact dont **tous** les rôles portent déjà un identifiant Boond n'est
+    pas recréé : sans cette garde, le report manuel avant signature puis la
+    synchronisation à la signature laisseraient des doublons dans le CRM. Un
+    contact qui gagne un rôle depuis le dernier report est en revanche recréé,
+    faute de pouvoir compléter ses types autrement.
+    """
+    ids = persisted_contact_ids(third_party)
+    to_create: list[SupplierContact] = []
+    already_pushed: list[SupplierContact] = []
+    for contact in supplier_contacts(third_party):
+        if all(ids.get(role) for role in contact.roles):
+            already_pushed.append(contact)
+        else:
+            to_create.append(contact)
+    return to_create, already_pushed

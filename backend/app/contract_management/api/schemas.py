@@ -44,6 +44,9 @@ class ContractRequestResponse(BaseModel):
     contractualization_contact_email: str | None = None
     third_party_id: UUID | None = None
     third_party_name: str | None = None
+    # Société fournisseur déjà créée dans BoondManager : renseigné dès le
+    # report, signature ou pas. Sa présence interdit un second report.
+    third_party_boond_provider_id: int | None = None
     portal_url: str | None = None
     compliance_override: bool
     compliance_override_reason: str | None = None

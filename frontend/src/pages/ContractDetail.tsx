@@ -26,6 +26,7 @@ import {
   Eye,
   Upload,
   SkipForward,
+  Building2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -319,6 +320,23 @@ export default function ContractDetail() {
       queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
       queryClient.invalidateQueries({ queryKey: ['contracts', id] });
       queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  // Report du fournisseur dans BoondManager, sans attendre la signature : l'ADV
+  // a souvent besoin de la fiche dans le CRM pendant que le contrat circule.
+  const pushSupplierMutation = useMutation({
+    mutationFn: () => contractsApi.boondCreateCompany(id!),
+    onSuccess: (result) => {
+      const created = result.contacts_created.length;
+      toast.success(
+        result.created_company
+          ? `Fournisseur créé dans Boond (#${result.boond_provider_id})` +
+              (created ? ` avec ${created} contact${created > 1 ? 's' : ''}.` : '.')
+          : `Fournisseur mis à jour dans Boond (#${result.boond_provider_id}).`,
+      );
+      queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -888,6 +906,30 @@ export default function ContractDetail() {
             >
               Envoyer en signature
             </Button>
+          )}
+          {isAdv &&
+            cr.third_party_id &&
+            cr.status !== 'cancelled' &&
+            cr.status !== 'redirected_payfit' && (
+            cr.third_party_boond_provider_id ? (
+              <span
+                className="st bg-grn-bg text-grn-fg"
+                title={`Société fournisseur #${cr.third_party_boond_provider_id} dans BoondManager`}
+              >
+                <span className="dot" />
+                Fournisseur dans Boond
+              </span>
+            ) : (
+              <Button
+                variant="secondary"
+                onClick={() => pushSupplierMutation.mutate()}
+                disabled={pushSupplierMutation.isPending}
+                title="Créer la société fournisseur et ses contacts dans BoondManager, sans attendre la signature"
+                leftIcon={<Building2 className="h-3.5 w-3.5" />}
+              >
+                {pushSupplierMutation.isPending ? 'Report…' : 'Pousser dans Boond'}
+              </Button>
+            )
           )}
           {canRollback && (
             <Button

@@ -485,7 +485,7 @@ nouveau → en_cours → entretien → accepté
 - `POST /{id}/mark-as-signed` - Mark contract as signed (ADV/admin)
 - `POST /{id}/push-to-crm` - Push to BoondManager (ADV/admin, full sync)
 - `POST /{id}/retry-boond-sync` - Retry failed Boond sync (ADV/admin)
-- `POST /{id}/boond/create-company` - [Boond] Create supplier company + contacts
+- `POST /{id}/boond/create-company` - [Boond] Create supplier company + contacts (available before signature; never re-creates what is already pushed)
 - `POST /{id}/boond/convert-candidate` - [Boond] Convert candidate to resource
 - `POST /{id}/boond/create-contract` - [Boond] Create Boond contract (external, optional resource_id override)
 - `POST /{id}/boond/create-purchase-order` - [Boond] Create purchase order

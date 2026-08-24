@@ -781,6 +781,8 @@ export interface ContractRequest {
   contractualization_contact_email: string | null;
   third_party_id: string | null;
   third_party_name: string | null;
+  /** Société fournisseur dans BoondManager : renseigné dès le report, signature ou pas. */
+  third_party_boond_provider_id: number | null;
   portal_url: string | null;
   compliance_override: boolean;
   /** Justification de la dérogation, ou motif de blocage si compliance_override est false. */

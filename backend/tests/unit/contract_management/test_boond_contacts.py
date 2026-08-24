@@ -13,6 +13,7 @@ from app.contract_management.application.boond_contacts import (
     CONTACT_TYPE_DIRIGEANT,
     CONTACT_TYPE_FACTURATION,
     CONTACT_TYPE_SIGNATAIRE,
+    split_supplier_contacts,
     supplier_contacts,
 )
 
@@ -41,6 +42,10 @@ def _third_party(**overrides) -> SimpleNamespace:
         "billing_contact_last_name": "MOREAU",
         "billing_contact_email": "compta@akema-tech.fr",
         "billing_contact_phone": "0601020306",
+        # Aucun contact encore reporté dans Boond.
+        "boond_signatory_contact_id": None,
+        "boond_adv_contact_id": None,
+        "boond_billing_contact_id": None,
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -147,3 +152,54 @@ class TestDeduplication:
         )
 
         assert [c.roles for c in contacts] == [("signataire",), ("adv",)]
+
+
+class TestAlreadyPushed:
+    """Un contact déjà reporté n'est pas recréé.
+
+    Le report manuel avant signature et la synchronisation à la signature
+    passent tous deux ici : sans cette garde, le second laisserait des doublons
+    dans le CRM.
+    """
+
+    def test_nothing_is_pushed_yet(self):
+        to_create, already_pushed = split_supplier_contacts(_third_party())
+
+        assert len(to_create) == 3
+        assert already_pushed == []
+
+    def test_a_pushed_contact_is_not_recreated(self):
+        to_create, already_pushed = split_supplier_contacts(
+            _third_party(boond_signatory_contact_id=4242)
+        )
+
+        assert [c.roles for c in already_pushed] == [("signataire",)]
+        assert [c.roles for c in to_create] == [("adv",), ("facturation",)]
+
+    def test_a_fully_pushed_supplier_has_nothing_left_to_create(self):
+        to_create, already_pushed = split_supplier_contacts(
+            _third_party(
+                boond_signatory_contact_id=4242,
+                boond_adv_contact_id=4243,
+                boond_billing_contact_id=4244,
+            )
+        )
+
+        assert to_create == []
+        assert len(already_pushed) == 3
+
+    def test_a_contact_gaining_a_role_is_recreated(self):
+        """Boond ne sait pas compléter les types d'un contact existant."""
+        solo = _third_party(
+            adv_contact_first_name="Karim",
+            adv_contact_last_name="BENALI",
+            adv_contact_email="karim@akema-tech.fr",
+            boond_signatory_contact_id=4242,
+        )
+
+        to_create, already_pushed = split_supplier_contacts(solo)
+
+        # La personne cumule signataire et ADV ; seul le rôle de signataire est
+        # reporté, donc le contact repart pour porter les deux types.
+        assert already_pushed == []
+        assert [c.roles for c in to_create] == [("signataire", "adv"), ("facturation",)]

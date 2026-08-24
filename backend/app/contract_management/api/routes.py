@@ -24,7 +24,10 @@ from app.contract_management.api.schemas import (
     SupplierFrameworkSummary,
     SupplierLookupResponse,
 )
-from app.contract_management.application.boond_contacts import supplier_contacts
+from app.contract_management.application.boond_contacts import (
+    persisted_contact_ids,
+    split_supplier_contacts,
+)
 from app.contract_management.application.boond_mappings import (
     contract_type_of as boond_contract_type_of,
 )
@@ -177,6 +180,7 @@ def _cr_to_response(
     *,
     commercial_name: str | None = None,
     third_party_name: str | None = None,
+    third_party_boond_provider_id: int | None = None,
     company_name: str | None = None,
     purchase_orders_count: int = 0,
     portal_url: str | None = None,
@@ -217,6 +221,7 @@ def _cr_to_response(
         contractualization_contact_email=cr.contractualization_contact_email,
         third_party_id=cr.third_party_id,
         third_party_name=third_party_name,
+        third_party_boond_provider_id=third_party_boond_provider_id,
         portal_url=portal_url,
         compliance_override=cr.compliance_override,
         compliance_override_reason=cr.compliance_override_reason,
@@ -514,11 +519,16 @@ async def _enrich_cr_response(
     from app.third_party.infrastructure.models import ThirdPartyModel
 
     third_party_name = None
+    boond_provider_id = None
     if cr.third_party_id:
         result = await db.execute(
-            _sel(ThirdPartyModel.company_name).where(ThirdPartyModel.id == cr.third_party_id)
+            _sel(ThirdPartyModel.company_name, ThirdPartyModel.boond_provider_id).where(
+                ThirdPartyModel.id == cr.third_party_id
+            )
         )
-        third_party_name = result.scalar_one_or_none()
+        row = result.one_or_none()
+        if row:
+            third_party_name, boond_provider_id = row
 
     company_names = await _issuer_company_names(db, [cr.company_id])
     counts = await _purchase_order_counts(db, [cr.id])
@@ -527,6 +537,7 @@ async def _enrich_cr_response(
         cr,
         commercial_name=await _resolve_commercial_name(db, cr.commercial_email),
         third_party_name=third_party_name,
+        third_party_boond_provider_id=boond_provider_id,
         company_name=company_names.get(cr.company_id),
         purchase_orders_count=counts.get(cr.id, 0),
         portal_url=portal_url,
@@ -2778,6 +2789,34 @@ def _boond_deps(db: AsyncSession, settings):
     return cr_repo, contract_repo, tp_repo, crm
 
 
+# Statuts sur lesquels plus rien ne se reporte : le dossier ne mènera pas à un
+# contrat.
+_CLOSED_STATUSES = ("cancelled", "redirected_payfit")
+
+
+def _require_pushable_supplier(cr, tp):
+    """Vérifie qu'un fournisseur peut être reporté dans BoondManager.
+
+    Le report n'attend pas la signature : l'ADV a souvent besoin de la fiche
+    fournisseur dans le CRM pendant que le contrat circule. Il exige en
+    revanche une identité complète — Boond refuse une société sans nom, et une
+    fiche incomplète devrait être corrigée à la main ensuite.
+    """
+    if cr.status.value in _CLOSED_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Dossier {cr.status.display_name.lower()} : rien à reporter dans BoondManager.",
+        )
+    if not (tp.company_name and tp.siret):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Identité du fournisseur incomplète (raison sociale, SIRET) : "
+                "saisissez-la avant de la reporter dans BoondManager."
+            ),
+        )
+
+
 def _require_signed_or_archived(cr, contract_request_id: UUID):
     if not cr:
         raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
@@ -3010,7 +3049,8 @@ async def boond_create_company(
     cr_repo, _cr2, tp_repo, crm = _boond_deps(db, settings)
 
     cr = await cr_repo.get_by_id(contract_request_id)
-    _require_signed_or_archived(cr, contract_request_id)
+    if not cr:
+        raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
 
     if not cr.third_party_id:
         raise HTTPException(status_code=400, detail="Pas de tiers associé à cette demande.")
@@ -3024,6 +3064,8 @@ async def boond_create_company(
         raise HTTPException(status_code=500, detail="Erreur lors du chargement du tiers.")
     if not tp:
         raise HTTPException(status_code=404, detail="Tiers introuvable.")
+
+    _require_pushable_supplier(cr, tp)
 
     # Fetch issuing company for agency_id
     from sqlalchemy import select as _select
@@ -3103,9 +3145,22 @@ async def boond_create_company(
         # dans `boond_contacts`, partagés avec la synchronisation automatique.
         agency_id = company.boond_agency_id if company else None
 
+        # Idempotence : un contact déjà reporté n'est pas recréé. Sans cela, un
+        # second appel — le report manuel avant signature, puis la
+        # synchronisation à la signature — donnerait des doublons dans le CRM.
+        to_create, already_pushed = split_supplier_contacts(tp)
+        existing_ids = persisted_contact_ids(tp)
+
         contacts_created = []
+        contacts_existing = [
+            {
+                "label": " + ".join(contact.roles),
+                "boond_contact_id": existing_ids[contact.roles[0]],
+            }
+            for contact in already_pushed
+        ]
         role_to_contact_id: dict[str, int] = {}
-        for contact in supplier_contacts(tp):
+        for contact in to_create:
             contact_id = await crm.create_contact(
                 company_id=provider_id,
                 civility=contact.civility,
@@ -3144,6 +3199,7 @@ async def boond_create_company(
             "created_company": created_company,
             "boond_provider_id": provider_id,
             "contacts_created": contacts_created,
+            "contacts_existing": contacts_existing,
         }
     except HTTPException:
         raise

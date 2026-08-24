@@ -233,6 +233,17 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (feat: reporter le fournisseur dans Boond sans attendre la signature)
+
+L'ADV a souvent besoin de la fiche fournisseur dans le CRM pendant que le contrat circule ; le report n'existait qu'à la signature, et n'était exposé nulle part dans l'interface.
+
+- **Bouton « Pousser dans Boond »** dans l'entête de la fiche contrat cadre (ADV/admin). Une fois le fournisseur reporté, le bouton cède la place à un état « Fournisseur dans Boond » : plus rien à cliquer, conformément à la règle « ne pas pousser si déjà poussé ».
+- La route `boond/create-company` n'exige plus un contrat signé. Elle exige en revanche une **identité complète** (raison sociale + SIRET) et refuse un dossier annulé ou redirigé Payfit.
+- **Idempotence des contacts** : la route les recréait à chaque appel. Un contact dont tous les rôles portent déjà un identifiant Boond n'est plus recréé — sinon le report manuel puis la synchronisation à la signature laissaient des doublons dans le CRM. La règle vit dans `boond_contacts.split_supplier_contacts`, partagée par les deux chemins. Un contact qui *gagne* un rôle depuis le dernier report est en revanche recréé : Boond ne sait pas compléter les types d'un contact existant.
+- `third_party_boond_provider_id` exposé sur la demande de contrat, pour que l'écran sache si le report a eu lieu.
+
+12 tests sur les contacts fournisseur. 642 tests backend verts, front `tsc`/`eslint`/282 tests OK.
+
 ### 2026-08-24 (fix: le contact facturation du fournisseur partait en « Commercial » dans Boond)
 
 La configuration réelle du CRM (Administration → Types des contacts) donne 2 = Contact facturation, 7 = Dirigeant, 8 = Commercial, 9 = Contact ADV, 10 = Signataire. Bobby poussait le **contact facturation du fournisseur avec le type 8 (Commercial)** et la fonction « Commercial » : la personne se rangeait dans la mauvaise colonne du CRM, sans que rien ne casse.
