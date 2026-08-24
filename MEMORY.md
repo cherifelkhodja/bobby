@@ -233,6 +233,22 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (feat: purger un cadre annulé emporte les traces du fournisseur)
+
+Supprimer définitivement un contrat cadre annulé ne retirait que le dossier : les bons de commande, les documents de vigilance et la fiche du tiers restaient, et le fournisseur ne pouvait pas être ressaisi proprement.
+
+- La purge emporte désormais **les bons de commande du cadre**, puis — si le fournisseur n'a plus aucun autre dossier ni aucune autre mission — **ses documents de vigilance, ses magic links et sa fiche**. Un fournisseur qui travaille avec une autre société du groupe reste intact : le cadre lie un fournisseur à une société, la purge aussi.
+- **Elle refuse** tant qu'un bon de commande vit sa propre vie : parti en signature, signé, actif, clos, ou déjà reporté dans BoondManager. Le message les nomme ; l'ADV les annule d'abord. Sans cette garde, la purge laisserait un document signé sans dossier, ou des objets orphelins dans le CRM.
+- La prestation ne compte pas comme une écriture Boond : Bobby ne la crée jamais, il la lit depuis le positionnement. Seuls le contrat et l'achat sont de son fait.
+- Aucun garde-fou supplémentaire n'est nécessaire sur l'état : un cadre signé ne peut pas être annulé, donc un dossier annulé n'a jamais été conclu.
+- Front : la confirmation dit ce qui part, et le message de retour ce qui est parti.
+
+7 tests sur la règle de purge (`PurchaseOrder.blocks_framework_purge`). 666 tests backend verts.
+
+### 2026-08-24 (fix: l'étape du contrat cadre nommée dans le sélecteur fournisseur)
+
+Le sélecteur de fournisseurs du panel affichait « (cadre en cours) » aussi bien pour un dossier à la collecte des documents que pour un cadre parti en signature. Vérification faite, **tous** les états en cours étaient déjà proposés — seuls les cadres annulés et redirigés Payfit sont écartés —, mais l'étiquette ne disait pas lequel. Elle distingue maintenant « en cours de signature », « à envoyer en signature » et « en cours de contractualisation ».
+
 ### 2026-08-24 (fix: le consultant d'un bon de commande peut déjà être une ressource)
 
 Le report d'un bon de commande convertissait le consultant en ressource dès que sa fiche ne le disait pas déjà ressource. Un identifiant de **ressource** pris pour un candidat faisait échouer tout le report : `PUT /candidates/{id}` sur un numéro qui n'est pas celui d'un candidat.

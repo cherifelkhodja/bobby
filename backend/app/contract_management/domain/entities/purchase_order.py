@@ -220,6 +220,32 @@ class PurchaseOrder:
         """Le BDC a-t-il tout ce qu'il faut pour être généré ?"""
         return not self.missing_fields
 
+    @property
+    def is_pushed_to_boond(self) -> bool:
+        """Le bon de commande a-t-il déjà écrit dans BoondManager ?
+
+        La prestation ne compte pas : Bobby ne la crée jamais, il la lit depuis
+        le positionnement. Seuls le contrat et l'achat sont de son fait, et leur
+        présence interdit de supprimer le bon de commande sans laisser des
+        objets orphelins dans le CRM.
+        """
+        return bool(self.boond_contract_id or self.boond_purchase_order_id)
+
+    @property
+    def blocks_framework_purge(self) -> bool:
+        """Ce bon de commande empêche-t-il de purger son contrat cadre ?
+
+        Purger un cadre mort emporte ses bons de commande, mais pas ceux qui
+        vivent leur propre vie : partis en signature, signés, actifs, clos, ou
+        déjà reportés dans le CRM. L'ADV doit d'abord les annuler.
+        """
+        keep = self.status in (
+            PurchaseOrderStatus.DRAFT,
+            PurchaseOrderStatus.GENERATED,
+            PurchaseOrderStatus.CANCELLED,
+        )
+        return not keep or self.is_pushed_to_boond
+
     def is_covered_by(self, framework) -> bool:
         """Le contrat cadre passé en argument couvre-t-il ce bon de commande ?
 

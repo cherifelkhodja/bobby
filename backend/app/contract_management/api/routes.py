@@ -1594,6 +1594,28 @@ async def purge_contract_request(
             status_code=400,
             detail="Seules les demandes annulées peuvent être supprimées définitivement.",
         )
+    # Un cadre signé ne peut pas être annulé (la machine à états l'interdit) :
+    # atteindre ce point garantit qu'aucun contrat n'a jamais été conclu.
+
+    # Les bons de commande du cadre partent avec lui — sauf ceux qui vivent leur
+    # propre vie : en signature, signés, actifs, clos, ou déjà reportés dans le
+    # CRM. Ceux-là doivent être annulés d'abord, sinon la purge laisserait des
+    # objets orphelins dans BoondManager.
+    from app.contract_management.infrastructure.adapters.postgres_purchase_order_repo import (
+        PurchaseOrderRepository,
+    )
+
+    po_repo = PurchaseOrderRepository(db)
+    purchase_orders = await po_repo.list_by_contract_request(contract_request_id)
+    blocking = [po for po in purchase_orders if po.blocks_framework_purge]
+    if blocking:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Annulez d'abord les bons de commande de ce fournisseur : "
+                + ", ".join(po.display_reference for po in blocking)
+            ),
+        )
 
     # Delete related data (respect FK order)
     from app.contract_management.infrastructure.models import (
@@ -1641,10 +1663,41 @@ async def purge_contract_request(
     if cr.boond_positioning_id:
         await webhook_repo.delete_by_prefix(f"positioning_update_{cr.boond_positioning_id}_")
 
+    # Bons de commande du cadre : tous purgeables, la garde ci-dessus l'a vérifié.
+    for purchase_order in purchase_orders:
+        await po_repo.delete(purchase_order.id)
+
     # Delete the contract request itself
     await db.execute(
         sa_delete(ContractRequestModel).where(ContractRequestModel.id == contract_request_id)
     )
+
+    # Le fournisseur ne survit pas à son dernier dossier : sans cadre ni mission
+    # ailleurs, sa fiche et ses documents de vigilance n'ont plus d'objet et
+    # empêcheraient de le ressaisir proprement. Il reste intact s'il travaille
+    # avec une autre société du groupe.
+    third_party_purged = False
+    if cr.third_party_id:
+        remaining_requests = await cr_repo.list_by_third_party(cr.third_party_id)
+        remaining_orders = await po_repo.list_by_third_party(cr.third_party_id)
+        if not remaining_requests and not remaining_orders:
+            from app.third_party.infrastructure.models import ThirdPartyModel
+            from app.vigilance.infrastructure.models import VigilanceDocumentModel
+
+            await db.execute(
+                sa_delete(VigilanceDocumentModel).where(
+                    VigilanceDocumentModel.third_party_id == cr.third_party_id
+                )
+            )
+            await db.execute(
+                sa_delete(MagicLinkModel).where(
+                    MagicLinkModel.third_party_id == cr.third_party_id
+                )
+            )
+            await db.execute(
+                sa_delete(ThirdPartyModel).where(ThirdPartyModel.id == cr.third_party_id)
+            )
+            third_party_purged = True
 
     await db.commit()
 
@@ -1653,10 +1706,20 @@ async def purge_contract_request(
         AuditResource.CONTRACT_REQUEST,
         user_id=user_id,
         resource_id=str(contract_request_id),
-        details={"action": "purge", "reference": cr.reference},
+        details={
+            "action": "purge",
+            "reference": cr.reference,
+            "purchase_orders_deleted": len(purchase_orders),
+            "third_party_purged": third_party_purged,
+        },
     )
 
-    return {"status": "ok", "message": f"Demande {cr.display_reference} supprimée définitivement."}
+    detail = f"Demande {cr.display_reference} supprimée définitivement"
+    if purchase_orders:
+        detail += f", avec {len(purchase_orders)} bon(s) de commande"
+    if third_party_purged:
+        detail += " et la fiche du fournisseur"
+    return {"status": "ok", "message": f"{detail}."}
 
 
 @router.get(

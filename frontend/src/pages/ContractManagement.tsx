@@ -158,9 +158,12 @@ export function ContractManagement() {
 
   const purgeCrMutation = useMutation({
     mutationFn: (id: string) => contractsApi.purge(id),
-    onSuccess: () => {
-      toast.success('Demande supprimée.');
+    onSuccess: (result) => {
+      // Le serveur dit ce qu'il a emporté : bons de commande, fiche du
+      // fournisseur. Le taire laisserait croire qu'un dossier seul a disparu.
+      toast.success(result.message);
       queryClient.invalidateQueries({ queryKey: ['contract-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['third-parties'] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -365,7 +368,14 @@ export function ContractManagement() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (confirm(`Supprimer définitivement ${cr.display_reference} ?`)) {
+                        if (
+                          confirm(
+                            `Supprimer définitivement ${cr.display_reference} ?\n\n` +
+                              'Le dossier part avec ses bons de commande non signés, ses ' +
+                              'documents et ses brouillons. La fiche du fournisseur est ' +
+                              "effacée aussi s'il ne travaille avec aucune autre société du groupe.",
+                          )
+                        ) {
                           purgeCrMutation.mutate(cr.id);
                         }
                       }}

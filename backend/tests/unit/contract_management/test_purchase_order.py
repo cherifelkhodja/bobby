@@ -233,3 +233,51 @@ class TestStatusValueObject:
         """Chaque statut est affichable en français."""
         for status in PurchaseOrderStatus:
             assert status.display_name != status.value
+
+
+class TestFrameworkPurge:
+    """Ce qu'un bon de commande laisse faire quand on purge son contrat cadre.
+
+    Purger un cadre mort emporte ses bons de commande. Ceux qui ont commencé
+    leur vie ailleurs — chez le fournisseur ou dans BoondManager — doivent
+    d'abord être annulés à la main, sans quoi la purge laisserait un document
+    signé sans dossier ou des objets orphelins dans le CRM.
+    """
+
+    def test_a_draft_goes_with_its_framework(self):
+        assert _complete_po().blocks_framework_purge is False
+
+    def test_a_generated_order_goes_with_its_framework(self):
+        po = _complete_po(status=PurchaseOrderStatus.GENERATED)
+
+        assert po.blocks_framework_purge is False
+
+    def test_a_cancelled_order_goes_with_its_framework(self):
+        po = _complete_po(status=PurchaseOrderStatus.CANCELLED)
+
+        assert po.blocks_framework_purge is False
+
+    def test_an_order_out_for_signature_blocks_the_purge(self):
+        """Le fournisseur l'a entre les mains : il n'est plus à nous de l'effacer."""
+        po = _complete_po(status=PurchaseOrderStatus.SENT_FOR_SIGNATURE)
+
+        assert po.blocks_framework_purge is True
+
+    def test_a_signed_order_blocks_the_purge(self):
+        po = _complete_po(status=PurchaseOrderStatus.SIGNED)
+
+        assert po.blocks_framework_purge is True
+
+    def test_an_order_pushed_to_boond_blocks_the_purge(self):
+        """Contrat ou achat créés dans le CRM : les effacer ici les rendrait orphelins."""
+        po = _complete_po(boond_contract_id=555)
+
+        assert po.is_pushed_to_boond is True
+        assert po.blocks_framework_purge is True
+
+    def test_the_delivery_alone_is_not_a_boond_footprint(self):
+        """La prestation vient du positionnement : Bobby ne l'a pas créée."""
+        po = _complete_po(boond_delivery_id=797)
+
+        assert po.is_pushed_to_boond is False
+        assert po.blocks_framework_purge is False
