@@ -135,6 +135,33 @@ class BoondCrmAdapter:
             )
             return None
 
+    async def positioning_states(self) -> dict[int, str]:
+        """États de positionnement configurés dans le CRM, du dictionnaire Boond.
+
+        Chaque entité a **sa propre échelle** : l'état 1 d'un positionnement
+        n'est pas celui d'une opportunité. Les libellés étant définis par
+        l'administrateur du CRM, les lire vaut mieux que les supposer.
+
+        Returns:
+            ``{valeur: libellé}``, vide si le dictionnaire est illisible.
+        """
+        try:
+            response = await self._boond._make_request(
+                "GET", "/application/dictionary/setting.state.positioning"
+            )
+        except Exception as exc:
+            logger.warning("boond_positioning_states_unreadable", error=str(exc)[:200])
+            return {}
+
+        states: dict[int, str] = {}
+        for entry in (response or {}).get("data", []):
+            try:
+                states[int(entry["id"])] = entry.get("attributes", {}).get("value", "")
+            except (KeyError, TypeError, ValueError):
+                continue
+        logger.info("boond_positioning_states_fetched", states=states)
+        return states
+
     async def update_positioning_state(self, positioning_id: int, state: int) -> int | None:
         """Change l'état d'un positionnement BoondManager.
 

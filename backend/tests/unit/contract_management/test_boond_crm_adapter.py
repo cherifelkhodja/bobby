@@ -49,6 +49,59 @@ def _http_status_error(status_code: int) -> httpx.HTTPStatusError:
     return httpx.HTTPStatusError(f"HTTP {status_code}", request=request, response=response)
 
 
+class TestPositioningStatesDictionary:
+    """L'échelle des états se lit dans le CRM, elle ne se suppose pas."""
+
+    @pytest.mark.asyncio
+    async def test_the_states_are_read_from_the_dictionary(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value={
+                "data": [
+                    {"id": "0", "attributes": {"value": "Positionné"}},
+                    {"id": "1", "attributes": {"value": "Refus Client"}},
+                    {"id": "2", "attributes": {"value": "Gagné"}},
+                    {"id": "7", "attributes": {"value": "Gagné attente contrat"}},
+                ]
+            }
+        )
+
+        states = await adapter.positioning_states()
+
+        assert boond._make_request.await_args.args == (
+            "GET",
+            "/application/dictionary/setting.state.positioning",
+        )
+        assert states == {
+            0: "Positionné",
+            1: "Refus Client",
+            2: "Gagné",
+            7: "Gagné attente contrat",
+        }
+
+    @pytest.mark.asyncio
+    async def test_an_unreadable_dictionary_gives_nothing(self):
+        """L'appelant décide quoi faire : ici, rien ne doit remonter en erreur."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=_http_status_error(404))
+
+        assert await adapter.positioning_states() == {}
+
+    @pytest.mark.asyncio
+    async def test_an_unparsable_entry_is_skipped(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value={
+                "data": [
+                    {"id": "deux", "attributes": {"value": "Gagné"}},
+                    {"id": "2", "attributes": {"value": "Gagné"}},
+                ]
+            }
+        )
+
+        assert await adapter.positioning_states() == {2: "Gagné"}
+
+
 class TestPositioningState:
     """Le passage à « Gagné » est ce qui fait naître la prestation."""
 

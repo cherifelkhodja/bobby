@@ -24,10 +24,26 @@ logger = structlog.get_logger()
 # État Boond « Arrivée prochaine » d'une ressource fraîchement convertie.
 RESOURCE_STATE_ARRIVING = 3
 
-# État Boond « Gagné » d'un positionnement. C'est lui qui fait naître la
-# prestation : Boond la crée à partir du positionnement au passage à cet état,
-# l'API n'offrant aucun moyen de la créer directement.
-POSITIONING_STATE_WON = 1
+# Clé de configuration runtime (table `app_settings`) : état « Gagné » d'un
+# positionnement. C'est lui qui fait naître la prestation — Boond la crée à
+# partir du positionnement au passage à cet état, l'API n'offrant aucun moyen
+# de la créer directement.
+WON_STATE_SETTING_KEY = "bdc_won_positioning_state"
+
+# Libellé de l'état recherché dans le dictionnaire du CRM. Chaque entité Boond
+# a sa propre échelle : l'état 1 d'une opportunité est « Gagné », celui d'un
+# positionnement « Refus Client ». Les confondre écrit un refus sur une affaire
+# gagnée — c'est arrivé.
+WON_STATE_LABEL = "gagne"
+
+# Valeur configurée dans le CRM aujourd'hui, dernier recours si le dictionnaire
+# est illisible. Un dictionnaire lisible qui ne connaît pas « Gagné » ne mène
+# pas ici : le libellé a changé, et deviner serait reprendre le risque.
+DEFAULT_WON_STATE = 2
+
+# « Gagné attente contrat » commence pareil sans désigner le même état : la
+# correspondance est exacte, jamais par préfixe.
+_ACCENTS = str.maketrans("àâäéèêëîïôöùûüç", "aaaeeeeiioouuuc")
 
 # Ce que BoondManager exige pour porter la mission : le contrat vit du CJM et
 # des dates, l'achat du montant qui en découle. Le reste du bon de commande —
@@ -59,12 +75,14 @@ class SyncPurchaseOrderToBoondUseCase:
         third_party_repository,
         crm_service,
         db=None,
+        settings_service=None,
     ) -> None:
         self._po_repo = purchase_order_repository
         self._cr_repo = contract_request_repository
         self._tp_repo = third_party_repository
         self._crm = crm_service
         self._db = db
+        self._settings = settings_service
 
     async def execute(self, purchase_order_id: UUID) -> PurchaseOrder:
         """Execute the use case.
@@ -369,10 +387,12 @@ class SyncPurchaseOrderToBoondUseCase:
         L'état est relu ensuite : BoondManager peut accepter la demande sans
         l'appliquer, et un report qui n'aurait rien changé doit se voir.
         """
+        won = await self._won_state(warnings)
+        if won is None:
+            return
+
         try:
-            echoed = await self._crm.update_positioning_state(
-                po.boond_positioning_id, POSITIONING_STATE_WON
-            )
+            echoed = await self._crm.update_positioning_state(po.boond_positioning_id, won)
         except Exception as exc:
             # Le contrat et l'achat restent créables : l'ADV reprendra la
             # prestation à la main plutôt que de tout rejouer.
@@ -395,11 +415,11 @@ class SyncPurchaseOrderToBoondUseCase:
         positioning = await self._crm.get_positioning(po.boond_positioning_id) or {}
 
         state = positioning.get("state")
-        if state is not None and int(state) != POSITIONING_STATE_WON:
+        if state is not None and int(state) != won:
             # Deux pannes différentes, que seul l'écho de l'écriture sépare :
             # une demande ignorée d'emblée, ou un changement pris puis défait
             # par une règle du CRM. La distinction oriente la reprise.
-            ignoree = isinstance(echoed, int) and echoed != POSITIONING_STATE_WON
+            ignoree = isinstance(echoed, int) and echoed != won
             logger.warning(
                 "purchase_order_positioning_state_unchanged",
                 purchase_order_id=str(po.id),
@@ -433,6 +453,55 @@ class SyncPurchaseOrderToBoondUseCase:
                 f"Positionnement {po.boond_positioning_id} passé à « Gagné », mais "
                 "BoondManager n'a pas rattaché de prestation : à vérifier dans le CRM."
             )
+
+    async def _won_state(self, warnings: list[str]) -> int | None:
+        """Valeur de l'état « Gagné » pour un positionnement, dans ce CRM.
+
+        Elle est **lue**, jamais supposée : chaque entité Boond a sa propre
+        échelle d'états, et se tromper d'échelle écrit un refus sur une affaire
+        gagnée. L'ordre est celui de la confiance — ce que l'administrateur a
+        réglé, puis ce que le dictionnaire du CRM déclare. À défaut des deux, le
+        positionnement n'est pas touché : mieux vaut une prestation à créer à la
+        main qu'un état faux.
+        """
+        configure = await self._configured_won_state()
+        if configure is not None:
+            return configure
+
+        states = await self._crm.positioning_states()
+        if not states:
+            # Dictionnaire injoignable : la valeur du CRM reste la meilleure
+            # connue, et s'abstenir priverait le report de sa prestation.
+            logger.warning("purchase_order_won_state_from_default", state=DEFAULT_WON_STATE)
+            return DEFAULT_WON_STATE
+
+        exacts = [value for value, label in states.items() if _normalise(label) == WON_STATE_LABEL]
+        if len(exacts) == 1:
+            return exacts[0]
+
+        # Le dictionnaire répond mais ne connaît pas « Gagné » : le libellé a
+        # été changé. Écrire un numéro au jugé remettrait un refus sur une
+        # affaire gagnée.
+        logger.warning("purchase_order_won_state_unresolved", states=states, matches=exacts)
+        warnings.append(
+            "L'état « Gagné » d'un positionnement n'a pas pu être déterminé dans "
+            "BoondManager : la prestation n'a pas été créée. Renseignez le réglage "
+            f"« {WON_STATE_SETTING_KEY} » avec sa valeur numérique."
+        )
+        return None
+
+    async def _configured_won_state(self) -> int | None:
+        """Valeur réglée par l'administrateur, si elle l'a été."""
+        if not self._settings:
+            return None
+        raw = await self._settings.get(WON_STATE_SETTING_KEY)
+        if raw in (None, ""):
+            return None
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            logger.warning("bdc_won_state_invalid", value=raw)
+            return None
 
     async def _align_delivery(self, po: PurchaseOrder, warnings: list[str]) -> None:
         """Recale la prestation Boond sur les conditions du bon de commande.
@@ -558,6 +627,11 @@ def _provider_contact_id(third_party) -> int | None:
         if contact_id:
             return contact_id
     return None
+
+
+def _normalise(label: str) -> str:
+    """Libellé comparable : sans accents, sans casse, sans espaces de bord."""
+    return (label or "").strip().lower().translate(_ACCENTS)
 
 
 def _purchase_title(po: PurchaseOrder) -> str:

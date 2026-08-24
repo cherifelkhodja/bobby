@@ -789,6 +789,7 @@ async def push_purchase_order_to_boond(
         BoondCrmAdapter,
     )
     from app.infrastructure.boond.client import BoondClient
+    from app.infrastructure.settings.app_settings_service import AppSettingsService
     from app.third_party.infrastructure.adapters.postgres_third_party_repo import (
         ThirdPartyRepository,
     )
@@ -803,6 +804,7 @@ async def push_purchase_order_to_boond(
         third_party_repository=ThirdPartyRepository(db),
         crm_service=BoondCrmAdapter(BoondClient(settings)),
         db=db,
+        settings_service=AppSettingsService(db),
     )
 
     try:

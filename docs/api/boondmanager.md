@@ -704,6 +704,23 @@ positionnement. Le report d'un bon de commande sans prestation passe donc par
 là, puis relit le positionnement pour récupérer l'identifiant de la prestation
 créée.
 
+> ⚠️ **Chaque entité a sa propre échelle d'états.** L'état `1` vaut « Gagné »
+> pour une **opportunité** et « Refus Client » pour un **positionnement** :
+> écrire l'un pour l'autre marque une affaire gagnée comme refusée. Les
+> libellés étant réglés par l'administrateur du CRM, ils se lisent dans le
+> dictionnaire — `GET /application/dictionary/setting.state.positioning` —
+> plutôt qu'ils ne se supposent.
+>
+> États des positionnements de ce CRM (9), à titre indicatif :
+>
+> | Valeur | Libellé | | Valeur | Libellé |
+> |---|---|---|---|---|
+> | 0 | Positionné (défaut) | | 5 | Refus Collaborateur |
+> | 1 | **Refus Client** | | 6 | Attente retour collaborateur/Client |
+> | 2 | **Gagné** | | 7 | Gagné attente contrat |
+> | 3 | CV Envoyé | | 8 | Relance Client |
+> | 4 | Présenté Client | | | |
+
 > **L'adresse d'écriture suit celle de lecture.** Un positionnement n'a pas
 > d'onglet `/information` — `PUT /positionings/{id}/information` répond **404**.
 > Il s'écrit à son adresse propre, comme les prestations (`PUT /deliveries/{id}`).

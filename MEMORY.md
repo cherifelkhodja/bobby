@@ -233,6 +233,17 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (fix: l'état « Gagné » se lit dans le CRM, il ne se suppose pas)
+
+Le report marquait le positionnement **« Refus Client »**. La valeur écrite, 1, venait de `OPPORTUNITY_STATE_NAMES` où elle vaut « Gagné » : c'est l'échelle des **opportunités**, pas celle des positionnements, où « Gagné » vaut **2** et 1 vaut « Refus Client ». Une affaire gagnée a donc été marquée refusée.
+
+- **La valeur se lit désormais dans le CRM** : `GET /application/dictionary/setting.state.positioning`, correspondance **exacte** sur le libellé « Gagné » — « Gagné attente contrat » commence pareil sans désigner le même état. Les libellés étant réglés par l'administrateur, les relire vaut mieux que les figer.
+- **Trois niveaux de confiance** : le réglage `bdc_won_positioning_state` s'il est renseigné, puis le dictionnaire, puis 2 — la valeur de ce CRM — si le dictionnaire est injoignable. Un dictionnaire lisible qui ne connaît pas « Gagné » ne mène pas au repli : le libellé a changé, et deviner reprendrait le risque. Le positionnement n'est alors pas touché, et l'ADV est prévenu.
+- **Même faute ailleurs** : `BOOND_POSITIONING_STATE_ID` valait 1 par défaut pour les positionnements créés par une **cooptation** — soit « Refus Client ». Passé à 0, « Positionné », l'état d'entrée du CRM. Sans effet là où la variable d'environnement est renseignée.
+- Le tableau des états de ce CRM est consigné dans `docs/api/boondmanager.md`, avec l'avertissement sur les échelles.
+
+9 tests sur la résolution de l'état et la lecture du dictionnaire. 790 tests backend verts.
+
 ### 2026-08-24 (fix: un positionnement s'écrit à son adresse propre)
 
 `PUT /positionings/{id}/information` répond **404** : un positionnement n'a pas d'onglet « information ». Il s'écrit à son adresse propre, `PUT /positionings/{id}`, comme les prestations.

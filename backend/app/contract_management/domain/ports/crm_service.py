@@ -28,6 +28,10 @@ class CrmServicePort(Protocol):
         """
         ...
 
+    async def positioning_states(self) -> dict[int, str]:
+        """CRM-configured positioning states, as ``{value: label}``."""
+        ...
+
     async def update_positioning_state(self, positioning_id: int, state: int) -> int | None:
         """Change l'état d'un positionnement (« Gagné » crée la prestation).
 
