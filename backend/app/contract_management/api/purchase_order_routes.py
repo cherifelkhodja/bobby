@@ -13,6 +13,7 @@ from app.contract_management.api.purchase_order_schemas import (
     BoondDeletionResponse,
     PanelSupplierListResponse,
     PanelSupplierResponse,
+    PurchaseOrderAttachDelivery,
     PurchaseOrderCreate,
     PurchaseOrderListResponse,
     PurchaseOrderRenew,
@@ -117,6 +118,7 @@ def _po_to_response(
         boond_positioning_id=po.boond_positioning_id,
         boond_need_id=po.boond_need_id,
         boond_delivery_id=po.boond_delivery_id,
+        boond_project_id=po.boond_project_id,
         client_name=po.client_name,
         mission_title=po.mission_title,
         mission_description=po.mission_description,
@@ -765,6 +767,62 @@ async def mark_purchase_order_as_signed(
         details={"kind": "purchase_order", "reference": saved.display_reference},
     )
     return await _respond(db, cr_repo, saved)
+
+
+@router.post(
+    "/{purchase_order_id}/attach-delivery",
+    response_model=PurchaseOrderResponse,
+    summary="Rattacher à la main la prestation BoondManager de la mission",
+)
+async def attach_delivery_to_purchase_order(
+    purchase_order_id: UUID,
+    body: PurchaseOrderAttachDelivery,
+    user_id: AdvOrAdminUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Retient la prestation Boond que le report n'a pas su retrouver.
+
+    L'achat fournisseur se rattache à la prestation : sans elle, le report
+    s'arrête là. La prestation est relue dans le CRM avant d'être retenue — un
+    achat posé sur la mauvaise ne se corrige qu'en le supprimant. Possible quel
+    que soit l'état du bon de commande, le report ayant lieu après la
+    signature. ADV/admin uniquement.
+    """
+    from app.contract_management.application.use_cases.attach_delivery_to_purchase_order import (
+        AttachDeliveryToPurchaseOrderUseCase,
+    )
+    from app.contract_management.infrastructure.adapters.boond_crm_adapter import (
+        BoondCrmAdapter,
+    )
+    from app.infrastructure.boond.client import BoondClient
+
+    cr_repo = ContractRequestRepository(db)
+    use_case = AttachDeliveryToPurchaseOrderUseCase(
+        purchase_order_repository=PurchaseOrderRepository(db),
+        crm_service=BoondCrmAdapter(BoondClient(get_settings())),
+    )
+
+    try:
+        po = await use_case.execute(purchase_order_id, body.delivery_id)
+    except PurchaseOrderNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except InvalidPurchaseOrderDataError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    await db.commit()
+
+    audit_logger.log(
+        AuditAction.PURCHASE_ORDER_DELIVERY_ATTACHED,
+        AuditResource.CONTRACT,
+        user_id=user_id,
+        resource_id=str(po.id),
+        details={
+            "kind": "purchase_order",
+            "reference": po.display_reference,
+            "boond_delivery_id": po.boond_delivery_id,
+        },
+    )
+    return await _respond(db, cr_repo, po)
 
 
 @router.post(

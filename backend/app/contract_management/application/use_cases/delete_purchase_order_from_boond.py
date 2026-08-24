@@ -21,14 +21,23 @@ class DeletePurchaseOrderFromBoondUseCase:
     **Outil de test.** Il sert à rejouer un report sur un dossier d'essai sans
     laisser derrière soi des achats et des contrats fantômes.
 
-    L'ordre est celui de la création à l'envers — achat, contrat, prestation —,
-    parce que l'achat pend à la prestation. Chaque objet est traité à part :
-    l'échec de l'un n'empêche pas les autres. Un identifiant n'est effacé du
-    bon de commande que si l'objet a bien disparu du CRM ; le garder est le
-    seul moyen de ne pas créer un doublon au report suivant.
+    **L'ordre est celui de la création à l'envers**, chaque objet reposant sur
+    le précédent : l'achat pend à la prestation, la prestation naît du
+    positionnement gagné, le contrat porte sur la ressource, et la ressource
+    est née de la conversion du candidat.
 
-    Ce qui n'est **pas** défait : la conversion d'un candidat en ressource, que
-    l'API ne sait pas annuler, et la société fournisseur, qui appartient au
+        achat → prestation → positionnement → contrat → ressource
+
+    Chaque objet est traité à part : l'échec de l'un n'empêche pas les autres.
+    Un identifiant n'est effacé du bon de commande que si l'objet a bien
+    disparu du CRM ; le garder est le seul moyen de ne pas créer un doublon au
+    report suivant.
+
+    La ressource se supprime, faute de pouvoir se reconvertir en candidat : le
+    candidat, lui, survit à sa ressource, et le bon de commande repointe sur
+    lui — relu sur le positionnement, qui ne l'a jamais perdu de vue.
+
+    Ce qui n'est **pas** défait : la société fournisseur, qui appartient au
     contrat cadre et sert à d'autres missions.
     """
 
@@ -54,8 +63,8 @@ class DeletePurchaseOrderFromBoondUseCase:
 
         for champ, libelle, methode in (
             ("boond_purchase_order_id", "Achat", self._crm.delete_supplier_purchase),
-            ("boond_contract_id", "Contrat", self._crm.delete_boond_contract),
             ("boond_delivery_id", "Prestation", self._crm.delete_delivery),
+            ("boond_contract_id", "Contrat", self._crm.delete_boond_contract),
         ):
             identifiant = getattr(po, champ)
             if not identifiant:
@@ -102,10 +111,8 @@ class DeletePurchaseOrderFromBoondUseCase:
                     "à remettre à la main dans BoondManager."
                 )
 
-        if po.boond_consultant_type == "resource":
-            report.append(
-                "La ressource reste : BoondManager ne sait pas la reconvertir en candidat."
-            )
+        if supprimes:
+            await self._delete_resource(po, report)
 
         po.boond_sync_error = None
         saved = await self._po_repo.save(po)
@@ -116,6 +123,49 @@ class DeletePurchaseOrderFromBoondUseCase:
             deleted=supprimes,
         )
         return saved, report
+
+    async def _delete_resource(self, po: PurchaseOrder, report: list[str]) -> None:
+        """Supprime la ressource née de la conversion, et rend son candidat au BDC.
+
+        Le candidat est relu sur le positionnement : le report avait remplacé
+        son numéro par celui de la ressource, et sans lui le bon de commande
+        pointerait sur une ressource effacée.
+        """
+        if po.boond_consultant_type != "resource" or not po.boond_consultant_id:
+            return
+
+        resource_id = po.boond_consultant_id
+        try:
+            await self._crm.delete_resource(resource_id)
+        except Exception as exc:
+            logger.warning(
+                "purchase_order_resource_delete_failed",
+                purchase_order_id=str(po.id),
+                resource_id=resource_id,
+                error=_readable_error(exc),
+            )
+            report.append(f"Ressource #{resource_id} : suppression refusée par Boond.")
+            return
+
+        report.append(f"Ressource #{resource_id} supprimée.")
+
+        positioning = None
+        if po.boond_positioning_id:
+            try:
+                positioning = await self._crm.get_positioning(po.boond_positioning_id)
+            except Exception:
+                positioning = None
+
+        candidat = (positioning or {}).get("candidate_id")
+        if candidat:
+            po.boond_consultant_id = candidat
+            po.boond_consultant_type = (positioning or {}).get("consultant_type") or "candidate"
+        else:
+            # Sans le positionnement, le bon de commande garderait le numéro
+            # d'une ressource effacée : mieux vaut un consultant à ressaisir.
+            po.boond_consultant_id = None
+            po.boond_consultant_type = None
+            report.append("Consultant détaché : son numéro de candidat n'a pas pu être relu.")
 
 
 def _readable_error(exc: Exception) -> str:

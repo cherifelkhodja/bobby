@@ -1100,6 +1100,7 @@ export interface PurchaseOrder {
   boond_positioning_id: number | null;
   boond_need_id: number | null;
   boond_delivery_id: number | null;
+  boond_project_id: number | null;
 
   // Mission
   client_name: string | null;

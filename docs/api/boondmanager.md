@@ -624,6 +624,58 @@ async def update_resource_administrative(
 }
 ```
 
+### Workflow complet d'un bon de commande
+
+**Naissance** — webhook positionnement (« Gagné attente contrat ») :
+
+```http
+GET /positionings/{id}
+```
+
+Un seul appel. Son `included` porte le besoin avec son commercial, son client
+et son agence, le projet, et le consultant avec la ressource qui lui correspond
+déjà. Lire en plus le besoin, la prestation et le candidat n'y ajoutait rien.
+
+**Report** — `POST /purchase-orders/{id}/push-to-boond`, cinq étapes idempotentes :
+
+| # | Étape | Appel |
+|---|---|---|
+| a | Ressource | `PUT /candidates/{id}/information` — **seulement si candidat** ; le positionnement l'a dit dès la création, rien à sonder |
+| b | Fournisseur | `PUT /resources/{id}/administrative` — société + contact de facturation |
+| c | Contrat | `POST /contracts` — CJM, dates, type selon le tiers |
+| d | Prestation | `PUT /positionings/{id}` puis `GET /projects/{projectId}/deliveries-groupments` puis `PUT /deliveries/{id}` |
+| e | Achat | `POST /purchases` |
+
+L'étape **b n'est pas accessoire** : une ressource sans société fournisseur est
+un consultant que Boond ne sait pas rattacher à qui le facture. Un échec arrête
+le report.
+
+À l'étape **d**, le `PUT` fait naître la prestation et **renvoie le
+positionnement à jour** : son état, qui dit si l'écriture a été prise, et son
+projet. Le relire n'apprendrait rien. Le dictionnaire des états n'est pas
+interrogé non plus — « Gagné » vaut 2, et le réglage `bdc_won_positioning_state`
+le couvre si le CRM change.
+
+*Reconduction* : `POST /deliveries/{id}/renew` remplace d et e, produisant
+lui-même l'achat et la commande client.
+
+**Réparation** :
+
+```http
+POST /purchase-orders/{id}/attach-delivery   # la prestation, à la main
+POST /purchase-orders/{id}/push-to-boond     # rejeu, complète ce qui manque
+POST /purchase-orders/{id}/delete-from-boond # [test] défait tout, à l'envers
+```
+
+La suppression suit l'ordre de création inversé, chaque objet reposant sur le
+précédent : **achat → prestation → positionnement (ramené à « Gagné attente
+contrat ») → contrat → ressource**. La ressource ne se reconvertit pas en
+candidat mais s'efface, et le bon de commande repointe sur le candidat, relu
+sur le positionnement. Seule la société fournisseur survit : elle appartient au
+contrat cadre.
+
+---
+
 ### Bon de commande
 
 #### GET /purchases/default puis POST /purchases
@@ -644,8 +696,15 @@ longtemps écrit ici, n'existe pas dans l'API et répondait 404.
    `company`, `contact`, `project`, `delivery`, plus un bloc `included`.
    Paramètres acceptés : `project`, `delivery`, `additionalTurnoverAndCosts`,
    `contact`, `company`.
-2. `POST /purchases` — on renvoie ce corps, ajusté. Seul `title` est
-   obligatoire dans `attributes`.
+2. `POST /purchases` — on renvoie ce corps, **filtré puis ajusté**. Seul
+   `title` est obligatoire dans `attributes`.
+
+Le pré-remplissage n'est **pas repostable tel quel**. Le schéma d'écriture est
+en `additionalProperties: false`, et la réponse porte quatre clés qu'il ignore :
+`_metadata` — qui contient le login de l'appelant et le nom du compte Boond,
+qu'on lui renverrait —, `createPayments`, `statePayments`, et la relation
+`order`. Bobby filtre donc sur ce que le schéma déclare (`PURCHASE_ATTRIBUTES`
+et `PURCHASE_RELATIONSHIPS`) au lieu de recopier.
 
 Composer le corps à la main plutôt que de partir de ce pré-remplissage est la
 cause classique des 422 : prestation, projet, société et agence doivent
@@ -661,8 +720,8 @@ s'accorder.
       "date": "2026-09-01",
       "startDate": "2026-09-01",
       "endDate": "2027-02-28",
-      "quantity": 18,
-      "amountExcludingTax": 9000
+      "quantity": 6,
+      "amountExcludingTax": 12285
     },
     "relationships": {
       "delivery": {"data": {"id": "1234", "type": "delivery"}},
@@ -684,10 +743,34 @@ s'accorder.
 > la prestation et désigne le client, à remplacer — son contact part avec elle.
 > Bobby y met le contact de facturation du fournisseur.
 
+> **`amountExcludingTax` est un montant unitaire**, pas un total : Boond calcule
+> `totalAmountExcludingTax = quantity x amountExcludingTax`. Y poser le total du
+> bon de commande le fait multiplier une seconde fois — une mission de 18 jours
+> à 500 € s'enregistrait à 162 000 € au lieu de 9 000. Bobby **ne dicte donc ni
+> `quantity` ni `amountExcludingTax`** : il garde ceux du pré-remplissage, qui
+> dérivent de la prestation que le report vient de recaler sur le CJM et les
+> jours du bon de commande, et dont les deux termes s'accordent déjà. Le
+> pré-remplissage compte en mois (`subscription: 1`), pas en jours.
+
+> **Les calculés ne se réécrivent pas** : `amountIncludingTax`,
+> `totalAmountExcludingTax`, `totalAmountIncludingTax` sont dérivés par Boond,
+> les lui dicter ne peut que le contredire. Idem pour `creationDate` et
+> `updateDate`.
+
+> **Un pré-remplissage sans montant ne donne pas d'achat** : Bobby s'arrête
+> avant le `POST` et le signale à l'ADV. Un achat à 0 € passerait inaperçu là où
+> l'absence d'achat se voit.
+
 Autres attributs disponibles : `number` (réf. fournisseur), `typeOf`, `state`,
 `subscription`, `paymentTerm`, `paymentMethod`, `taxRates`, `toReinvoice`,
 `reinvoiceRate`, `reinvoiceAmountExcludingTax`, `informationComments`,
-`createPayments`, `exchangeRate`, `currency`.
+`showInformationCommentsOnPDF`, `exchangeRate`, `currency`. Bobby garde ceux du
+pré-remplissage, **sauf la TVA** : un fournisseur non assujetti
+(`tp_third_parties.vat_liable = false`) est acheté à `taxRate: 0`,
+`taxRates: [0]`.
+
+`createPayments` et `statePayments`, renvoyés par le pré-remplissage, ne sont
+pas des attributs d'écriture — ils ne figurent pas au schéma.
 
 Pour un achat rattaché à un frais ou un CA additionnel plutôt qu'à une
 prestation : même flux avec `?additionalTurnoverAndCosts={id}`.
@@ -729,13 +812,57 @@ créée.
 > `/opportunities/{id}/information`), plus l'onglet `administrative` des ressources.
 
 > Seul l'état est envoyé : les données du positionnement — dates, tarif de
-> vente, jours — restent celles du commercial. Une réponse en 200 ne prouvant
-> pas que le changement a été pris, l'état renvoyé par Boond est comparé à
-> celui demandé, puis relu.
+> vente, jours — restent celles du commercial. **Ce corps minimal suffit à faire
+> naître la prestation**, vérifié contre le CRM ; l'onglet entier que sauvegarde
+> l'interface Boond n'est pas nécessaire. Une réponse en 200 ne prouvant pas que
+> le changement a été pris, l'état renvoyé par Boond est comparé à celui
+> demandé, puis relu.
 
 ```python
 async def update_positioning_state(self, positioning_id: int, state: int) -> None
 ```
+
+> **Un positionnement n'expose pas la prestation.** Ses relations sont
+> `opportunity`, `project`, `files`, `dependsOn`, `createdBy` — vérifié sur les
+> positionnements 538 et 539. Relire `relationships.delivery` après l'avoir
+> gagné ne rend donc jamais rien. La prestation pend à un **projet**, que Boond
+> remplit sur le positionnement au passage à « Gagné » : c'est par lui qu'on la
+> retrouve (`find_project_delivery`), en retenant celle dont le `dependsOn` est
+> la ressource de la mission.
+>
+
+#### GET /projects/{id}/deliveries-groupments
+
+L'onglet « Prestations » d'un projet, et **la seule voie connue du positionnement
+vers sa prestation**. `data` est une liste ; chaque entrée porte sa période, ses
+jours, son tarif de vente, et surtout `relationships.dependsOn` — la ressource
+dont elle dépend, qui désigne le consultant de la mission. `relationships.purchase`
+dit si un achat y pend déjà.
+
+L'onglet mêle prestations (`type: "delivery"`) et groupements
+(`type: "groupment"`) : seules les premières peuvent recevoir un achat.
+
+```python
+async def find_project_delivery(
+    self, project_id: int, resource_id: int | None = None,
+    start_date: str | None = None, end_date: str | None = None,
+    days_sold: float | None = None,
+) -> int | None
+```
+
+**Un projet en porte plusieurs** : une par consultant, et une de plus à chaque
+reconduction du même. Le rattachement se fait sur les données de la mission,
+jamais sur la position dans la liste :
+
+1. **Le consultant filtre d'abord, fermement.** Une prestation qui n'est pas la
+   sienne n'est jamais retenue, fût-elle la seule du projet.
+2. **La période sépare ses reconductions.**
+3. **Les jours vendus tranchent** ce que la période laisse à égalité — avenant,
+   correction.
+
+Ce qui demeure ambigu ne donne rien : mieux vaut une prestation à rattacher à la
+main (`POST /purchase-orders/{id}/attach-delivery`) qu'un achat parti sur une
+autre mission, qui ne se corrige qu'en le supprimant et le recréant.
 
 ```python
 async def create_supplier_purchase(

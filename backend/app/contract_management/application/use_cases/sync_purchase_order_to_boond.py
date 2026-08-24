@@ -30,20 +30,12 @@ RESOURCE_STATE_ARRIVING = 3
 # de la créer directement.
 WON_STATE_SETTING_KEY = "bdc_won_positioning_state"
 
-# Libellé de l'état recherché dans le dictionnaire du CRM. Chaque entité Boond
-# a sa propre échelle : l'état 1 d'une opportunité est « Gagné », celui d'un
+# État « Gagné » d'un positionnement dans ce CRM. Chaque entité Boond a sa
+# propre échelle : l'état 1 d'une opportunité est « Gagné », celui d'un
 # positionnement « Refus Client ». Les confondre écrit un refus sur une affaire
-# gagnée — c'est arrivé.
-WON_STATE_LABEL = "gagne"
-
-# Valeur configurée dans le CRM aujourd'hui, dernier recours si le dictionnaire
-# est illisible. Un dictionnaire lisible qui ne connaît pas « Gagné » ne mène
-# pas ici : le libellé a changé, et deviner serait reprendre le risque.
+# gagnée — c'est arrivé. Le réglage `bdc_won_positioning_state` la couvre si le
+# CRM change.
 DEFAULT_WON_STATE = 2
-
-# « Gagné attente contrat » commence pareil sans désigner le même état : la
-# correspondance est exacte, jamais par préfixe.
-_ACCENTS = str.maketrans("àâäéèêëîïôöùûüç", "aaaeeeeiioouuuc")
 
 # Ce que BoondManager exige pour porter la mission : le contrat vit du CJM et
 # des dates, l'achat du montant qui en découle. Le reste du bon de commande —
@@ -171,7 +163,10 @@ class SyncPurchaseOrderToBoondUseCase:
         """Retourne l'ID ressource Boond du consultant, en le convertissant au besoin.
 
         Un consultant encore candidat devient ressource à la signature du bon de
-        commande : c'est ce document qui acte sa mission.
+        commande : c'est ce document qui acte sa mission. **Le positionnement
+        dit lui-même laquelle des deux natures il a** — `dependsOn.type` —, et
+        cette nature est retenue sur le bon de commande dès sa création : rien à
+        sonder dans le CRM, candidat on convertit, ressource on continue.
         """
         if not po.boond_consultant_id:
             raise PurchaseOrderBoondSyncError(
@@ -180,32 +175,6 @@ class SyncPurchaseOrderToBoondUseCase:
 
         if po.boond_consultant_type == "resource":
             return po.boond_consultant_id
-
-        existing = await self._crm.resolve_resource_id(po.boond_consultant_id)
-        if existing:
-            self._remember_resource(po, existing)
-            return existing
-
-        # Le consultant peut déjà être une ressource : identifiant saisi tel
-        # quel, ou positionnement dont Boond n'a pas dit la nature. Le convertir
-        # échouerait — `PUT /candidates/{id}` sur un numéro qui n'est pas celui
-        # d'un candidat. La sonde n'a lieu que si aucun candidat ne porte ce
-        # numéro : candidats et ressources ont deux séries d'identifiants, et le
-        # même numéro peut désigner deux personnes.
-        if not await self._crm.candidate_exists(po.boond_consultant_id):
-            if await self._crm.resource_exists(po.boond_consultant_id):
-                logger.info(
-                    "purchase_order_consultant_already_a_resource",
-                    purchase_order_id=str(po.id),
-                    resource_id=po.boond_consultant_id,
-                )
-                self._remember_resource(po, po.boond_consultant_id)
-                return po.boond_consultant_id
-            raise PurchaseOrderBoondSyncError(
-                po.display_reference,
-                f"le consultant {po.boond_consultant_id} est introuvable dans BoondManager, "
-                "ni comme candidat ni comme ressource",
-            )
 
         # Le type de tiers du fournisseur classe la ressource dans Boond :
         # externe pour la sous-traitance et le portage salarial, type dédié pour
@@ -248,8 +217,11 @@ class SyncPurchaseOrderToBoondUseCase:
         comme au report du contrat cadre ; à défaut, l'ADV, puis le signataire —
         mieux vaut un contact approchant que pas de contact du tout.
 
-        Best-effort : un échec ici ne doit pas empêcher la création du contrat
-        et de l'achat, le lien restant corrigeable à la main dans Boond.
+        Ce rattachement fait partie du processus, il n'est pas accessoire : une
+        ressource sans société fournisseur est un consultant que Boond ne sait
+        pas rattacher à qui le facture. Un échec arrête donc le report, plutôt
+        que de laisser naître un contrat et un achat sur une ressource
+        orpheline.
         """
         try:
             await self._crm.update_resource_administrative(
@@ -258,11 +230,16 @@ class SyncPurchaseOrderToBoondUseCase:
                 provider_contact_id=_provider_contact_id(third_party),
             )
         except Exception as exc:
-            logger.warning(
+            logger.error(
                 "purchase_order_provider_link_failed",
                 purchase_order_id=str(po.id),
                 resource_id=resource_id,
-                error=str(exc),
+                error=_readable_error(exc),
+            )
+            raise PurchaseOrderBoondSyncError(
+                po.display_reference,
+                f"la ressource {resource_id} n'a pas pu être rattachée à sa société "
+                f"fournisseur ({_readable_error(exc)})",
             )
 
     async def _create_contract(self, po: PurchaseOrder, resource_id: int) -> None:
@@ -304,36 +281,34 @@ class SyncPurchaseOrderToBoondUseCase:
     async def _create_purchase_order(
         self, po: PurchaseOrder, third_party, warnings: list[str]
     ) -> None:
-        """Crée l'achat fournisseur Boond, au montant d'achat de la mission.
+        """Crée l'achat fournisseur Boond sur la prestation de la mission.
 
         L'achat pend à la prestation : sans elle, il n'a rien à quoi se
         rattacher, et ce rattachement ne se fait qu'à la création. Rien n'est
         créé si le renouvellement natif d'une reconduction en a déjà produit un.
+
+        Rien ne lui est dicté que le projet, la prestation et un intitulé :
+        Boond déduit le reste de la prestation, que `_align_delivery` vient
+        d'accorder au CJM et aux jours du bon de commande.
         """
         # Une reconduction reçoit son achat du renouvellement natif de la
         # prestation, qui le produit lui-même avec la commande client.
         if po.boond_purchase_order_id:
             return
 
-        if not po.boond_delivery_id:
+        if not po.boond_delivery_id or not po.boond_project_id:
+            manquant = "la prestation" if not po.boond_delivery_id else "le projet"
             warnings.append(
-                "L'achat fournisseur n'a pas été créé : il se rattache à la prestation, "
-                "qui manque encore. Reprenez le report une fois la prestation en place."
+                f"L'achat fournisseur n'a pas été créé : {manquant} manque encore. "
+                "Reprenez le report une fois la prestation en place."
             )
             return
 
         try:
             po.boond_purchase_order_id = await self._crm.create_supplier_purchase(
+                project_id=po.boond_project_id,
                 delivery_id=po.boond_delivery_id,
-                title=_purchase_title(po),
-                provider_id=third_party.boond_provider_id,
-                provider_contact_id=_provider_contact_id(third_party),
-                reference=po.display_reference,
-                start_date=_iso(po.start_date),
-                end_date=_iso(po.end_date),
-                # Jours réellement achetés : la gratuité ne se paie pas.
-                quantity=float(po.days_sold or 0) - float(po.free_days or 0),
-                amount=float(po.total_amount),
+                title=_purchase_title(po, third_party),
             )
         except Exception as exc:
             # La ressource, le contrat et la prestation sont en place : les
@@ -379,20 +354,19 @@ class SyncPurchaseOrderToBoondUseCase:
     async def _win_positioning(self, po: PurchaseOrder, warnings: list[str]) -> None:
         """Passe le positionnement à « Gagné » et retient la prestation qui en naît.
 
-        Seul l'état change : les données du positionnement — dates, tarif de
+        Seul l'état est écrit : les données du positionnement — dates, tarif de
         vente, jours — restent celles du commercial. Les conditions du bon de
         commande sont portées à la prestation ensuite (`_align_delivery`), pas
         au positionnement.
 
-        L'état est relu ensuite : BoondManager peut accepter la demande sans
-        l'appliquer, et un report qui n'aurait rien changé doit se voir.
+        **La réponse du `PUT` porte le positionnement à jour** : son état, qui
+        dit si l'écriture a été prise, et son projet, par lequel se retrouve la
+        prestation. Le relire n'apprendrait rien de plus.
         """
-        won = await self._won_state(warnings)
-        if won is None:
-            return
+        won = await self._won_state()
 
         try:
-            echoed = await self._crm.update_positioning_state(po.boond_positioning_id, won)
+            positioning = await self._crm.update_positioning_state(po.boond_positioning_id, won)
         except Exception as exc:
             # Le contrat et l'achat restent créables : l'ADV reprendra la
             # prestation à la main plutôt que de tout rejouer.
@@ -412,35 +386,33 @@ class SyncPurchaseOrderToBoondUseCase:
             )
             return
 
-        positioning = await self._crm.get_positioning(po.boond_positioning_id) or {}
-
+        positioning = positioning or {}
         state = positioning.get("state")
         if state is not None and int(state) != won:
-            # Deux pannes différentes, que seul l'écho de l'écriture sépare :
-            # une demande ignorée d'emblée, ou un changement pris puis défait
-            # par une règle du CRM. La distinction oriente la reprise.
-            ignoree = isinstance(echoed, int) and echoed != won
+            # Une réponse en 200 ne prouve pas que le changement a été pris :
+            # Boond peut l'accepter puis le défaire par une règle du CRM.
             logger.warning(
                 "purchase_order_positioning_state_unchanged",
                 purchase_order_id=str(po.id),
                 positioning_id=po.boond_positioning_id,
                 state=state,
-                echoed_state=echoed if isinstance(echoed, int) else None,
-                ignored_outright=ignoree,
+                requested_state=won,
             )
             warnings.append(
                 f"Positionnement {po.boond_positioning_id} : BoondManager a accepté la "
-                f"demande mais l'état est resté à {state} — "
-                + (
-                    "le changement n'a même pas été pris en compte dans sa réponse. "
-                    if ignoree
-                    else ""
-                )
-                + "À passer à « Gagné » à la main."
+                f"demande mais l'état est resté à {state}. À passer à « Gagné » à la main."
             )
 
-        delivery_id = positioning.get("delivery_id")
-        if delivery_id and not po.boond_delivery_id:
+        # Le projet est la voie vers la prestation, et l'achat s'y rattache
+        # aussi : il est retenu même quand la prestation est déjà connue.
+        if positioning.get("project_id"):
+            po.boond_project_id = positioning["project_id"]
+
+        if po.boond_delivery_id:
+            return
+
+        delivery_id = await self._find_delivery(po, positioning)
+        if delivery_id:
             po.boond_delivery_id = delivery_id
             logger.info(
                 "purchase_order_delivery_created",
@@ -448,47 +420,57 @@ class SyncPurchaseOrderToBoondUseCase:
                 positioning_id=po.boond_positioning_id,
                 delivery_id=delivery_id,
             )
-        elif not po.boond_delivery_id:
-            warnings.append(
-                f"Positionnement {po.boond_positioning_id} passé à « Gagné », mais "
-                "BoondManager n'a pas rattaché de prestation : à vérifier dans le CRM."
-            )
+            return
 
-    async def _won_state(self, warnings: list[str]) -> int | None:
+        warnings.append(
+            f"Positionnement {po.boond_positioning_id} passé à « Gagné », mais la prestation "
+            "n'a pas été retrouvée : relevez son numéro dans BoondManager et rattachez-la "
+            "sur le bon de commande, puis relancez le report."
+        )
+
+    async def _find_delivery(self, po: PurchaseOrder, positioning: dict) -> int | None:
+        """Cherche la prestation par le projet du positionnement.
+
+        Best-effort : ce qu'elle ne trouve pas se rattrape par la saisie de
+        l'ADV, et une lecture qui échoue ne doit pas retenir le contrat.
+        """
+        project_id = positioning.get("project_id")
+        if not project_id:
+            return None
+        try:
+            return await self._crm.find_project_delivery(
+                project_id,
+                # La prestation dépend de la ressource, pas du candidat : le
+                # consultant est déjà converti à ce stade du report.
+                resource_id=po.boond_consultant_id
+                if po.boond_consultant_type == "resource"
+                else None,
+                # Un projet porte une prestation par consultant, et une de plus
+                # à chaque reconduction du même : la période et les jours les
+                # départagent.
+                start_date=_iso(po.start_date),
+                end_date=_iso(po.end_date),
+                days_sold=float(po.days_sold) if po.days_sold is not None else None,
+            )
+        except Exception as exc:
+            logger.warning(
+                "purchase_order_delivery_lookup_failed",
+                purchase_order_id=str(po.id),
+                project_id=project_id,
+                error=_readable_error(exc),
+            )
+            return None
+
+    async def _won_state(self) -> int:
         """Valeur de l'état « Gagné » pour un positionnement, dans ce CRM.
 
-        Elle est **lue**, jamais supposée : chaque entité Boond a sa propre
-        échelle d'états, et se tromper d'échelle écrit un refus sur une affaire
-        gagnée. L'ordre est celui de la confiance — ce que l'administrateur a
-        réglé, puis ce que le dictionnaire du CRM déclare. À défaut des deux, le
-        positionnement n'est pas touché : mieux vaut une prestation à créer à la
-        main qu'un état faux.
+        C'est `2` chez Gemini — l'état 1 d'un positionnement vaut « Refus
+        Client », chaque entité Boond ayant sa propre échelle. Un réglage la
+        couvre si le CRM change, sans redéploiement ; le dictionnaire, lui,
+        n'est plus interrogé : un appel de plus à chaque report pour une valeur
+        qui ne bouge pas.
         """
-        configure = await self._configured_won_state()
-        if configure is not None:
-            return configure
-
-        states = await self._crm.positioning_states()
-        if not states:
-            # Dictionnaire injoignable : la valeur du CRM reste la meilleure
-            # connue, et s'abstenir priverait le report de sa prestation.
-            logger.warning("purchase_order_won_state_from_default", state=DEFAULT_WON_STATE)
-            return DEFAULT_WON_STATE
-
-        exacts = [value for value, label in states.items() if _normalise(label) == WON_STATE_LABEL]
-        if len(exacts) == 1:
-            return exacts[0]
-
-        # Le dictionnaire répond mais ne connaît pas « Gagné » : le libellé a
-        # été changé. Écrire un numéro au jugé remettrait un refus sur une
-        # affaire gagnée.
-        logger.warning("purchase_order_won_state_unresolved", states=states, matches=exacts)
-        warnings.append(
-            "L'état « Gagné » d'un positionnement n'a pas pu être déterminé dans "
-            "BoondManager : la prestation n'a pas été créée. Renseignez le réglage "
-            f"« {WON_STATE_SETTING_KEY} » avec sa valeur numérique."
-        )
-        return None
+        return await self._configured_won_state() or DEFAULT_WON_STATE
 
     async def _configured_won_state(self) -> int | None:
         """Valeur réglée par l'administrateur, si elle l'a été."""
@@ -629,14 +611,19 @@ def _provider_contact_id(third_party) -> int | None:
     return None
 
 
-def _normalise(label: str) -> str:
-    """Libellé comparable : sans accents, sans casse, sans espaces de bord."""
-    return (label or "").strip().lower().translate(_ACCENTS)
+def _purchase_title(po: PurchaseOrder, third_party) -> str:
+    """Intitulé de l'achat dans Boond : qui, pour qui, sous quelle référence.
 
-
-def _purchase_title(po: PurchaseOrder) -> str:
-    """Intitulé de l'achat dans Boond : la référence du bon de commande, puis la mission."""
-    return " - ".join(part for part in (po.display_reference, po.mission_title) if part)
+    C'est le seul texte de l'achat, et il doit suffire à le reconnaître dans une
+    liste : le consultant, la société qui le facture, puis la référence du bon
+    de commande — unique, elle distingue deux missions du même consultant chez
+    le même fournisseur.
+    """
+    consultant = " ".join(
+        part for part in (po.consultant_last_name, po.consultant_first_name) if part
+    )
+    fournisseur = getattr(third_party, "company_name", None) if third_party else None
+    return " - ".join(part for part in (consultant, fournisseur, po.display_reference) if part)
 
 
 def _iso(value: date | None) -> str | None:

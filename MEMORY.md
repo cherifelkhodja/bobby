@@ -233,6 +233,80 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (fix: la conversion rendait un candidat déguisé en ressource)
+
+Le report du BDC PROV-BC-2026-004 échouait en `404 Not Found` sur `/resources/2398/administrative` : 2398 est un **candidat**, pas une ressource.
+
+`data.id` reste celui du candidat après la conversion — la ressource née de l'opération est dans `data.relationships.resource`. La lecture retombait en silence sur `data.id` quand cette relation manquait, et rendait donc un numéro de candidat comme s'il s'agissait d'une ressource. Tout ce qui suivait s'adressait au mauvais objet.
+
+- **Plus de repli sur `data.id`.** Quand l'écriture ne rend pas la relation, la fiche du candidat est relue (`GET /candidates/{id}/information`), qui la porte. À défaut des deux, la conversion est déclarée en échec plutôt que de rendre un numéro faux.
+
+3 tests sur la conversion. 974 tests unitaires backend verts.
+
+### 2026-08-24 (refacto: le report Boond, réduit à ce qu'il faut)
+
+Le workflow complet relu appel par appel. Onze appels supprimés, un payload d'achat divisé par dix.
+
+**Naissance du BDC : un seul appel.** `GET /positionings/{id}` porte tout dans son `included` — le besoin avec son commercial, son client et son agence, le projet, le consultant avec la ressource qui lui correspond déjà. Les lectures du besoin, de la prestation et du candidat n'y ajoutaient rien : supprimées. Seule perte, l'email Boond du responsable en repli — le commercial se résout par son compte Bobby, ce qui est le seul usage du champ.
+
+**La nature du consultant ne se sonde plus.** `dependsOn.type` dit candidat ou ressource ; candidat on convertit, ressource on continue. Trois appels de sonde (`resolve_resource_id`, `candidate_exists`, `resource_exists`) disparaissent. Et un candidat que Boond a déjà converti porte sa ressource dans l'`included` : le BDC pointe dessus dès sa création, ce qui évite d'en créer une seconde.
+
+**Le rattachement au fournisseur n'est plus best-effort** : une ressource sans société fournisseur est un consultant que Boond ne sait pas rattacher à qui le facture. Un échec arrête le report au lieu de laisser naître un contrat et un achat sur une ressource orpheline.
+
+**Le passage à « Gagné » se suffit à lui-même.** Le dictionnaire des états n'est plus interrogé — la valeur ne bouge pas, et le réglage `bdc_won_positioning_state` la couvre. Surtout, **la réponse du `PUT` porte le positionnement à jour** : son état, qui dit si l'écriture a été prise, et son projet. La relecture qui suivait n'apprenait rien.
+
+**L'achat se crée en douze lignes.** Plus de `GET /purchases/default` ni de recopie filtrée : le corps ne porte que le projet, la prestation, un intitulé et `createPayments: null`. Boond déduit le reste de la prestation — montants, période, société, agence, responsable. L'intitulé nomme le consultant, le fournisseur et la référence du BDC : `CHEBBI Rym - AKEMA TECH - GEM-BC-001`.
+
+**La suppression suit l'ordre de création inversé** : achat → prestation → positionnement → contrat → **ressource**. Elle s'arrêtait au contrat et laissait la ressource, faute de savoir la reconvertir en candidat ; elle la supprime désormais, le candidat lui survivant, et le BDC repointe sur lui — relu sur le positionnement, qui ne l'a jamais perdu de vue.
+
+Migration **083** : `boond_project_id` sur `cm_purchase_orders`. Le projet est la voie vers la prestation et l'achat s'y rattache : le retenir permet de reprendre un report interrompu sans redemander au CRM par où passer.
+
+Le workflow complet, appel par appel, est consigné dans `docs/api/boondmanager.md`.
+
+971 tests unitaires backend verts (les 9 échecs de `test_auth` préexistent), type-check et lint frontend verts.
+
+### 2026-08-24 (fix: la prestation se retrouve par le projet du positionnement)
+
+Un positionnement n'expose **aucune** relation `delivery` — vérifié contre le CRM sur les positionnements 538 et 539, dont les relations sont `opportunity`, `project`, `files`, `dependsOn` et `createdBy`. Le report cherchait donc une clé qui n'existe pas : il ne pouvait structurellement jamais retrouver la prestation, sur aucune mission.
+
+Une prestation pend à un **projet** (`_parse_delivery` lit `relationships.project`) et dépend d'une ressource. Le projet, lui, est rempli par Boond sur le positionnement au passage à « Gagné ». C'est la voie retenue.
+
+- `get_positioning()` rend désormais `project_id`.
+- `find_project_delivery(project_id, resource_id)` lit l'onglet des prestations du projet, **`GET /projects/{id}/deliveries-groupments`**, confirmé contre le CRM : `data` liste les prestations, chacune avec le `dependsOn` qui désigne son consultant. L'onglet mêle prestations et groupements ; seules les premières peuvent recevoir un achat.
+- **Un projet porte plusieurs prestations** : une par consultant, et une de plus à chaque reconduction du même. La sélection va du plus sûr au plus fin — le consultant filtre d'abord **fermement** (une prestation qui n'est pas la sienne n'est jamais retenue, fût-elle la seule du projet), la période sépare ses reconductions, les jours vendus tranchent le reste. Ce qui demeure ambigu ne donne rien : mieux vaut une prestation à rattacher à la main qu'un achat parti sur une autre mission, qui ne se corrige qu'en le supprimant et le recréant.
+- La recherche est best-effort : ce qu'elle ne trouve pas se rattrape par le rattachement manuel, et une lecture qui échoue ne retient pas la création du contrat.
+
+12 tests sur la recherche et le projet du positionnement. 488 tests contractualisation verts.
+
+### 2026-08-24 (feat: rattacher à la main la prestation Boond d'une mission)
+
+Le report d'un bon de commande fait naître la prestation en passant le positionnement à « Gagné », puis relit le positionnement pour en récupérer le numéro. Sur la mission 538, la prestation est bien créée dans le CRM mais cette relecture ne la rend pas : l'achat fournisseur s'accroche à la prestation, la mission reste donc bloquée — et rien ne permettait de dire à Bobby laquelle.
+
+`POST /purchase-orders/{id}/attach-delivery` (ADV/admin) : l'ADV colle le numéro lu dans BoondManager, relance le report, l'achat se crée.
+
+- **La prestation est relue dans le CRM avant d'être retenue.** Un numéro saisi de travers poserait l'achat sur la mission d'un autre consultant, et un achat mal rattaché ne se corrige pas — `PUT /purchases/{id}/information` n'expose pas `delivery`, il faut le supprimer et le recréer.
+- **Possible quel que soit l'état du bon de commande**, annulé excepté. Passer par la modification ordinaire (`PATCH`) aurait rendu le champ inutile au moment précis où il sert : elle s'arrête au brouillon, alors que le report a lieu après la signature.
+- L'avertissement du report est effacé au rattachement : le laisser afficherait un blocage levé. Rien n'est régénéré — la prestation est un lien de CRM, elle ne s'imprime pas.
+- Saisie dans la carte BoondManager du bon de commande, à la place du tiret de la prestation manquante.
+
+> **Contournement, pas correctif** — la cause a été traitée depuis, dans les deux entrées suivantes : Bobby cherchait `relationships.delivery` sur le positionnement, clé absente de sa réponse. Le rattachement manuel reste le recours quand la sélection ne peut pas trancher. **L'écriture, elle, n'était pas en cause** : `{"state": 2}` seul fait bien naître la prestation, l'onglet entier de l'interface Boond n'est pas nécessaire.
+
+7 tests sur le rattachement. 476 tests contractualisation verts.
+
+### 2026-08-24 (fix: l'achat Boond était multiplié une seconde fois)
+
+Le schéma officiel de `POST /purchases`, confronté à une réponse réelle de `GET /purchases/default`, met au jour trois défauts du report d'un bon de commande.
+
+- **`amountExcludingTax` est un montant *unitaire*.** Boond calcule `totalAmountExcludingTax = quantity x amountExcludingTax` — vérifié sur un achat du CRM : `12 285 x 6 = 73 710`. Bobby y posait le **total** du bon de commande tout en renseignant `quantity` en jours : une mission de 18 jours à 500 € s'enregistrait à **162 000 € au lieu de 9 000 €**. Ni `quantity` ni `amountExcludingTax` ne sont désormais dictés : Bobby garde ceux du pré-remplissage, qui dérivent de la prestation que `_align_delivery` vient de recaler sur le CJM et les jours du bon de commande, et dont les deux termes s'accordent déjà. Le CRM compte en mois (`subscription: 1`) ; le montant Boond ne retombe donc pas au centime sur celui du document signé, mais il cesse d'être faux d'un facteur 18.
+- **Le pré-remplissage n'était pas repostable tel quel.** Le schéma d'écriture est en `additionalProperties: false`, et la réponse porte quatre clés qu'il ignore : `createPayments`, `statePayments`, la relation `order`, et surtout **`_metadata` — le login de l'appelant et le nom du compte Boond, qu'on lui renvoyait à chaque création**. Le corps est maintenant filtré sur ce que le schéma déclare (`PURCHASE_ATTRIBUTES`, `PURCHASE_RELATIONSHIPS`) plutôt que recopié. Les calculés (`amountIncludingTax`, les deux totaux) et les horodatages de lecture en sont exclus : les dicter ne peut que contredire Boond.
+- **La TVA du fournisseur monte enfin dans le CRM.** `vat_liable`, déjà porté par le document depuis la migration 081, n'atteignait pas l'achat : un fournisseur non assujetti est acheté à `taxRate: 0`, `taxRates: [0]`.
+
+**Un pré-remplissage sans montant ne donne plus d'achat** : Bobby s'arrête avant le `POST` et l'ADV est averti par le canal habituel. Un achat à 0 € passerait inaperçu là où l'absence d'achat se voit.
+
+> **À reprendre à la main** : les achats déjà créés dans Boond portent le montant faux, et `PUT /purchases/{id}/information` n'expose ni `quantity` ni `amountExcludingTax` — la correction passe par le CRM, ou par une suppression/recréation.
+
+Le pré-remplissage de test est repris d'une réponse réelle du CRM. 15 tests sur l'achat, 469 tests contractualisation verts (1254 backend, les 9 échecs de `test_auth` préexistent).
+
 ### 2026-08-24 (fix: l'état « Gagné » se lit dans le CRM, il ne se suppose pas)
 
 Le report marquait le positionnement **« Refus Client »**. La valeur écrite, 1, venait de `OPPORTUNITY_STATE_NAMES` où elle vaut « Gagné » : c'est l'échelle des **opportunités**, pas celle des positionnements, où « Gagné » vaut **2** et 1 vaut « Refus Client ». Une affaire gagnée a donc été marquée refusée.

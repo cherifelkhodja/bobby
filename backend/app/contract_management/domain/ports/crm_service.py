@@ -10,6 +10,17 @@ class CrmServicePort(Protocol):
         """Fetch a positioning from the CRM."""
         ...
 
+    async def find_project_delivery(  # noqa: PLR0913
+        self,
+        project_id: int,
+        resource_id: int | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        days_sold: float | None = None,
+    ) -> int | None:
+        """Find the delivery of this mission among the project's. None if ambiguous."""
+        ...
+
     async def get_need(self, need_id: int) -> dict[str, Any] | None:
         """Fetch a need/opportunity from the CRM."""
         ...
@@ -74,8 +85,7 @@ class CrmServicePort(Protocol):
         reference: str | None = None,
         start_date: str | None = None,
         end_date: str | None = None,
-        quantity: float | None = None,
-        amount: float | None = None,
+        vat_liable: bool = True,
     ) -> int:
         """Create the supplier purchase attached to a delivery. Returns its ID."""
         ...
@@ -86,6 +96,10 @@ class CrmServicePort(Protocol):
 
     async def delete_boond_contract(self, contract_id: int) -> bool:
         """Delete a CRM contract. True once it is gone."""
+        ...
+
+    async def delete_resource(self, resource_id: int) -> bool:
+        """Delete a resource. True once it is gone."""
         ...
 
     async def delete_delivery(self, delivery_id: int) -> bool:

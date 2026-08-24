@@ -49,272 +49,459 @@ def _http_status_error(status_code: int) -> httpx.HTTPStatusError:
     return httpx.HTTPStatusError(f"HTTP {status_code}", request=request, response=response)
 
 
-class TestPositioningStatesDictionary:
-    """L'échelle des états se lit dans le CRM, elle ne se suppose pas."""
+class TestPositioning:
+    """La lecture d'un positionnement, et l'écriture de son état.
 
-    @pytest.mark.asyncio
-    async def test_the_states_are_read_from_the_dictionary(self):
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            return_value={
-                "data": [
-                    {"id": "0", "attributes": {"value": "Positionné"}},
-                    {"id": "1", "attributes": {"value": "Refus Client"}},
-                    {"id": "2", "attributes": {"value": "Gagné"}},
-                    {"id": "7", "attributes": {"value": "Gagné attente contrat"}},
-                ]
-            }
-        )
+    **Un seul appel suffit** : le bloc `included` porte le besoin avec son
+    commercial, son client et son agence, le projet, et le consultant avec la
+    ressource qui lui correspond déjà.
 
-        states = await adapter.positioning_states()
+    Le `PUT` rend le positionnement à jour dans la même forme : le relire
+    ensuite n'apprendrait rien de plus.
+    """
 
-        assert boond._make_request.await_args.args == (
-            "GET",
-            "/application/dictionary/setting.state.positioning",
-        )
-        assert states == {
-            0: "Positionné",
-            1: "Refus Client",
-            2: "Gagné",
-            7: "Gagné attente contrat",
+    @staticmethod
+    def _response(*, state=2, resource=None, project="224") -> dict:
+        """Réponse réelle du CRM pour le positionnement 539."""
+        candidate = {
+            "id": "2398",
+            "type": "candidate",
+            "attributes": {"lastName": "CHEBBI", "firstName": "Rym", "typeOf": 10},
+            "relationships": {"agency": {"data": {"id": "5", "type": "agency"}}},
+        }
+        if resource:
+            candidate["relationships"]["resource"] = {"data": {"id": resource, "type": "resource"}}
+        return {
+            "data": {
+                "id": "539",
+                "type": "positioning",
+                "attributes": {
+                    "state": state,
+                    "startDate": "2026-07-06",
+                    "endDate": "2026-12-31",
+                    "averageDailyPriceExcludingTax": 620,
+                    "averageDailyCost": 585,
+                    "numberOfDaysInvoicedOrQuantity": 126,
+                    "numberOfDaysFree": 2,
+                },
+                "relationships": {
+                    "opportunity": {"data": {"id": "1628", "type": "opportunity"}},
+                    "project": {"data": {"id": project, "type": "project"}} if project else {},
+                    "files": {"data": []},
+                    "dependsOn": {"data": {"id": "2398", "type": "candidate"}},
+                    "createdBy": {"data": {"id": "1", "type": "resource"}},
+                },
+            },
+            "included": [
+                {"id": "1", "type": "resource", "attributes": {"lastName": "EL KHODJA"}},
+                {"id": "262", "type": "company", "attributes": {"name": "BNP Paribas AM"}},
+                {
+                    "id": "1628",
+                    "type": "opportunity",
+                    "attributes": {"title": "Developpement JAVA", "reference": "AO1628"},
+                    "relationships": {
+                        "mainManager": {"data": {"id": "1", "type": "resource"}},
+                        "company": {"data": {"id": "262", "type": "company"}},
+                    },
+                },
+                {"id": "224", "type": "project", "attributes": {"reference": "AMFR"}},
+                {"id": "5", "type": "agency", "attributes": {}},
+                candidate,
+            ],
         }
 
     @pytest.mark.asyncio
-    async def test_an_unreadable_dictionary_gives_nothing(self):
-        """L'appelant décide quoi faire : ici, rien ne doit remonter en erreur."""
+    async def test_one_call_gives_the_whole_context(self):
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(side_effect=_http_status_error(404))
+        boond._make_request = AsyncMock(return_value=self._response())
 
-        assert await adapter.positioning_states() == {}
+        positioning = await adapter.get_positioning(539)
+
+        assert boond._make_request.await_count == 1
+        assert positioning["need_id"] == 1628
+        assert positioning["need_title"] == "Developpement JAVA"
+        assert positioning["client_name"] == "BNP Paribas AM"
+        assert positioning["manager_id"] == 1
+        assert positioning["agency_id"] == 5
+        assert positioning["project_id"] == 224
 
     @pytest.mark.asyncio
-    async def test_an_unparsable_entry_is_skipped(self):
+    async def test_the_consultant_says_his_own_nature(self):
+        """`dependsOn.type` tranche candidat ou ressource : rien à sonder."""
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            return_value={
-                "data": [
-                    {"id": "deux", "attributes": {"value": "Gagné"}},
-                    {"id": "2", "attributes": {"value": "Gagné"}},
-                ]
-            }
-        )
+        boond._make_request = AsyncMock(return_value=self._response())
 
-        assert await adapter.positioning_states() == {2: "Gagné"}
+        positioning = await adapter.get_positioning(539)
 
-
-class TestPositioningState:
-    """Le passage à « Gagné » est ce qui fait naître la prestation."""
+        assert positioning["candidate_id"] == 2398
+        assert positioning["consultant_type"] == "candidate"
+        assert positioning["consultant_last_name"] == "CHEBBI"
+        assert positioning["resource_id"] is None
 
     @pytest.mark.asyncio
-    async def test_the_state_is_written_at_the_positioning_own_address(self):
-        """Un positionnement n'a pas d'onglet « information » : cette adresse répond 404.
-
-        Sa lecture le disait déjà — `GET /positionings/{id}` —, comme pour les
-        prestations. Les candidats, sociétés et besoins, eux, ont bien cet onglet.
-        """
+    async def test_a_candidate_already_converted_carries_his_resource(self):
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(return_value={"data": {"id": "538"}})
+        boond._make_request = AsyncMock(return_value=self._response(resource="2870"))
 
-        await adapter.update_positioning_state(538, 1)
-
-        method, path = boond._make_request.await_args.args[:2]
-        assert (method, path) == ("PUT", "/positionings/538")
+        assert (await adapter.get_positioning(539))["resource_id"] == 2870
 
     @pytest.mark.asyncio
-    async def test_only_the_state_is_sent(self):
-        """Dates, tarif de vente et jours restent ceux du commercial."""
+    async def test_the_conditions_of_the_mission_are_read(self):
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(return_value={"data": {"id": "538"}})
+        boond._make_request = AsyncMock(return_value=self._response())
 
-        await adapter.update_positioning_state(538, 1)
+        positioning = await adapter.get_positioning(539)
 
-        data = boond._make_request.await_args.kwargs["json"]["data"]
-        assert data == {"type": "positioning", "id": "538", "attributes": {"state": 1}}
+        assert positioning["daily_rate"] == 585
+        assert positioning["sale_daily_rate"] == 620
+        assert positioning["quantity"] == 126
+        assert positioning["free_days"] == 2
 
     @pytest.mark.asyncio
-    async def test_the_state_boond_confirms_is_returned(self):
-        """Une réponse en 200 ne dit pas que le changement a été pris."""
+    async def test_writing_the_state_sends_only_the_state(self):
+        """Dates, tarif et jours restent ceux du commercial."""
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            return_value={"data": {"id": "538", "attributes": {"state": 7}}}
-        )
+        boond._make_request = AsyncMock(return_value=self._response())
 
-        assert await adapter.update_positioning_state(538, 1) == 7
+        await adapter.update_positioning_state(539, 2)
+
+        call = boond._make_request.await_args
+        assert call.args[:2] == ("PUT", "/positionings/539")
+        assert call.kwargs["json"]["data"]["attributes"] == {"state": 2}
 
     @pytest.mark.asyncio
-    async def test_a_response_without_state_says_nothing(self):
+    async def test_the_write_returns_the_updated_positioning(self):
+        """Sa réponse porte l'état pris et le projet : la relire n'apprend rien."""
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(return_value={"data": {"id": "538"}})
+        boond._make_request = AsyncMock(return_value=self._response())
 
-        assert await adapter.update_positioning_state(538, 1) is None
+        positioning = await adapter.update_positioning_state(539, 2)
 
+        assert boond._make_request.await_count == 1
+        assert positioning["state"] == 2
+        assert positioning["project_id"] == 224
 
-def _purchase_defaults(**relationship_overrides) -> dict:
-    """Réponse type de ``GET /purchases/default?delivery=...``.
+    @pytest.mark.asyncio
+    async def test_a_state_boond_did_not_take_is_visible(self):
+        """Une réponse en 200 ne prouve pas que le changement a été pris."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value=self._response(state=7))
 
-    Boond y compose un achat vide déjà accordé au contexte de la prestation :
-    responsable, agence, pôle, projet, société et contact du client.
-    """
-    relationships = {
-        "mainManager": {"data": {"type": "resource", "id": "12"}},
-        "agency": {"data": {"type": "agency", "id": "1"}},
-        "pole": {"data": {"type": "pole", "id": "3"}},
-        "project": {"data": {"type": "project", "id": "567"}},
-        "company": {"data": {"type": "company", "id": "89"}},
-        "contact": {"data": {"type": "contact", "id": "90"}},
-        "delivery": {"data": {"type": "delivery", "id": "1234"}},
-        "billingDetail": {"data": None},
-    }
-    relationships.update(relationship_overrides)
-    return {
-        "data": {
-            "id": "0",
-            "type": "purchase",
-            "attributes": {"typeOf": 0, "state": 0, "currency": "EUR"},
-            "relationships": relationships,
-        },
-        "included": [{"type": "delivery", "id": "1234"}],
-    }
+        assert (await adapter.update_positioning_state(539, 2))["state"] == 7
+
+    @pytest.mark.asyncio
+    async def test_an_unreadable_positioning_gives_nothing(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=RuntimeError("Boond 500"))
+
+        assert await adapter.get_positioning(539) is None
 
 
-def _purchase_calls(boond: AsyncMock) -> tuple[dict, dict]:
-    """Renvoie les paramètres du pré-remplissage et le corps de la création."""
-    prefill, creation = boond._make_request.await_args_list
-    assert prefill.args[:2] == ("GET", "/purchases/default")
-    assert creation.args[:2] == ("POST", "/purchases")
-    return prefill.kwargs["params"], creation.kwargs["json"]["data"]
+class TestCandidateConversion:
+    """La conversion d'un candidat en ressource, et le numéro qu'elle rend.
 
-
-class TestSupplierPurchaseCreation:
-    """L'achat fournisseur : pré-remplissage Boond, puis `POST /purchases`.
-
-    `/purchase-orders` n'existe pas dans l'API BoondManager — il répondait 404
-    et faisait échouer tout le report d'un bon de commande. Le corps part de
-    `GET /purchases/default`, qui accorde prestation, projet, société et agence
-    entre eux : les composer à la main est la cause classique des 422.
+    `data.id` reste **celui du candidat** après la conversion : la ressource
+    née de l'opération est dans `data.relationships.resource`. Retomber sur
+    `data.id` rendait un numéro de candidat déguisé en ressource, et la suite
+    du report échouait en 404 sur `/resources/{id}/administrative`.
     """
 
-    @pytest.mark.asyncio
-    async def test_the_purchase_is_prefilled_from_its_delivery(self):
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
+    @staticmethod
+    def _converted(resource_id: str | None = "2870") -> dict:
+        relationships = (
+            {"resource": {"data": {"id": resource_id, "type": "resource"}}} if resource_id else {}
+        )
+        return {"data": {"id": "2398", "type": "resource", "relationships": relationships}}
 
-        purchase_id = await adapter.create_supplier_purchase(
-            delivery_id=1234, title="GEM-BC-001 - Développeur Python"
+    @pytest.mark.asyncio
+    async def test_the_new_resource_is_returned(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value=self._converted())
+
+        assert await adapter.convert_candidate_to_resource(2398) == 2870
+
+    @pytest.mark.asyncio
+    async def test_the_candidate_id_is_never_returned_as_a_resource(self):
+        """Le 404 sur `/resources/2398/administrative` venait de là."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            side_effect=[self._converted(resource_id=None), {"data": {"relationships": {}}}]
         )
 
-        assert purchase_id == 666
-        params, data = _purchase_calls(boond)
-        assert params == {"delivery": "1234"}
-        assert data["type"] == "purchase"
-        # Le contexte composé par Boond est repris tel quel.
-        assert data["attributes"]["currency"] == "EUR"
-        assert data["relationships"]["project"]["data"]["id"] == "567"
-        assert data["relationships"]["agency"]["data"]["id"] == "1"
+        with pytest.raises(BoondCrmError):
+            await adapter.convert_candidate_to_resource(2398)
 
     @pytest.mark.asyncio
-    async def test_the_delivery_relationship_carries_the_delivery_type(self):
-        """La doc décrit cette relation avec `type: "project"` : c'est une coquille."""
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
-
-        await adapter.create_supplier_purchase(delivery_id=797, title="GEM-BC-001")
-
-        _, data = _purchase_calls(boond)
-        assert data["relationships"]["delivery"] == {"data": {"type": "delivery", "id": "797"}}
-
-    @pytest.mark.asyncio
-    async def test_empty_relationships_are_dropped(self):
-        """Renvoyer une relation à `null` ferait échouer la création."""
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
-
-        await adapter.create_supplier_purchase(delivery_id=1234, title="GEM-BC-001")
-
-        _, data = _purchase_calls(boond)
-        assert "billingDetail" not in data["relationships"]
-
-    @pytest.mark.asyncio
-    async def test_the_mission_conditions_are_written_on_the_purchase(self):
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
-
-        await adapter.create_supplier_purchase(
-            delivery_id=1234,
-            title="GEM-BC-001 - Développeur Python",
-            reference="GEM-BC-001",
-            start_date="2026-09-01",
-            end_date="2027-02-28",
-            quantity=18.0,
-            amount=9000.0,
-        )
-
-        _, data = _purchase_calls(boond)
-        assert data["attributes"]["title"] == "GEM-BC-001 - Développeur Python"
-        assert data["attributes"]["reference"] == "GEM-BC-001"
-        assert data["attributes"]["date"] == "2026-09-01"
-        assert data["attributes"]["startDate"] == "2026-09-01"
-        assert data["attributes"]["endDate"] == "2027-02-28"
-        assert data["attributes"]["quantity"] == 18.0
-        assert data["attributes"]["amountExcludingTax"] == 9000.0
-
-    @pytest.mark.asyncio
-    async def test_the_supplier_replaces_the_client_company_and_its_contact(self):
-        """Un achat se paie au fournisseur : le contact du client n'y a plus sa place."""
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
-
-        await adapter.create_supplier_purchase(
-            delivery_id=1234, title="GEM-BC-001", provider_id=777
-        )
-
-        _, data = _purchase_calls(boond)
-        assert data["relationships"]["company"] == {"data": {"type": "company", "id": "777"}}
-        assert "contact" not in data["relationships"]
-
-    @pytest.mark.asyncio
-    async def test_the_supplier_contact_is_used_when_known(self):
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
-
-        await adapter.create_supplier_purchase(
-            delivery_id=1234,
-            title="GEM-BC-001",
-            provider_id=777,
-            provider_contact_id=2864,
-        )
-
-        _, data = _purchase_calls(boond)
-        assert data["relationships"]["contact"] == {"data": {"type": "contact", "id": "2864"}}
-
-    @pytest.mark.asyncio
-    async def test_a_prefill_already_on_the_supplier_keeps_its_contact(self):
-        """Boond a déjà désigné le fournisseur : son contact est le bon."""
+    async def test_the_candidate_sheet_is_read_when_the_write_stays_silent(self):
+        """Boond ne rend pas toujours la relation dans la réponse de l'écriture."""
         adapter, boond = _make_adapter()
         boond._make_request = AsyncMock(
             side_effect=[
-                _purchase_defaults(
-                    company={"data": {"type": "company", "id": "777"}},
-                    contact={"data": {"type": "contact", "id": "2864"}},
-                ),
-                {"data": {"id": "666"}},
+                self._converted(resource_id=None),
+                {"data": {"relationships": {"resource": {"data": {"id": "2870"}}}}},
             ]
         )
 
-        await adapter.create_supplier_purchase(
-            delivery_id=1234, title="GEM-BC-001", provider_id=777
+        assert await adapter.convert_candidate_to_resource(2398) == 2870
+        assert boond._make_request.await_args_list[1].args == (
+            "GET",
+            "/candidates/2398/information",
         )
 
-        _, data = _purchase_calls(boond)
-        assert data["relationships"]["contact"] == {"data": {"type": "contact", "id": "2864"}}
+
+class TestSupplierPurchase:
+    """L'achat fournisseur : un corps minimal, Boond déduit le reste.
+
+    Il se rattache à une **prestation**, pas à un positionnement, et
+    **seulement à la création** : `PUT /purchases/{id}/information` n'expose ni
+    `delivery` ni `project`. Un achat posé sur la mauvaise prestation se
+    supprime et se recrée.
+    """
+
+    @staticmethod
+    def _body(boond: AsyncMock) -> dict:
+        call = boond._make_request.await_args
+        assert call.args[:2] == ("POST", "/purchases")
+        return call.kwargs["json"]["data"]
+
+    @pytest.mark.asyncio
+    async def test_the_purchase_hangs_on_its_project_and_delivery(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value={"data": {"id": "666"}})
+
+        purchase_id = await adapter.create_supplier_purchase(
+            project_id=224, delivery_id=804, title="CHEBBI Rym - AKEMA TECH - GEM-BC-001"
+        )
+
+        assert purchase_id == 666
+        data = self._body(boond)
+        assert data["type"] == "purchase"
+        assert data["relationships"] == {
+            "project": {"data": {"type": "project", "id": "224"}},
+            "delivery": {"data": {"type": "delivery", "id": "804"}},
+        }
+
+    @pytest.mark.asyncio
+    async def test_nothing_is_dictated_that_boond_can_deduce(self):
+        """Montants, période, société, agence : la prestation les porte déjà.
+
+        Le montant surtout : Boond compte `quantity` x `amountExcludingTax`, ce
+        dernier **unitaire**. Y poser le total du bon de commande le faisait
+        multiplier une seconde fois.
+        """
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value={"data": {"id": "666"}})
+
+        await adapter.create_supplier_purchase(project_id=224, delivery_id=804, title="GEM-BC-001")
+
+        assert set(self._body(boond)["attributes"]) == {"title", "createPayments"}
+
+    @pytest.mark.asyncio
+    async def test_payments_are_not_scheduled_by_boond(self):
+        """L'omettre laissait Boond échelonner l'achat de lui-même."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value={"data": {"id": "666"}})
+
+        await adapter.create_supplier_purchase(project_id=224, delivery_id=804, title="GEM-BC-001")
+
+        assert self._body(boond)["attributes"]["createPayments"] is None
+
+    @pytest.mark.asyncio
+    async def test_a_long_title_is_cut_to_what_boond_accepts(self):
+        """`TAB_ACHAT.ACHAT_TITLE` est borné : au-delà, la création est refusée."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value={"data": {"id": "666"}})
+
+        await adapter.create_supplier_purchase(project_id=224, delivery_id=804, title="X" * 400)
+
+        assert len(self._body(boond)["attributes"]["title"]) == 150
 
     @pytest.mark.asyncio
     async def test_a_creation_without_id_is_an_error(self):
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {}}])
+        boond._make_request = AsyncMock(return_value={"data": {}})
 
         with pytest.raises(BoondCrmError):
-            await adapter.create_supplier_purchase(delivery_id=1234, title="GEM-BC-001")
+            await adapter.create_supplier_purchase(
+                project_id=224, delivery_id=804, title="GEM-BC-001"
+            )
+
+
+class TestProjectDeliveryLookup:
+    """Retrouver la prestation d'une mission parmi celles de son projet.
+
+    Un positionnement n'expose **aucune** relation `delivery` — vérifié contre
+    le CRM sur les positionnements 538 et 539, dont les relations sont
+    `opportunity`, `project`, `files`, `dependsOn` et `createdBy`. Le lien passe
+    par l'onglet des prestations du projet.
+
+    Un projet en porte **plusieurs** : une par consultant, et une de plus à
+    chaque reconduction du même. Le rattachement se fait donc sur les données de
+    la mission — un achat posé sur la mauvaise prestation ne se corrige qu'en le
+    supprimant et le recréant.
+    """
+
+    @staticmethod
+    def _delivery(did, rid, start="2026-07-06", end="2026-12-31", days=126) -> dict:
+        return {
+            "id": str(did),
+            "type": "delivery",
+            "attributes": {
+                "startDate": start,
+                "endDate": end,
+                "numberOfDaysInvoicedOrQuantity": days,
+            },
+            "relationships": {
+                "dependsOn": {"data": {"id": str(rid), "type": "resource"}},
+                "purchase": {"data": None},
+                "project": {"data": {"id": "224", "type": "project"}},
+            },
+        }
+
+    @classmethod
+    def _tab(cls, *entries) -> dict:
+        """Réponse type de `GET /projects/{id}/deliveries-groupments`."""
+        return {"meta": {"totals": {"rows": len(entries)}}, "data": list(entries), "included": []}
+
+    @pytest.mark.asyncio
+    async def test_the_only_delivery_of_the_consultant_is_taken(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value=self._tab(self._delivery(804, 2870)))
+
+        assert await adapter.find_project_delivery(224, resource_id=2870) == 804
+
+    @pytest.mark.asyncio
+    async def test_the_deliveries_tab_of_the_project_is_read(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value=self._tab(self._delivery(804, 2870)))
+
+        await adapter.find_project_delivery(224)
+
+        assert boond._make_request.await_args.args == (
+            "GET",
+            "/projects/224/deliveries-groupments",
+        )
+
+    @pytest.mark.asyncio
+    async def test_the_delivery_of_another_consultant_is_never_taken(self):
+        """Même seule du projet : l'achat partirait sur la mission d'un autre."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value=self._tab(self._delivery(804, 2999)))
+
+        assert await adapter.find_project_delivery(224, resource_id=2870) is None
+
+    @pytest.mark.asyncio
+    async def test_the_consultant_singles_his_out(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value=self._tab(self._delivery(804, 2870), self._delivery(805, 2999))
+        )
+
+        assert await adapter.find_project_delivery(224, resource_id=2999) == 805
+
+    @pytest.mark.asyncio
+    async def test_a_renewal_is_separated_by_its_period(self):
+        """Deux prestations du même consultant sur le même projet : la période tranche."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value=self._tab(
+                self._delivery(804, 2870, start="2026-07-06", end="2026-12-31"),
+                self._delivery(806, 2870, start="2027-01-01", end="2027-06-30"),
+            )
+        )
+
+        found = await adapter.find_project_delivery(
+            224, resource_id=2870, start_date="2027-01-01", end_date="2027-06-30"
+        )
+
+        assert found == 806
+
+    @pytest.mark.asyncio
+    async def test_the_days_separate_what_the_period_leaves_tied(self):
+        """Deux prestations sur la même période, avenant ou correction."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value=self._tab(
+                self._delivery(804, 2870, days=126),
+                self._delivery(807, 2870, days=90),
+            )
+        )
+
+        found = await adapter.find_project_delivery(
+            224,
+            resource_id=2870,
+            start_date="2026-07-06",
+            end_date="2026-12-31",
+            days_sold=90,
+        )
+
+        assert found == 807
+
+    @pytest.mark.asyncio
+    async def test_an_ambiguous_choice_gives_nothing(self):
+        """Rien ne les distingue : l'ADV rattachera à la main."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value=self._tab(self._delivery(804, 2870), self._delivery(808, 2870))
+        )
+
+        found = await adapter.find_project_delivery(
+            224, resource_id=2870, start_date="2026-07-06", end_date="2026-12-31", days_sold=126
+        )
+
+        assert found is None
+
+    @pytest.mark.asyncio
+    async def test_a_period_matching_none_of_them_gives_nothing(self):
+        """Mieux vaut pas de prestation qu'une prestation approchante."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value=self._tab(
+                self._delivery(804, 2870, start="2026-07-06"),
+                self._delivery(806, 2870, start="2027-01-01"),
+            )
+        )
+
+        found = await adapter.find_project_delivery(
+            224, resource_id=2870, start_date="2028-03-01", end_date="2028-09-30"
+        )
+
+        assert found is None
+
+    @pytest.mark.asyncio
+    async def test_groupments_are_not_mistaken_for_deliveries(self):
+        """L'onglet mêle les deux ; seule une prestation peut recevoir un achat."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value=self._tab(
+                self._delivery(804, 2870), {"id": "12", "type": "groupment", "relationships": {}}
+            )
+        )
+
+        assert await adapter.find_project_delivery(224, resource_id=2870) == 804
+
+    @pytest.mark.asyncio
+    async def test_a_project_without_delivery_gives_nothing(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value={"data": [], "included": []})
+
+        assert await adapter.find_project_delivery(224, resource_id=2870) is None
+
+    @pytest.mark.asyncio
+    async def test_a_decimal_quantity_still_matches(self):
+        """Boond rend les jours tantôt entiers, tantôt décimaux."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value=self._tab(
+                self._delivery(804, 2870, days=126.0), self._delivery(807, 2870, days=90.5)
+            )
+        )
+
+        found = await adapter.find_project_delivery(
+            224, resource_id=2870, start_date="2026-07-06", end_date="2026-12-31", days_sold=90.5
+        )
+
+        assert found == 807
 
 
 class TestSuppressions:
@@ -351,47 +538,6 @@ class TestSuppressions:
 
         with pytest.raises(httpx.HTTPStatusError):
             await adapter.delete_boond_contract(555)
-
-
-class TestConsultantExistence:
-    """``candidate_exists`` / ``resource_exists`` : mêmes règles que pour une société.
-
-    Elles décident si un consultant doit être converti ou pris tel quel :
-    conclure à l'absence sur une panne ferait convertir une ressource, ce que
-    BoondManager refuse.
-    """
-
-    @pytest.mark.asyncio
-    async def test_a_candidate_is_looked_up_on_its_own_endpoint(self):
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(return_value={"data": {"id": "4242"}})
-
-        assert await adapter.candidate_exists(4242) is True
-        assert boond._make_request.await_args.args[1] == "/candidates/4242"
-
-    @pytest.mark.asyncio
-    async def test_a_resource_is_looked_up_on_its_own_endpoint(self):
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(return_value={"data": {"id": "9001"}})
-
-        assert await adapter.resource_exists(9001) is True
-        assert boond._make_request.await_args.args[1] == "/resources/9001"
-
-    @pytest.mark.asyncio
-    async def test_only_a_404_means_absent(self):
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(side_effect=_http_status_error(404))
-
-        assert await adapter.candidate_exists(4242) is False
-        assert await adapter.resource_exists(4242) is False
-
-    @pytest.mark.asyncio
-    async def test_a_server_failure_is_propagated(self):
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(side_effect=_http_status_error(500))
-
-        with pytest.raises(httpx.HTTPStatusError):
-            await adapter.candidate_exists(4242)
 
 
 class TestVerifyCompanyExists:

@@ -84,6 +84,7 @@ class PurchaseOrder:
     boond_positioning_id: int | None = None
     boond_need_id: int | None = None
     boond_delivery_id: int | None = None
+    boond_project_id: int | None = None
 
     # Mission
     client_name: str | None = None

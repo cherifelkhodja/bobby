@@ -30,6 +30,7 @@ def _signed_po(**overrides) -> PurchaseOrder:
         "third_party_id": uuid4(),
         "contract_request_id": uuid4(),
         "boond_positioning_id": 41,
+        "boond_project_id": 224,
         "boond_consultant_id": 4242,
         "boond_consultant_type": "candidate",
         "purchase_daily_rate": Decimal("500"),
@@ -49,6 +50,7 @@ def _third_party(**overrides) -> SimpleNamespace:
         "boond_billing_contact_id": 2864,
         "boond_adv_contact_id": 2865,
         "boond_signatory_contact_id": 2866,
+        "vat_liable": True,
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -73,25 +75,12 @@ def _make_use_case(po, *, provider_id=777, third_party_type="sous_traitant", thi
     )
 
     crm = AsyncMock()
-    crm.resolve_resource_id = AsyncMock(return_value=None)
-    crm.candidate_exists = AsyncMock(return_value=True)
-    crm.resource_exists = AsyncMock(return_value=False)
     crm.convert_candidate_to_resource = AsyncMock(return_value=9001)
     crm.update_resource_administrative = AsyncMock()
-    crm.update_positioning_state = AsyncMock()
-    # États de positionnement tels que configurés dans le CRM : chaque entité
-    # Boond a la sienne, et « Gagné » n'y vaut pas 1 — c'est « Refus Client ».
-    crm.positioning_states = AsyncMock(
-        return_value={
-            0: "Positionné",
-            1: "Refus Client",
-            2: "Gagné",
-            3: "CV Envoyé",
-            5: "Refus Collaborateur",
-            7: "Gagné attente contrat",
-        }
-    )
-    crm.get_positioning = AsyncMock(return_value={"delivery_id": 797})
+    # L'écriture de l'état rend le positionnement à jour : son état, qui dit si
+    # elle a été prise, et son projet, par lequel se retrouve la prestation.
+    crm.update_positioning_state = AsyncMock(return_value={"state": 2, "project_id": 224})
+    crm.find_project_delivery = AsyncMock(return_value=797)
     crm.create_boond_contract = AsyncMock(return_value=555)
     crm.create_supplier_purchase = AsyncMock(return_value=666)
     crm.renew_delivery = AsyncMock(return_value={"id": 798, "purchase_id": 900, "contract_id": 264})
@@ -207,18 +196,6 @@ class TestResourceResolution:
         assert crm.convert_candidate_to_resource.await_args.kwargs["state_reason_type_of"] == 1
 
     @pytest.mark.asyncio
-    async def test_an_existing_resource_is_reused(self):
-        """Un candidat déjà converti n'est pas converti une seconde fois."""
-        po = _signed_po()
-        use_case, crm, _ = _make_use_case(po)
-        crm.resolve_resource_id = AsyncMock(return_value=8500)
-
-        await use_case.execute(po.id)
-
-        crm.convert_candidate_to_resource.assert_not_awaited()
-        assert crm.create_boond_contract.await_args.kwargs["resource_id"] == 8500
-
-    @pytest.mark.asyncio
     async def test_a_resource_consultant_is_used_as_is(self):
         po = _signed_po(boond_consultant_type="resource", boond_consultant_id=8888)
         use_case, crm, _ = _make_use_case(po)
@@ -229,16 +206,17 @@ class TestResourceResolution:
         assert crm.create_boond_contract.await_args.kwargs["resource_id"] == 8888
 
     @pytest.mark.asyncio
-    async def test_a_failed_provider_link_does_not_stop_the_sync(self):
-        """Le rattachement administratif est corrigeable à la main dans Boond."""
+    async def test_a_failed_provider_link_stops_the_sync(self):
+        """Une ressource sans société fournisseur est un consultant que rien ne facture."""
         po = _signed_po()
         use_case, crm, _ = _make_use_case(po)
         crm.update_resource_administrative = AsyncMock(side_effect=RuntimeError("Boond 422"))
 
-        result = await use_case.execute(po.id)
+        with pytest.raises(PurchaseOrderBoondSyncError):
+            await use_case.execute(po.id)
 
-        assert result.status == PurchaseOrderStatus.ACTIVE
-        crm.create_supplier_purchase.assert_awaited_once()
+        crm.create_boond_contract.assert_not_awaited()
+        crm.create_supplier_purchase.assert_not_awaited()
 
 
 class TestDelivery:
@@ -305,36 +283,65 @@ class TestDelivery:
         """Boond peut accepter la demande sans l'appliquer : cela doit se voir."""
         po = _signed_po(boond_delivery_id=797)
         use_case, crm, _ = _make_use_case(po)
-        crm.get_positioning = AsyncMock(return_value={"delivery_id": 797, "state": 7})
+        crm.update_positioning_state = AsyncMock(return_value={"state": 7, "project_id": 224})
 
         result = await use_case.execute(po.id)
 
         assert "l'état est resté à 7" in result.boond_sync_error
 
     @pytest.mark.asyncio
-    async def test_a_state_ignored_outright_is_named_as_such(self):
-        """Boond renvoie déjà l'ancien état : l'écriture n'a pas été prise en compte."""
-        po = _signed_po(boond_delivery_id=797)
+    async def test_the_delivery_is_looked_up_by_project_when_absent(self):
+        """Un positionnement n'expose pas de relation `delivery` : le projet est la voie."""
+        po = _signed_po()
         use_case, crm, _ = _make_use_case(po)
-        crm.update_positioning_state = AsyncMock(return_value=7)
-        crm.get_positioning = AsyncMock(return_value={"delivery_id": 797, "state": 7})
+        crm.update_positioning_state = AsyncMock(return_value={"state": 2, "project_id": 224})
+        crm.find_project_delivery = AsyncMock(return_value=800)
 
         result = await use_case.execute(po.id)
 
-        assert "n'a même pas été pris en compte" in result.boond_sync_error
+        assert result.boond_delivery_id == 800
+        assert result.boond_sync_error is None
 
     @pytest.mark.asyncio
-    async def test_a_state_taken_then_undone_is_told_apart(self):
-        """Boond a confirmé « Gagné », mais l'état est retombé : règle du CRM."""
+    async def test_the_lookup_is_given_the_data_of_the_mission(self):
+        """Un projet porte une prestation par consultant, et une par reconduction."""
+        po = _signed_po(boond_consultant_id=2870, boond_consultant_type="resource")
+        use_case, crm, _ = _make_use_case(po)
+        crm.update_positioning_state = AsyncMock(return_value={"state": 2, "project_id": 224})
+        crm.find_project_delivery = AsyncMock(return_value=800)
+
+        await use_case.execute(po.id)
+
+        crm.find_project_delivery.assert_awaited_once_with(
+            224,
+            resource_id=2870,
+            start_date="2026-09-01",
+            end_date="2027-02-28",
+            days_sold=20.0,
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_known_delivery_spares_the_lookup(self):
+        """Une prestation déjà retenue n'est pas recherchée à chaque report."""
         po = _signed_po(boond_delivery_id=797)
         use_case, crm, _ = _make_use_case(po)
-        crm.update_positioning_state = AsyncMock(return_value=2)
-        crm.get_positioning = AsyncMock(return_value={"delivery_id": 797, "state": 7})
+
+        await use_case.execute(po.id)
+
+        crm.find_project_delivery.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_failing_lookup_does_not_break_the_report(self):
+        """Ce qu'elle ne trouve pas se rattrape par la saisie de l'ADV."""
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po)
+        crm.update_positioning_state = AsyncMock(return_value={"state": 2, "project_id": 224})
+        crm.find_project_delivery = AsyncMock(side_effect=RuntimeError("Boond 404"))
 
         result = await use_case.execute(po.id)
 
-        assert "l'état est resté à 7" in result.boond_sync_error
-        assert "n'a même pas été pris en compte" not in result.boond_sync_error
+        assert result.boond_contract_id == 555
+        assert "n'a pas été retrouvée" in result.boond_sync_error
 
     @pytest.mark.asyncio
     async def test_a_state_that_took_says_nothing(self):
@@ -351,11 +358,11 @@ class TestDelivery:
         """Gagné, mais aucune prestation rattachée : l'ADV doit le savoir."""
         po = _signed_po(boond_delivery_id=None)
         use_case, crm, _ = _make_use_case(po)
-        crm.get_positioning = AsyncMock(return_value={"delivery_id": None})
+        crm.find_project_delivery = AsyncMock(return_value=None)
 
         result = await use_case.execute(po.id)
 
-        assert "n'a pas rattaché de prestation" in result.boond_sync_error
+        assert "n'a pas été retrouvée" in result.boond_sync_error
         crm.update_delivery.assert_not_awaited()
 
     @pytest.mark.asyncio
@@ -381,81 +388,6 @@ class TestDelivery:
 
         assert result.boond_purchase_order_id == 666
         assert "Prestation 797 non recalée" in result.boond_sync_error
-
-
-class TestWonState:
-    """Quel numéro vaut « Gagné » — la question qui a écrit un refus client.
-
-    Chaque entité Boond a sa propre échelle d'états. L'état 1 est « Gagné »
-    pour une opportunité, « Refus Client » pour un positionnement : le numéro
-    ne se déduit pas, il se lit.
-    """
-
-    @pytest.mark.asyncio
-    async def test_the_state_comes_from_the_crm_dictionary(self):
-        po = _signed_po(boond_delivery_id=None)
-        use_case, crm, _ = _make_use_case(po)
-
-        await use_case.execute(po.id)
-
-        crm.update_positioning_state.assert_awaited_once_with(41, 2)
-
-    @pytest.mark.asyncio
-    async def test_a_renamed_state_is_followed(self):
-        """Les libellés sont réglés par l'administrateur du CRM : on les relit."""
-        po = _signed_po(boond_delivery_id=None)
-        use_case, crm, _ = _make_use_case(po)
-        crm.positioning_states = AsyncMock(return_value={4: "GAGNE", 9: "Gagné attente contrat"})
-
-        await use_case.execute(po.id)
-
-        crm.update_positioning_state.assert_awaited_once_with(41, 4)
-
-    @pytest.mark.asyncio
-    async def test_the_waiting_state_is_never_mistaken_for_it(self):
-        """« Gagné attente contrat » commence pareil sans désigner le même état."""
-        po = _signed_po(boond_delivery_id=None)
-        use_case, crm, _ = _make_use_case(po)
-        crm.positioning_states = AsyncMock(return_value={7: "Gagné attente contrat"})
-
-        result = await use_case.execute(po.id)
-
-        crm.update_positioning_state.assert_not_awaited()
-        assert "n'a pas pu être déterminé" in result.boond_sync_error
-
-    @pytest.mark.asyncio
-    async def test_an_unreadable_dictionary_falls_back_to_the_known_value(self):
-        """S'abstenir priverait le report de sa prestation."""
-        po = _signed_po(boond_delivery_id=None)
-        use_case, crm, _ = _make_use_case(po)
-        crm.positioning_states = AsyncMock(return_value={})
-
-        await use_case.execute(po.id)
-
-        crm.update_positioning_state.assert_awaited_once_with(41, 2)
-
-    @pytest.mark.asyncio
-    async def test_the_administrator_setting_wins(self):
-        po = _signed_po(boond_delivery_id=None)
-        use_case, crm, _ = _make_use_case(po)
-        use_case._settings = AsyncMock()
-        use_case._settings.get = AsyncMock(return_value="6")
-
-        await use_case.execute(po.id)
-
-        crm.update_positioning_state.assert_awaited_once_with(41, 6)
-        crm.positioning_states.assert_not_awaited()
-
-    @pytest.mark.asyncio
-    async def test_an_unusable_setting_falls_back_to_the_dictionary(self):
-        po = _signed_po(boond_delivery_id=None)
-        use_case, crm, _ = _make_use_case(po)
-        use_case._settings = AsyncMock()
-        use_case._settings.get = AsyncMock(return_value="au choix")
-
-        await use_case.execute(po.id)
-
-        crm.update_positioning_state.assert_awaited_once_with(41, 2)
 
 
 class TestProviderLink:
@@ -503,62 +435,6 @@ class TestProviderLink:
         assert kwargs["provider_contact_id"] is None
 
 
-class TestAlreadyAResource:
-    """Le consultant est parfois déjà une ressource Boond."""
-
-    @pytest.mark.asyncio
-    async def test_a_consultant_declared_as_a_resource_is_used_as_is(self):
-        po = _signed_po(boond_consultant_type="resource")
-        use_case, crm, _ = _make_use_case(po)
-
-        await use_case.execute(po.id)
-
-        crm.convert_candidate_to_resource.assert_not_awaited()
-        crm.candidate_exists.assert_not_awaited()
-        assert crm.create_boond_contract.await_args.kwargs["resource_id"] == 4242
-
-    @pytest.mark.asyncio
-    async def test_an_id_that_is_not_a_candidate_but_a_resource_is_used_as_is(self):
-        """Identifiant de ressource pris pour un candidat : le convertir échouerait."""
-        po = _signed_po(boond_consultant_type="candidate")
-        use_case, crm, _ = _make_use_case(po)
-        crm.candidate_exists = AsyncMock(return_value=False)
-        crm.resource_exists = AsyncMock(return_value=True)
-
-        result = await use_case.execute(po.id)
-
-        crm.convert_candidate_to_resource.assert_not_awaited()
-        assert result.boond_consultant_id == 4242
-        assert result.boond_consultant_type == "resource"
-
-    @pytest.mark.asyncio
-    async def test_a_candidate_without_a_resource_is_still_converted(self):
-        """Un candidat existant est converti : le numéro d'une ressource homonyme ne vaut rien.
-
-        Candidats et ressources ont deux séries d'identifiants — se rabattre sur
-        la ressource du même numéro rattacherait une autre personne.
-        """
-        po = _signed_po()
-        use_case, crm, _ = _make_use_case(po)
-
-        await use_case.execute(po.id)
-
-        crm.convert_candidate_to_resource.assert_awaited_once()
-        crm.resource_exists.assert_not_awaited()
-
-    @pytest.mark.asyncio
-    async def test_an_unknown_consultant_is_reported(self):
-        po = _signed_po()
-        use_case, crm, _ = _make_use_case(po)
-        crm.candidate_exists = AsyncMock(return_value=False)
-        crm.resource_exists = AsyncMock(return_value=False)
-
-        with pytest.raises(PurchaseOrderBoondSyncError, match="introuvable"):
-            await use_case.execute(po.id)
-
-        crm.convert_candidate_to_resource.assert_not_awaited()
-
-
 class TestResourceMemory:
     """La ressource résolue est retenue sur le bon de commande."""
 
@@ -581,7 +457,6 @@ class TestResourceMemory:
         await use_case.execute(po.id)
 
         crm.convert_candidate_to_resource.assert_awaited_once()
-        crm.resolve_resource_id.assert_awaited_once()
 
 
 class TestBoondWrites:
@@ -611,43 +486,67 @@ class TestBoondWrites:
         assert crm.create_boond_contract.await_args.kwargs["type_of"] == 6
 
     @pytest.mark.asyncio
-    async def test_the_purchase_carries_the_billable_total(self):
-        """Montant Boond = (jours vendus - gratuité) x CJM, sur les jours payés."""
+    async def test_the_purchase_carries_only_what_boond_cannot_deduce(self):
+        """Boond tire le reste de la prestation : montants, période, société, agence."""
         po = _signed_po()
         use_case, crm, _ = _make_use_case(po)
 
         await use_case.execute(po.id)
 
-        kwargs = crm.create_supplier_purchase.await_args.kwargs
-        assert kwargs["amount"] == 9000.0  # 18 x 500
-        assert kwargs["quantity"] == 18.0  # 20 vendus - 2 gratuits
-        assert kwargs["reference"] == "GEM-BC-001"
-        assert kwargs["start_date"] == "2026-09-01"
-        assert kwargs["end_date"] == "2027-02-28"
+        assert set(crm.create_supplier_purchase.await_args.kwargs) == {
+            "project_id",
+            "delivery_id",
+            "title",
+        }
 
     @pytest.mark.asyncio
-    async def test_the_purchase_hangs_on_the_delivery_and_the_supplier(self):
-        """L'achat se rattache à la prestation, et se paie au fournisseur."""
+    async def test_the_amount_is_not_dictated_to_boond(self):
+        """Boond le pré-remplit depuis la prestation, que le report vient de recaler.
+
+        Il compte `quantity` x `amountExcludingTax`, ce dernier **unitaire** :
+        lui poser le total du bon de commande le faisait multiplier une seconde
+        fois. Le montant ne fait donc plus partie de ce que Bobby lui dicte.
+        """
         po = _signed_po()
         use_case, crm, _ = _make_use_case(po)
 
         await use_case.execute(po.id)
 
         kwargs = crm.create_supplier_purchase.await_args.kwargs
+        assert "amount" not in kwargs
+        assert "quantity" not in kwargs
+
+    @pytest.mark.asyncio
+    async def test_the_purchase_hangs_on_the_project_and_its_delivery(self):
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po)
+
+        await use_case.execute(po.id)
+
+        kwargs = crm.create_supplier_purchase.await_args.kwargs
+        assert kwargs["project_id"] == 224
         assert kwargs["delivery_id"] == 797
-        assert kwargs["provider_id"] == 777
-        assert kwargs["provider_contact_id"] == 2864  # contact facturation
 
     @pytest.mark.asyncio
-    async def test_the_purchase_title_names_the_order_then_the_mission(self):
-        """L'intitulé sert à retrouver l'achat dans Boond."""
-        po = _signed_po(mission_title="Développeur Python senior")
+    async def test_the_project_is_remembered_from_the_won_positioning(self):
+        """Il ne se redemande pas au CRM à chaque reprise du report."""
+        po = _signed_po(boond_project_id=None)
+        use_case, _, _ = _make_use_case(po)
+
+        result = await use_case.execute(po.id)
+
+        assert result.boond_project_id == 224
+
+    @pytest.mark.asyncio
+    async def test_the_purchase_title_names_who_bills_whom_under_which_reference(self):
+        """Seul texte de l'achat : il doit suffire à le reconnaître dans une liste."""
+        po = _signed_po(consultant_first_name="Rym", consultant_last_name="CHEBBI")
         use_case, crm, _ = _make_use_case(po)
 
         await use_case.execute(po.id)
 
         title = crm.create_supplier_purchase.await_args.kwargs["title"]
-        assert title == "GEM-BC-001 - Développeur Python senior"
+        assert title == "CHEBBI Rym - AKEMA TECH - GEM-BC-001"
 
     @pytest.mark.asyncio
     async def test_the_order_becomes_active(self):
@@ -813,9 +712,9 @@ class TestSupplierPurchase:
     @pytest.mark.asyncio
     async def test_no_delivery_means_no_purchase(self):
         """Le rattachement ne se fait qu'à la création : sans prestation, on s'abstient."""
-        po = _signed_po()
+        po = _signed_po(boond_delivery_id=None)
         use_case, crm, _ = _make_use_case(po)
-        crm.get_positioning = AsyncMock(return_value={})
+        crm.find_project_delivery = AsyncMock(return_value=None)
 
         result = await use_case.execute(po.id)
 
