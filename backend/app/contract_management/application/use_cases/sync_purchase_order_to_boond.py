@@ -376,15 +376,19 @@ class SyncPurchaseOrderToBoondUseCase:
         except Exception as exc:
             # Le contrat et l'achat restent créables : l'ADV reprendra la
             # prestation à la main plutôt que de tout rejouer.
+            motif = _readable_error(exc)
             logger.warning(
                 "purchase_order_positioning_win_failed",
                 purchase_order_id=str(po.id),
                 positioning_id=po.boond_positioning_id,
-                error=_readable_error(exc),
+                error=motif,
             )
+            # Le motif rendu par Boond est la seule information exploitable :
+            # sans lui, l'ADV ne sait pas s'il doit corriger le dossier,
+            # demander un droit, ou appeler l'éditeur.
             warnings.append(
-                f"Positionnement {po.boond_positioning_id} non passé à « Gagné » : "
-                "la prestation n'a pas été créée, à reprendre dans BoondManager."
+                f"Positionnement {po.boond_positioning_id} non passé à « Gagné » "
+                f"({motif}) : la prestation n'a pas été créée, à reprendre dans BoondManager."
             )
             return
 

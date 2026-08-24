@@ -233,6 +233,15 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (fix: l'onglet du positionnement se sauvegarde entier)
+
+Le passage à « Gagné » échouait en erreur HTTP, et le bon de commande n'en disait rien d'exploitable : « non passé à « Gagné » », sans le motif rendu par Boond. Deux corrections.
+
+- **Le motif remonte à l'ADV**, dans le bandeau du bon de commande : sans lui, impossible de savoir s'il faut corriger le dossier, demander un droit, ou appeler l'éditeur. Il n'était jusqu'ici que dans les journaux.
+- **L'écriture repart de l'onglet lu** (`GET /positionings/{id}/information`, état modifié, réécriture) : cet onglet se sauvegarde entier, et un corps réduit au seul état revenait à en demander l'enregistrement amputé. Même méthode que pour l'achat fournisseur, et même raison. Les relations vides sont écartées — les renvoyer à `null` demanderait leur effacement. Si la lecture échoue, l'écriture est tentée avec le corps minimal : c'est son erreur qui renseignera.
+
+5 tests sur l'écriture de l'état. 781 tests backend verts.
+
 ### 2026-08-24 (fix: le report passe le positionnement à « Gagné »)
 
 Le report ne touchait au positionnement que s'il n'y avait **pas** de prestation rattachée. Or le bon de commande en enregistre une dès sa création : un positionnement en porte une à « Gagné attente contrat », l'état où le bon de commande s'ouvre. Le report ne changeait donc jamais rien, et la mission restait en attente dans le CRM.
