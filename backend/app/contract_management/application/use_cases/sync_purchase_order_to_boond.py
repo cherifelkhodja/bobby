@@ -42,13 +42,14 @@ REQUIRED_FOR_BOOND: tuple[tuple[str, str], ...] = (
 
 
 class SyncPurchaseOrderToBoondUseCase:
-    """Reporte un bon de commande signé dans BoondManager.
+    """Reporte un bon de commande dans BoondManager.
 
-    Trois écritures, chacune idempotente : la ressource (conversion du candidat
-    puis rattachement au fournisseur), le contrat Boond qui porte le CJM et les
-    dates, et le bon de commande qui porte le montant d'achat. Une erreur est
-    conservée sur le bon de commande pour que l'ADV puisse relancer sans
-    reprendre les étapes déjà passées.
+    Quatre écritures, chacune idempotente : la ressource (conversion du
+    candidat puis rattachement au fournisseur), le contrat Boond qui porte le
+    CJM et les dates, la prestation que fait naître le positionnement gagné, et
+    l'achat fournisseur qui pend à cette prestation. Ce qui a abouti est
+    conservé sur le bon de commande, pour qu'une relance reprenne là où le
+    report s'est arrêté au lieu de tout rejouer.
     """
 
     def __init__(
@@ -115,7 +116,7 @@ class SyncPurchaseOrderToBoondUseCase:
             await self._link_provider(po, resource_id, third_party)
             await self._create_contract(po, resource_id)
             await self._ensure_delivery(po, warnings)
-            await self._create_purchase_order(po, third_party.boond_provider_id, warnings)
+            await self._create_purchase_order(po, third_party, warnings)
         except PurchaseOrderBoondSyncError:
             raise
         except Exception as exc:
@@ -283,40 +284,67 @@ class SyncPurchaseOrderToBoondUseCase:
         po.boond_contract_id = contract_id
 
     async def _create_purchase_order(
-        self, po: PurchaseOrder, provider_id: int, warnings: list[str]
+        self, po: PurchaseOrder, third_party, warnings: list[str]
     ) -> None:
-        """Crée le bon de commande Boond, au montant d'achat de la mission.
+        """Crée l'achat fournisseur Boond, au montant d'achat de la mission.
 
-        Une reconduction passe d'abord par le renouvellement natif de la
-        prestation, qui produit lui-même l'achat fournisseur et la commande
-        client. On ne crée un bon de commande que si ce renouvellement n'en a
-        pas produit — ou s'il n'y a pas de prestation à renouveler.
+        L'achat pend à la prestation : sans elle, il n'a rien à quoi se
+        rattacher, et ce rattachement ne se fait qu'à la création. Rien n'est
+        créé si le renouvellement natif d'une reconduction en a déjà produit un.
         """
+        # Une reconduction reçoit son achat du renouvellement natif de la
+        # prestation, qui le produit lui-même avec la commande client.
         if po.boond_purchase_order_id:
             return
 
-        if po.parent_purchase_order_id and po.boond_delivery_id:
-            await self._renew_delivery(po, warnings)
-            if po.boond_purchase_order_id:
-                return
+        if not po.boond_delivery_id:
+            warnings.append(
+                "L'achat fournisseur n'a pas été créé : il se rattache à la prestation, "
+                "qui manque encore. Reprenez le report une fois la prestation en place."
+            )
+            return
 
-        boond_po_id = await self._crm.create_purchase_order(
-            provider_id=provider_id,
-            positioning_id=po.boond_positioning_id,
-            reference=po.display_reference,
-            amount=float(po.total_amount),
-        )
-        po.boond_purchase_order_id = boond_po_id
+        try:
+            po.boond_purchase_order_id = await self._crm.create_supplier_purchase(
+                delivery_id=po.boond_delivery_id,
+                title=_purchase_title(po),
+                provider_id=third_party.boond_provider_id,
+                provider_contact_id=_provider_contact_id(third_party),
+                reference=po.display_reference,
+                start_date=_iso(po.start_date),
+                end_date=_iso(po.end_date),
+                # Jours réellement achetés : la gratuité ne se paie pas.
+                quantity=float(po.days_sold or 0) - float(po.free_days or 0),
+                amount=float(po.total_amount),
+            )
+        except Exception as exc:
+            # La ressource, le contrat et la prestation sont en place : les
+            # rejouer pour un achat manqué ferait plus de dégâts que de bien.
+            # L'ADV le saisit dans Boond, ou relance le report.
+            logger.warning(
+                "purchase_order_supplier_purchase_failed",
+                purchase_order_id=str(po.id),
+                delivery_id=po.boond_delivery_id,
+                error=_readable_error(exc),
+            )
+            warnings.append(
+                f"Achat fournisseur non créé sur la prestation {po.boond_delivery_id} : "
+                "à saisir dans BoondManager."
+            )
 
     async def _ensure_delivery(self, po: PurchaseOrder, warnings: list[str]) -> None:
         """Fait exister la prestation Boond, puis la met d'accord avec le bon de commande.
 
         Bobby ne crée pas de prestation — l'API ne le permet pas. Il fait
         passer le positionnement à « Gagné », et Boond la produit à partir de
-        lui. Une reconduction ne passe pas ici : sa prestation vient du
-        renouvellement natif, qui la recale lui-même (`_renew_delivery`).
+        lui. Une reconduction, elle, part de la prestation en cours et la
+        renouvelle : c'est ce renouvellement qui la recale et produit l'achat.
+        Une reconduction sans prestation connue — mission dont le premier bon
+        de commande n'a jamais été reporté — n'a rien à renouveler et repasse
+        donc par le positionnement.
         """
-        if po.parent_purchase_order_id:
+        if po.parent_purchase_order_id and po.boond_delivery_id:
+            await self._renew_delivery(po, warnings)
             return
 
         if not po.boond_delivery_id:
@@ -490,6 +518,11 @@ def _provider_contact_id(third_party) -> int | None:
         if contact_id:
             return contact_id
     return None
+
+
+def _purchase_title(po: PurchaseOrder) -> str:
+    """Intitulé de l'achat dans Boond : la référence du bon de commande, puis la mission."""
+    return " - ".join(part for part in (po.display_reference, po.mission_title) if part)
 
 
 def _iso(value: date | None) -> str | None:

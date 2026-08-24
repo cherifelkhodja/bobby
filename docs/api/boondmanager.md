@@ -626,12 +626,71 @@ async def update_resource_administrative(
 
 ### Bon de commande
 
-#### POST /purchases
-Crée l'**achat fournisseur** (« bon de commande » côté Bobby), lié au fournisseur
-et au positionnement. C'est le même objet que celui produit par le
-renouvellement natif d'une prestation, qui le renvoie dans
-`relationships.purchase`. `/purchase-orders`, longtemps écrit ici, n'existe pas
-dans l'API et répondait 404.
+#### GET /purchases/default puis POST /purchases
+Crée l'**achat fournisseur** (« bon de commande » côté Bobby). Il se rattache à
+une **prestation**, pas à un positionnement, et **seulement à la création** :
+`PUT /purchases/{id}/information` n'expose que `mainManager`, `agency`, `pole`,
+`company`, `contact` et `billingDetail`. Un achat posé sur la mauvaise
+prestation se supprime (`DELETE /purchases/{id}`) et se recrée.
+
+C'est le même objet que celui produit par le renouvellement natif d'une
+prestation, qui le renvoie dans `relationships.purchase`. `/purchase-orders`,
+longtemps écrit ici, n'existe pas dans l'API et répondait 404.
+
+**En deux temps**, comme le fait l'interface :
+
+1. `GET /purchases/default?delivery={id}` — Boond renvoie un achat vide déjà
+   accordé au contexte de la prestation : `mainManager`, `agency`, `pole`,
+   `company`, `contact`, `project`, `delivery`, plus un bloc `included`.
+   Paramètres acceptés : `project`, `delivery`, `additionalTurnoverAndCosts`,
+   `contact`, `company`.
+2. `POST /purchases` — on renvoie ce corps, ajusté. Seul `title` est
+   obligatoire dans `attributes`.
+
+Composer le corps à la main plutôt que de partir de ce pré-remplissage est la
+cause classique des 422 : prestation, projet, société et agence doivent
+s'accorder.
+
+```json
+{
+  "data": {
+    "type": "purchase",
+    "attributes": {
+      "title": "GEM-BC-001 - Développeur Python",
+      "reference": "GEM-BC-001",
+      "date": "2026-09-01",
+      "startDate": "2026-09-01",
+      "endDate": "2027-02-28",
+      "quantity": 18,
+      "amountExcludingTax": 9000
+    },
+    "relationships": {
+      "delivery": {"data": {"id": "1234", "type": "delivery"}},
+      "project": {"data": {"id": "567", "type": "project"}},
+      "company":  {"data": {"id": "777", "type": "company"}},
+      "contact":  {"data": {"id": "2864", "type": "contact"}},
+      "agency":   {"data": {"id": "1", "type": "agency"}}
+    }
+  }
+}
+```
+
+> **Coquille de la doc** : le schéma de `POST /purchases` décrit la relation
+> `delivery` avec `type: "project"` (copier-coller du bloc voisin). Le type
+> attendu est bien `delivery`, comme le confirment les schémas de réponse de
+> `/purchases/default` et de `POST /purchases`.
+
+> **La société est le fournisseur**, pas le client : le pré-remplissage vient de
+> la prestation et désigne le client, à remplacer — son contact part avec elle.
+> Bobby y met le contact de facturation du fournisseur.
+
+Autres attributs disponibles : `number` (réf. fournisseur), `typeOf`, `state`,
+`subscription`, `paymentTerm`, `paymentMethod`, `taxRates`, `toReinvoice`,
+`reinvoiceRate`, `reinvoiceAmountExcludingTax`, `informationComments`,
+`createPayments`, `exchangeRate`, `currency`.
+
+Pour un achat rattaché à un frais ou un CA additionnel plutôt qu'à une
+prestation : même flux avec `?additionalTurnoverAndCosts={id}`.
 
 > Ne pas confondre : `/purchases` (finance) est l'**achat fournisseur**,
 > `/orders` (staffing) la **commande client**. Le catalogue de l'API ne connaît
@@ -650,10 +709,13 @@ async def update_positioning_state(self, positioning_id: int, state: int) -> Non
 ```
 
 ```python
-async def create_purchase_order(
-    self, provider_id: int, positioning_id: int,
-    reference: str, amount: float,
-) -> int  # Retourne purchase_order_id Boond
+async def create_supplier_purchase(
+    self, delivery_id: int, title: str,
+    provider_id: int | None = None, provider_contact_id: int | None = None,
+    reference: str | None = None,
+    start_date: str | None = None, end_date: str | None = None,
+    quantity: float | None = None, amount: float | None = None,
+) -> int  # Retourne l'ID de l'achat Boond
 ```
 
 ---

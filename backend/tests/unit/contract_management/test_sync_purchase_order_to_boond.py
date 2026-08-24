@@ -81,7 +81,7 @@ def _make_use_case(po, *, provider_id=777, third_party_type="sous_traitant", thi
     crm.update_positioning_state = AsyncMock()
     crm.get_positioning = AsyncMock(return_value={"delivery_id": 797})
     crm.create_boond_contract = AsyncMock(return_value=555)
-    crm.create_purchase_order = AsyncMock(return_value=666)
+    crm.create_supplier_purchase = AsyncMock(return_value=666)
     crm.renew_delivery = AsyncMock(return_value={"id": 798, "purchase_id": 900, "contract_id": 264})
     crm.update_delivery = AsyncMock()
 
@@ -107,7 +107,7 @@ class TestPrerequisites:
         result = await use_case.execute(po.id)
 
         crm.create_boond_contract.assert_awaited_once()
-        crm.create_purchase_order.assert_awaited_once()
+        crm.create_supplier_purchase.assert_awaited_once()
         # Rien n'est signé : le bon de commande reste où il en est.
         assert result.status == PurchaseOrderStatus.GENERATED
 
@@ -140,7 +140,7 @@ class TestPrerequisites:
 
         await use_case.execute(po.id)
 
-        crm.create_purchase_order.assert_awaited_once()
+        crm.create_supplier_purchase.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_a_supplier_absent_from_boond_is_refused(self):
@@ -151,7 +151,7 @@ class TestPrerequisites:
         with pytest.raises(PurchaseOrderBoondSyncError, match="société fournisseur"):
             await use_case.execute(po.id)
 
-        crm.create_purchase_order.assert_not_awaited()
+        crm.create_supplier_purchase.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_an_order_without_positioning_is_refused(self):
@@ -226,7 +226,7 @@ class TestResourceResolution:
         result = await use_case.execute(po.id)
 
         assert result.status == PurchaseOrderStatus.ACTIVE
-        crm.create_purchase_order.assert_awaited_once()
+        crm.create_supplier_purchase.assert_awaited_once()
 
 
 class TestDelivery:
@@ -296,13 +296,15 @@ class TestDelivery:
 
     @pytest.mark.asyncio
     async def test_a_failed_win_warns_without_failing_the_push(self):
+        """Le contrat reste posé ; l'achat, lui, attend la prestation."""
         po = _signed_po(boond_delivery_id=None)
         use_case, crm, _ = _make_use_case(po)
         crm.update_positioning_state = AsyncMock(side_effect=RuntimeError("Boond 500"))
 
         result = await use_case.execute(po.id)
 
-        assert result.boond_purchase_order_id == 666
+        assert result.boond_contract_id == 555
+        assert result.boond_purchase_order_id is None
         assert "non passé à « Gagné »" in result.boond_sync_error
 
     @pytest.mark.asyncio
@@ -470,17 +472,43 @@ class TestBoondWrites:
         assert crm.create_boond_contract.await_args.kwargs["type_of"] == 6
 
     @pytest.mark.asyncio
-    async def test_the_purchase_order_carries_the_billable_total(self):
-        """Montant Boond = (jours vendus - gratuité) x CJM."""
+    async def test_the_purchase_carries_the_billable_total(self):
+        """Montant Boond = (jours vendus - gratuité) x CJM, sur les jours payés."""
         po = _signed_po()
         use_case, crm, _ = _make_use_case(po)
 
         await use_case.execute(po.id)
 
-        kwargs = crm.create_purchase_order.await_args.kwargs
+        kwargs = crm.create_supplier_purchase.await_args.kwargs
         assert kwargs["amount"] == 9000.0  # 18 x 500
+        assert kwargs["quantity"] == 18.0  # 20 vendus - 2 gratuits
         assert kwargs["reference"] == "GEM-BC-001"
-        assert kwargs["positioning_id"] == 41
+        assert kwargs["start_date"] == "2026-09-01"
+        assert kwargs["end_date"] == "2027-02-28"
+
+    @pytest.mark.asyncio
+    async def test_the_purchase_hangs_on_the_delivery_and_the_supplier(self):
+        """L'achat se rattache à la prestation, et se paie au fournisseur."""
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po)
+
+        await use_case.execute(po.id)
+
+        kwargs = crm.create_supplier_purchase.await_args.kwargs
+        assert kwargs["delivery_id"] == 797
+        assert kwargs["provider_id"] == 777
+        assert kwargs["provider_contact_id"] == 2864  # contact facturation
+
+    @pytest.mark.asyncio
+    async def test_the_purchase_title_names_the_order_then_the_mission(self):
+        """L'intitulé sert à retrouver l'achat dans Boond."""
+        po = _signed_po(mission_title="Développeur Python senior")
+        use_case, crm, _ = _make_use_case(po)
+
+        await use_case.execute(po.id)
+
+        title = crm.create_supplier_purchase.await_args.kwargs["title"]
+        assert title == "GEM-BC-001 - Développeur Python senior"
 
     @pytest.mark.asyncio
     async def test_the_order_becomes_active(self):
@@ -511,7 +539,7 @@ class TestIdempotence:
         result = await use_case.execute(po.id)
 
         crm.create_boond_contract.assert_not_awaited()
-        crm.create_purchase_order.assert_not_awaited()
+        crm.create_supplier_purchase.assert_not_awaited()
         assert result.boond_sync_error is None
 
     @pytest.mark.asyncio
@@ -523,7 +551,7 @@ class TestIdempotence:
         result = await use_case.execute(po.id)
 
         crm.create_boond_contract.assert_not_awaited()
-        crm.create_purchase_order.assert_awaited_once()
+        crm.create_supplier_purchase.assert_awaited_once()
         assert result.boond_purchase_order_id == 666
 
 
@@ -541,7 +569,7 @@ class TestRenewals:
         crm.renew_delivery.assert_awaited_once_with(797)
         assert result.boond_delivery_id == 798
         # L'achat créé par Boond est repris tel quel, sans en créer un second.
-        crm.create_purchase_order.assert_not_awaited()
+        crm.create_supplier_purchase.assert_not_awaited()
         assert result.boond_purchase_order_id == 900
 
     @pytest.mark.asyncio
@@ -574,7 +602,7 @@ class TestRenewals:
 
         result = await use_case.execute(po.id)
 
-        crm.create_purchase_order.assert_awaited_once()
+        crm.create_supplier_purchase.assert_awaited_once()
         assert result.boond_purchase_order_id == 666
 
     @pytest.mark.asyncio
@@ -600,18 +628,20 @@ class TestRenewals:
         with pytest.raises(PurchaseOrderBoondSyncError):
             await use_case.execute(po.id)
 
-        crm.create_purchase_order.assert_not_awaited()
+        crm.create_supplier_purchase.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_a_renewal_without_a_delivery_creates_a_plain_purchase_order(self):
-        """Sans prestation connue, la reconduction retombe sur le chemin standard."""
+    async def test_a_renewal_without_a_delivery_goes_through_the_positioning(self):
+        """Rien à renouveler : la prestation naît du positionnement, puis l'achat."""
         po = _signed_po(parent_purchase_order_id=uuid4())
         use_case, crm, _ = _make_use_case(po)
 
         result = await use_case.execute(po.id)
 
         crm.renew_delivery.assert_not_awaited()
-        crm.create_purchase_order.assert_awaited_once()
+        crm.update_positioning_state.assert_awaited_once()
+        assert result.boond_delivery_id == 797
+        assert crm.create_supplier_purchase.await_args.kwargs["delivery_id"] == 797
         assert result.boond_purchase_order_id == 666
 
     @pytest.mark.asyncio
@@ -633,9 +663,53 @@ class TestRenewals:
 
         result = await use_case.execute(po.id)
 
-        crm.create_purchase_order.assert_awaited_once()
+        crm.create_supplier_purchase.assert_awaited_once()
         assert result.boond_purchase_order_id == 666
         assert result.status == PurchaseOrderStatus.ACTIVE
+
+
+class TestSupplierPurchase:
+    """L'achat fournisseur pend à la prestation, jamais au vide."""
+
+    @pytest.mark.asyncio
+    async def test_no_delivery_means_no_purchase(self):
+        """Le rattachement ne se fait qu'à la création : sans prestation, on s'abstient."""
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po)
+        crm.get_positioning = AsyncMock(return_value={})
+
+        result = await use_case.execute(po.id)
+
+        crm.create_supplier_purchase.assert_not_awaited()
+        assert result.boond_purchase_order_id is None
+        assert "prestation" in result.boond_sync_error
+
+    @pytest.mark.asyncio
+    async def test_a_failed_purchase_does_not_undo_the_rest(self):
+        """Ressource, contrat et prestation sont posés : on ne les rejoue pas pour un achat."""
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po)
+        crm.create_supplier_purchase = AsyncMock(side_effect=RuntimeError("Boond 422"))
+
+        result = await use_case.execute(po.id)
+
+        assert result.boond_contract_id == 555
+        assert result.boond_delivery_id == 797
+        assert result.boond_purchase_order_id is None
+        assert result.status == PurchaseOrderStatus.ACTIVE
+        assert "Achat fournisseur non créé" in result.boond_sync_error
+
+    @pytest.mark.asyncio
+    async def test_a_renewal_gets_its_purchase_from_boond(self):
+        """Le renouvellement natif produit l'achat lui-même : rien à créer."""
+        po = _signed_po(parent_purchase_order_id=uuid4(), boond_delivery_id=797)
+        use_case, crm, _ = _make_use_case(po)
+
+        result = await use_case.execute(po.id)
+
+        crm.renew_delivery.assert_awaited_once_with(797)
+        crm.create_supplier_purchase.assert_not_awaited()
+        assert result.boond_purchase_order_id == 900
 
 
 class TestErrorReporting:
@@ -663,13 +737,13 @@ class TestErrorReporting:
         class _BoondHttpError(Exception):
             """Erreur porteuse d'une réponse HTTP, comme celles de httpx."""
 
-            response = SimpleNamespace(status_code=422, text="quantity is required")
+            response = SimpleNamespace(status_code=422, text="daily rate is required")
 
         failure = RuntimeError("wrapped")
         failure.__cause__ = _BoondHttpError()
-        crm.create_purchase_order = AsyncMock(side_effect=failure)
+        crm.create_boond_contract = AsyncMock(side_effect=failure)
 
         with pytest.raises(PurchaseOrderBoondSyncError):
             await use_case.execute(po.id)
 
-        assert po.boond_sync_error == "Boond HTTP 422: quantity is required"
+        assert po.boond_sync_error == "Boond HTTP 422: daily rate is required"

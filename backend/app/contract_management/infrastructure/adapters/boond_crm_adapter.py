@@ -520,6 +520,108 @@ class BoondCrmAdapter:
         )
         return provider_id
 
+    async def create_supplier_purchase(
+        self,
+        delivery_id: int,
+        title: str,
+        provider_id: int | None = None,
+        provider_contact_id: int | None = None,
+        reference: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        quantity: float | None = None,
+        amount: float | None = None,
+    ) -> int:
+        """Crée l'achat fournisseur rattaché à une prestation Boond.
+
+        Le rattachement se fait **à la création seulement** : `PUT
+        /purchases/{id}/information` n'expose ni `delivery` ni `project`. Un
+        achat posé sur la mauvaise prestation se supprime et se recrée.
+
+        Le corps part du pré-remplissage Boond (`GET /purchases/default`)
+        plutôt que d'une composition à la main : c'est lui qui accorde
+        prestation, projet, société et agence entre eux, désaccord qui est la
+        cause classique des 422.
+
+        Args:
+            delivery_id: Prestation Boond qui porte la mission.
+            title: Intitulé de l'achat, seul attribut obligatoire.
+            provider_id: Société fournisseur, si elle diffère du pré-remplissage.
+            provider_contact_id: Contact facturation du fournisseur.
+            reference: Référence du bon de commande Bobby.
+            start_date: Début de la période achetée (YYYY-MM-DD).
+            end_date: Fin de la période achetée (YYYY-MM-DD).
+            quantity: Jours achetés (jours vendus moins gratuité).
+            amount: Montant d'achat HT total de la période.
+
+        Returns:
+            Identifiant Boond de l'achat créé.
+        """
+        attributes, relationships = await self._purchase_defaults(delivery_id)
+
+        attributes["title"] = title
+        # `date` est la date de l'achat : celle de son point de départ, pour
+        # qu'il se range dans le bon exercice.
+        for key, value in (
+            ("reference", reference),
+            ("date", start_date),
+            ("startDate", start_date),
+            ("endDate", end_date),
+            ("quantity", quantity),
+            ("amountExcludingTax", amount),
+        ):
+            if value is not None:
+                attributes[key] = value
+
+        # La doc décrit cette relation avec `type: "project"` — coquille de
+        # copier-coller du bloc voisin. Le type attendu est bien `delivery`.
+        relationships["delivery"] = {"data": {"type": "delivery", "id": str(delivery_id)}}
+
+        if provider_id and self._extract_relationship_id(relationships, "company") != provider_id:
+            # Le pré-remplissage vient de la prestation : sa société est celle
+            # du client. Sur un achat, c'est le fournisseur que l'on paie — et
+            # le contact du client n'a alors plus rien à y faire.
+            relationships["company"] = {"data": {"type": "company", "id": str(provider_id)}}
+            relationships.pop("contact", None)
+        if provider_contact_id:
+            relationships["contact"] = {
+                "data": {"type": "contact", "id": str(provider_contact_id)}
+            }
+
+        payload = {"data": {"type": "purchase", "attributes": attributes}}
+        if relationships:
+            payload["data"]["relationships"] = relationships
+
+        response = await self._boond._make_request("POST", "/purchases", json=payload)
+        purchase_id = self._require_created_id(response, "achat fournisseur")
+        logger.info(
+            "boond_supplier_purchase_created",
+            purchase_id=purchase_id,
+            delivery_id=delivery_id,
+            reference=reference,
+        )
+        return purchase_id
+
+    async def _purchase_defaults(self, delivery_id: int) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Pré-remplissage Boond d'un achat rattaché à une prestation.
+
+        Renvoie les attributs et les relations de l'achat vide que Boond
+        compose pour cette prestation : responsable, agence, pôle, société,
+        contact, projet. Les relations vides sont écartées — les renvoyer à
+        `null` ferait échouer la création.
+        """
+        response = await self._boond._make_request(
+            "GET", "/purchases/default", params={"delivery": str(delivery_id)}
+        )
+        data = (response or {}).get("data") or {}
+        attributes = dict(data.get("attributes") or {})
+        relationships = {
+            name: value
+            for name, value in (data.get("relationships") or {}).items()
+            if isinstance(value, dict) and value.get("data")
+        }
+        return attributes, relationships
+
     async def create_purchase_order(
         self,
         provider_id: int,
@@ -528,6 +630,12 @@ class BoondCrmAdapter:
         amount: float,
     ) -> int:
         """Create a purchase order in BoondManager.
+
+        .. deprecated::
+            Chemin de l'ancienne méthode, où l'achat pendait au contrat cadre.
+            L'achat fournisseur naît désormais du bon de commande, rattaché à
+            la prestation (`create_supplier_purchase`) — seule forme confirmée
+            contre l'API.
 
         Args:
             provider_id: Boond provider ID.

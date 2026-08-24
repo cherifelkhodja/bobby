@@ -65,29 +65,186 @@ class TestPositioningState:
         assert data == {"type": "positioning", "id": "41", "attributes": {"state": 1}}
 
 
-class TestPurchaseCreation:
-    """L'achat fournisseur : `POST /purchases`, type `purchase`.
+def _purchase_defaults(**relationship_overrides) -> dict:
+    """Réponse type de ``GET /purchases/default?delivery=...``.
+
+    Boond y compose un achat vide déjà accordé au contexte de la prestation :
+    responsable, agence, pôle, projet, société et contact du client.
+    """
+    relationships = {
+        "mainManager": {"data": {"type": "resource", "id": "12"}},
+        "agency": {"data": {"type": "agency", "id": "1"}},
+        "pole": {"data": {"type": "pole", "id": "3"}},
+        "project": {"data": {"type": "project", "id": "567"}},
+        "company": {"data": {"type": "company", "id": "89"}},
+        "contact": {"data": {"type": "contact", "id": "90"}},
+        "delivery": {"data": {"type": "delivery", "id": "1234"}},
+        "billingDetail": {"data": None},
+    }
+    relationships.update(relationship_overrides)
+    return {
+        "data": {
+            "id": "0",
+            "type": "purchase",
+            "attributes": {"typeOf": 0, "state": 0, "currency": "EUR"},
+            "relationships": relationships,
+        },
+        "included": [{"type": "delivery", "id": "1234"}],
+    }
+
+
+def _purchase_calls(boond: AsyncMock) -> tuple[dict, dict]:
+    """Renvoie les paramètres du pré-remplissage et le corps de la création."""
+    prefill, creation = boond._make_request.await_args_list
+    assert prefill.args[:2] == ("GET", "/purchases/default")
+    assert creation.args[:2] == ("POST", "/purchases")
+    return prefill.kwargs["params"], creation.kwargs["json"]["data"]
+
+
+class TestSupplierPurchaseCreation:
+    """L'achat fournisseur : pré-remplissage Boond, puis `POST /purchases`.
 
     `/purchase-orders` n'existe pas dans l'API BoondManager — il répondait 404
-    et faisait échouer tout le report d'un bon de commande.
+    et faisait échouer tout le report d'un bon de commande. Le corps part de
+    `GET /purchases/default`, qui accorde prestation, projet, société et agence
+    entre eux : les composer à la main est la cause classique des 422.
     """
 
     @pytest.mark.asyncio
-    async def test_the_purchase_is_posted_on_the_right_resource(self):
+    async def test_the_purchase_is_prefilled_from_its_delivery(self):
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(return_value={"data": {"id": "666"}})
+        boond._make_request = AsyncMock(
+            side_effect=[_purchase_defaults(), {"data": {"id": "666"}}]
+        )
 
-        purchase_id = await adapter.create_purchase_order(
-            provider_id=777, positioning_id=41, reference="GEM-BC-001", amount=9000.0
+        purchase_id = await adapter.create_supplier_purchase(
+            delivery_id=1234, title="GEM-BC-001 - Développeur Python"
         )
 
         assert purchase_id == 666
-        method, path = boond._make_request.await_args.args[:2]
-        assert (method, path) == ("POST", "/purchases")
-        data = boond._make_request.await_args.kwargs["json"]["data"]
+        params, data = _purchase_calls(boond)
+        assert params == {"delivery": "1234"}
         assert data["type"] == "purchase"
-        assert data["attributes"]["amountExcludingTax"] == 9000.0
+        # Le contexte composé par Boond est repris tel quel.
+        assert data["attributes"]["currency"] == "EUR"
+        assert data["relationships"]["project"]["data"]["id"] == "567"
+        assert data["relationships"]["agency"]["data"]["id"] == "1"
+
+    @pytest.mark.asyncio
+    async def test_the_delivery_relationship_carries_the_delivery_type(self):
+        """La doc décrit cette relation avec `type: "project"` : c'est une coquille."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            side_effect=[_purchase_defaults(), {"data": {"id": "666"}}]
+        )
+
+        await adapter.create_supplier_purchase(delivery_id=797, title="GEM-BC-001")
+
+        _, data = _purchase_calls(boond)
+        assert data["relationships"]["delivery"] == {
+            "data": {"type": "delivery", "id": "797"}
+        }
+
+    @pytest.mark.asyncio
+    async def test_empty_relationships_are_dropped(self):
+        """Renvoyer une relation à `null` ferait échouer la création."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            side_effect=[_purchase_defaults(), {"data": {"id": "666"}}]
+        )
+
+        await adapter.create_supplier_purchase(delivery_id=1234, title="GEM-BC-001")
+
+        _, data = _purchase_calls(boond)
+        assert "billingDetail" not in data["relationships"]
+
+    @pytest.mark.asyncio
+    async def test_the_mission_conditions_are_written_on_the_purchase(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            side_effect=[_purchase_defaults(), {"data": {"id": "666"}}]
+        )
+
+        await adapter.create_supplier_purchase(
+            delivery_id=1234,
+            title="GEM-BC-001 - Développeur Python",
+            reference="GEM-BC-001",
+            start_date="2026-09-01",
+            end_date="2027-02-28",
+            quantity=18.0,
+            amount=9000.0,
+        )
+
+        _, data = _purchase_calls(boond)
+        assert data["attributes"]["title"] == "GEM-BC-001 - Développeur Python"
         assert data["attributes"]["reference"] == "GEM-BC-001"
+        assert data["attributes"]["date"] == "2026-09-01"
+        assert data["attributes"]["startDate"] == "2026-09-01"
+        assert data["attributes"]["endDate"] == "2027-02-28"
+        assert data["attributes"]["quantity"] == 18.0
+        assert data["attributes"]["amountExcludingTax"] == 9000.0
+
+    @pytest.mark.asyncio
+    async def test_the_supplier_replaces_the_client_company_and_its_contact(self):
+        """Un achat se paie au fournisseur : le contact du client n'y a plus sa place."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            side_effect=[_purchase_defaults(), {"data": {"id": "666"}}]
+        )
+
+        await adapter.create_supplier_purchase(
+            delivery_id=1234, title="GEM-BC-001", provider_id=777
+        )
+
+        _, data = _purchase_calls(boond)
+        assert data["relationships"]["company"] == {"data": {"type": "company", "id": "777"}}
+        assert "contact" not in data["relationships"]
+
+    @pytest.mark.asyncio
+    async def test_the_supplier_contact_is_used_when_known(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            side_effect=[_purchase_defaults(), {"data": {"id": "666"}}]
+        )
+
+        await adapter.create_supplier_purchase(
+            delivery_id=1234,
+            title="GEM-BC-001",
+            provider_id=777,
+            provider_contact_id=2864,
+        )
+
+        _, data = _purchase_calls(boond)
+        assert data["relationships"]["contact"] == {"data": {"type": "contact", "id": "2864"}}
+
+    @pytest.mark.asyncio
+    async def test_a_prefill_already_on_the_supplier_keeps_its_contact(self):
+        """Boond a déjà désigné le fournisseur : son contact est le bon."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            side_effect=[
+                _purchase_defaults(
+                    company={"data": {"type": "company", "id": "777"}},
+                    contact={"data": {"type": "contact", "id": "2864"}},
+                ),
+                {"data": {"id": "666"}},
+            ]
+        )
+
+        await adapter.create_supplier_purchase(
+            delivery_id=1234, title="GEM-BC-001", provider_id=777
+        )
+
+        _, data = _purchase_calls(boond)
+        assert data["relationships"]["contact"] == {"data": {"type": "contact", "id": "2864"}}
+
+    @pytest.mark.asyncio
+    async def test_a_creation_without_id_is_an_error(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {}}])
+
+        with pytest.raises(BoondCrmError):
+            await adapter.create_supplier_purchase(delivery_id=1234, title="GEM-BC-001")
 
 
 class TestConsultantExistence:

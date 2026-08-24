@@ -58,6 +58,21 @@ class CrmServicePort(Protocol):
         """Create a minimal provider in the CRM."""
         ...
 
+    async def create_supplier_purchase(
+        self,
+        delivery_id: int,
+        title: str,
+        provider_id: int | None = None,
+        provider_contact_id: int | None = None,
+        reference: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        quantity: float | None = None,
+        amount: float | None = None,
+    ) -> int:
+        """Create the supplier purchase attached to a delivery. Returns its ID."""
+        ...
+
     async def create_purchase_order(
         self,
         provider_id: int,
@@ -65,7 +80,7 @@ class CrmServicePort(Protocol):
         reference: str,
         amount: float,
     ) -> int:
-        """Create a purchase order in the CRM."""
+        """Create a purchase order in the CRM (ancienne méthode, adossée au contrat cadre)."""
         ...
 
     async def convert_candidate_to_resource(

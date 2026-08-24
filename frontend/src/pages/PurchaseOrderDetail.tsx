@@ -93,6 +93,18 @@ function formatAmount(value: number | null): string {
   return `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(value)} €`;
 }
 
+function boondPushSummary(po: PurchaseOrder): string {
+  // Le report peut n'avoir que partiellement abouti : dire ce qui est en place
+  // évite d'aller le vérifier dans BoondManager.
+  const done = [
+    po.boond_consultant_type === 'resource' ? 'ressource' : null,
+    po.boond_delivery_id ? `prestation #${po.boond_delivery_id}` : null,
+    po.boond_contract_id ? `contrat #${po.boond_contract_id}` : null,
+    po.boond_purchase_order_id ? `achat #${po.boond_purchase_order_id}` : null,
+  ].filter(Boolean);
+  return `Dans BoondManager : ${done.join(', ')}`;
+}
+
 function formatDate(value: string | null): string {
   if (!value) return '—';
   return new Date(value).toLocaleDateString('fr-FR', {
@@ -254,7 +266,9 @@ export function PurchaseOrderDetail() {
     po.days_sold !== null &&
     Boolean(po.start_date) &&
     Boolean(po.end_date);
-  const pushedToBoond = po.boond_purchase_order_id !== null;
+  // Le contrat Boond est la première écriture qui reste : la prestation et
+  // l'achat peuvent manquer à l'appel sans que le report soit à refaire.
+  const pushedToBoond = po.boond_contract_id !== null || po.boond_purchase_order_id !== null;
   const panelSuppliers = suppliers?.items ?? [];
   const attachmentChanged =
     supplierId !== (po.third_party_id ?? '') || companyId !== (po.company_id ?? '');
@@ -396,7 +410,7 @@ export function PurchaseOrderDetail() {
           {isAdv && pushedToBoond && (
             <span
               className="st bg-grn-bg text-grn-fg"
-              title={`Achat #${po.boond_purchase_order_id} dans BoondManager`}
+              title={boondPushSummary(po)}
             >
               <span className="dot" />
               Dans Boond

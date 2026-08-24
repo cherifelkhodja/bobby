@@ -233,6 +233,18 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (feat: l'achat fournisseur naît de la prestation)
+
+Le corps attendu par `POST /purchases` est confirmé, et il ne ressemble pas à celui qui était posté : l'achat ne se rattache pas à un **positionnement** mais à une **prestation**, et ce rattachement ne se fait **qu'à la création** (`PUT /purchases/{id}/information` n'expose ni `delivery` ni `project` — un achat posé sur la mauvaise prestation se supprime et se recrée).
+
+- Le corps part du pré-remplissage Boond, `GET /purchases/default?delivery={id}` : c'est lui qui accorde prestation, projet, société et agence entre eux, désaccord qui est la cause classique des 422. Bobby ne fait que l'ajuster — intitulé, référence, période, jours payés (jours vendus moins gratuité), montant HT — et **remplace la société par le fournisseur**, l'achat se payant à lui et non au client ; le contact du client s'en va avec elle, remplacé par celui de la facturation du fournisseur.
+- La doc décrit la relation `delivery` avec `type: "project"` : coquille de copier-coller. Le type attendu est bien `delivery`.
+- **Sans prestation, pas d'achat** : l'ADV est averti plutôt que de voir naître un achat orphelin, impossible à rattacher après coup. Un échec de l'achat n'invalide plus le report — ressource, contrat et prestation restent en place, la relance reprend là où ça s'est arrêté.
+- Le renouvellement d'une reconduction produit lui-même son achat : rien n'est créé par-dessus. Une reconduction dont la prestation d'origine est inconnue — premier bon de commande jamais reporté — repasse par le positionnement pour la faire naître.
+- `create_purchase_order` (achat adossé au contrat cadre, ancienne méthode) reste en place mais n'est plus le chemin du bon de commande.
+
+11 tests sur l'achat et son pré-remplissage. 686 tests backend verts.
+
 ### 2026-08-24 (feat: la ressource Boond porte le contact du fournisseur)
 
 Le report d'un bon de commande rattachait la ressource à la société fournisseur, sans contact — Boond en attend un : l'interlocuteur du fournisseur pour ce consultant (`providerContact`, à côté de `providerCompany`).
@@ -463,7 +475,7 @@ Deux conséquences corrigées :
 `POST /deliveries/{id}/renew` est une **action REST sans corps de requête** (confirmé côté client Boond) : elle duplique la prestation et crée, selon la configuration du dossier, l'achat fournisseur et la commande client.
 
 - `BoondCrmAdapter.renew_delivery` / `update_delivery` ajoutés ; le parsing d'une prestation est partagé entre la lecture et le renouvellement.
-- La synchronisation d'une reconduction passe désormais par ce renouvellement quand la prestation d'origine est connue : la nouvelle prestation est rattachée au BDC, et **l'achat créé par Boond est repris tel quel** au lieu d'en créer un second. Sans prestation connue, ou si Boond n'a pas produit d'achat, le chemin `POST /purchase-orders` prend le relais.
+- La synchronisation d'une reconduction passe désormais par ce renouvellement quand la prestation d'origine est connue : la nouvelle prestation est rattachée au BDC, et **l'achat créé par Boond est repris tel quel** au lieu d'en créer un second. Sans prestation connue, ou si Boond n'a pas produit d'achat, l'achat est créé sur la prestation (`POST /purchases`).
 - Boond duplique à l'identique : la prestation créée est **recalée** sur les dates, quantités et taux du nouveau bon de commande. `forceAverageDailyPriceExcludingTax` accompagne le prix de vente, sinon Boond le recalcule depuis la grille du projet.
 - Le recalage est non bloquant : prestation et achat existent déjà, un échec est signalé sur le dossier pour reprise manuelle plutôt que de faire échouer le report.
 - Le bandeau front passe de « Synchronisation en échec » à un intitulé neutre, ce champ portant désormais aussi des avertissements.
@@ -483,7 +495,7 @@ Mise en œuvre complète de la spec `docs/contracts/workflow-fournisseur-mission
 **Points d'entrée** :
 - `POST /contract-requests/suppliers` : dossier fournisseur **sans consultant**, avec déduplication par SIREN (`/suppliers/lookup` renseigne l'ADV avant création) et choix du mode de collecte dès la création.
 - Webhook `positioning-update` redirigé : il crée le **premier BDC** d'une mission, plus jamais de demande de contrat cadre. État déclencheur configurable (`app_settings` → `bdc_trigger_positioning_state`, 7 par défaut). Webhooks candidat et ressource supprimés, ainsi que les deux use cases devenus inatteignables.
-- `POST /purchase-orders` : même chemin, déclenché à la main (rattrapage).
+- `POST /purchases` : même chemin, déclenché à la main (rattrapage).
 
 **Cycle du BDC** : complétion (fournisseur, mission, conditions) → génération du PDF (`bon_de_commande.html`, charte « Éditorial », **sans le TJM**) → envoi en signature → dépôt du signé → report Boond (conversion candidat, rattachement fournisseur, contrat au CJM, bon de commande au montant d'achat), chaque écriture idempotente et l'erreur conservée pour relance.
 
@@ -503,7 +515,7 @@ Cadrage complet de la reprise du workflow de contractualisation, écrit avant im
 - **Nouvelle table `cm_purchase_orders`** : fournisseur, contrat cadre de rattachement, consultant (ID candidat/ressource), positionnement et besoin Boond, mission, TJM vente / CJM achat, jours vendus, jours de gratuité, dates, documents, IDs Boond, `parent_purchase_order_id` pour les reconductions.
 - **Machine à états BDC** : `draft → generated → sent_for_signature → signed → active → closed`, `cancelled` avant signature. Envoi en signature refusé tant que le contrat cadre n'est pas `signed`/`active`.
 - **Confidentialité des marges** : le TJM de vente reste interne, seul le CJM figure sur le document du fournisseur. Montant du BDC = `(jours vendus - gratuité) x CJM` — lève le `NEEDS-CONFIRMATION` sur `amountExcludingTax` du bon de commande Boond.
-- **Push Boond à la signature du BDC** : conversion candidat → ressource, rattachement fournisseur, `POST /contracts` (CJM + dates), `POST /purchase-orders` (positionnement + montant achat). La création de la société fournisseur et des chartes partenaire reste à la signature du cadre.
+- **Push Boond à la signature du BDC** : conversion candidat → ressource, rattachement fournisseur, `POST /contracts` (CJM + dates), `POST /purchases` (prestation + montant achat). La création de la société fournisseur et des chartes partenaire reste à la signature du cadre.
 - **Webhooks** : `positioning-update` conservé et redirigé vers la création du premier BDC (il ne crée plus de demande de contrat cadre) ; `candidate-state-update` et `resource-state-update` supprimés ; webhook YouSign conservé.
 - **Défauts retenus, à confirmer en revue** : état de positionnement déclencheur = 7 « Gagné attente contrat », stocké dans `app_settings` (`bdc_trigger_positioning_state`) parce que les états Boond sont paramétrables côté client et ont déjà changé deux fois ; reconduction Boond = nouveau bon de commande sur le positionnement d'origine (le positionnement n'est pas dupliqué, l'ancien bon de commande est conservé) + recul de la date de fin du contrat Boond, sous réserve que l'API accepte la mise à jour d'un contrat existant — non vérifié, seul `POST /contracts` est câblé aujourd'hui.
 
