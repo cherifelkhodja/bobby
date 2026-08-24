@@ -300,6 +300,31 @@ class TestDelivery:
         assert "l'état est resté à 7" in result.boond_sync_error
 
     @pytest.mark.asyncio
+    async def test_a_state_ignored_outright_is_named_as_such(self):
+        """Boond renvoie déjà l'ancien état : l'écriture n'a pas été prise en compte."""
+        po = _signed_po(boond_delivery_id=797)
+        use_case, crm, _ = _make_use_case(po)
+        crm.update_positioning_state = AsyncMock(return_value=7)
+        crm.get_positioning = AsyncMock(return_value={"delivery_id": 797, "state": 7})
+
+        result = await use_case.execute(po.id)
+
+        assert "n'a même pas été pris en compte" in result.boond_sync_error
+
+    @pytest.mark.asyncio
+    async def test_a_state_taken_then_undone_is_told_apart(self):
+        """Boond a confirmé « Gagné », mais l'état est retombé : règle du CRM."""
+        po = _signed_po(boond_delivery_id=797)
+        use_case, crm, _ = _make_use_case(po)
+        crm.update_positioning_state = AsyncMock(return_value=1)
+        crm.get_positioning = AsyncMock(return_value={"delivery_id": 797, "state": 7})
+
+        result = await use_case.execute(po.id)
+
+        assert "l'état est resté à 7" in result.boond_sync_error
+        assert "n'a même pas été pris en compte" not in result.boond_sync_error
+
+    @pytest.mark.asyncio
     async def test_a_state_that_took_says_nothing(self):
         po = _signed_po(boond_delivery_id=797)
         use_case, crm, _ = _make_use_case(po)

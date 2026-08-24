@@ -370,7 +370,7 @@ class SyncPurchaseOrderToBoondUseCase:
         l'appliquer, et un report qui n'aurait rien changé doit se voir.
         """
         try:
-            await self._crm.update_positioning_state(
+            echoed = await self._crm.update_positioning_state(
                 po.boond_positioning_id, POSITIONING_STATE_WON
             )
         except Exception as exc:
@@ -392,15 +392,27 @@ class SyncPurchaseOrderToBoondUseCase:
 
         state = positioning.get("state")
         if state is not None and int(state) != POSITIONING_STATE_WON:
+            # Deux pannes différentes, que seul l'écho de l'écriture sépare :
+            # une demande ignorée d'emblée, ou un changement pris puis défait
+            # par une règle du CRM. La distinction oriente la reprise.
+            ignoree = isinstance(echoed, int) and echoed != POSITIONING_STATE_WON
             logger.warning(
                 "purchase_order_positioning_state_unchanged",
                 purchase_order_id=str(po.id),
                 positioning_id=po.boond_positioning_id,
                 state=state,
+                echoed_state=echoed if isinstance(echoed, int) else None,
+                ignored_outright=ignoree,
             )
             warnings.append(
                 f"Positionnement {po.boond_positioning_id} : BoondManager a accepté la "
-                f"demande mais l'état est resté à {state} — à passer à « Gagné » à la main."
+                f"demande mais l'état est resté à {state} — "
+                + (
+                    "le changement n'a même pas été pris en compte dans sa réponse. "
+                    if ignoree
+                    else ""
+                )
+                + "À passer à « Gagné » à la main."
             )
 
         delivery_id = positioning.get("delivery_id")

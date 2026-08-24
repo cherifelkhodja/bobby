@@ -135,12 +135,19 @@ class BoondCrmAdapter:
             )
             return None
 
-    async def update_positioning_state(self, positioning_id: int, state: int) -> None:
+    async def update_positioning_state(self, positioning_id: int, state: int) -> int | None:
         """Change l'état d'un positionnement BoondManager.
 
         C'est ainsi que naît une prestation : passer le positionnement à
         « Gagné » la fait créer par Boond à partir du positionnement. Bobby n'a
         pas d'autre moyen de la produire — l'API ne crée pas de prestation.
+
+        Returns:
+            L'état que BoondManager renvoie dans sa réponse, quand il en
+            renvoie un. Il dit s'il a pris le changement en compte : une
+            réponse en 200 ne le garantit pas, et un état inchangé dès cette
+            réponse distingue une écriture ignorée d'un changement défait
+            ensuite par une règle du CRM.
         """
         payload = {
             "data": {
@@ -149,10 +156,20 @@ class BoondCrmAdapter:
                 "attributes": {"state": state},
             }
         }
-        await self._boond._make_request(
+        response = await self._boond._make_request(
             "PUT", f"/positionings/{positioning_id}/information", json=payload
         )
-        logger.info("boond_positioning_state_updated", positioning_id=positioning_id, state=state)
+        echoed = ((response or {}).get("data") or {}).get("attributes", {}).get("state")
+        logger.info(
+            "boond_positioning_state_updated",
+            positioning_id=positioning_id,
+            state=state,
+            echoed_state=echoed,
+        )
+        try:
+            return int(echoed)
+        except (TypeError, ValueError):
+            return None
 
     async def get_delivery(self, delivery_id: int) -> dict[str, Any] | None:
         """Fetch a delivery (prestation) from BoondManager.

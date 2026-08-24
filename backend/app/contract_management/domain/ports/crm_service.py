@@ -28,8 +28,11 @@ class CrmServicePort(Protocol):
         """
         ...
 
-    async def update_positioning_state(self, positioning_id: int, state: int) -> None:
-        """Change l'état d'un positionnement (« Gagné » crée la prestation)."""
+    async def update_positioning_state(self, positioning_id: int, state: int) -> int | None:
+        """Change l'état d'un positionnement (« Gagné » crée la prestation).
+
+        Renvoie l'état que le CRM confirme, quand il en confirme un.
+        """
         ...
 
     async def resolve_resource_id(self, candidate_id: int) -> int | None:
