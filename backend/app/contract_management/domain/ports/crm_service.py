@@ -74,8 +74,7 @@ class CrmServicePort(Protocol):
         reference: str | None = None,
         start_date: str | None = None,
         end_date: str | None = None,
-        quantity: float | None = None,
-        amount: float | None = None,
+        vat_liable: bool = True,
     ) -> int:
         """Create the supplier purchase attached to a delivery. Returns its ID."""
         ...

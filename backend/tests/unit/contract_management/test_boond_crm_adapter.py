@@ -152,8 +152,15 @@ class TestPositioningState:
 def _purchase_defaults(**relationship_overrides) -> dict:
     """Réponse type de ``GET /purchases/default?delivery=...``.
 
-    Boond y compose un achat vide déjà accordé au contexte de la prestation :
-    responsable, agence, pôle, projet, société et contact du client.
+    Reprise d'une réponse réelle du CRM. Boond y compose un achat vide déjà
+    accordé au contexte de la prestation — responsable, agence, pôle, projet,
+    société et contact du client — et y **pré-calcule le montant** depuis les
+    conditions de la prestation : ``quantity`` x ``amountExcludingTax``, ce
+    dernier étant unitaire.
+
+    Elle porte aussi quatre clés que le schéma d'écriture ignore et qui font
+    échouer un ``POST`` en ``additionalProperties: false`` : ``_metadata``,
+    ``createPayments``, ``statePayments`` et la relation ``order``.
     """
     relationships = {
         "mainManager": {"data": {"type": "resource", "id": "12"}},
@@ -164,13 +171,47 @@ def _purchase_defaults(**relationship_overrides) -> dict:
         "contact": {"data": {"type": "contact", "id": "90"}},
         "delivery": {"data": {"type": "delivery", "id": "1234"}},
         "billingDetail": {"data": None},
+        "createdBy": {"data": None},
+        "order": {"data": None},
+        "files": {"data": []},
     }
     relationships.update(relationship_overrides)
     return {
         "data": {
             "id": "0",
             "type": "purchase",
-            "attributes": {"typeOf": 0, "state": 0, "currency": "EUR"},
+            "attributes": {
+                "typeOf": 1,
+                "state": 1,
+                "subscription": 1,
+                "currency": 0,
+                "currencyAgency": 0,
+                "exchangeRate": 1,
+                "exchangeRateAgency": 1,
+                "paymentTerm": 12,
+                "paymentMethod": 0,
+                "taxRate": 20,
+                "taxRates": [20],
+                "date": "2026-08-24",
+                "startDate": "2026-07-06",
+                "endDate": "2026-12-31",
+                "quantity": 6,
+                "amountExcludingTax": 12285,
+                # Calculés par Boond, jamais réécrits.
+                "amountIncludingTax": 14742,
+                "totalAmountExcludingTax": 73710,
+                "totalAmountIncludingTax": 88452,
+                # Hors schéma d'écriture.
+                "createPayments": 0,
+                "statePayments": None,
+                "_metadata": {
+                    "version": "9.1.83.1",
+                    "isLogged": True,
+                    "language": "fr",
+                    "login": "adv@geminiconsulting.fr",
+                    "customer": "gemini",
+                },
+            },
             "relationships": relationships,
         },
         "included": [{"type": "delivery", "id": "1234"}],
@@ -207,8 +248,9 @@ class TestSupplierPurchaseCreation:
         params, data = _purchase_calls(boond)
         assert params == {"delivery": "1234"}
         assert data["type"] == "purchase"
-        # Le contexte composé par Boond est repris tel quel.
-        assert data["attributes"]["currency"] == "EUR"
+        # Le contexte composé par Boond est repris.
+        assert data["attributes"]["currency"] == 0
+        assert data["attributes"]["paymentTerm"] == 12
         assert data["relationships"]["project"]["data"]["id"] == "567"
         assert data["relationships"]["agency"]["data"]["id"] == "1"
 
@@ -245,18 +287,114 @@ class TestSupplierPurchaseCreation:
             reference="GEM-BC-001",
             start_date="2026-09-01",
             end_date="2027-02-28",
-            quantity=18.0,
-            amount=9000.0,
         )
 
         _, data = _purchase_calls(boond)
         assert data["attributes"]["title"] == "GEM-BC-001 - Développeur Python"
         assert data["attributes"]["reference"] == "GEM-BC-001"
-        assert data["attributes"]["date"] == "2026-09-01"
         assert data["attributes"]["startDate"] == "2026-09-01"
         assert data["attributes"]["endDate"] == "2027-02-28"
-        assert data["attributes"]["quantity"] == 18.0
-        assert data["attributes"]["amountExcludingTax"] == 9000.0
+
+    @pytest.mark.asyncio
+    async def test_the_purchase_date_is_the_start_of_the_period(self):
+        """Le pré-remplissage y met le jour même : l'achat se rangerait dans le mauvais exercice."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
+
+        await adapter.create_supplier_purchase(
+            delivery_id=1234, title="GEM-BC-001", start_date="2026-09-01"
+        )
+
+        _, data = _purchase_calls(boond)
+        assert data["attributes"]["date"] == "2026-09-01"
+
+    @pytest.mark.asyncio
+    async def test_the_prefilled_amount_is_never_overwritten(self):
+        """Boond compte `quantity` x `amountExcludingTax`, ce dernier **unitaire**.
+
+        Y poser le total du bon de commande le faisait multiplier une seconde
+        fois : 18 jours à 500 € s'enregistraient à 162 000 € au lieu de 9 000.
+        Le pré-remplissage dérive de la prestation, que le report vient de
+        recaler — ses deux termes s'accordent déjà.
+        """
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
+
+        await adapter.create_supplier_purchase(delivery_id=1234, title="GEM-BC-001")
+
+        _, data = _purchase_calls(boond)
+        assert data["attributes"]["quantity"] == 6
+        assert data["attributes"]["amountExcludingTax"] == 12285
+
+    @pytest.mark.asyncio
+    async def test_keys_outside_the_write_schema_are_dropped(self):
+        """`POST /purchases` est en `additionalProperties: false`.
+
+        `_metadata` est le plus gênant : il porte le login de l'appelant et le
+        nom du compte Boond, que l'on renverrait à l'expéditeur.
+        """
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
+
+        await adapter.create_supplier_purchase(delivery_id=1234, title="GEM-BC-001")
+
+        _, data = _purchase_calls(boond)
+        for hors_schema in ("_metadata", "createPayments", "statePayments"):
+            assert hors_schema not in data["attributes"]
+        assert "order" not in data["relationships"]
+
+    @pytest.mark.asyncio
+    async def test_the_computed_totals_are_left_to_boond(self):
+        """Les dicter ne peut que contredire le produit que Boond calcule lui-même."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
+
+        await adapter.create_supplier_purchase(delivery_id=1234, title="GEM-BC-001")
+
+        _, data = _purchase_calls(boond)
+        for calcule in (
+            "amountIncludingTax",
+            "totalAmountExcludingTax",
+            "totalAmountIncludingTax",
+        ):
+            assert calcule not in data["attributes"]
+
+    @pytest.mark.asyncio
+    async def test_a_supplier_outside_vat_is_purchased_without_it(self):
+        """Un fournisseur non assujetti facture sans TVA : le TTC serait gonflé."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
+
+        await adapter.create_supplier_purchase(
+            delivery_id=1234, title="GEM-BC-001", vat_liable=False
+        )
+
+        _, data = _purchase_calls(boond)
+        assert data["attributes"]["taxRate"] == 0
+        assert data["attributes"]["taxRates"] == [0]
+
+    @pytest.mark.asyncio
+    async def test_a_supplier_liable_to_vat_keeps_the_prefilled_rate(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=[_purchase_defaults(), {"data": {"id": "666"}}])
+
+        await adapter.create_supplier_purchase(delivery_id=1234, title="GEM-BC-001")
+
+        _, data = _purchase_calls(boond)
+        assert data["attributes"]["taxRate"] == 20
+
+    @pytest.mark.asyncio
+    async def test_a_prefill_without_amount_creates_nothing(self):
+        """Un achat à 0 € passerait inaperçu ; l'absence d'achat est signalée à l'ADV."""
+        adapter, boond = _make_adapter()
+        prefill = _purchase_defaults()
+        prefill["data"]["attributes"]["amountExcludingTax"] = 0
+        boond._make_request = AsyncMock(side_effect=[prefill, {"data": {"id": "666"}}])
+
+        with pytest.raises(BoondCrmError):
+            await adapter.create_supplier_purchase(delivery_id=1234, title="GEM-BC-001")
+
+        assert boond._make_request.await_count == 1
 
     @pytest.mark.asyncio
     async def test_the_supplier_replaces_the_client_company_and_its_contact(self):

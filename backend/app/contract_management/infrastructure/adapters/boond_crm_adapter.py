@@ -7,6 +7,62 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Attributs d'un achat que `POST /purchases` accepte en écriture. Le schéma est
+# en `additionalProperties: false` : toute autre clé fait échouer la création,
+# et `GET /purchases/default` en renvoie plusieurs (`_metadata`,
+# `createPayments`, `statePayments`).
+#
+# Les calculés en sont exclus à dessein — `amountIncludingTax`,
+# `totalAmountExcludingTax`, `totalAmountIncludingTax` : Boond les dérive de
+# `quantity` x `amountExcludingTax`, et les lui dicter ne peut que le
+# contredire. Les horodatages de lecture (`creationDate`, `updateDate`) aussi.
+PURCHASE_ATTRIBUTES: frozenset[str] = frozenset(
+    {
+        "date",
+        "startDate",
+        "endDate",
+        "title",
+        "reference",
+        "number",
+        "state",
+        "typeOf",
+        "subscription",
+        "paymentTerm",
+        "paymentMethod",
+        "taxRate",
+        "taxRates",
+        "informationComments",
+        "showInformationCommentsOnPDF",
+        "quantity",
+        "amountExcludingTax",
+        "toReinvoice",
+        "reinvoiceRate",
+        "reinvoiceAmountExcludingTax",
+        "currency",
+        "currencyAgency",
+        "exchangeRate",
+        "exchangeRateAgency",
+        "additionalTurnoverAndCosts",
+    }
+)
+
+# Relations d'un achat, même règle. `order` — la commande client — est renvoyée
+# par le pré-remplissage mais absente du schéma d'écriture.
+PURCHASE_RELATIONSHIPS: frozenset[str] = frozenset(
+    {
+        "mainManager",
+        "createdBy",
+        "agency",
+        "pole",
+        "company",
+        "contact",
+        "project",
+        "delivery",
+        "billingDetail",
+        "files",
+    }
+)
+
 
 class BoondCrmError(RuntimeError):
     """Erreur d'une opération CRM BoondManager (réponse 2xx sans identifiant…)."""
@@ -581,8 +637,7 @@ class BoondCrmAdapter:
         reference: str | None = None,
         start_date: str | None = None,
         end_date: str | None = None,
-        quantity: float | None = None,
-        amount: float | None = None,
+        vat_liable: bool = True,
     ) -> int:
         """Crée l'achat fournisseur rattaché à une prestation Boond.
 
@@ -595,6 +650,15 @@ class BoondCrmAdapter:
         prestation, projet, société et agence entre eux, désaccord qui est la
         cause classique des 422.
 
+        **Le montant vient du pré-remplissage, jamais du bon de commande.**
+        Boond compte un achat en `quantity` x `amountExcludingTax`, où le
+        montant est *unitaire* — il le multiplie ensuite lui-même. Y poser le
+        total du bon de commande, comme cela se faisait, le faisait multiplier
+        une seconde fois : une mission de 20 jours à 500 € s'enregistrait à
+        200 000 € au lieu de 10 000 €. Le pré-remplissage, lui, dérive de la
+        prestation — que le report vient de recaler sur le CJM et les jours du
+        bon de commande — et ses deux termes s'accordent déjà.
+
         Args:
             delivery_id: Prestation Boond qui porte la mission.
             title: Intitulé de l'achat, seul attribut obligatoire.
@@ -603,27 +667,42 @@ class BoondCrmAdapter:
             reference: Référence du bon de commande Bobby.
             start_date: Début de la période achetée (YYYY-MM-DD).
             end_date: Fin de la période achetée (YYYY-MM-DD).
-            quantity: Jours achetés (jours vendus moins gratuité).
-            amount: Montant d'achat HT total de la période.
+            vat_liable: False si le fournisseur n'est pas assujetti à la TVA.
 
         Returns:
             Identifiant Boond de l'achat créé.
+
+        Raises:
+            BoondCrmError: Si le pré-remplissage ne porte aucun montant. Un
+                achat à 0 € passerait inaperçu là où l'absence d'achat est
+                signalée à l'ADV.
         """
         attributes, relationships = await self._purchase_defaults(delivery_id)
 
+        if not attributes.get("amountExcludingTax"):
+            raise BoondCrmError(
+                f"BoondManager n'a pré-rempli aucun montant d'achat pour la prestation "
+                f"{delivery_id} : ses conditions d'achat sont probablement vides."
+            )
+
         attributes["title"] = title
         # `date` est la date de l'achat : celle de son point de départ, pour
-        # qu'il se range dans le bon exercice.
+        # qu'il se range dans le bon exercice. Le pré-remplissage y met le jour
+        # même, qui n'a rien à voir avec la période achetée.
         for key, value in (
             ("reference", reference),
             ("date", start_date),
             ("startDate", start_date),
             ("endDate", end_date),
-            ("quantity", quantity),
-            ("amountExcludingTax", amount),
         ):
             if value is not None:
                 attributes[key] = value
+
+        # Un fournisseur non assujetti facture sans TVA : la lui appliquer
+        # gonflerait le TTC d'un achat qui n'en portera jamais.
+        if not vat_liable:
+            attributes["taxRate"] = 0
+            attributes["taxRates"] = [0]
 
         # La doc décrit cette relation avec `type: "project"` — coquille de
         # copier-coller du bloc voisin. Le type attendu est bien `delivery`.
@@ -649,6 +728,8 @@ class BoondCrmAdapter:
             purchase_id=purchase_id,
             delivery_id=delivery_id,
             reference=reference,
+            quantity=attributes.get("quantity"),
+            unit_amount=attributes.get("amountExcludingTax"),
         )
         return purchase_id
 
@@ -657,18 +738,31 @@ class BoondCrmAdapter:
 
         Renvoie les attributs et les relations de l'achat vide que Boond
         compose pour cette prestation : responsable, agence, pôle, société,
-        contact, projet. Les relations vides sont écartées — les renvoyer à
-        `null` ferait échouer la création.
+        contact, projet.
+
+        Ce pré-remplissage **n'est pas repostable tel quel**. Le schéma de
+        `POST /purchases` est en `additionalProperties: false`, et la réponse
+        porte des clés qu'il ignore : `_metadata` — qui contient le login de
+        l'appelant et le nom du compte Boond, renvoyés à l'expéditeur —,
+        `createPayments`, `statePayments`, et la relation `order`. Tout est
+        donc filtré sur ce que le schéma déclare, plutôt que recopié.
+
+        Les relations vides sont écartées — les renvoyer à `null` ferait
+        échouer la création.
         """
         response = await self._boond._make_request(
             "GET", "/purchases/default", params={"delivery": str(delivery_id)}
         )
         data = (response or {}).get("data") or {}
-        attributes = dict(data.get("attributes") or {})
+        attributes = {
+            name: value
+            for name, value in (data.get("attributes") or {}).items()
+            if name in PURCHASE_ATTRIBUTES
+        }
         relationships = {
             name: value
             for name, value in (data.get("relationships") or {}).items()
-            if isinstance(value, dict) and value.get("data")
+            if name in PURCHASE_RELATIONSHIPS and isinstance(value, dict) and value.get("data")
         }
         return attributes, relationships
 

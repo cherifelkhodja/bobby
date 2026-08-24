@@ -304,11 +304,17 @@ class SyncPurchaseOrderToBoondUseCase:
     async def _create_purchase_order(
         self, po: PurchaseOrder, third_party, warnings: list[str]
     ) -> None:
-        """Crée l'achat fournisseur Boond, au montant d'achat de la mission.
+        """Crée l'achat fournisseur Boond sur la prestation de la mission.
 
         L'achat pend à la prestation : sans elle, il n'a rien à quoi se
         rattacher, et ce rattachement ne se fait qu'à la création. Rien n'est
         créé si le renouvellement natif d'une reconduction en a déjà produit un.
+
+        Le montant ne lui est pas dicté : Boond le pré-remplit depuis la
+        prestation, que `_align_delivery` vient d'accorder au CJM et aux jours
+        du bon de commande. C'est un montant **unitaire** que Boond multiplie
+        ensuite par la quantité — lui poser le total du bon de commande le
+        faisait multiplier une seconde fois.
         """
         # Une reconduction reçoit son achat du renouvellement natif de la
         # prestation, qui le produit lui-même avec la commande client.
@@ -331,9 +337,7 @@ class SyncPurchaseOrderToBoondUseCase:
                 reference=po.display_reference,
                 start_date=_iso(po.start_date),
                 end_date=_iso(po.end_date),
-                # Jours réellement achetés : la gratuité ne se paie pas.
-                quantity=float(po.days_sold or 0) - float(po.free_days or 0),
-                amount=float(po.total_amount),
+                vat_liable=getattr(third_party, "vat_liable", True),
             )
         except Exception as exc:
             # La ressource, le contrat et la prestation sont en place : les

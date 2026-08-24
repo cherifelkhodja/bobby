@@ -49,6 +49,7 @@ def _third_party(**overrides) -> SimpleNamespace:
         "boond_billing_contact_id": 2864,
         "boond_adv_contact_id": 2865,
         "boond_signatory_contact_id": 2866,
+        "vat_liable": True,
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -611,19 +612,44 @@ class TestBoondWrites:
         assert crm.create_boond_contract.await_args.kwargs["type_of"] == 6
 
     @pytest.mark.asyncio
-    async def test_the_purchase_carries_the_billable_total(self):
-        """Montant Boond = (jours vendus - gratuité) x CJM, sur les jours payés."""
+    async def test_the_purchase_carries_the_period_of_the_order(self):
+        """La période et la référence viennent du bon de commande."""
         po = _signed_po()
         use_case, crm, _ = _make_use_case(po)
 
         await use_case.execute(po.id)
 
         kwargs = crm.create_supplier_purchase.await_args.kwargs
-        assert kwargs["amount"] == 9000.0  # 18 x 500
-        assert kwargs["quantity"] == 18.0  # 20 vendus - 2 gratuits
         assert kwargs["reference"] == "GEM-BC-001"
         assert kwargs["start_date"] == "2026-09-01"
         assert kwargs["end_date"] == "2027-02-28"
+
+    @pytest.mark.asyncio
+    async def test_the_amount_is_not_dictated_to_boond(self):
+        """Boond le pré-remplit depuis la prestation, que le report vient de recaler.
+
+        Il compte `quantity` x `amountExcludingTax`, ce dernier **unitaire** :
+        lui poser le total du bon de commande le faisait multiplier une seconde
+        fois. Le montant ne fait donc plus partie de ce que Bobby lui dicte.
+        """
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po)
+
+        await use_case.execute(po.id)
+
+        kwargs = crm.create_supplier_purchase.await_args.kwargs
+        assert "amount" not in kwargs
+        assert "quantity" not in kwargs
+
+    @pytest.mark.asyncio
+    async def test_a_supplier_outside_vat_is_reported_as_such(self):
+        """Déjà porté par le document ; il manquait au CRM."""
+        po = _signed_po()
+        use_case, crm, _ = _make_use_case(po, third_party=_third_party(vat_liable=False))
+
+        await use_case.execute(po.id)
+
+        assert crm.create_supplier_purchase.await_args.kwargs["vat_liable"] is False
 
     @pytest.mark.asyncio
     async def test_the_purchase_hangs_on_the_delivery_and_the_supplier(self):

@@ -233,6 +233,20 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-08-24 (fix: l'achat Boond était multiplié une seconde fois)
+
+Le schéma officiel de `POST /purchases`, confronté à une réponse réelle de `GET /purchases/default`, met au jour trois défauts du report d'un bon de commande.
+
+- **`amountExcludingTax` est un montant *unitaire*.** Boond calcule `totalAmountExcludingTax = quantity x amountExcludingTax` — vérifié sur un achat du CRM : `12 285 x 6 = 73 710`. Bobby y posait le **total** du bon de commande tout en renseignant `quantity` en jours : une mission de 18 jours à 500 € s'enregistrait à **162 000 € au lieu de 9 000 €**. Ni `quantity` ni `amountExcludingTax` ne sont désormais dictés : Bobby garde ceux du pré-remplissage, qui dérivent de la prestation que `_align_delivery` vient de recaler sur le CJM et les jours du bon de commande, et dont les deux termes s'accordent déjà. Le CRM compte en mois (`subscription: 1`) ; le montant Boond ne retombe donc pas au centime sur celui du document signé, mais il cesse d'être faux d'un facteur 18.
+- **Le pré-remplissage n'était pas repostable tel quel.** Le schéma d'écriture est en `additionalProperties: false`, et la réponse porte quatre clés qu'il ignore : `createPayments`, `statePayments`, la relation `order`, et surtout **`_metadata` — le login de l'appelant et le nom du compte Boond, qu'on lui renvoyait à chaque création**. Le corps est maintenant filtré sur ce que le schéma déclare (`PURCHASE_ATTRIBUTES`, `PURCHASE_RELATIONSHIPS`) plutôt que recopié. Les calculés (`amountIncludingTax`, les deux totaux) et les horodatages de lecture en sont exclus : les dicter ne peut que contredire Boond.
+- **La TVA du fournisseur monte enfin dans le CRM.** `vat_liable`, déjà porté par le document depuis la migration 081, n'atteignait pas l'achat : un fournisseur non assujetti est acheté à `taxRate: 0`, `taxRates: [0]`.
+
+**Un pré-remplissage sans montant ne donne plus d'achat** : Bobby s'arrête avant le `POST` et l'ADV est averti par le canal habituel. Un achat à 0 € passerait inaperçu là où l'absence d'achat se voit.
+
+> **À reprendre à la main** : les achats déjà créés dans Boond portent le montant faux, et `PUT /purchases/{id}/information` n'expose ni `quantity` ni `amountExcludingTax` — la correction passe par le CRM, ou par une suppression/recréation.
+
+Le pré-remplissage de test est repris d'une réponse réelle du CRM. 15 tests sur l'achat, 469 tests contractualisation verts (1254 backend, les 9 échecs de `test_auth` préexistent).
+
 ### 2026-08-24 (fix: l'état « Gagné » se lit dans le CRM, il ne se suppose pas)
 
 Le report marquait le positionnement **« Refus Client »**. La valeur écrite, 1, venait de `OPPORTUNITY_STATE_NAMES` où elle vaut « Gagné » : c'est l'échelle des **opportunités**, pas celle des positionnements, où « Gagné » vaut **2** et 1 vaut « Refus Client ». Une affaire gagnée a donc été marquée refusée.

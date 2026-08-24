@@ -644,8 +644,15 @@ longtemps écrit ici, n'existe pas dans l'API et répondait 404.
    `company`, `contact`, `project`, `delivery`, plus un bloc `included`.
    Paramètres acceptés : `project`, `delivery`, `additionalTurnoverAndCosts`,
    `contact`, `company`.
-2. `POST /purchases` — on renvoie ce corps, ajusté. Seul `title` est
-   obligatoire dans `attributes`.
+2. `POST /purchases` — on renvoie ce corps, **filtré puis ajusté**. Seul
+   `title` est obligatoire dans `attributes`.
+
+Le pré-remplissage n'est **pas repostable tel quel**. Le schéma d'écriture est
+en `additionalProperties: false`, et la réponse porte quatre clés qu'il ignore :
+`_metadata` — qui contient le login de l'appelant et le nom du compte Boond,
+qu'on lui renverrait —, `createPayments`, `statePayments`, et la relation
+`order`. Bobby filtre donc sur ce que le schéma déclare (`PURCHASE_ATTRIBUTES`
+et `PURCHASE_RELATIONSHIPS`) au lieu de recopier.
 
 Composer le corps à la main plutôt que de partir de ce pré-remplissage est la
 cause classique des 422 : prestation, projet, société et agence doivent
@@ -661,8 +668,8 @@ s'accorder.
       "date": "2026-09-01",
       "startDate": "2026-09-01",
       "endDate": "2027-02-28",
-      "quantity": 18,
-      "amountExcludingTax": 9000
+      "quantity": 6,
+      "amountExcludingTax": 12285
     },
     "relationships": {
       "delivery": {"data": {"id": "1234", "type": "delivery"}},
@@ -684,10 +691,34 @@ s'accorder.
 > la prestation et désigne le client, à remplacer — son contact part avec elle.
 > Bobby y met le contact de facturation du fournisseur.
 
+> **`amountExcludingTax` est un montant unitaire**, pas un total : Boond calcule
+> `totalAmountExcludingTax = quantity x amountExcludingTax`. Y poser le total du
+> bon de commande le fait multiplier une seconde fois — une mission de 18 jours
+> à 500 € s'enregistrait à 162 000 € au lieu de 9 000. Bobby **ne dicte donc ni
+> `quantity` ni `amountExcludingTax`** : il garde ceux du pré-remplissage, qui
+> dérivent de la prestation que le report vient de recaler sur le CJM et les
+> jours du bon de commande, et dont les deux termes s'accordent déjà. Le
+> pré-remplissage compte en mois (`subscription: 1`), pas en jours.
+
+> **Les calculés ne se réécrivent pas** : `amountIncludingTax`,
+> `totalAmountExcludingTax`, `totalAmountIncludingTax` sont dérivés par Boond,
+> les lui dicter ne peut que le contredire. Idem pour `creationDate` et
+> `updateDate`.
+
+> **Un pré-remplissage sans montant ne donne pas d'achat** : Bobby s'arrête
+> avant le `POST` et le signale à l'ADV. Un achat à 0 € passerait inaperçu là où
+> l'absence d'achat se voit.
+
 Autres attributs disponibles : `number` (réf. fournisseur), `typeOf`, `state`,
 `subscription`, `paymentTerm`, `paymentMethod`, `taxRates`, `toReinvoice`,
 `reinvoiceRate`, `reinvoiceAmountExcludingTax`, `informationComments`,
-`createPayments`, `exchangeRate`, `currency`.
+`showInformationCommentsOnPDF`, `exchangeRate`, `currency`. Bobby garde ceux du
+pré-remplissage, **sauf la TVA** : un fournisseur non assujetti
+(`tp_third_parties.vat_liable = false`) est acheté à `taxRate: 0`,
+`taxRates: [0]`.
+
+`createPayments` et `statePayments`, renvoyés par le pré-remplissage, ne sont
+pas des attributs d'écriture — ils ne figurent pas au schéma.
 
 Pour un achat rattaché à un frais ou un CA additionnel plutôt qu'à une
 prestation : même flux avec `?additionalTurnoverAndCosts={id}`.
