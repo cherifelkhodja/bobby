@@ -530,14 +530,13 @@ Un contact cumulant plusieurs rôles porte plusieurs types : le dédoublonnage s
 fait sur prénom + nom + email (`application/boond_contacts.py`), partagé par la
 synchronisation automatique et par l'action manuelle de l'ADV.
 
-#### GET /contacts?keywords=
-Retrouve un contact d'une société par son adresse e-mail, avant d'en créer un.
-Une société rattachée par l'ADV a souvent déjà ses contacts dans le CRM : les
-recréer y laisserait des homonymes. Ne retient qu'un contact **de cette
-société** (`relationships.company`) dont l'une des adresses `email1..3` est
-exactement celle cherchée — un homonyme chez un autre client n'est jamais
-rattaché. Un échec de la recherche ne bloque pas le report : le contact est
-alors créé (`boond_supplier.find_existing_contact_id`).
+#### GET /companies/{id}/contacts
+Liste les contacts d'une société, avant d'en créer un. Une société rattachée
+par l'ADV a souvent déjà ses contacts dans le CRM : les recréer y laisserait
+des homonymes. On retient le contact dont `email1` est exactement l'adresse
+cherchée ; la liste est parcourue page par page jusqu'au total annoncé par
+`meta.totals.rows`. Un échec de la lecture ne bloque pas le report : le
+contact est alors créé (`boond_supplier.find_existing_contact_id`).
 
 ```python
 async def find_contact_by_email(self, company_id: int, email: str) -> int | None
@@ -915,7 +914,7 @@ async def create_supplier_purchase(
 | Étape | Action | Endpoint Boond | Données persistées |
 |-------|--------|----------------|-------------------|
 | 1 | Créer société fournisseur — ou actualiser celle que l'ADV a rattachée | `POST /companies` ou `PUT /companies/{id}/information` | `tp.boond_provider_id` |
-| 2 | Créer contacts (signataire, ADV, facturation) — repris par e-mail si la société les connaît déjà | `GET /contacts?keywords=` puis `POST /contacts` | `tp.boond_signatory_contact_id`, `tp.boond_adv_contact_id`, `tp.boond_billing_contact_id` |
+| 2 | Créer contacts (signataire, ADV, facturation) — repris par e-mail si la société les connaît déjà | `GET /companies/{id}/contacts` puis `POST /contacts` | `tp.boond_signatory_contact_id`, `tp.boond_adv_contact_id`, `tp.boond_billing_contact_id` |
 | 3 | Convertir candidat → ressource | `PUT /candidates/{id}/information` | `cr.boond_candidate_id` (nouvel ID), `cr.boond_consultant_type = "resource"` |
 | 4 | Créer contrat Boond | `POST /contracts` | `cr.boond_contract_id` |
 | 5 | Créer l'achat fournisseur | `POST /purchases` | `contract.boond_purchase_order_id` |

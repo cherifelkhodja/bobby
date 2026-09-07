@@ -10,6 +10,11 @@ logger = structlog.get_logger()
 # `TAB_ACHAT.ACHAT_TITLE` est borné : au-delà, Boond refuse la création.
 PURCHASE_TITLE_MAX = 150
 
+# Contacts d'une société, lus page par page ; la borne protège d'un CRM qui
+# ignorerait `page` et rendrait toujours la même liste.
+COMPANY_CONTACTS_PAGE_SIZE = 100
+COMPANY_CONTACTS_MAX_PAGES = 10
+
 
 class _ProjectDelivery(NamedTuple):
     """Une prestation de l'onglet d'un projet, réduite à ce qui l'identifie."""
@@ -1196,10 +1201,11 @@ class BoondCrmAdapter:
         """Retrouve un contact d'une société Boond par son adresse e-mail.
 
         Une société rattachée par l'ADV a souvent déjà ses contacts dans le
-        CRM : les recréer y laisserait des homonymes. La recherche passe par
-        ``GET /contacts?keywords=`` et ne retient qu'un contact **de cette
-        société** dont l'une des adresses est exactement celle cherchée — un
-        homonyme chez un autre client n'est jamais rattaché.
+        CRM : les recréer y laisserait des homonymes. ``GET
+        /companies/{id}/contacts`` liste les contacts **de cette société** —
+        et d'elle seule — et l'on retient celui dont ``email1`` est exactement
+        l'adresse cherchée. Les pages sont parcourues jusqu'au total annoncé
+        par ``meta.totals.rows`` ; une page vide ou déjà vue arrête la lecture.
 
         Returns:
             L'identifiant du contact, ou ``None`` faute de correspondance.
@@ -1207,25 +1213,36 @@ class BoondCrmAdapter:
         wanted = (email or "").strip().lower()
         if not wanted:
             return None
-        response = await self._boond._make_request(
-            "GET", "/contacts", params={"keywords": wanted, "maxResults": 30}
-        )
-        for item in response.get("data") or []:
-            attributes = item.get("attributes") or {}
-            emails = {
-                str(attributes.get(key) or "").strip().lower()
-                for key in ("email1", "email2", "email3")
-            }
-            if wanted not in emails:
-                continue
-            if self._extract_relationship_id(item.get("relationships") or {}, "company") != (
-                company_id
+
+        seen: set[str] = set()
+        page = 1
+        while page <= COMPANY_CONTACTS_MAX_PAGES:
+            response = await self._boond._make_request(
+                "GET",
+                f"/companies/{company_id}/contacts",
+                params={"page": page, "maxResults": COMPANY_CONTACTS_PAGE_SIZE},
+            )
+            items = response.get("data") or []
+            new_ids = {str(item.get("id")) for item in items if item.get("id")}
+            if not items or new_ids <= seen:
+                return None
+            seen |= new_ids
+            for item in items:
+                attributes = item.get("attributes") or {}
+                if str(attributes.get("email1") or "").strip().lower() != wanted:
+                    continue
+                contact_id = item.get("id")
+                if contact_id:
+                    logger.info(
+                        "boond_contact_reused", company_id=company_id, contact_id=contact_id
+                    )
+                    return int(contact_id)
+            total = ((response.get("meta") or {}).get("totals") or {}).get("rows")
+            if len(items) < COMPANY_CONTACTS_PAGE_SIZE or (
+                isinstance(total, int) and len(seen) >= total
             ):
-                continue
-            contact_id = item.get("id")
-            if contact_id:
-                logger.info("boond_contact_reused", company_id=company_id, contact_id=contact_id)
-                return int(contact_id)
+                return None
+            page += 1
         return None
 
     async def get_resource_type_of(self, resource_id: int) -> int | None:

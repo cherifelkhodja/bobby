@@ -843,65 +843,76 @@ class TestUpdateCompanyInformation:
         boond._make_request.assert_not_awaited()
 
 
-def _contact(contact_id: str, company_id: str | None, **emails) -> dict:
-    item = {"id": contact_id, "type": "contact", "attributes": dict(emails)}
-    if company_id is not None:
-        item["relationships"] = {"company": {"data": {"id": company_id, "type": "company"}}}
-    return item
+def _contact(contact_id: str, email1: str | None = None) -> dict:
+    return {"id": contact_id, "type": "contact", "attributes": {"email1": email1}}
+
+
+def _contacts_page(items: list[dict], total: int | None = None) -> dict:
+    page = {"data": items}
+    if total is not None:
+        page["meta"] = {"totals": {"rows": total}}
+    return page
 
 
 class TestFindContactByEmail:
-    """``find_contact_by_email`` : même adresse, même société, sinon rien."""
+    """``find_contact_by_email`` : les contacts de la société, même adresse, sinon rien."""
 
     @pytest.mark.asyncio
-    async def test_matches_email_on_the_same_company(self):
+    async def test_matches_email_among_the_company_contacts(self):
         adapter, boond = _make_adapter()
         boond._make_request = AsyncMock(
-            return_value={
-                "data": [
-                    _contact("10", "999", email1="jean@acme.test"),
-                    _contact("11", "123", email1="Jean@ACME.test"),
-                ]
-            }
+            return_value=_contacts_page(
+                [_contact("10", "autre@acme.test"), _contact("11", "Jean@ACME.test")], total=2
+            )
         )
 
         result = await adapter.find_contact_by_email(123, " jean@acme.test ")
 
         assert result == 11
         boond._make_request.assert_awaited_once_with(
-            "GET", "/contacts", params={"keywords": "jean@acme.test", "maxResults": 30}
+            "GET", "/companies/123/contacts", params={"page": 1, "maxResults": 100}
         )
 
     @pytest.mark.asyncio
-    async def test_matches_secondary_email(self):
+    async def test_none_when_no_contact_carries_the_email(self):
         adapter, boond = _make_adapter()
         boond._make_request = AsyncMock(
-            return_value={
-                "data": [_contact("12", "123", email1="pro@acme.test", email2="jean@acme.test")]
-            }
-        )
-
-        assert await adapter.find_contact_by_email(123, "jean@acme.test") == 12
-
-    @pytest.mark.asyncio
-    async def test_never_attaches_a_contact_of_another_company(self):
-        """Un homonyme chez un autre client, ou sans société, n'est pas rattaché."""
-        adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(
-            return_value={
-                "data": [
-                    _contact("10", "999", email1="jean@acme.test"),
-                    _contact("13", None, email1="jean@acme.test"),
-                ]
-            }
+            return_value=_contacts_page([_contact("10", "autre@acme.test"), _contact("12", None)])
         )
 
         assert await adapter.find_contact_by_email(123, "jean@acme.test") is None
+        boond._make_request.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_reads_the_next_page_until_the_announced_total(self):
+        """Le contact cherché est en deuxième page : on y va, puis on s'arrête."""
+        adapter, boond = _make_adapter()
+        first_page = [_contact(str(i), f"c{i}@acme.test") for i in range(100)]
+        boond._make_request = AsyncMock(
+            side_effect=[
+                _contacts_page(first_page, total=101),
+                _contacts_page([_contact("200", "jean@acme.test")], total=101),
+            ]
+        )
+
+        assert await adapter.find_contact_by_email(123, "jean@acme.test") == 200
+        assert boond._make_request.await_count == 2
+        assert boond._make_request.await_args_list[1].kwargs["params"]["page"] == 2
+
+    @pytest.mark.asyncio
+    async def test_stops_when_a_page_repeats(self):
+        """Un CRM qui ignore `page` rend toujours la même liste : on n'insiste pas."""
+        adapter, boond = _make_adapter()
+        same_page = [_contact(str(i), f"c{i}@acme.test") for i in range(100)]
+        boond._make_request = AsyncMock(return_value=_contacts_page(same_page))
+
+        assert await adapter.find_contact_by_email(123, "jean@acme.test") is None
+        assert boond._make_request.await_count == 2
 
     @pytest.mark.asyncio
     async def test_no_request_without_email(self):
         adapter, boond = _make_adapter()
-        boond._make_request = AsyncMock(return_value={"data": []})
+        boond._make_request = AsyncMock(return_value=_contacts_page([]))
 
         assert await adapter.find_contact_by_email(123, "  ") is None
         boond._make_request.assert_not_awaited()
