@@ -14,12 +14,15 @@ import { PageSpinner } from '../components/ui/Spinner';
 import type { PurchaseOrder, PurchaseOrderStatus } from '../types';
 import { PURCHASE_ORDER_STATUS_CONFIG } from '../types';
 
-type FilterTab = 'all' | 'todo' | 'waiting' | 'done';
+type FilterTab = 'all' | 'todo' | 'waiting' | 'done' | 'cancelled';
 
 const TODO_STATUSES = new Set<PurchaseOrderStatus>(['draft', 'generated']);
 const WAITING_STATUSES = new Set<PurchaseOrderStatus>(['sent_for_signature', 'signed']);
 
+// Un bon de commande annulé ne représente aucune mission : il a son onglet à
+// lui et ne compte ni dans « Tous » ni dans les indicateurs.
 function tabOf(po: PurchaseOrder): Exclude<FilterTab, 'all'> {
+  if (po.status === 'cancelled') return 'cancelled';
   if (TODO_STATUSES.has(po.status)) return 'todo';
   if (WAITING_STATUSES.has(po.status)) return 'waiting';
   return 'done';
@@ -53,8 +56,7 @@ export function PurchaseOrders() {
   const pageSize = 20;
   // Le regroupement par onglet couvre plusieurs statuts, que l'API ne filtre
   // qu'un par un : le tri et la pagination se font côté client sur la liste
-  // complète, chargée en une fois (plafonnée à FETCH_LIMIT). Les bons de
-  // commande annulés n'en font pas partie : ils ne représentent aucune mission.
+  // complète, chargée en une fois (plafonnée à FETCH_LIMIT), annulés compris.
   const FETCH_LIMIT = 500;
 
   const { data: companies = [] } = useQuery({
@@ -69,7 +71,6 @@ export function PurchaseOrders() {
       purchaseOrdersApi.list({
         skip: 0,
         limit: FETCH_LIMIT,
-        exclude_cancelled: true,
         ...(search ? { search } : {}),
         ...(companyFilter ? { company_id: companyFilter } : {}),
       }),
@@ -87,12 +88,14 @@ export function PurchaseOrders() {
     onError: (error) => toast.error(getErrorMessage(error)),
   });
 
-  const items = data?.items ?? [];
+  const allItems = data?.items ?? [];
+  const items = allItems.filter((po) => po.status !== 'cancelled');
   const counts: Record<FilterTab, number> = {
     all: items.length,
     todo: items.filter((po) => tabOf(po) === 'todo').length,
     waiting: items.filter((po) => tabOf(po) === 'waiting').length,
     done: items.filter((po) => tabOf(po) === 'done').length,
+    cancelled: allItems.length - items.length,
   };
   const toAttach = items.filter((po) => po.needs_third_party).length;
   const activeCount = items.filter((po) => po.status === 'active').length;
@@ -100,7 +103,7 @@ export function PurchaseOrders() {
     .filter((po) => po.status === 'active')
     .reduce((sum, po) => sum + po.total_amount, 0);
 
-  const filtered = items.filter((po) => (filterTab === 'all' ? true : tabOf(po) === filterTab));
+  const filtered = filterTab === 'all' ? items : allItems.filter((po) => tabOf(po) === filterTab);
   const paged = filtered.slice(page * pageSize, page * pageSize + pageSize);
 
   if (isLoading) return <PageSpinner />;
@@ -184,6 +187,7 @@ export function PurchaseOrders() {
             { key: 'todo' as FilterTab, label: 'À compléter' },
             { key: 'waiting' as FilterTab, label: 'En signature' },
             { key: 'done' as FilterTab, label: 'Actifs et clos' },
+            { key: 'cancelled' as FilterTab, label: 'Annulés' },
           ]
         ).map(({ key, label }) => (
           <button
@@ -203,11 +207,15 @@ export function PurchaseOrders() {
       {filtered.length === 0 ? (
         <div className="card text-center py-12">
           <ClipboardList className="h-10 w-10 text-mut2 mx-auto mb-4" />
-          <p className="dn">Aucun bon de commande</p>
-          <p className="ds mt-1.5">
-            Ils arrivent depuis BoondManager quand un positionnement est gagné, ou se créent ici
-            depuis un positionnement.
+          <p className="dn">
+            {filterTab === 'cancelled' ? 'Aucun bon de commande annulé' : 'Aucun bon de commande'}
           </p>
+          {filterTab !== 'cancelled' && (
+            <p className="ds mt-1.5">
+              Ils arrivent depuis BoondManager quand un positionnement est gagné, ou se créent ici
+              depuis un positionnement.
+            </p>
+          )}
         </div>
       ) : (
         <div className="tbl">

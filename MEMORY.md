@@ -233,6 +233,15 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-09-07 (feat: onglet « Annulés » dans la liste des bons de commande)
+
+Sortis de la liste le matin même, les BDC annulés retrouvent une place, à part : un cinquième onglet « Annulés » sur `/contracts/bdc`.
+
+- **La page recharge tout**, annulés compris — un seul appel, le tri par onglet restant côté client comme avant. `exclude_cancelled` ne sert plus qu'au badge de la barre latérale.
+- **« Tous » et les indicateurs restent vivants** : les annulés n'y comptent pas, ils n'apparaissent que dans leur onglet, avec leur propre compteur.
+
+Type-check et lint frontend verts.
+
 ### 2026-09-07 (fix: les bons de commande annulés sortent de la liste)
 
 La page « Bons de commande » affichait les BDC annulés au milieu des missions vivantes, dans l'onglet « Actifs et clos » et dans le total « Tous ». Un BDC annulé ne représente aucune mission : il n'a rien à y faire, comme il ne comptait déjà pas dans le nombre de missions d'un contrat cadre.
