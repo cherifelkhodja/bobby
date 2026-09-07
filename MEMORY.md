@@ -233,6 +233,18 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-09-07 (feat: rattacher le fournisseur à une société déjà présente dans Boond)
+
+Le report d'un contrat cadre créait toujours la société dans BoondManager. Or elle y existe parfois déjà — un fournisseur connu du CRM, ou saisi à la main par un commercial — et le report en laissait un doublon. La règle : quand la société existe, on **actualise avec un PUT** au lieu de créer, et c'est l'administrateur qui donne son identifiant.
+
+- **« Pousser dans Boond » demande d'abord** : la carte ouverte par le bouton porte un champ optionnel « ID de la société dans BoondManager ». Vide, la société est créée comme avant ; rempli, elle est rattachée.
+- **Vérification avant rattachement** (`GET /{id}/boond/company-lookup`) : Bobby relit la société (`GET /companies/{id}/information`), affiche son nom pour confirmation, compare son `registrationNumber` au SIRET du tiers (sur les chiffres, un SIREN seul contre les neuf premiers) et signale l'écart. Un identifiant déjà rattaché à un autre fournisseur de Bobby est refusé (409) — une société du CRM ne représente qu'un fournisseur (`ThirdPartyRepository.get_by_boond_provider_id`).
+- **Le PUT porte toute l'identité collectée** : adresse, mentions légales, et désormais TVA, SIRET (`registrationNumber`), code APE. Jamais le **nom** ni l'**état** : la société peut vivre sous un autre libellé dans le CRM, et ce PUT n'accepte pas `typeOf` — il ne saurait faire d'un client un fournisseur. Même élargissement pour la synchronisation à la signature.
+- **Contacts repris plutôt que doublés** : une société déjà dans le CRM a souvent ses contacts. Avant d'en créer un, Bobby le cherche par e-mail (`GET /contacts?keywords=`) et ne retient qu'un contact **de cette société** ; un homonyme chez un autre client n'est jamais rattaché. La recherche est un bonus : en panne, le contact est créé. Une société créée à l'instant n'est pas fouillée. Partagé par l'action manuelle et la synchronisation (`application/boond_supplier.py`).
+- La réponse du report distingue `created_company`, `attached_company`, `contacts_created`, `contacts_reused`, `contacts_existing` ; le rattachement est tracé dans l'audit (`boond_company_attached`).
+
+15 tests (fiche société, PUT, recherche de contact, comparaison SIRET, recherche en panne). Backend et front verts.
+
 ### 2026-08-24 (fix: la conversion rendait un candidat déguisé en ressource)
 
 Le report du BDC PROV-BC-2026-004 échouait en `404 Not Found` sur `/resources/2398/administrative` : 2398 est un **candidat**, pas une ressource.

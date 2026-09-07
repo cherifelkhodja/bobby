@@ -136,8 +136,11 @@ class CrmServicePort(Protocol):
         country: str | None = None,
         legal_status: str | None = None,
         registered_office: str | None = None,
+        vat_number: str | None = None,
+        siret: str | None = None,
+        ape_code: str | None = None,
     ) -> None:
-        """Update company information in CRM."""
+        """Update company information in CRM (never its name nor its state)."""
         ...
 
     async def create_company_full(
@@ -204,6 +207,14 @@ class CrmServicePort(Protocol):
 
     async def verify_company_exists(self, company_id: int) -> bool:
         """Check whether a company exists in the CRM."""
+        ...
+
+    async def get_company_information(self, company_id: int) -> dict[str, Any] | None:
+        """Read a company's identity (name, state, registration number); None if absent."""
+        ...
+
+    async def find_contact_by_email(self, company_id: int, email: str) -> int | None:
+        """Find an existing contact of a company by e-mail address."""
         ...
 
     async def update_company_bank_details(

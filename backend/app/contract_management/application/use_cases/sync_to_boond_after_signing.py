@@ -15,6 +15,7 @@ from app.contract_management.application.boond_mappings import (
     resource_type_of,
     state_reason_type_of,
 )
+from app.contract_management.application.boond_supplier import find_existing_contact_id
 from app.contract_management.domain.value_objects.contract_request_status import (
     ContractRequestStatus,
 )
@@ -88,6 +89,10 @@ class SyncToBoondAfterSigningUseCase:
             formatted_siren = _format_siren(tp.rcs_number)
             registered_office = f"{formatted_siren} R.C.S. {tp.rcs_city}"
 
+        # Une société créée à l'instant n'a aucun contact : inutile d'y
+        # chercher ceux du fournisseur.
+        company_created_now = False
+
         # Verify cached provider_id still exists in Boond
         if tp and tp.boond_provider_id:
             exists = await self._crm.verify_company_exists(tp.boond_provider_id)
@@ -109,6 +114,9 @@ class SyncToBoondAfterSigningUseCase:
                         country="France",
                         legal_status=legal_status,
                         registered_office=registered_office,
+                        vat_number=tp.vat_number,
+                        siret=tp.siret,
+                        ape_code=tp.ape_code,
                     )
                 except Exception as exc:
                     logger.warning(
@@ -135,6 +143,7 @@ class SyncToBoondAfterSigningUseCase:
                 )
                 tp.boond_provider_id = provider_id
                 await self._tp_repo.save(tp)
+                company_created_now = True
                 logger.info(
                     "sync_boond_company_created",
                     cr_id=str(cr.id),
@@ -215,6 +224,16 @@ class SyncToBoondAfterSigningUseCase:
             agency_id = company.boond_agency_id if company else None
             to_create, _already_pushed = split_supplier_contacts(tp)
             for contact in to_create:
+                # Société déjà dans le CRM : un contact qu'elle connaît est
+                # repris plutôt que doublé.
+                if not company_created_now:
+                    existing_id = await find_existing_contact_id(
+                        self._crm, tp.boond_provider_id, contact
+                    )
+                    if existing_id:
+                        for role in contact.roles:
+                            boond_contact_ids[role] = existing_id
+                        continue
                 try:
                     contact_id = await self._crm.create_contact(
                         company_id=tp.boond_provider_id,

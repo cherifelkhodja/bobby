@@ -36,6 +36,20 @@ class ThirdPartyRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
+    async def get_by_boond_provider_id(self, boond_provider_id: int) -> ThirdParty | None:
+        """Le tiers déjà rattaché à une société BoondManager, s'il y en a un.
+
+        Une société du CRM ne représente qu'un fournisseur : c'est ce qui
+        empêche l'ADV d'en rattacher un second au même identifiant.
+        """
+        result = await self.session.execute(
+            select(ThirdPartyModel)
+            .where(ThirdPartyModel.boond_provider_id == boond_provider_id)
+            .order_by(ThirdPartyModel.created_at)
+        )
+        model = result.scalars().first()
+        return self._to_entity(model) if model else None
+
     async def save(self, third_party: ThirdParty) -> ThirdParty:
         """Save third party (create or update)."""
         result = await self.session.execute(

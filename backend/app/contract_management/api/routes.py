@@ -5,13 +5,15 @@ from datetime import datetime
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import AdminUser, AdvOrAdminUser, ContractAccessUser
 from app.config import get_settings
 from app.contract_management.api.schemas import (
     ArticleOverridesRequest,
+    BoondCompanyLookupResponse,
+    BoondCreateCompanyRequest,
     CommercialValidationRequest,
     ComplianceOverrideRequest,
     ContractConfigRequest,
@@ -36,6 +38,10 @@ from app.contract_management.application.boond_mappings import (
 )
 from app.contract_management.application.boond_mappings import (
     state_reason_type_of as boond_state_reason_type_of,
+)
+from app.contract_management.application.boond_supplier import (
+    find_existing_contact_id,
+    registration_matches,
 )
 from app.contract_management.application.use_cases.block_compliance import (
     BlockComplianceUseCase,
@@ -2850,6 +2856,21 @@ def _boond_deps(db: AsyncSession, settings):
     return cr_repo, contract_repo, tp_repo, crm
 
 
+def _boond_error_detail(exc: Exception) -> str:
+    """La vraie erreur Boond, extraite d'une chaîne RetryError / HTTPStatusError."""
+    detail = str(exc)
+    cause = exc.__cause__ or (getattr(exc, "__context__", None))
+    if hasattr(cause, "response"):
+        return f"Boond HTTP {cause.response.status_code}: {cause.response.text[:2000]}"
+    if hasattr(exc, "last_attempt"):
+        inner = exc.last_attempt.exception()
+        if inner and hasattr(inner, "response"):
+            return f"Boond HTTP {inner.response.status_code}: {inner.response.text[:2000]}"
+        if inner:
+            return str(inner)
+    return detail
+
+
 # Statuts sur lesquels plus rien ne se reporte : le dossier ne mènera pas à un
 # contrat.
 _CLOSED_STATUSES = ("cancelled", "redirected_payfit")
@@ -3094,21 +3115,8 @@ async def boond_create_contract(
         )
 
 
-@router.post(
-    "/{contract_request_id}/boond/create-company",
-    summary="[Boond] Créer la société fournisseur + contacts",
-)
-async def boond_create_company(
-    contract_request_id: UUID,
-    user_id: AdvOrAdminUser,
-    db: AsyncSession = Depends(get_db),
-):
-    """Crée la société et les 3 contacts (dirigeant, ADV, facturation) dans Boond. ADV/admin only."""
-    from app.contract_management.infrastructure.models import ContractCompanyModel
-
-    settings = get_settings()
-    cr_repo, _cr2, tp_repo, crm = _boond_deps(db, settings)
-
+async def _load_supplier_for_boond(contract_request_id: UUID, cr_repo, tp_repo):
+    """La demande de contrat et son fournisseur, ou l'erreur HTTP qui dit ce qui manque."""
     cr = await cr_repo.get_by_id(contract_request_id)
     if not cr:
         raise HTTPException(status_code=404, detail="Demande de contrat introuvable.")
@@ -3125,8 +3133,113 @@ async def boond_create_company(
         raise HTTPException(status_code=500, detail="Erreur lors du chargement du tiers.")
     if not tp:
         raise HTTPException(status_code=404, detail="Tiers introuvable.")
+    return cr, tp
+
+
+async def _require_boond_company_free(tp_repo, boond_company_id: int, third_party_id: UUID):
+    """Refuse une société Boond déjà rattachée à un autre fournisseur de Bobby."""
+    linked = await tp_repo.get_by_boond_provider_id(boond_company_id)
+    if linked and linked.id != third_party_id:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"La société #{boond_company_id} est déjà rattachée au fournisseur "
+                f"« {linked.company_name or linked.id} » dans Bobby."
+            ),
+        )
+
+
+@router.get(
+    "/{contract_request_id}/boond/company-lookup",
+    response_model=BoondCompanyLookupResponse,
+    summary="[Boond] Vérifier une société existante avant d'y rattacher le fournisseur",
+)
+async def boond_company_lookup(
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    boond_company_id: int = Query(
+        ..., ge=1, description="Identifiant de la société dans BoondManager"
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """Montre à l'ADV la société Boond qu'il s'apprête à rattacher au fournisseur.
+
+    Le nom trouvé confirme qu'il ne s'est pas trompé d'identifiant, la
+    comparaison de l'immatriculation au SIRET du tiers signale une société qui
+    n'est pas la bonne, et un tiers Bobby déjà rattaché à cette société
+    interdit d'en rattacher un second. ADV/admin only.
+    """
+    settings = get_settings()
+    cr_repo, _contract_repo, tp_repo, crm = _boond_deps(db, settings)
+    _cr, tp = await _load_supplier_for_boond(contract_request_id, cr_repo, tp_repo)
+
+    try:
+        info = await crm.get_company_information(boond_company_id)
+    except Exception as exc:
+        logger.error(
+            "boond_company_lookup_failed",
+            error=_boond_error_detail(exc),
+            boond_company_id=boond_company_id,
+            cr_id=str(contract_request_id),
+        )
+        raise HTTPException(
+            status_code=400, detail="Erreur lors de l'interrogation de BoondManager."
+        )
+    if info is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Société #{boond_company_id} introuvable dans BoondManager.",
+        )
+
+    linked = await tp_repo.get_by_boond_provider_id(boond_company_id)
+    return BoondCompanyLookupResponse(
+        boond_company_id=boond_company_id,
+        name=info.get("name"),
+        state=info.get("state"),
+        registration_number=info.get("registration_number"),
+        siret_matches=registration_matches(info.get("registration_number"), tp.siret),
+        linked_third_party_id=linked.id if linked else None,
+        linked_third_party_name=linked.company_name if linked else None,
+        linked_to_this_third_party=bool(linked and linked.id == tp.id),
+    )
+
+
+@router.post(
+    "/{contract_request_id}/boond/create-company",
+    summary="[Boond] Créer ou rattacher la société fournisseur + contacts",
+)
+async def boond_create_company(  # noqa: PLR0912, PLR0915
+    contract_request_id: UUID,
+    user_id: AdvOrAdminUser,
+    body: BoondCreateCompanyRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Reporte le fournisseur dans Boond : société et contacts. ADV/admin only.
+
+    Sans identifiant, la société est créée. Avec `boond_company_id`, le
+    fournisseur est **rattaché** à cette société déjà présente dans le CRM :
+    sa fiche est actualisée — jamais son nom ni son état — et ses contacts
+    déjà connus, retrouvés par e-mail, sont repris plutôt que doublés.
+    """
+    from app.contract_management.infrastructure.models import ContractCompanyModel
+
+    settings = get_settings()
+    cr_repo, _cr2, tp_repo, crm = _boond_deps(db, settings)
+    cr, tp = await _load_supplier_for_boond(contract_request_id, cr_repo, tp_repo)
 
     _require_pushable_supplier(cr, tp)
+
+    requested_id = body.boond_company_id if body else None
+    if requested_id and tp.boond_provider_id and tp.boond_provider_id != requested_id:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Ce fournisseur est déjà rattaché à la société #{tp.boond_provider_id} "
+                "dans BoondManager."
+            ),
+        )
+    if requested_id:
+        await _require_boond_company_free(tp_repo, requested_id, tp.id)
 
     # Fetch issuing company for agency_id
     from sqlalchemy import select as _select
@@ -3149,6 +3262,8 @@ async def boond_create_company(
     try:
         provider_id = tp.boond_provider_id
         created_company = False
+        attached_company = False
+        company_verified = False
 
         # Build formatted legal fields
         legal_status = None
@@ -3159,8 +3274,41 @@ async def boond_create_company(
             formatted_siren = _format_siren(tp.rcs_number)
             registered_office = f"{formatted_siren} R.C.S. {tp.rcs_city}"
 
+        # Société déjà dans le CRM, désignée par l'ADV : on la relit avant de
+        # la rattacher — un identifiant mal saisi ne doit rien rattacher.
+        if requested_id and not provider_id:
+            info = await crm.get_company_information(requested_id)
+            if info is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Société #{requested_id} introuvable dans BoondManager.",
+                )
+            provider_id = requested_id
+            tp.boond_provider_id = requested_id
+            await tp_repo.save(tp)
+            attached_company = True
+            company_verified = True
+            audit_logger.log(
+                AuditAction.BOOND_SYNC,
+                AuditResource.THIRD_PARTY,
+                user_id=user_id,
+                resource_id=str(tp.id),
+                details={
+                    "action": "boond_company_attached",
+                    "boond_company_id": requested_id,
+                    "boond_company_name": info.get("name"),
+                    "contract_request_id": str(cr.id),
+                },
+            )
+            logger.info(
+                "boond_company_attached",
+                cr_id=str(cr.id),
+                provider_id=requested_id,
+                company_name=info.get("name"),
+            )
+
         # Verify the cached provider_id still exists in Boond (may have been deleted)
-        if provider_id:
+        if provider_id and not company_verified:
             exists = await crm.verify_company_exists(provider_id)
             if not exists:
                 logger.warning(
@@ -3170,17 +3318,21 @@ async def boond_create_company(
                 )
                 provider_id = None
                 tp.boond_provider_id = None
-            else:
-                # Company exists — update with latest data
-                await crm.update_company_information(
-                    company_id=provider_id,
-                    postcode=tp.head_office_postal_code,
-                    address=tp.head_office_street or tp.head_office_address,
-                    town=tp.head_office_city,
-                    country="France",
-                    legal_status=legal_status,
-                    registered_office=registered_office,
-                )
+
+        if provider_id:
+            # Company exists — update with latest data (never its name nor state)
+            await crm.update_company_information(
+                company_id=provider_id,
+                postcode=tp.head_office_postal_code,
+                address=tp.head_office_street or tp.head_office_address,
+                town=tp.head_office_city,
+                country="France",
+                legal_status=legal_status,
+                registered_office=registered_office,
+                vat_number=tp.vat_number,
+                siret=tp.siret,
+                ape_code=tp.ape_code,
+            )
 
         if not provider_id:
             provider_id = await crm.create_company_full(
@@ -3213,6 +3365,7 @@ async def boond_create_company(
         existing_ids = persisted_contact_ids(tp)
 
         contacts_created = []
+        contacts_reused = []
         contacts_existing = [
             {
                 "label": " + ".join(contact.roles),
@@ -3222,26 +3375,30 @@ async def boond_create_company(
         ]
         role_to_contact_id: dict[str, int] = {}
         for contact in to_create:
-            contact_id = await crm.create_contact(
-                company_id=provider_id,
-                civility=contact.civility,
-                first_name=contact.first_name,
-                last_name=contact.last_name,
-                email=contact.email,
-                phone=contact.phone,
-                job_title=contact.job_title,
-                types_of=list(contact.types_of),
-                postcode=tp.head_office_postal_code,
-                address=tp.head_office_street or tp.head_office_address,
-                town=tp.head_office_city,
-                agency_id=agency_id,
-            )
-            contacts_created.append(
-                {
-                    "label": " + ".join(contact.roles),
-                    "boond_contact_id": contact_id,
-                }
-            )
+            label = " + ".join(contact.roles)
+            # Société déjà dans le CRM : un contact qu'elle connaît est repris
+            # plutôt que doublé. Une société créée à l'instant n'en a aucun.
+            contact_id = None
+            if not created_company:
+                contact_id = await find_existing_contact_id(crm, provider_id, contact)
+            if contact_id:
+                contacts_reused.append({"label": label, "boond_contact_id": contact_id})
+            else:
+                contact_id = await crm.create_contact(
+                    company_id=provider_id,
+                    civility=contact.civility,
+                    first_name=contact.first_name,
+                    last_name=contact.last_name,
+                    email=contact.email,
+                    phone=contact.phone,
+                    job_title=contact.job_title,
+                    types_of=list(contact.types_of),
+                    postcode=tp.head_office_postal_code,
+                    address=tp.head_office_street or tp.head_office_address,
+                    town=tp.head_office_city,
+                    agency_id=agency_id,
+                )
+                contacts_created.append({"label": label, "boond_contact_id": contact_id})
             for role in contact.roles:
                 role_to_contact_id[role] = contact_id
 
@@ -3258,24 +3415,16 @@ async def boond_create_company(
         return {
             "ok": True,
             "created_company": created_company,
+            "attached_company": attached_company,
             "boond_provider_id": provider_id,
             "contacts_created": contacts_created,
+            "contacts_reused": contacts_reused,
             "contacts_existing": contacts_existing,
         }
     except HTTPException:
         raise
     except Exception as exc:
-        # Extract the real Boond error from RetryError / HTTPStatusError chain
-        detail = str(exc)
-        cause = exc.__cause__ or (getattr(exc, "__context__", None))
-        if hasattr(cause, "response"):
-            detail = f"Boond HTTP {cause.response.status_code}: {cause.response.text[:2000]}"
-        elif hasattr(exc, "last_attempt"):
-            inner = exc.last_attempt.exception()
-            if inner and hasattr(inner, "response"):
-                detail = f"Boond HTTP {inner.response.status_code}: {inner.response.text[:2000]}"
-            elif inner:
-                detail = str(inner)
+        detail = _boond_error_detail(exc)
         logger.error("boond_create_company_failed", error=detail, cr_id=str(contract_request_id))
         raise HTTPException(
             status_code=400, detail="Erreur lors de la synchronisation avec BoondManager."

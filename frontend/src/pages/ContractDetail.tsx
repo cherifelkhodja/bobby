@@ -27,10 +27,12 @@ import {
   Upload,
   SkipForward,
   Building2,
+  Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { contractsApi, contractCompaniesApi, contractArticlesApi, contractAnnexesApi, contractConsultantsApi } from '../api/contracts';
+import type { BoondCompanyLookup } from '../api/contracts';
 import { vigilanceApi } from '../api/vigilance';
 import { purchaseOrdersApi } from '../api/purchaseOrders';
 import { useAuthStore } from '../stores/authStore';
@@ -201,6 +203,26 @@ export default function ContractDetail() {
   const [showSkipDocs, setShowSkipDocs] = useState(false);
   const [skipDocsReason, setSkipDocsReason] = useState('');
   const [showTpForm, setShowTpForm] = useState(false);
+  // Report du fournisseur dans Boond : l'ADV peut désigner une société déjà
+  // présente dans le CRM, relue et confirmée avant d'être rattachée.
+  const [showPushSupplier, setShowPushSupplier] = useState(false);
+  const [boondCompanyIdInput, setBoondCompanyIdInput] = useState('');
+  const [boondLookup, setBoondLookup] = useState<BoondCompanyLookup | null>(null);
+  const boondCompanyIdValue = boondCompanyIdInput.trim();
+  const boondCompanyIdValid = /^\d+$/.test(boondCompanyIdValue) && Number(boondCompanyIdValue) > 0;
+  // La vérification vaut pour l'identifiant saisi, pas pour un précédent.
+  const boondLookupCurrent =
+    !!boondLookup && String(boondLookup.boond_company_id) === boondCompanyIdValue;
+  const boondLookupConflict =
+    !!boondLookup && !!boondLookup.linked_third_party_id && !boondLookup.linked_to_this_third_party;
+  // Sans identifiant on crée ; avec, il faut l'avoir vérifié et qu'il soit libre.
+  const canPushSupplier =
+    boondCompanyIdValue === '' || (boondLookupCurrent && !boondLookupConflict);
+  const resetPushSupplier = () => {
+    setShowPushSupplier(false);
+    setBoondCompanyIdInput('');
+    setBoondLookup(null);
+  };
 
   // Contract configuration form state
   const [configForm, setConfigForm] = useState({
@@ -324,18 +346,38 @@ export default function ContractDetail() {
     onError: (error) => toast.error(getErrorMessage(error)),
   });
 
+  // Société Boond désignée par l'ADV : relue avant d'être rattachée, pour
+  // qu'un identifiant mal saisi ne rattache rien.
+  const lookupBoondCompanyMutation = useMutation({
+    mutationFn: () => contractsApi.boondLookupCompany(id!, Number(boondCompanyIdValue)),
+    onSuccess: (result) => setBoondLookup(result),
+    onError: (error) => {
+      setBoondLookup(null);
+      toast.error(getErrorMessage(error));
+    },
+  });
+
   // Report du fournisseur dans BoondManager, sans attendre la signature : l'ADV
   // a souvent besoin de la fiche dans le CRM pendant que le contrat circule.
   const pushSupplierMutation = useMutation({
-    mutationFn: () => contractsApi.boondCreateCompany(id!),
+    mutationFn: () =>
+      contractsApi.boondCreateCompany(
+        id!,
+        boondCompanyIdValue ? Number(boondCompanyIdValue) : undefined,
+      ),
     onSuccess: (result) => {
       const created = result.contacts_created.length;
-      toast.success(
-        result.created_company
-          ? `Fournisseur créé dans Boond (#${result.boond_provider_id})` +
-              (created ? ` avec ${created} contact${created > 1 ? 's' : ''}.` : '.')
-          : `Fournisseur mis à jour dans Boond (#${result.boond_provider_id}).`,
-      );
+      const reused = result.contacts_reused.length;
+      const details: string[] = [];
+      if (created) details.push(`${created} contact${created > 1 ? 's' : ''} créé${created > 1 ? 's' : ''}`);
+      if (reused) details.push(`${reused} contact${reused > 1 ? 's' : ''} existant${reused > 1 ? 's' : ''} repris`);
+      const head = result.created_company
+        ? `Fournisseur créé dans Boond (#${result.boond_provider_id})`
+        : result.attached_company
+          ? `Fournisseur rattaché à la société Boond #${result.boond_provider_id}, fiche actualisée`
+          : `Fournisseur mis à jour dans Boond (#${result.boond_provider_id})`;
+      toast.success(`${head}${details.length ? ` — ${details.join(', ')}` : ''}.`);
+      resetPushSupplier();
       queryClient.invalidateQueries({ queryKey: ['contract-request', id] });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
@@ -922,9 +964,9 @@ export default function ContractDetail() {
             ) : (
               <Button
                 variant="secondary"
-                onClick={() => pushSupplierMutation.mutate()}
-                disabled={pushSupplierMutation.isPending}
-                title="Créer la société fournisseur et ses contacts dans BoondManager, sans attendre la signature"
+                onClick={() => setShowPushSupplier(true)}
+                disabled={showPushSupplier || pushSupplierMutation.isPending}
+                title="Créer la société fournisseur et ses contacts dans BoondManager, ou la rattacher à une société déjà présente, sans attendre la signature"
                 leftIcon={<Building2 className="h-3.5 w-3.5" />}
               >
                 {pushSupplierMutation.isPending ? 'Report…' : 'Pousser dans Boond'}
@@ -990,6 +1032,87 @@ export default function ContractDetail() {
                 setSkipDocsReason('');
               }}
             >
+              Annuler
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Report du fournisseur dans Boond — création, ou rattachement à une société déjà présente */}
+      {isAdv && showPushSupplier && (
+        <div className="card mt-3">
+          <h3 className="ct">Pousser le fournisseur dans BoondManager</h3>
+          <p className="cs">
+            La société et ses contacts sont créés dans le CRM. Si la société y existe déjà,
+            indiquez son identifiant : sa fiche est actualisée au lieu d'être doublée, et ses
+            contacts déjà connus sont repris.
+          </p>
+          <label className="f-lab mt-3.5" htmlFor="boond-company-id">
+            ID de la société dans BoondManager (si elle existe déjà)
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="boond-company-id"
+              type="text"
+              inputMode="numeric"
+              value={boondCompanyIdInput}
+              onChange={(e) => {
+                setBoondCompanyIdInput(e.target.value);
+                setBoondLookup(null);
+              }}
+              placeholder="Ex. : 1234 — vide pour créer la société"
+              className="f-in max-w-xs"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => lookupBoondCompanyMutation.mutate()}
+              disabled={!boondCompanyIdValid || lookupBoondCompanyMutation.isPending}
+              isLoading={lookupBoondCompanyMutation.isPending}
+              leftIcon={<Search className="h-3.5 w-3.5" />}
+            >
+              Vérifier
+            </Button>
+          </div>
+          {boondLookup && boondLookupCurrent && (
+            <div
+              className={
+                boondLookupConflict
+                  ? 'alert red !mt-3 !py-2.5 !text-[12.5px]'
+                  : boondLookup.siret_matches === true
+                    ? 'okbox mt-3 !py-2.5 !text-[12.5px]'
+                    : 'alert !mt-3 !py-2.5 !text-[12.5px]'
+              }
+            >
+              {boondLookupConflict || boondLookup.siret_matches !== true ? (
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+              ) : (
+                <CheckCircle className="h-4 w-4 shrink-0" />
+              )}
+              <span>
+                Société #{boondLookup.boond_company_id} « {boondLookup.name ?? 'sans nom'} »
+                trouvée dans BoondManager.
+                {boondLookup.siret_matches === true && ' SIRET identique.'}
+                {boondLookup.siret_matches === false &&
+                  ` Attention : son immatriculation (${boondLookup.registration_number}) diffère du SIRET du fournisseur.`}
+                {boondLookup.siret_matches === null &&
+                  " Immatriculation non renseignée dans Boond : vérifiez qu'il s'agit bien de la même société."}
+                {boondLookupConflict &&
+                  ` Elle est déjà rattachée au fournisseur « ${boondLookup.linked_third_party_name ?? '?'} » dans Bobby : impossible de la rattacher à celui-ci.`}
+              </span>
+            </div>
+          )}
+          <div className="flex gap-2 mt-3">
+            <Button
+              size="sm"
+              onClick={() => pushSupplierMutation.mutate()}
+              disabled={!canPushSupplier || pushSupplierMutation.isPending}
+              isLoading={pushSupplierMutation.isPending}
+              leftIcon={<Building2 className="h-3.5 w-3.5" />}
+            >
+              {boondCompanyIdValue ? 'Rattacher et pousser' : 'Créer dans Boond'}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={resetPushSupplier}>
               Annuler
             </Button>
           </div>

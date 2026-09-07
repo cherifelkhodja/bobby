@@ -485,7 +485,8 @@ nouveau → en_cours → entretien → accepté
 - `POST /{id}/mark-as-signed` - Mark contract as signed (ADV/admin)
 - `POST /{id}/push-to-crm` - Push to BoondManager (ADV/admin, full sync)
 - `POST /{id}/retry-boond-sync` - Retry failed Boond sync (ADV/admin)
-- `POST /{id}/boond/create-company` - [Boond] Create supplier company + contacts (available before signature; never re-creates what is already pushed)
+- `GET /{id}/boond/company-lookup?boond_company_id=` - [Boond] Read an existing Boond company before attaching the supplier to it: name, SIRET match, tiers already linked (ADV/admin)
+- `POST /{id}/boond/create-company` - [Boond] Create supplier company + contacts (available before signature; never re-creates what is already pushed). With `boond_company_id`, attaches the supplier to that existing Boond company instead: its sheet is updated by PUT (never its name nor state) and contacts already known by e-mail are reused
 - `POST /{id}/boond/convert-candidate` - [Boond] Convert candidate to resource
 - `POST /{id}/boond/create-contract` - [Boond] Create Boond contract (external, optional resource_id override)
 - `POST /{id}/boond/create-purchase-order` - [Boond] Create purchase order

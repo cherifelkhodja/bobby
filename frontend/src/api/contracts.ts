@@ -295,16 +295,32 @@ export const contractsApi = {
   /**
    * Reporte le fournisseur (société + contacts) dans BoondManager. N'attend pas
    * la signature du contrat cadre, et ne recrée ni la société ni les contacts
-   * déjà reportés.
+   * déjà reportés. Avec `boondCompanyId`, le fournisseur est rattaché à cette
+   * société déjà présente dans le CRM, actualisée au lieu d'être doublée.
    */
-  boondCreateCompany: async (id: string): Promise<{
+  boondCreateCompany: async (
+    id: string,
+    boondCompanyId?: number,
+  ): Promise<{
     ok: boolean;
     created_company: boolean;
+    attached_company: boolean;
     boond_provider_id: number;
     contacts_created: { label: string; boond_contact_id: number }[];
+    contacts_reused: { label: string; boond_contact_id: number }[];
     contacts_existing: { label: string; boond_contact_id: number }[];
   }> => {
-    const response = await apiClient.post(`/contract-requests/${id}/boond/create-company`);
+    const body = boondCompanyId ? { boond_company_id: boondCompanyId } : undefined;
+    const response = await apiClient.post(`/contract-requests/${id}/boond/create-company`, body);
+    return response.data;
+  },
+
+  /** Relit une société Boond avant d'y rattacher le fournisseur : nom, SIRET, tiers déjà lié. */
+  boondLookupCompany: async (id: string, boondCompanyId: number): Promise<BoondCompanyLookup> => {
+    const response = await apiClient.get<BoondCompanyLookup>(
+      `/contract-requests/${id}/boond/company-lookup`,
+      { params: { boond_company_id: boondCompanyId } },
+    );
     return response.data;
   },
 
@@ -436,6 +452,20 @@ export interface ThirdPartyInfoInput {
   billing_contact_last_name?: string | null;
   billing_contact_email?: string | null;
   billing_contact_phone?: string | null;
+}
+
+/** Société BoondManager relue avant d'y rattacher le fournisseur. */
+export interface BoondCompanyLookup {
+  boond_company_id: number;
+  name: string | null;
+  state: number | null;
+  registration_number: string | null;
+  /** null : rien à comparer (immatriculation ou SIRET absent). */
+  siret_matches: boolean | null;
+  /** Tiers Bobby déjà rattaché à cette société, s'il y en a un. */
+  linked_third_party_id: string | null;
+  linked_third_party_name: string | null;
+  linked_to_this_third_party: boolean;
 }
 
 export interface SiretLookupResult {

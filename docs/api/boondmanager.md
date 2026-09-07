@@ -462,8 +462,24 @@ Vérifie si une société existe encore dans Boond (avant de créer des contacts
 async def verify_company_exists(self, company_id: int) -> bool
 ```
 
+#### GET /companies/{id}/information
+Relit la fiche d'une société, réduite à ce qui l'identifie : nom, état,
+`registrationNumber` (SIREN + NIC), TVA, ville. Sert à **rattacher** un
+fournisseur à une société déjà présente dans le CRM : l'ADV saisit son
+identifiant, Bobby lui montre le nom trouvé et compare l'immatriculation au
+SIRET du tiers (`boond_supplier.registration_matches`) avant de rattacher.
+
+```python
+async def get_company_information(self, company_id: int) -> dict | None
+# {"id", "name", "state", "registration_number", "vat_number", "town"} — None sur 404
+```
+
 #### PUT /companies/{id}/information
-Met à jour les données d'une société existante.
+Actualise une société existante. Seule l'identité collectée par Bobby est
+poussée : adresse, mentions légales, TVA, SIRET (`registrationNumber`), code
+APE. Le **nom** et l'**état** restent ceux du CRM — une société rattachée par
+l'ADV peut y vivre sous un autre libellé, et ce PUT n'accepte pas `typeOf` :
+il ne saurait faire d'un client un fournisseur.
 
 ```python
 async def update_company_information(
@@ -471,6 +487,7 @@ async def update_company_information(
     postcode: str | None = None, address: str | None = None,
     town: str | None = None, country: str | None = None,
     legal_status: str | None = None, registered_office: str | None = None,
+    vat_number: str | None = None, siret: str | None = None, ape_code: str | None = None,
 ) -> None
 ```
 
@@ -512,6 +529,19 @@ Types des contacts. Les valeurs ci-dessous sont celles du CRM du groupe :
 Un contact cumulant plusieurs rôles porte plusieurs types : le dédoublonnage se
 fait sur prénom + nom + email (`application/boond_contacts.py`), partagé par la
 synchronisation automatique et par l'action manuelle de l'ADV.
+
+#### GET /contacts?keywords=
+Retrouve un contact d'une société par son adresse e-mail, avant d'en créer un.
+Une société rattachée par l'ADV a souvent déjà ses contacts dans le CRM : les
+recréer y laisserait des homonymes. Ne retient qu'un contact **de cette
+société** (`relationships.company`) dont l'une des adresses `email1..3` est
+exactement celle cherchée — un homonyme chez un autre client n'est jamais
+rattaché. Un échec de la recherche ne bloque pas le report : le contact est
+alors créé (`boond_supplier.find_existing_contact_id`).
+
+```python
+async def find_contact_by_email(self, company_id: int, email: str) -> int | None
+```
 
 ### Conversion candidat → ressource
 
@@ -884,8 +914,8 @@ async def create_supplier_purchase(
 
 | Étape | Action | Endpoint Boond | Données persistées |
 |-------|--------|----------------|-------------------|
-| 1 | Créer société fournisseur | `POST /companies` | `tp.boond_provider_id` |
-| 2 | Créer contacts (signataire, ADV, facturation) | `POST /contacts` | `tp.boond_signatory_contact_id`, `tp.boond_adv_contact_id`, `tp.boond_billing_contact_id` |
+| 1 | Créer société fournisseur — ou actualiser celle que l'ADV a rattachée | `POST /companies` ou `PUT /companies/{id}/information` | `tp.boond_provider_id` |
+| 2 | Créer contacts (signataire, ADV, facturation) — repris par e-mail si la société les connaît déjà | `GET /contacts?keywords=` puis `POST /contacts` | `tp.boond_signatory_contact_id`, `tp.boond_adv_contact_id`, `tp.boond_billing_contact_id` |
 | 3 | Convertir candidat → ressource | `PUT /candidates/{id}/information` | `cr.boond_candidate_id` (nouvel ID), `cr.boond_consultant_type = "resource"` |
 | 4 | Créer contrat Boond | `POST /contracts` | `cr.boond_contract_id` |
 | 5 | Créer l'achat fournisseur | `POST /purchases` | `contract.boond_purchase_order_id` |

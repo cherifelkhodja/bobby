@@ -931,6 +931,38 @@ class BoondCrmAdapter:
                 return False
             raise
 
+    async def get_company_information(self, company_id: int) -> dict[str, Any] | None:
+        """Lit la fiche d'une société Boond, réduite à ce qui l'identifie.
+
+        Sert à rattacher un fournisseur à une société **déjà présente** dans
+        le CRM : l'ADV saisit son identifiant, Bobby lui montre le nom trouvé
+        et compare l'immatriculation au SIRET du tiers avant de rattacher.
+
+        Returns:
+            ``{"id", "name", "state", "registration_number", "vat_number",
+            "town"}``, ou ``None`` sur un vrai 404. Toute autre erreur est
+            propagée, comme pour ``verify_company_exists``.
+        """
+        try:
+            response = await self._boond._make_request(
+                "GET", f"/companies/{company_id}/information"
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                logger.warning("boond_company_not_found", company_id=company_id)
+                return None
+            raise
+        data = response.get("data") or {}
+        attributes = data.get("attributes") or {}
+        return {
+            "id": int(data.get("id") or company_id),
+            "name": attributes.get("name"),
+            "state": attributes.get("state"),
+            "registration_number": attributes.get("registrationNumber"),
+            "vat_number": attributes.get("vatNumber"),
+            "town": attributes.get("town"),
+        }
+
     async def create_company_full(  # noqa: PLR0913
         self,
         company_name: str,
@@ -1026,10 +1058,18 @@ class BoondCrmAdapter:
         country: str | None = None,
         legal_status: str | None = None,
         registered_office: str | None = None,
+        vat_number: str | None = None,
+        siret: str | None = None,
+        ape_code: str | None = None,
     ) -> None:
-        """Update a company's information in BoondManager.
+        """Actualise une société existante via ``PUT /companies/{id}/information``.
 
-        Uses PUT /companies/{id}/information with data.attributes.postcode etc.
+        Seules les données d'identité collectées par Bobby sont poussées :
+        adresse, mentions légales, TVA, SIRET (``registrationNumber``), code
+        APE. Le **nom** et l'**état** de la société restent ceux du CRM : une
+        société rattachée par l'ADV peut y vivre sous un autre libellé, et ce
+        PUT n'accepte pas ``typeOf`` — il ne saurait faire d'un client un
+        fournisseur.
         """
         attributes: dict[str, Any] = {}
         if postcode:
@@ -1044,6 +1084,12 @@ class BoondCrmAdapter:
             attributes["legalStatus"] = legal_status
         if registered_office:
             attributes["registeredOffice"] = registered_office
+        if vat_number:
+            attributes["vatNumber"] = vat_number
+        if siret:
+            attributes["registrationNumber"] = siret
+        if ape_code:
+            attributes["apeCode"] = ape_code
 
         if not attributes:
             return
@@ -1145,6 +1191,42 @@ class BoondCrmAdapter:
             types_of=types_of,
         )
         return contact_id
+
+    async def find_contact_by_email(self, company_id: int, email: str) -> int | None:
+        """Retrouve un contact d'une société Boond par son adresse e-mail.
+
+        Une société rattachée par l'ADV a souvent déjà ses contacts dans le
+        CRM : les recréer y laisserait des homonymes. La recherche passe par
+        ``GET /contacts?keywords=`` et ne retient qu'un contact **de cette
+        société** dont l'une des adresses est exactement celle cherchée — un
+        homonyme chez un autre client n'est jamais rattaché.
+
+        Returns:
+            L'identifiant du contact, ou ``None`` faute de correspondance.
+        """
+        wanted = (email or "").strip().lower()
+        if not wanted:
+            return None
+        response = await self._boond._make_request(
+            "GET", "/contacts", params={"keywords": wanted, "maxResults": 30}
+        )
+        for item in response.get("data") or []:
+            attributes = item.get("attributes") or {}
+            emails = {
+                str(attributes.get(key) or "").strip().lower()
+                for key in ("email1", "email2", "email3")
+            }
+            if wanted not in emails:
+                continue
+            if self._extract_relationship_id(item.get("relationships") or {}, "company") != (
+                company_id
+            ):
+                continue
+            contact_id = item.get("id")
+            if contact_id:
+                logger.info("boond_contact_reused", company_id=company_id, contact_id=contact_id)
+                return int(contact_id)
+        return None
 
     async def get_resource_type_of(self, resource_id: int) -> int | None:
         """Fetch the typeOf attribute of a resource.

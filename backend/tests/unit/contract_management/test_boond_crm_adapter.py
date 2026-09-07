@@ -737,3 +737,171 @@ class TestCreateBoondContract:
                 daily_rate=500.0,
                 type_of=2,
             )
+
+
+class TestGetCompanyInformation:
+    """``get_company_information`` : la fiche réduite, None sur 404, propage sinon."""
+
+    @pytest.mark.asyncio
+    async def test_returns_identity_fields(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value={
+                "data": {
+                    "id": "123",
+                    "type": "company",
+                    "attributes": {
+                        "name": "ACME SAS",
+                        "state": 9,
+                        "registrationNumber": "894 213 669 00012",
+                        "vatNumber": "FR12894213669",
+                        "town": "Paris",
+                        "website": "ignored",
+                    },
+                }
+            }
+        )
+
+        result = await adapter.get_company_information(123)
+
+        assert result == {
+            "id": 123,
+            "name": "ACME SAS",
+            "state": 9,
+            "registration_number": "894 213 669 00012",
+            "vat_number": "FR12894213669",
+            "town": "Paris",
+        }
+        boond._make_request.assert_awaited_once_with("GET", "/companies/123/information")
+
+    @pytest.mark.asyncio
+    async def test_returns_none_only_on_404(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=_http_status_error(404))
+
+        assert await adapter.get_company_information(123) is None
+
+    @pytest.mark.asyncio
+    async def test_propagates_on_500(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(side_effect=_http_status_error(500))
+
+        with pytest.raises(httpx.HTTPStatusError):
+            await adapter.get_company_information(123)
+
+
+class TestUpdateCompanyInformation:
+    """``update_company_information`` : l'identité collectée, jamais le nom ni l'état."""
+
+    @pytest.mark.asyncio
+    async def test_pushes_identity_fields_only(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value={"data": {"id": "123"}})
+
+        await adapter.update_company_information(
+            company_id=123,
+            postcode="75001",
+            address="1 rue de la Paix",
+            town="Paris",
+            country="France",
+            legal_status="SAS au capital de 1 000 €",
+            registered_office="894 213 669 R.C.S. Paris",
+            vat_number="FR12894213669",
+            siret="89421366900012",
+            ape_code="6202A",
+        )
+
+        boond._make_request.assert_awaited_once()
+        method, path = boond._make_request.await_args.args
+        payload = boond._make_request.await_args.kwargs["json"]
+        assert (method, path) == ("PUT", "/companies/123/information")
+        assert payload == {
+            "data": {
+                "attributes": {
+                    "postcode": "75001",
+                    "address": "1 rue de la Paix",
+                    "town": "Paris",
+                    "country": "France",
+                    "legalStatus": "SAS au capital de 1 000 €",
+                    "registeredOffice": "894 213 669 R.C.S. Paris",
+                    "vatNumber": "FR12894213669",
+                    "registrationNumber": "89421366900012",
+                    "apeCode": "6202A",
+                }
+            }
+        }
+        assert "name" not in payload["data"]["attributes"]
+        assert "state" not in payload["data"]["attributes"]
+
+    @pytest.mark.asyncio
+    async def test_skips_empty_values_and_noop_when_nothing(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value={})
+
+        await adapter.update_company_information(company_id=123, siret="", ape_code=None)
+
+        boond._make_request.assert_not_awaited()
+
+
+def _contact(contact_id: str, company_id: str | None, **emails) -> dict:
+    item = {"id": contact_id, "type": "contact", "attributes": dict(emails)}
+    if company_id is not None:
+        item["relationships"] = {"company": {"data": {"id": company_id, "type": "company"}}}
+    return item
+
+
+class TestFindContactByEmail:
+    """``find_contact_by_email`` : même adresse, même société, sinon rien."""
+
+    @pytest.mark.asyncio
+    async def test_matches_email_on_the_same_company(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value={
+                "data": [
+                    _contact("10", "999", email1="jean@acme.test"),
+                    _contact("11", "123", email1="Jean@ACME.test"),
+                ]
+            }
+        )
+
+        result = await adapter.find_contact_by_email(123, " jean@acme.test ")
+
+        assert result == 11
+        boond._make_request.assert_awaited_once_with(
+            "GET", "/contacts", params={"keywords": "jean@acme.test", "maxResults": 30}
+        )
+
+    @pytest.mark.asyncio
+    async def test_matches_secondary_email(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value={
+                "data": [_contact("12", "123", email1="pro@acme.test", email2="jean@acme.test")]
+            }
+        )
+
+        assert await adapter.find_contact_by_email(123, "jean@acme.test") == 12
+
+    @pytest.mark.asyncio
+    async def test_never_attaches_a_contact_of_another_company(self):
+        """Un homonyme chez un autre client, ou sans société, n'est pas rattaché."""
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(
+            return_value={
+                "data": [
+                    _contact("10", "999", email1="jean@acme.test"),
+                    _contact("13", None, email1="jean@acme.test"),
+                ]
+            }
+        )
+
+        assert await adapter.find_contact_by_email(123, "jean@acme.test") is None
+
+    @pytest.mark.asyncio
+    async def test_no_request_without_email(self):
+        adapter, boond = _make_adapter()
+        boond._make_request = AsyncMock(return_value={"data": []})
+
+        assert await adapter.find_contact_by_email(123, "  ") is None
+        boond._make_request.assert_not_awaited()

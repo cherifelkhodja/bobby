@@ -195,6 +195,34 @@ class SupplierFrameworkSummary(BaseModel):
     issuer_company_name: str | None = None
 
 
+class BoondCreateCompanyRequest(BaseModel):
+    """Report du fournisseur dans BoondManager.
+
+    Sans identifiant, la société est créée. Avec, elle est **rattachée** à la
+    société déjà présente dans le CRM, dont la fiche est actualisée au lieu
+    d'être doublée.
+    """
+
+    boond_company_id: int | None = Field(
+        None, ge=1, description="Société déjà présente dans BoondManager, à actualiser"
+    )
+
+
+class BoondCompanyLookupResponse(BaseModel):
+    """Ce que Bobby sait d'une société Boond avant de lui rattacher le fournisseur."""
+
+    boond_company_id: int
+    name: str | None = None
+    state: int | None = None
+    registration_number: str | None = None
+    # None : rien à comparer (immatriculation ou SIRET absent).
+    siret_matches: bool | None = None
+    # Tiers Bobby déjà rattaché à cette société, s'il y en a un.
+    linked_third_party_id: UUID | None = None
+    linked_third_party_name: str | None = None
+    linked_to_this_third_party: bool = False
+
+
 class SupplierLookupResponse(BaseModel):
     """Résultat de la recherche d'un fournisseur par SIRET.
 
