@@ -47,7 +47,7 @@ push Boond restent tels quels. Le BDC s'ajoute à côté.
 | Colonne | Type | Rôle |
 |---|---|---|
 | `id` | UUID PK | |
-| `reference` | VARCHAR(20) unique | `XXX-BC-NNNN`, séquence par société émettrice |
+| `reference` | VARCHAR(20) unique | `XXX-BDC-NNNN`, séquence par société émettrice |
 | `status` | VARCHAR(30) | cf. machine à états |
 | `company_id` | FK `cm_contract_companies` | société émettrice (GEM…) |
 | `third_party_id` | FK `tp_third_parties` | fournisseur |
@@ -164,7 +164,7 @@ contrôle d'état, même préremplissage. Sert aux reconductions et aux rattrapa
 2. Complément : client, intitulé et description de mission, lieu, TJM, CJM,
    jours vendus, jours de gratuité, dates. Besoin Boond modifiable, facultatif.
 3. Génération du PDF (moteur HTML → PDF existant, charte « Éditorial »),
-   numéroté `XXX-BC-NNNN` et référençant le contrat cadre parent.
+   numéroté `XXX-BDC-NNNN` et référençant le contrat cadre parent.
 4. Envoi en signature au fournisseur. **Aucune validation fournisseur ni consultant
    en amont** : le dossier est instruit uniquement côté Bobby.
 5. À la signature, **push Boond** :

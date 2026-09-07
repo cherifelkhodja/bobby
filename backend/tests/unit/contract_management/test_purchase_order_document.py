@@ -31,8 +31,8 @@ SALE_RATE = Decimal("780")
 
 def _purchase_order(**overrides) -> PurchaseOrder:
     defaults = {
-        "provisional_reference": "PROV-BC-2026-001",
-        "reference": "GEM-BC-001",
+        "provisional_reference": "PROV-BDC-2026-001",
+        "reference": "GEM-BDC-001",
         "company_id": uuid4(),
         "third_party_id": uuid4(),
         "contract_request_id": uuid4(),
@@ -120,7 +120,7 @@ def _make_use_case(  # noqa: PLR0913
     third_party=None,
     framework=None,
     company=None,
-    next_reference="GEM-BC-009",
+    next_reference="GEM-BDC-009",
     company_code="GEM",
 ):
     po_repo = AsyncMock()
@@ -277,7 +277,7 @@ class TestTemplateRendering:
         html = self._html()
 
         assert "Bon de commande" in html
-        assert "GEM-BC-001" in html
+        assert "GEM-BDC-001" in html
         assert "TMA Socle Data" in html
         assert "AKEMA TECH" in html
 
@@ -456,7 +456,7 @@ class TestGeneration:
 
         s3.upload_file.assert_awaited_once()
         assert result.status == PurchaseOrderStatus.GENERATED
-        assert result.s3_key_draft == "purchase-orders/GEM-BC-001/bon_de_commande_v1.pdf"
+        assert result.s3_key_draft == "purchase-orders/GEM-BDC-001/bon_de_commande_v1.pdf"
 
     @pytest.mark.asyncio
     async def test_a_framework_signed_after_the_last_edit_is_still_quoted(self, monkeypatch):
@@ -499,15 +499,15 @@ class TestNumbering:
             po,
             third_party=_third_party(),
             framework=_framework(),
-            next_reference="GEM-BC-007",
+            next_reference="GEM-BDC-007",
         )
         _stub_pdf(monkeypatch)
 
         result = await use_case.execute(po.id)
 
-        assert result.reference == "GEM-BC-007"
-        assert result.s3_key_draft == "purchase-orders/GEM-BC-007/bon_de_commande_v1.pdf"
-        assert s3.upload_file.await_args.kwargs["key"].startswith("purchase-orders/GEM-BC-007/")
+        assert result.reference == "GEM-BDC-007"
+        assert result.s3_key_draft == "purchase-orders/GEM-BDC-007/bon_de_commande_v1.pdf"
+        assert s3.upload_file.await_args.kwargs["key"].startswith("purchase-orders/GEM-BDC-007/")
 
     @pytest.mark.asyncio
     async def test_a_numbered_order_is_never_renumbered(self, monkeypatch):
@@ -517,13 +517,13 @@ class TestNumbering:
             po,
             third_party=_third_party(),
             framework=_framework(),
-            next_reference="GEM-BC-042",
+            next_reference="GEM-BDC-042",
         )
         _stub_pdf(monkeypatch)
 
         result = await use_case.execute(po.id)
 
-        assert result.reference == "GEM-BC-001"
+        assert result.reference == "GEM-BDC-001"
 
     @pytest.mark.asyncio
     async def test_an_incomplete_order_consumes_no_number(self):
@@ -535,4 +535,4 @@ class TestNumbering:
             await use_case.execute(po.id)
 
         assert po.reference is None
-        assert po.display_reference == "PROV-BC-2026-001"
+        assert po.display_reference == "PROV-BDC-2026-001"

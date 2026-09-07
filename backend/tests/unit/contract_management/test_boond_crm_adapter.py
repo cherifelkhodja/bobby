@@ -270,7 +270,7 @@ class TestSupplierPurchase:
         boond._make_request = AsyncMock(return_value={"data": {"id": "666"}})
 
         purchase_id = await adapter.create_supplier_purchase(
-            project_id=224, delivery_id=804, title="CHEBBI Rym - AKEMA TECH - GEM-BC-001"
+            project_id=224, delivery_id=804, title="CHEBBI Rym - AKEMA TECH - GEM-BDC-001"
         )
 
         assert purchase_id == 666
@@ -292,7 +292,7 @@ class TestSupplierPurchase:
         adapter, boond = _make_adapter()
         boond._make_request = AsyncMock(return_value={"data": {"id": "666"}})
 
-        await adapter.create_supplier_purchase(project_id=224, delivery_id=804, title="GEM-BC-001")
+        await adapter.create_supplier_purchase(project_id=224, delivery_id=804, title="GEM-BDC-001")
 
         assert set(self._body(boond)["attributes"]) == {"title", "createPayments"}
 
@@ -302,7 +302,7 @@ class TestSupplierPurchase:
         adapter, boond = _make_adapter()
         boond._make_request = AsyncMock(return_value={"data": {"id": "666"}})
 
-        await adapter.create_supplier_purchase(project_id=224, delivery_id=804, title="GEM-BC-001")
+        await adapter.create_supplier_purchase(project_id=224, delivery_id=804, title="GEM-BDC-001")
 
         assert self._body(boond)["attributes"]["createPayments"] is None
 
@@ -323,7 +323,7 @@ class TestSupplierPurchase:
 
         with pytest.raises(BoondCrmError):
             await adapter.create_supplier_purchase(
-                project_id=224, delivery_id=804, title="GEM-BC-001"
+                project_id=224, delivery_id=804, title="GEM-BDC-001"
             )
 
 

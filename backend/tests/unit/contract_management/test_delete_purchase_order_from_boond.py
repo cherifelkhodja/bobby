@@ -25,8 +25,8 @@ from app.contract_management.domain.value_objects.purchase_order_status import (
 
 def _pushed_po(**overrides) -> PurchaseOrder:
     defaults = {
-        "provisional_reference": "PROV-BC-2026-001",
-        "reference": "GEM-BC-001",
+        "provisional_reference": "PROV-BDC-2026-001",
+        "reference": "GEM-BDC-001",
         "status": PurchaseOrderStatus.SIGNED,
         "third_party_id": uuid4(),
         "boond_positioning_id": 41,

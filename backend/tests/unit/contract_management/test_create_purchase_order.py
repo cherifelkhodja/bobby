@@ -55,8 +55,8 @@ def _make_use_case(
     """Use case wired with fakes; returns it along with its repositories."""
     po_repo = AsyncMock()
     po_repo.get_by_positioning_id = AsyncMock(return_value=existing)
-    po_repo.get_next_provisional_reference = AsyncMock(return_value="PROV-BC-2026-001")
-    po_repo.get_next_reference = AsyncMock(return_value="GEM-BC-001")
+    po_repo.get_next_provisional_reference = AsyncMock(return_value="PROV-BDC-2026-001")
+    po_repo.get_next_reference = AsyncMock(return_value="GEM-BDC-001")
     po_repo.save = AsyncMock(side_effect=lambda po: po)
 
     crm = AsyncMock()
@@ -93,9 +93,9 @@ class TestTriggerState:
         po = await use_case.execute(41)
 
         # Le numéro définitif n'arrive qu'à la génération du document.
-        assert po.provisional_reference == "PROV-BC-2026-001"
+        assert po.provisional_reference == "PROV-BDC-2026-001"
         assert po.reference is None
-        assert po.display_reference == "PROV-BC-2026-001"
+        assert po.display_reference == "PROV-BDC-2026-001"
         assert po.status == PurchaseOrderStatus.DRAFT
 
     @pytest.mark.asyncio
@@ -146,8 +146,8 @@ class TestIdempotence:
     async def test_refuses_a_second_purchase_order(self):
         """Rejouer le webhook ne crée pas de doublon."""
         existing = PurchaseOrder(
-            provisional_reference="PROV-BC-2026-001",
-            reference="GEM-BC-001",
+            provisional_reference="PROV-BDC-2026-001",
+            reference="GEM-BDC-001",
             boond_positioning_id=41,
         )
         use_case, po_repo, _, _ = _make_use_case(existing=existing)
@@ -155,7 +155,7 @@ class TestIdempotence:
         with pytest.raises(PurchaseOrderAlreadyExistsError) as exc:
             await use_case.execute(41)
 
-        assert exc.value.reference == "GEM-BC-001"
+        assert exc.value.reference == "GEM-BDC-001"
         po_repo.save.assert_not_awaited()
 
 

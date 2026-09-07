@@ -28,8 +28,8 @@ from app.contract_management.domain.value_objects.purchase_order_status import (
 
 def _make_po(**overrides) -> PurchaseOrder:
     defaults = {
-        "provisional_reference": "PROV-BC-2026-001",
-        "reference": "GEM-BC-001",
+        "provisional_reference": "PROV-BDC-2026-001",
+        "reference": "GEM-BDC-001",
         "boond_positioning_id": 41,
         "days_sold": Decimal("20"),
         "purchase_daily_rate": Decimal("500"),
@@ -40,7 +40,7 @@ def _make_po(**overrides) -> PurchaseOrder:
     return PurchaseOrder(**defaults)
 
 
-def _make_use_case(po, *, framework=None, other_requests=None, next_reference="GEM-BC-002"):
+def _make_use_case(po, *, framework=None, other_requests=None, next_reference="GEM-BDC-002"):
     po_repo = AsyncMock()
     po_repo.get_by_id = AsyncMock(return_value=po)
     po_repo.save = AsyncMock(side_effect=lambda entity: entity)
@@ -261,7 +261,7 @@ class TestReferenceNumbering:
         po_repo.get_next_reference.assert_not_awaited()
         cr_repo.get_company_code.assert_not_awaited()
         assert result.reference is None
-        assert result.display_reference == "PROV-BC-2026-001"
+        assert result.display_reference == "PROV-BDC-2026-001"
 
     @pytest.mark.asyncio
     async def test_changing_the_issuing_company_releases_the_definitive_reference(self):
@@ -275,7 +275,7 @@ class TestReferenceNumbering:
         # prochaine génération du document.
         po_repo.get_next_reference.assert_not_awaited()
         assert result.reference is None
-        assert result.display_reference == "PROV-BC-2026-001"
+        assert result.display_reference == "PROV-BDC-2026-001"
 
     @pytest.mark.asyncio
     async def test_the_reference_is_kept_when_the_company_does_not_change(self):
@@ -287,7 +287,7 @@ class TestReferenceNumbering:
         result = await use_case.execute(_command(po, company_id=company_id, client_name="ACME"))
 
         po_repo.get_next_reference.assert_not_awaited()
-        assert result.reference == "GEM-BC-001"
+        assert result.reference == "GEM-BDC-001"
 
 
 class TestMissingOrder:

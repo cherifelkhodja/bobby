@@ -43,10 +43,10 @@ class PurchaseOrder:
 
     Numérotation, en deux temps :
 
-    - ``provisional_reference`` (``PROV-BC-YYYY-NNN``) est assignée à la
+    - ``provisional_reference`` (``PROV-BDC-YYYY-NNN``) est assignée à la
       création et sert d'identifiant tant que le bon de commande est en
       préparation ;
-    - ``reference`` (``XXX-BC-NNN``, séquence propre à chaque société
+    - ``reference`` (``XXX-BDC-NNN``, séquence propre à chaque société
       émettrice) n'est assignée qu'à la **génération du document**, moment où
       le numéro s'imprime et devient définitif.
 

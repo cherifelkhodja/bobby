@@ -24,8 +24,8 @@ from app.contract_management.domain.value_objects.purchase_order_status import (
 
 def _signed_po(**overrides) -> PurchaseOrder:
     defaults = {
-        "provisional_reference": "PROV-BC-2026-001",
-        "reference": "GEM-BC-001",
+        "provisional_reference": "PROV-BDC-2026-001",
+        "reference": "GEM-BDC-001",
         "status": PurchaseOrderStatus.SIGNED,
         "third_party_id": uuid4(),
         "contract_request_id": uuid4(),
@@ -546,7 +546,7 @@ class TestBoondWrites:
         await use_case.execute(po.id)
 
         title = crm.create_supplier_purchase.await_args.kwargs["title"]
-        assert title == "CHEBBI Rym - AKEMA TECH - GEM-BC-001"
+        assert title == "CHEBBI Rym - AKEMA TECH - GEM-BDC-001"
 
     @pytest.mark.asyncio
     async def test_the_order_becomes_active(self):

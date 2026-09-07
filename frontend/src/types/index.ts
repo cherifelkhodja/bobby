@@ -1061,9 +1061,9 @@ export const PURCHASE_ORDER_STATUS_CONFIG: Record<
 
 export interface PurchaseOrder {
   id: string;
-  /** Numéro provisoire (PROV-BC-AAAA-NNN), porté dès la création. */
+  /** Numéro provisoire (PROV-BDC-AAAA-NNN), porté dès la création. */
   provisional_reference: string;
-  /** Numéro définitif (XXX-BC-NNN), attribué à la génération du document. */
+  /** Numéro définitif (XXX-BDC-NNN), attribué à la génération du document. */
   reference: string | null;
   /** Numéro à afficher : définitif s'il existe, provisoire sinon. */
   display_reference: string;

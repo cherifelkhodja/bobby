@@ -744,8 +744,8 @@ s'accorder.
   "data": {
     "type": "purchase",
     "attributes": {
-      "title": "GEM-BC-001 - Développeur Python",
-      "reference": "GEM-BC-001",
+      "title": "GEM-BDC-001 - Développeur Python",
+      "reference": "GEM-BDC-001",
       "date": "2026-09-01",
       "startDate": "2026-09-01",
       "endDate": "2027-02-28",

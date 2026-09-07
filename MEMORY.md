@@ -233,6 +233,14 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-09-07 (feat: les références des bons de commande passent de « BC » à « BDC »)
+
+`PROV-BC-AAAA-NNN` devient `PROV-BDC-AAAA-NNN`, `XXX-BC-NNN` devient `XXX-BDC-NNN` — le sigle que porte l'objet partout ailleurs dans Bobby.
+
+- **Migration 084** : les numéros existants, provisoires et définitifs, sont renommés. Le rang ne bouge pas, et la séquence de chaque société émettrice reste continue puisque le préfixe interrogé pour attribuer le suivant (`get_next_reference`, `get_next_provisional_reference`) change avec eux.
+- **Non réécrits** : les clés S3 déjà posées (`purchase-orders/GEM-BC-001/…`, toujours valides puisque stockées entières), les titres d'achat déjà créés dans Boond et les PDF déjà générés gardent l'ancien sigle. Un document régénéré portera le nouveau.
+- Colonnes `String(20)` : `PROV-BDC-2026-001` tient en 17 caractères.
+
 ### 2026-09-07 (fix: le bon de commande reprend le délai de paiement du cadre, unités insécables)
 
 Deux retouches du document, relevées sur un bon de commande Leonum.

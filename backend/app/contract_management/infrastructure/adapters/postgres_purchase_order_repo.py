@@ -171,13 +171,13 @@ class PurchaseOrderRepository:
         return query
 
     async def get_next_provisional_reference(self) -> str:
-        """Generate the next provisional reference, format PROV-BC-YYYY-NNN.
+        """Generate the next provisional reference, format PROV-BDC-YYYY-NNN.
 
         Portée par le bon de commande tant qu'il n'est pas validé : un brouillon
         abandonné ne consomme ainsi aucun numéro de la séquence définitive, que
         le contrat cadre exige continue.
         """
-        prefix = f"PROV-BC-{datetime.utcnow().year}-"
+        prefix = f"PROV-BDC-{datetime.utcnow().year}-"
 
         # Sérialise l'allocation pour cette famille de préfixe (anti-race
         # condition). Le verrou tient jusqu'au commit, couvrant l'insert.
@@ -194,7 +194,7 @@ class PurchaseOrderRepository:
         return f"{prefix}{_next_reference_number(result.scalars().all()):03d}"
 
     async def get_next_reference(self, company_code: str | None = None) -> str:
-        """Generate the next purchase order reference, format XXX-BC-NNN.
+        """Generate the next purchase order reference, format XXX-BDC-NNN.
 
         La séquence est propre à chaque société émettrice, comme celle des
         contrats cadres (XXX-CC-NNN). Sans code fourni, celui de la société par
@@ -213,7 +213,7 @@ class PurchaseOrderRepository:
         else:
             code = company_code.upper()
 
-        prefix = f"{code}-BC-"
+        prefix = f"{code}-BDC-"
 
         # Sérialise l'allocation pour cette famille de préfixe (anti-race
         # condition). Le verrou tient jusqu'au commit, couvrant l'insert.

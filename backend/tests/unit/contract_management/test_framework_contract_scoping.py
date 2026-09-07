@@ -93,7 +93,7 @@ class TestFrameworkCoversThePurchaseOrder:
     """Garde-fou d'envoi en signature : le cadre doit couvrir la mission."""
 
     def _po(self, company_id) -> PurchaseOrder:
-        return PurchaseOrder(provisional_reference="PROV-BC-2026-001", company_id=company_id)
+        return PurchaseOrder(provisional_reference="PROV-BDC-2026-001", company_id=company_id)
 
     def test_a_signed_framework_of_the_same_company_covers(self):
         assert self._po(GEMINI).is_covered_by(_framework(GEMINI, "GEM-CC-003"))
