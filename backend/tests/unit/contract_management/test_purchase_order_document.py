@@ -131,6 +131,10 @@ def _make_use_case(  # noqa: PLR0913
     cr_repo = AsyncMock()
     cr_repo.get_by_id = AsyncMock(return_value=framework)
     cr_repo.get_company_code = AsyncMock(return_value=company_code)
+    # Rattachement d'un cadre signé après la dernière modification : par
+    # défaut le même cadre que celui chargé par identifiant.
+    cr_repo.get_framework_contract_for_third_party = AsyncMock(return_value=framework)
+    cr_repo.list_by_third_party = AsyncMock(return_value=[])
 
     tp_repo = AsyncMock()
     tp_repo.get_by_id = AsyncMock(return_value=third_party)
@@ -222,6 +226,26 @@ class TestContext:
         assert context["consultant_name"] == "Camille Norel"
         assert context["start_date"] == "01/09/2026"
         assert context["end_date"] == "28/02/2027"
+
+    def test_the_payment_delay_speaks_the_contract_vocabulary(self):
+        """Le délai s'imprime avec les mots du contrat cadre, comptant compris."""
+
+        def label(value):
+            framework = _framework()
+            framework.contract_config = {"payment_terms": value}
+            use_case, _ = _make_use_case(_purchase_order(), framework=framework)
+            context = use_case._build_context(
+                _purchase_order(), _third_party(), framework, _company()
+            )
+            return context["payment_terms_label"]
+
+        assert label("immediate") == "comptant"
+        assert label("net_30") == "à 30 jours nets"
+        assert label("net_45") == "à 45 jours nets"
+        assert label("end_of_month_45") == "à 45 jours fin de mois"
+        assert label("net_45_eom") == "à 45 jours fin de mois"
+        # Une valeur inconnue s'imprime telle quelle, comme sur le contrat.
+        assert label("net_90") == "net_90"
 
     def test_leonum_does_not_countersign(self):
         """Leonum n'appose pas de signature sur ses bons de commande."""
@@ -361,6 +385,35 @@ class TestTemplateRendering:
         # inventer un.
         assert context["payment_terms_label"] == ""
 
+    def test_the_payment_delay_is_written_in_the_invoicing_terms(self):
+        """Page 2 : le délai du cadre est inscrit, pas seulement rappelé en entête."""
+        html = self._html()
+
+        assert "Délai de paiement" in html
+        assert "réglées <b>à 45 jours fin de mois</b>, délai fixé par le contrat cadre" in html
+        assert '<b class="ref">GEM-CC-007</b>' in html
+        assert "Paiement à 45 jours fin de mois" in html
+
+    def test_without_a_configured_delay_the_document_defers_to_the_framework(self):
+        framework = _framework()
+        framework.contract_config = {}
+        use_case, _ = _make_use_case(_purchase_order(), framework=framework)
+        context = use_case._build_context(_purchase_order(), _third_party(), framework, _company())
+        apply_brand_theme(context)
+        html = build_environment().get_template(TEMPLATE_NAME).render(**context)
+
+        assert "réglées dans le délai fixé par le contrat cadre" in html
+        assert "Selon contrat cadre" in html
+
+    def test_numbers_never_part_from_their_unit(self):
+        """« 20 % » et « 9 000 € » tiennent sur une ligne, colonne étroite ou non."""
+        html = self._html()
+
+        assert '<td class="r">500&nbsp;€</td>' in html
+        assert '<td class="r">20&nbsp;%</td>' in html
+        assert '<td class="v">9 000&nbsp;€</td>' in html
+        assert "TVA (20&nbsp;%)" in html
+
     def test_the_mission_description_stays_internal(self):
         """La description de mission ne s'imprime pas sur le bon de commande."""
         html = self._html()
@@ -372,10 +425,10 @@ class TestTemplateRendering:
         html = self._html()
 
         # 18 j facturables x 500 € = 9 000 € HT, 1 800 € de TVA, 10 800 € TTC.
-        assert "9 000 €" in html
-        assert "TVA (20 %)" in html
-        assert "1 800 €" in html
-        assert "10 800 €" in html
+        assert "9 000&nbsp;€" in html
+        assert "TVA (20&nbsp;%)" in html
+        assert "1 800&nbsp;€" in html
+        assert "10 800&nbsp;€" in html
 
 
 class TestGeneration:
@@ -406,6 +459,20 @@ class TestGeneration:
         assert result.s3_key_draft == "purchase-orders/GEM-BC-001/bon_de_commande_v1.pdf"
 
     @pytest.mark.asyncio
+    async def test_a_framework_signed_after_the_last_edit_is_still_quoted(self, monkeypatch):
+        """Le cadre signé entre-temps est rattaché à la génération, conditions comprises."""
+        _stub_pdf(monkeypatch)
+        framework = _framework()
+        po = _purchase_order(contract_request_id=None)
+        use_case, _ = _make_use_case(po, third_party=_third_party(), framework=framework)
+
+        saved = await use_case.execute(po.id)
+
+        assert saved.contract_request_id == framework.id
+        use_case._cr_repo.get_framework_contract_for_third_party.assert_awaited_once_with(
+            po.third_party_id, po.company_id
+        )
+
     async def test_regeneration_writes_a_new_version(self):
         pytest.importorskip("weasyprint", reason="WeasyPrint absent de cet environnement")
         po = _purchase_order()

@@ -6,6 +6,9 @@ from uuid import UUID
 
 import structlog
 
+from app.contract_management.application.purchase_order_framework import (
+    attach_framework_contract,
+)
 from app.contract_management.domain.entities.purchase_order import PurchaseOrder
 from app.contract_management.domain.exceptions import (
     InvalidPurchaseOrderStatusError,
@@ -15,6 +18,7 @@ from app.contract_management.domain.exceptions import (
 from app.contract_management.domain.value_objects.contract_request_status import (
     ContractRequestStatus,
 )
+from app.contract_management.domain.value_objects.payment_terms import PaymentTerms
 from app.contract_management.domain.value_objects.purchase_order_status import (
     PurchaseOrderStatus,
 )
@@ -26,13 +30,26 @@ TEMPLATE_NAME = "bon_de_commande.html"
 # Taux de TVA appliqué aux prestations de services intérieures.
 VAT_RATE = Decimal("20")
 
-# Libellés des conditions de paiement, repris du contrat cadre quand il en
-# porte une : le bon de commande n'invente pas ses propres délais.
-PAYMENT_TERMS_LABELS = {
-    "immediate": "comptant",
-    "net_30": "à 30 jours",
-    "net_45_eom": "à 45 jours fin de mois",
-}
+
+def payment_terms_label(value: str | None) -> str:
+    """Délai de paiement du contrat cadre, en toutes lettres.
+
+    Le bon de commande n'invente pas ses propres délais : il reprend celui que
+    le fournisseur a accepté en signant le cadre, avec le vocabulaire du
+    contrat (`PaymentTerms.display_text`), précédé de « à » pour se lire après
+    « Paiement ». Le comptant, que le contrat ne connaît pas, est nommé ; une
+    valeur inconnue s'imprime telle quelle plutôt que de disparaître — c'est
+    ce que fait le contrat.
+    """
+    if not value:
+        return ""
+    if value == "immediate":
+        return "comptant"
+    try:
+        return f"à {PaymentTerms(value).display_text}"
+    except ValueError:
+        return value
+
 
 # Sociétés émettrices qui ne contresignent pas leurs bons de commande : le
 # document n'attend alors que la signature du fournisseur. Reconnues par un
@@ -108,6 +125,12 @@ class GeneratePurchaseOrderDocumentUseCase:
         third_party = (
             await self._tp_repo.get_by_id(po.third_party_id) if po.third_party_id else None
         )
+        # Le cadre a pu être signé après la dernière modification de la
+        # mission : le document doit tout de même en reprendre les conditions
+        # — délai de paiement, canal de facturation. Le rattachement est
+        # persisté avec le reste, comme le fait la mise à jour.
+        if po.contract_request_id is None and po.third_party_id is not None:
+            await attach_framework_contract(po, self._cr_repo)
         framework = (
             await self._cr_repo.get_by_id(po.contract_request_id)
             if po.contract_request_id
@@ -198,7 +221,7 @@ class GeneratePurchaseOrderDocumentUseCase:
             "vat_rate": _fmt_quantity(VAT_RATE),
             "vat_amount": _fmt_amount(vat_amount),
             "total_amount_ttc": _fmt_amount(po.total_amount + vat_amount),
-            "payment_terms_label": PAYMENT_TERMS_LABELS.get(payment_terms or "", ""),
+            "payment_terms_label": payment_terms_label(payment_terms),
             "invoice_submission_method": invoice_method,
             "invoice_address": invoice_address,
             # Interlocuteurs

@@ -233,6 +233,16 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-09-07 (fix: le bon de commande reprend le délai de paiement du cadre, unités insécables)
+
+Deux retouches du document, relevées sur un bon de commande Leonum.
+
+- **Délai de paiement du contrat cadre** : le bon de commande le reprenait déjà dans son bandeau, mais par une table de trois libellés (`immediate`, `net_30`, `net_45_eom`) — toute autre valeur portée par le cadre (`net_45`, `end_of_month_45`, …) retombait sur « Selon contrat cadre ». `payment_terms_label()` parle désormais la langue du contrat (`PaymentTerms.display_text`, précédé de « à »), nomme le comptant, et imprime telle quelle une valeur inconnue, comme le contrat. Le délai est en outre **inscrit en page 2**, nouvel article 4 « Délai de paiement » des conditions de facturation (« Les factures conformes sont réglées à 45 jours fin de mois, délai fixé par le contrat cadre GEM-CC-007 ») ; sans cadre configuré, l'article renvoie au cadre sans inventer de délai. Les articles suivants sont renumérotés (5 rejet et suspension, 6 pénalités).
+- **Cadre signé après la dernière modification** : la génération ne trouvait le cadre que par `contract_request_id`, posé à la mise à jour du bon — un cadre signé entre-temps restait ignoré, conditions comprises. La règle de rattachement (`_attach_framework_contract`) sort de `UpdatePurchaseOrderUseCase` vers `application/purchase_order_framework.py`, et la génération l'applique quand le bon a un fournisseur mais pas de cadre ; le rattachement est persisté avec le document.
+- **« 20 % » et « 99 975 € » sur une ligne** : la colonne TVA et la colonne Total HT coupaient entre le nombre et son unité. Espaces insécables dans le tableau et les totaux, `white-space: nowrap` sur les cellules numériques, et la référence du cadre ne se coupe plus à son tiret.
+
+492 tests `contract_management` verts, rendu WeasyPrint vérifié (tableau, page 2).
+
 ### 2026-09-07 (feat: Leonum ne contresigne pas ses bons de commande)
 
 Le bon de commande émis par Leonum ne porte plus la carte « Pour LEONUM » : seule la signature du fournisseur est attendue.

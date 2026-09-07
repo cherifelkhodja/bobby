@@ -110,6 +110,11 @@
   }
   .tbl th:first-child, .tbl td:first-child { padding-left: 0; }
   .tbl th.r, .tbl td.r { text-align: right; }
+  /* Un nombre et son unité (« 20 % », « 99 975 € ») tiennent sur une ligne :
+     la colonne s'élargit plutôt que de couper. */
+  .tbl td.r, .po-tot .v, .po-tot .l { white-space: nowrap; }
+  /* Une référence (« GEM-CC-007 ») ne se coupe pas à son tiret. */
+  .ref { white-space: nowrap; }
   .tbl td { border-bottom: 1px solid #e5e3df; padding: 9px 10px; color: #33322f; vertical-align: top; }
   .tbl .desc { font-family: 'Space Grotesk', sans-serif; font-weight: 600; color: #201f1e; }
   .tbl .sub { font-family: 'Hanken Grotesk', sans-serif; font-weight: 400; font-size: 11px; color: #6b6a66; line-height: 1.5; }
@@ -242,10 +247,10 @@
           {%- if mission_place %}Lieu d'exécution : {{ mission_place }}{% endif -%}
         </div>
       </td>
-      <td class="r">{{ billable_days }} j</td>
-      <td class="r">{{ purchase_daily_rate }} €</td>
-      <td class="r">{% if vat_liable %}{{ vat_rate }} %{% else %}—{% endif %}</td>
-      <td class="r">{{ total_amount }} €</td>
+      <td class="r">{{ billable_days }}&nbsp;j</td>
+      <td class="r">{{ purchase_daily_rate }}&nbsp;€</td>
+      <td class="r">{% if vat_liable %}{{ vat_rate }}&nbsp;%{% else %}—{% endif %}</td>
+      <td class="r">{{ total_amount }}&nbsp;€</td>
     </tr>
     {% if free_days and free_days != '0' %}
     <tr>
@@ -253,23 +258,23 @@
         <div class="desc">Jours de gratuité</div>
         <div class="sub">Accordés à titre gracieux, non facturés</div>
       </td>
-      <td class="r">{{ free_days }} j</td>
+      <td class="r">{{ free_days }}&nbsp;j</td>
       <td class="r">—</td>
       <td class="r">—</td>
-      <td class="r">0 €</td>
+      <td class="r">0&nbsp;€</td>
     </tr>
     {% endif %}
   </tbody>
 </table>
 <table class="po-tot">
-  <tr class="ht"><td class="l">Total HT</td><td class="v">{{ total_amount }} €</td></tr>
+  <tr class="ht"><td class="l">Total HT</td><td class="v">{{ total_amount }}&nbsp;€</td></tr>
   {% if vat_liable %}
-  <tr><td class="l">TVA ({{ vat_rate }} %)</td><td class="v">{{ vat_amount }} €</td></tr>
-  <tr class="ttc"><td class="l">Total TTC</td><td class="v">{{ total_amount_ttc }} €</td></tr>
+  <tr><td class="l">TVA ({{ vat_rate }}&nbsp;%)</td><td class="v">{{ vat_amount }}&nbsp;€</td></tr>
+  <tr class="ttc"><td class="l">Total TTC</td><td class="v">{{ total_amount_ttc }}&nbsp;€</td></tr>
   {% else %}
   {# Fournisseur non assujetti : pas de TVA à facturer, donc pas de TTC. #}
   <tr><td class="l">TVA</td><td class="v na">non applicable</td></tr>
-  <tr class="ttc"><td class="l">Total à régler</td><td class="v">{{ total_amount }} €</td></tr>
+  <tr class="ttc"><td class="l">Total à régler</td><td class="v">{{ total_amount }}&nbsp;€</td></tr>
   {% endif %}
 </table>
 {% if not vat_liable %}
@@ -302,7 +307,7 @@
   <div class="sigblock-hd">{% if issuer_signs %}Signatures{% else %}Signature{% endif %}</div>
   <p class="sig-lead">
     Bon de commande émis en application du contrat cadre de sous-traitance
-    {%- if framework_reference %} <b>{{ framework_reference }}</b>{% endif %}
+    {%- if framework_reference %} <b class="ref">{{ framework_reference }}</b>{% endif %}
     {%- if framework_signed_date %}, signé le <b>{{ framework_signed_date }}</b>{% endif %}.
     Document signé électroniquement via Yousign ; l'horodatage de la plateforme
     vaut acceptation et fait foi de la date.
@@ -364,11 +369,16 @@
 <table class="sec"><tr><td class="n">3</td><td class="t">Date de facture</td></tr></table>
 <p class="p">La facture doit impérativement être datée au dernier jour du mois correspondant à la période de facturation (exemple : période de janvier 2026 → date de facture 31/01/2026). Les factures établies à une autre date seront rejetées.</p>
 
-<table class="sec"><tr><td class="n">4</td><td class="t">Rejet et suspension du délai de paiement</td></tr></table>
+{# Délai de paiement : celui du contrat cadre, jamais un délai propre au bon
+   de commande. Sans cadre configuré, le document y renvoie sans en inventer. #}
+<table class="sec"><tr><td class="n">4</td><td class="t">Délai de paiement</td></tr></table>
+<p class="p">Les factures conformes sont réglées {% if payment_terms_label %}<b>{{ payment_terms_label }}</b>, délai fixé par{% else %}dans le délai fixé par{% endif %} le contrat cadre de sous-traitance{% if framework_reference %} <b class="ref">{{ framework_reference }}</b>{% endif %}.</p>
+
+<table class="sec"><tr><td class="n">5</td><td class="t">Rejet et suspension du délai de paiement</td></tr></table>
 <p class="p">Toute facture non conforme pourra être rejetée sans préavis et suspendra automatiquement le délai de paiement. Un nouveau délai contractuel de paiement commencera à courir uniquement à compter de la réception d'une facture rectifiée et conforme.</p>
 
-<table class="sec"><tr><td class="n">5</td><td class="t">Pénalités et indemnité forfaitaire</td></tr></table>
-<p class="p">Conformément aux articles L.441-10 et D.441-5 du Code de commerce, des pénalités de retard sont exigibles de plein droit en cas de paiement tardif, et une indemnité forfaitaire de 40 € pour frais de recouvrement est due de plein droit.</p>
+<table class="sec"><tr><td class="n">6</td><td class="t">Pénalités et indemnité forfaitaire</td></tr></table>
+<p class="p">Conformément aux articles L.441-10 et D.441-5 du Code de commerce, des pénalités de retard sont exigibles de plein droit en cas de paiement tardif, et une indemnité forfaitaire de 40&nbsp;€ pour frais de recouvrement est due de plein droit.</p>
 
 {# Canal de facturation : celui du contrat cadre, pas une règle propre au bon
    de commande. #}
