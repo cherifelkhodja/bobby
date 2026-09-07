@@ -233,6 +233,16 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-09-07 (feat: Leonum ne contresigne pas ses bons de commande)
+
+Le bon de commande émis par Leonum ne porte plus la carte « Pour LEONUM » : seule la signature du fournisseur est attendue.
+
+- **Règle** : `ISSUERS_WITHOUT_SIGNATURE` dans `generate_purchase_order_document.py`, reconnaissance par fragment du nom de la société émettrice, comme la charte graphique (`BRAND_THEMES`). Le gabarit reçoit `issuer_signs` ; sans société connue, ou si le contexte ne se prononce pas, le document reste bilatéral.
+- **Gabarit** `bon_de_commande.html` : quand `issuer_signs` est faux, l'en-tête passe au singulier (« Signature »), la carte du fournisseur reste seule à gauche sur sa demi-largeur (cellule vide à droite pour qu'elle ne s'étire pas), et la mention Yousign demeure — le fournisseur signe toujours électroniquement.
+- **Périmètre** : le document seulement. Le circuit applicatif (envoi en signature, dépôt du document signé, report Boond) ne change pas ; les autres sociétés gardent leurs deux cartes.
+- **Tests** : la garde d'alignement des deux zones de signature passe sur Craftmania ; Leonum a sa propre garde (une seule zone, rendu WeasyPrint réel) et ses tests de contexte et de rendu HTML.
+
+470 tests `contract_management` verts.
 ### 2026-09-07 (feat: onglet « Annulés » dans la liste des bons de commande)
 
 Sortis de la liste le matin même, les BDC annulés retrouvent une place, à part : un cinquième onglet « Annulés » sur `/contracts/bdc`.

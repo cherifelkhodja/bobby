@@ -44,9 +44,9 @@ def _signature_zones(template_name: str, context: dict) -> list[tuple[float, flo
 class TestPurchaseOrder:
     """Bon de commande."""
 
-    def test_both_signature_zones_start_at_the_same_height(self):
+    @staticmethod
+    def _context(company):
         from tests.unit.contract_management.test_purchase_order_document import (
-            _company,
             _framework,
             _make_use_case,
             _purchase_order,
@@ -55,13 +55,25 @@ class TestPurchaseOrder:
 
         purchase_order = _purchase_order()
         use_case, _ = _make_use_case(purchase_order)
-        context = use_case._build_context(purchase_order, _third_party(), _framework(), _company())
+        return use_case._build_context(purchase_order, _third_party(), _framework(), company)
 
-        zones = _signature_zones("bon_de_commande.html", context)
+    def test_both_signature_zones_start_at_the_same_height(self):
+        from tests.unit.contract_management.test_purchase_order_document import _company
+
+        # Une société qui contresigne — Leonum, elle, ne signe pas ses bons.
+        zones = _signature_zones("bon_de_commande.html", self._context(_company(name="CRAFTMANIA")))
 
         assert len(zones) == 2
         assert zones[0][1] == zones[1][1]
         assert zones[0][0] != zones[1][0]
+
+    def test_leonum_keeps_a_single_signature_zone(self):
+        """Leonum ne contresigne pas : une seule zone, celle du fournisseur."""
+        from tests.unit.contract_management.test_purchase_order_document import _company
+
+        zones = _signature_zones("bon_de_commande.html", self._context(_company()))
+
+        assert len(zones) == 1
 
 
 class TestContract:

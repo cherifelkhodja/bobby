@@ -6,6 +6,10 @@
   signatures), puis les conditions de facturation et de paiement, qui tiennent
   leur propre page pour rester lisibles et opposables.
 
+  Signatures : le document est bilatéral, sauf pour les sociétés qui ne
+  contresignent pas leurs bons de commande (`issuer_signs` faux — Leonum) ;
+  seule la carte du fournisseur est alors rendue.
+
   Contrainte tenue par ce gabarit : **seul le CJM d'achat figure ici**. Le TJM
   de vente au client est une donnée interne et ne doit jamais être injectée
   dans ce contexte.
@@ -289,8 +293,13 @@
 {% endif %}
 
 <!-- ===== SIGNATURES ===== -->
+{# Un contexte qui ne se prononce pas garde le document bilatéral. Quand
+   l'émetteur ne contresigne pas (Leonum), sa carte disparaît : celle du
+   fournisseur reste seule, à gauche, sur sa demi-largeur — la cellule vide
+   à droite l'empêche de s'étirer. #}
+{% set issuer_signs = issuer_signs if issuer_signs is defined else true %}
 <div class="sigblock">
-  <div class="sigblock-hd">Signatures</div>
+  <div class="sigblock-hd">{% if issuer_signs %}Signatures{% else %}Signature{% endif %}</div>
   <p class="sig-lead">
     Bon de commande émis en application du contrat cadre de sous-traitance
     {%- if framework_reference %} <b>{{ framework_reference }}</b>{% endif %}
@@ -300,6 +309,7 @@
   </p>
   <table class="sigrow" style="width: 100%">
     <tr>
+      {% if issuer_signs %}
       <td class="sigcard hd">
         <div class="sigcard-role">Pour {{ issuer_company_name | upper }}</div>
         <div class="sigcard-id"><table>
@@ -314,6 +324,7 @@
           <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ issuer_representative_sub_quality | default(issuer_representative_quality, true) }}</b></td></tr>
         </table></div>
       </td>
+      {% endif %}
       <td class="sigcard hd">
         <div class="sigcard-role">Pour le Fournisseur</div>
         <div class="sigcard-id"><table>
@@ -322,16 +333,20 @@
           <tr class="sl"><td class="k">Fonction</td><td class="v"><b>{{ partner_representative_title }}</b></td></tr>
         </table></div>
       </td>
+      {% if not issuer_signs %}<td></td>{% endif %}
     </tr>
     <tr>
+      {% if issuer_signs %}
       <td class="sigcard ft">
         <div class="sigzone"></div>
         <div class="sigmeta">Le <span class="fillin"></span></div>
       </td>
+      {% endif %}
       <td class="sigcard ft">
         <div class="sigzone"></div>
         <div class="sigmeta">Le <span class="fillin"></span></div>
       </td>
+      {% if not issuer_signs %}<td></td>{% endif %}
     </tr>
   </table>
 </div>

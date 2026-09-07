@@ -59,9 +59,10 @@ def _purchase_order(**overrides) -> PurchaseOrder:
     return PurchaseOrder(**defaults)
 
 
-def _company():
+def _company(name: str = "LEONUM"):
+    """Société émettrice. Leonum par défaut — celle qui ne contresigne pas."""
     return SimpleNamespace(
-        name="LEONUM",
+        name=name,
         legal_form="SAS",
         capital="10000",
         head_office="54 avenue Hoche, 75008 Paris",
@@ -154,11 +155,11 @@ def _stub_pdf(monkeypatch) -> None:
     monkeypatch.setattr(pdf_rendering, "render_pdf", lambda *args, **kwargs: b"%PDF-stub")
 
 
-def _context(po=None) -> dict:
+def _context(po=None, company=None) -> dict:
     """Contexte de gabarit produit par le use case, sans dépendance externe."""
     po = po or _purchase_order()
     use_case, _ = _make_use_case(po)
-    return use_case._build_context(po, _third_party(), _framework(), _company())
+    return use_case._build_context(po, _third_party(), _framework(), company or _company())
 
 
 class TestContext:
@@ -222,12 +223,29 @@ class TestContext:
         assert context["start_date"] == "01/09/2026"
         assert context["end_date"] == "28/02/2027"
 
+    def test_leonum_does_not_countersign(self):
+        """Leonum n'appose pas de signature sur ses bons de commande."""
+        assert _context()["issuer_signs"] is False
+        assert _context(company=_company(name="Leonum SAS"))["issuer_signs"] is False
+
+    def test_any_other_issuer_countersigns(self):
+        assert _context(company=_company(name="CRAFTMANIA"))["issuer_signs"] is True
+        assert _context(company=_company(name="Wohm"))["issuer_signs"] is True
+
+    def test_without_a_known_issuer_the_document_stays_bilateral(self):
+        po = _purchase_order()
+        use_case, _ = _make_use_case(po)
+
+        context = use_case._build_context(po, _third_party(), _framework(), None)
+
+        assert context["issuer_signs"] is True
+
 
 class TestTemplateRendering:
     """Rendu du gabarit, sans dépendre de WeasyPrint."""
 
-    def _html(self, po=None) -> str:
-        context = _context(po)
+    def _html(self, po=None, company=None) -> str:
+        context = _context(po, company)
         apply_brand_theme(context)
         return build_environment().get_template(TEMPLATE_NAME).render(**context)
 
@@ -252,9 +270,10 @@ class TestTemplateRendering:
 
     def test_both_parties_have_a_signature_card(self):
         """Chaque carte nomme sa société, son représentant et sa fonction."""
-        html = self._html()
+        html = self._html(company=_company(name="CRAFTMANIA"))
 
-        assert "Pour LEONUM" in html
+        assert "Signatures" in html
+        assert "Pour CRAFTMANIA" in html
         assert "Pour le Fournisseur" in html
         assert "AKEMA TECH" in html
         # Présidence tenue par une personne morale : la chaîne doit apparaître.
@@ -262,6 +281,22 @@ class TestTemplateRendering:
         assert "Karim BENALI" in html
         # Signature électronique : mention Yousign obligatoire (document bilatéral).
         assert "Yousign" in html
+        assert html.count('<div class="sigzone">') == 2
+
+    def test_leonum_leaves_only_the_supplier_signature(self):
+        """Leonum ne contresigne pas : sa carte disparaît, celle du fournisseur reste."""
+        html = self._html()
+
+        assert "Pour LEONUM" not in html
+        assert "SC HOLDING" not in html
+        assert "Signatures" not in html
+        assert "Pour le Fournisseur" in html
+        assert "Karim BENALI" in html
+        assert html.count('<div class="sigzone">') == 1
+        # Le fournisseur signe toujours électroniquement.
+        assert "Yousign" in html
+        # L'émetteur reste nommé ailleurs : parties, pied de page.
+        assert "LEONUM" in html
 
     def test_the_second_page_carries_the_invoicing_terms(self):
         """Les conditions de facturation tiennent leur propre page."""

@@ -34,6 +34,20 @@ PAYMENT_TERMS_LABELS = {
     "net_45_eom": "à 45 jours fin de mois",
 }
 
+# Sociétés émettrices qui ne contresignent pas leurs bons de commande : le
+# document n'attend alors que la signature du fournisseur. Reconnues par un
+# fragment de leur nom, comme la charte graphique (`BRAND_THEMES`).
+ISSUERS_WITHOUT_SIGNATURE: tuple[str, ...] = ("leonum",)
+
+
+def issuer_signs_purchase_orders(company) -> bool:
+    """Le bon de commande porte-t-il une carte de signature pour l'émetteur ?
+
+    Sans société connue, le document reste bilatéral.
+    """
+    name = (getattr(company, "name", None) or "").lower()
+    return not any(fragment in name for fragment in ISSUERS_WITHOUT_SIGNATURE)
+
 
 class GeneratePurchaseOrderDocumentUseCase:
     """Génère le PDF du bon de commande et le dépose sur S3.
@@ -189,6 +203,8 @@ class GeneratePurchaseOrderDocumentUseCase:
             "invoice_address": invoice_address,
             # Interlocuteurs
             "commercial_email": po.commercial_email or "",
+            # Signatures : Leonum ne contresigne pas, seul le fournisseur signe.
+            "issuer_signs": issuer_signs_purchase_orders(company),
         }
 
         if company:
