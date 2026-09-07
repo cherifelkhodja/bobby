@@ -89,6 +89,7 @@ class PurchaseOrderRepository:
         company_id: UUID | None = None,
         contract_request_id: UUID | None = None,
         search: str | None = None,
+        exclude_cancelled: bool = False,
     ) -> list[PurchaseOrder]:
         """List purchase orders with optional filters."""
         query = self._filtered_query(
@@ -98,6 +99,7 @@ class PurchaseOrderRepository:
             company_id,
             contract_request_id,
             search,
+            exclude_cancelled,
         )
         query = query.order_by(PurchaseOrderModel.created_at.desc()).offset(skip).limit(limit)
         result = await self.session.execute(query)
@@ -110,6 +112,7 @@ class PurchaseOrderRepository:
         company_id: UUID | None = None,
         contract_request_id: UUID | None = None,
         search: str | None = None,
+        exclude_cancelled: bool = False,
     ) -> int:
         """Count purchase orders matching the same filters as `list_all`."""
         query = self._filtered_query(
@@ -119,6 +122,7 @@ class PurchaseOrderRepository:
             company_id,
             contract_request_id,
             search,
+            exclude_cancelled,
         )
         result = await self.session.execute(query)
         return result.scalar_one()
@@ -131,15 +135,21 @@ class PurchaseOrderRepository:
         company_id: UUID | None,
         contract_request_id: UUID | None,
         search: str | None,
+        exclude_cancelled: bool = False,
     ):
         """Apply the shared filters of `list_all` and `count`.
 
         `company_id` isole les missions d'une société émettrice : un fournisseur
         travaillant avec plusieurs sociétés du groupe a des missions distinctes
         pour chacune, qui ne doivent pas se mélanger.
+
+        `exclude_cancelled` ne garde que les bons de commande vivants : un BDC
+        annulé ne représente aucune mission et n'a rien à faire dans la liste.
         """
         if status:
             query = query.where(PurchaseOrderModel.status == status.value)
+        if exclude_cancelled:
+            query = query.where(PurchaseOrderModel.status.in_(_LIVE_STATUSES))
         if third_party_id:
             query = query.where(PurchaseOrderModel.third_party_id == third_party_id)
         if company_id:

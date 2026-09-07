@@ -65,7 +65,7 @@ export function Sidebar() {
 
   const { data: purchaseOrdersData } = useQuery({
     queryKey: ['purchase-orders', 'nav-count'],
-    queryFn: () => purchaseOrdersApi.list({ limit: 1 }),
+    queryFn: () => purchaseOrdersApi.list({ limit: 1, exclude_cancelled: true }),
     enabled: canAccessContracts,
   });
 

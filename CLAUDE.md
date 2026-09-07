@@ -495,7 +495,7 @@ nouveau → en_cours → entretien → accepté
 - `POST /{id}/rollback` - Rollback contract request status (ADV/admin)
 
 ### Purchase Orders — Bons de commande (`/api/v1/purchase-orders`)
-- `GET /` - List purchase orders (filters: status, third_party_id, company_id, contract_request_id, search)
+- `GET /` - List purchase orders (filters: status, third_party_id, company_id, contract_request_id, search, exclude_cancelled — the list page and the sidebar count use it)
 - `GET /suppliers?company_id=` - Panel suppliers: those under framework contract (signed or in progress) with the issuing company, labelled by that contract's reference
 - `POST /` - Create from a Boond positioning (ADV/admin)
 - `GET /{id}` - Get purchase order detail

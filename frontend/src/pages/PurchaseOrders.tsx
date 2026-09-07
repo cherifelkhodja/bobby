@@ -53,7 +53,8 @@ export function PurchaseOrders() {
   const pageSize = 20;
   // Le regroupement par onglet couvre plusieurs statuts, que l'API ne filtre
   // qu'un par un : le tri et la pagination se font côté client sur la liste
-  // complète, chargée en une fois (plafonnée à FETCH_LIMIT).
+  // complète, chargée en une fois (plafonnée à FETCH_LIMIT). Les bons de
+  // commande annulés n'en font pas partie : ils ne représentent aucune mission.
   const FETCH_LIMIT = 500;
 
   const { data: companies = [] } = useQuery({
@@ -68,6 +69,7 @@ export function PurchaseOrders() {
       purchaseOrdersApi.list({
         skip: 0,
         limit: FETCH_LIMIT,
+        exclude_cancelled: true,
         ...(search ? { search } : {}),
         ...(companyFilter ? { company_id: companyFilter } : {}),
       }),
@@ -92,7 +94,7 @@ export function PurchaseOrders() {
     waiting: items.filter((po) => tabOf(po) === 'waiting').length,
     done: items.filter((po) => tabOf(po) === 'done').length,
   };
-  const toAttach = items.filter((po) => po.needs_third_party && po.status !== 'cancelled').length;
+  const toAttach = items.filter((po) => po.needs_third_party).length;
   const activeCount = items.filter((po) => po.status === 'active').length;
   const monthlyVolume = items
     .filter((po) => po.status === 'active')

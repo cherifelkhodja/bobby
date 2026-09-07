@@ -301,6 +301,7 @@ async def list_purchase_orders(  # noqa: PLR0913
     company_id: UUID | None = None,
     contract_request_id: UUID | None = None,
     search: str | None = None,
+    exclude_cancelled: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
     """Liste les bons de commande, filtrables par statut, fournisseur ou texte.
@@ -308,6 +309,9 @@ async def list_purchase_orders(  # noqa: PLR0913
     `company_id` et `contract_request_id` isolent les missions d'une société
     émettrice : un fournisseur travaillant avec plusieurs sociétés du groupe a
     des missions distinctes pour chacune, sous des contrats cadres différents.
+
+    `exclude_cancelled` retire les bons de commande annulés, du total compris :
+    la page de liste et son compteur de navigation ne les montrent plus.
     """
     _user_id, role, email = auth
     po_repo = PurchaseOrderRepository(db)
@@ -329,6 +333,7 @@ async def list_purchase_orders(  # noqa: PLR0913
         "company_id": company_id,
         "contract_request_id": contract_request_id,
         "search": search,
+        "exclude_cancelled": exclude_cancelled,
     }
     items = await po_repo.list_all(skip=skip, limit=limit, **filters)
     total = await po_repo.count(**filters)

@@ -66,6 +66,8 @@ export const purchaseOrdersApi = {
     company_id?: string;
     contract_request_id?: string;
     search?: string;
+    /** Retire les bons de commande annulés, du `total` compris. */
+    exclude_cancelled?: boolean;
   }): Promise<PurchaseOrderListResponse> => {
     const response = await apiClient.get<PurchaseOrderListResponse>('/purchase-orders', {
       params,

@@ -233,6 +233,16 @@ docker-compose up # Start all services
 
 > ⚠️ **OBLIGATOIRE** : Mettre à jour cette section après chaque modification significative.
 
+### 2026-09-07 (fix: les bons de commande annulés sortent de la liste)
+
+La page « Bons de commande » affichait les BDC annulés au milieu des missions vivantes, dans l'onglet « Actifs et clos » et dans le total « Tous ». Un BDC annulé ne représente aucune mission : il n'a rien à y faire, comme il ne comptait déjà pas dans le nombre de missions d'un contrat cadre.
+
+- **`GET /purchase-orders?exclude_cancelled=true`** : nouveau filtre, partagé par `list_all` et `count` du repository, qui ne garde que les statuts vivants (`_LIVE_STATUSES`). Le `total` le suit, pour que le compteur reste juste.
+- **La liste et le badge de navigation** le demandent tous deux : la page `/contracts/bdc` et le compteur « Bons de commande » de la barre latérale ne comptent plus les annulés, et s'accordent.
+- **Inchangé** : la carte « Bons de commande » d'un contrat cadre montre toujours l'historique complet, annulés compris, et un BDC annulé reste consultable par son URL.
+
+189 tests unitaires backend verts sur les bons de commande, ruff, type-check et lint frontend verts.
+
 ### 2026-09-07 (feat: rattacher le fournisseur à une société déjà présente dans Boond)
 
 Le report d'un contrat cadre créait toujours la société dans BoondManager. Or elle y existe parfois déjà — un fournisseur connu du CRM, ou saisi à la main par un commercial — et le report en laissait un doublon. La règle : quand la société existe, on **actualise avec un PUT** au lieu de créer, et c'est l'administrateur qui donne son identifiant.
